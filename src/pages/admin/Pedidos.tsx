@@ -9,7 +9,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SkeletonList } from "@/components/SkeletonCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatCentsToBRL } from "@/lib/packageUtils";
+import { formatPriceLabel } from "@/lib/packageUtils";
 import {
   approvePurchaseRequest,
   getPurchaseRequests,
@@ -71,7 +71,7 @@ export default function AdminPedidos() {
                   <div className="text-[15px] font-semibold text-foreground">{studentName}</div>
                   <div className="text-[12.5px] text-muted-foreground mt-0.5">
                     {template?.name}
-                    {template ? ` · ${formatCentsToBRL(template.priceCents)}` : ""}
+                    {template ? ` · ${formatPriceLabel(template.priceCents)}` : ""}
                   </div>
                 </div>
                 <Badge

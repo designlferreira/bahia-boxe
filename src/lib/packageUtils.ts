@@ -11,3 +11,8 @@ export function packageProgressPct(total: number, used: number) {
   if (total <= 0) return 0;
   return Math.min(100, Math.round((used / total) * 100));
 }
+
+/** Preço de um modelo de pacote. Zero é um pacote gratuito, não "R$ 0,00". */
+export function formatPriceLabel(cents: number) {
+  return cents === 0 ? "Grátis" : formatCentsToBRL(cents);
+}

@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getStatusConfig } from "@/lib/bookingStatus";
 import { formatDateTime } from "@/lib/dateUtils";
-import { formatCentsToBRL, packageProgressPct } from "@/lib/packageUtils";
+import { formatPriceLabel, packageProgressPct } from "@/lib/packageUtils";
 import {
   assignPackageFromTemplate,
   getAdminStudentDetail,
@@ -179,7 +179,7 @@ export default function AdminAlunoDetalhe() {
                   <div className="text-[15px] font-semibold text-foreground">{t.name}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">{t.description}</div>
                 </div>
-                <div className="text-accent font-semibold text-sm shrink-0">{formatCentsToBRL(t.priceCents)}</div>
+                <div className="text-accent font-semibold text-sm shrink-0">{formatPriceLabel(t.priceCents)}</div>
               </button>
             ))}
           </div>

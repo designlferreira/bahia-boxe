@@ -13,7 +13,7 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { formatCentsToBRL } from "@/lib/packageUtils";
+import { formatPriceLabel } from "@/lib/packageUtils";
 import {
   createPackageTemplate,
   deletePackageTemplate,
@@ -27,7 +27,6 @@ const empty = { name: "", description: "", totalClasses: 10, priceCents: null as
 function priceError(priceCents: number | null): string | null {
   if (priceCents === null) return "Informe o preço do pacote.";
   if (priceCents < 0) return "O preço não pode ser negativo.";
-  if (priceCents === 0) return "Informe um preço maior que zero.";
   return null;
 }
 
@@ -120,7 +119,7 @@ export default function AdminPacotes() {
               <div className="flex-1">
                 <div className="text-[15px] font-semibold text-foreground">{t.name}</div>
                 <div className="text-[12.5px] text-muted-foreground mt-0.5">{t.description}</div>
-                <div className="text-base text-accent font-semibold mt-1.5">{formatCentsToBRL(t.priceCents)}</div>
+                <div className="text-base text-accent font-semibold mt-1.5">{formatPriceLabel(t.priceCents)}</div>
               </div>
               <button
                 type="button"
@@ -198,10 +197,12 @@ export default function AdminPacotes() {
                 aria-describedby={priceTouched && priceValidation ? "price-error" : undefined}
                 onBlur={() => setPriceTouched(true)}
               />
-              {priceTouched && priceValidation && (
+              {priceTouched && priceValidation ? (
                 <div id="price-error" role="alert" className="text-[12.5px] text-destructive mt-1.5">
                   {priceValidation}
                 </div>
+              ) : (
+                <div className="text-[12.5px] text-muted-foreground mt-1.5">Use 0 para um pacote gratuito.</div>
               )}
             </div>
           </div>

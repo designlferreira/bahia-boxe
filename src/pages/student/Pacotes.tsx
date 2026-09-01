@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SkeletonList } from "@/components/SkeletonCard";
-import { formatCentsToBRL, packageProgressPct } from "@/lib/packageUtils";
+import { formatPriceLabel, packageProgressPct } from "@/lib/packageUtils";
 import { formatDateShort } from "@/lib/dateUtils";
 import { getPackageTemplates, getStudentAdminId, getStudentHome, requestPackage, requestSingleClass } from "@/integrations/backend/api";
 import type { PackageTemplate } from "@/integrations/backend/types";
@@ -77,7 +77,7 @@ export default function StudentPacotes() {
             <div className="flex-1">
               <div className="text-[15px] font-semibold text-foreground">{t.name}</div>
               <div className="text-[12.5px] text-muted-foreground mt-0.5">{t.description}</div>
-              <div className="text-base text-accent font-semibold mt-1.5">{formatCentsToBRL(t.priceCents)}</div>
+              <div className="text-base text-accent font-semibold mt-1.5">{formatPriceLabel(t.priceCents)}</div>
             </div>
             <Button
               variant="secondary"
