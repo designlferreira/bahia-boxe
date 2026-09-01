@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 7%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 10%;
+    --primary: 0 72% 51%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 15%;
+    --muted: 0 0% 18%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 45 93% 58%;
+    --accent-foreground: 45 40% 8%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --amber: 38 92% 50%;
+    --amber-foreground: 38 40% 8%;
+    --border: 0 0% 20%;
+    --input: 0 0% 18%;
+    --ring: 0 72% 51%;
+    --radius: 0.75rem;
+
+    --gradient-hero: linear-gradient(135deg, hsl(0 72% 51%), hsl(0 72% 35%));
+    --gradient-gold: linear-gradient(135deg, hsl(45 93% 58%), hsl(35 93% 45%));
+    --shadow-glow: 0 0 30px hsl(0 72% 51% / 0.3);
+    --shadow-card: 0 4px 20px hsl(0 0% 0% / 0.4);
+  }
+
+  * {
+    @apply border-border;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  ::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-primary text-primary-foreground font-semibold shadow-glow transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl border border-border bg-secondary text-foreground font-semibold transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-accent {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-gold text-accent-foreground font-bold transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .card-dark {
+    @apply rounded-2xl border border-border bg-card shadow-card;
+  }
+
+  .input-dark {
+    @apply w-full rounded-xl border border-border bg-input px-3.5 text-[15px] text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors;
+  }
+
+  .page-container {
+    @apply flex-1 overflow-y-auto px-5 pt-14 pb-28 animate-bb-in;
+  }
+
+  .page-title {
+    @apply font-display text-3xl tracking-wide text-foreground leading-none;
+  }
+}

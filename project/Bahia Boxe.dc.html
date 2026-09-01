@@ -1,0 +1,1665 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;background:#070707;}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+a{color:#F9CB2E;text-decoration:none}a:hover{color:#fff}
+button{font-family:inherit}
+input,textarea{font-family:inherit}
+::-webkit-scrollbar{width:0;height:0}
+@keyframes bbUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes bbIn{from{opacity:0;transform:translateY(14px) scale(.99)}to{opacity:1;transform:none}}
+@keyframes bbPulse{0%,100%{box-shadow:0 0 0 0 rgba(222,35,35,.35)}50%{box-shadow:0 0 0 14px rgba(222,35,35,0)}}
+@keyframes bbShim{0%{background-position:-260px 0}100%{background-position:260px 0}}
+@keyframes bbToast{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes bbBar{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+</style>
+</helmet>
+
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(90% 60% at 50% 0%, #16100f 0%, #070707 62%);font-family:Inter,system-ui,sans-serif">
+<div style="width:390px;height:844px;position:relative;border-radius:44px;padding:11px;background:linear-gradient(160deg,#2b2b2b,#0d0d0d);box-shadow:0 40px 90px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.06)">
+<div style="position:relative;width:100%;height:100%;border-radius:34px;overflow:hidden;background:#121212;display:flex;flex-direction:column">
+
+<div style="position:absolute;top:0;left:0;right:0;height:44px;z-index:40;display:flex;align-items:center;justify-content:space-between;padding:0 26px;font-size:13px;font-weight:600;color:#fff;pointer-events:none">
+<span>9:41</span>
+<span style="display:flex;gap:5px;align-items:center;opacity:.9"><span style="width:16px;height:9px;border:1.5px solid #fff;border-radius:2px;display:inline-block"></span></span>
+</div>
+<div style="position:absolute;top:9px;left:50%;transform:translateX(-50%);width:104px;height:28px;border-radius:16px;background:#000;z-index:41"></div>
+
+<!-- ===================== LOGIN ===================== -->
+<sc-if value="{{ isLogin }}" hint-placeholder-val="{{ true }}">
+<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;padding:0 24px 40px;background:linear-gradient(180deg,rgba(222,35,35,.22) 0%,rgba(18,18,18,1) 52%);animation:bbIn .4s ease both">
+<div style="position:absolute;top:96px;left:24px;display:flex;align-items:center;gap:12px">
+<div style="width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,#DE2323,#8C1616);display:flex;align-items:center;justify-content:center;box-shadow:0 0 30px rgba(222,35,35,.4)">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M7 5h8a4 4 0 0 1 4 4v3a4 4 0 0 1-4 4H9"/><path d="M7 5v11a3 3 0 0 0 3 3h5"/></svg>
+</div>
+<div>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:30px;line-height:.9;letter-spacing:.05em;color:#fff">BAHIA BOXE</div>
+<div style="font-size:11px;color:#8E8E8E;letter-spacing:.14em;text-transform:uppercase;margin-top:3px">Gestão de aulas</div>
+</div>
+</div>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:44px;line-height:.95;letter-spacing:.04em;color:#fff;margin-bottom:20px">SEU RING,<br>SUA AGENDA.</div>
+<label style="display:block;font-size:12px;color:#999;margin-bottom:6px">E-mail</label>
+<input type="email" value="marina@bahiaboxe.com" readonly style="width:100%;height:50px;border-radius:12px;background:#1E1E1E;border:1px solid #333;color:#fff;padding:0 14px;font-size:15px;margin-bottom:14px;outline:none" />
+<label style="display:block;font-size:12px;color:#999;margin-bottom:6px">Senha</label>
+<input type="password" value="123456" readonly style="width:100%;height:50px;border-radius:12px;background:#1E1E1E;border:1px solid #333;color:#fff;padding:0 14px;font-size:15px;margin-bottom:18px;outline:none" />
+<div style="display:flex;gap:10px;margin-bottom:18px">
+<button type="button" onClick="{{ loginStudent }}" aria-label="Entrar como aluno" style="flex:1;height:54px;border:none;border-radius:14px;background:#DE2323;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;box-shadow:0 0 30px rgba(222,35,35,.3)" style-active="transform:scale(.95)" style-hover="background:#EC3030">Entrar como aluno</button>
+<button type="button" onClick="{{ loginAdmin }}" aria-label="Entrar como professor" style="flex:1;height:54px;border:1px solid #3A3A3A;border-radius:14px;background:#1E1E1E;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s" style-active="transform:scale(.95)" style-hover="border-color:#5A5A5A">Entrar como professor</button>
+</div>
+<div style="text-align:center;font-size:13px;color:#8E8E8E">Esqueceu a senha? <a href="#">Recuperar</a></div>
+</div>
+</sc-if>
+
+<!-- ===================== ALUNO · HOME ===================== -->
+<sc-if value="{{ isHome }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;overflow-y:auto;padding:56px 20px 110px;animation:bbIn .35s ease both">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">
+<div>
+<div style="font-size:13px;color:#8E8E8E">Bom treino,</div>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.05em;color:#fff;line-height:1.05">MARINA SOUZA</div>
+</div>
+<button type="button" onClick="{{ openNotifs }}" aria-label="Notificações" style="position:relative;width:42px;height:42px;border-radius:13px;background:#1A1A1A;border:1px solid #2A2A2A;display:flex;align-items:center;justify-content:center;cursor:pointer" style-active="transform:scale(.95)">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E5E5E5" stroke-width="2" stroke-linecap="round"><path d="M18 9a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7"/><path d="M10.5 20a2 2 0 0 0 3 0"/></svg>
+<sc-if value="{{ hasUnread }}" hint-placeholder-val="{{ true }}">
+<span style="position:absolute;top:-6px;right:-6px;min-width:19px;height:19px;padding:0 5px;border-radius:99px;background:#DE2323;color:#fff;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #121212">{{ unread }}</span>
+</sc-if>
+</button>
+</div>
+
+<div style="position:relative;border-radius:22px;padding:22px;margin-bottom:14px;background:linear-gradient(150deg,#1F1B0C 0%,#171717 58%);border:1px solid #35301A;overflow:hidden;animation:bbUp .45s ease both">
+<div style="position:absolute;right:-30px;top:-30px;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,rgba(249,203,46,.18),transparent 70%)"></div>
+<div style="font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#A79A63;font-weight:600">Créditos disponíveis</div>
+<div style="display:flex;align-items:flex-end;gap:10px;margin:2px 0 14px">
+<span style="font-family:'Bebas Neue',sans-serif;font-size:92px;line-height:.82;letter-spacing:.02em;color:#F9CB2E">{{ credits }}</span>
+<span style="font-size:14px;color:#8E8E8E;padding-bottom:12px">aula(s) para agendar</span>
+</div>
+<div style="height:8px;border-radius:99px;background:#2A2A2A;overflow:hidden;margin-bottom:8px">
+<div style="height:100%;border-radius:99px;background:linear-gradient(90deg,#F9CB2E,#D89A15);transform-origin:left;animation:bbBar .7s cubic-bezier(.22,1,.36,1) both;width: {{ pkgPct }}"></div>
+</div>
+<div style="display:flex;justify-content:space-between;font-size:12.5px;color:#9A9A9A">
+<span>{{ pkgLabel }}</span><span>Pacote 10 aulas</span>
+</div>
+<sc-if value="{{ lowCredits }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:14px;display:flex;gap:9px;align-items:center;padding:10px 12px;border-radius:12px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3)">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4"/><path d="M12 17h.01"/></svg>
+<span style="font-size:12.5px;color:#F0B650">Restam poucas aulas — peça a renovação do pacote.</span>
+</div>
+</sc-if>
+</div>
+
+<sc-if value="{{ hasSuggestion }}" hint-placeholder-val="{{ false }}">
+<button type="button" onClick="{{ openSuggestion }}" style="width:100%;text-align:left;display:flex;gap:12px;align-items:center;padding:14px;border-radius:16px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.32);margin-bottom:14px;cursor:pointer;transition:all .2s;animation:bbUp .5s ease both" style-active="transform:scale(.98)">
+<div style="width:38px;height:38px;border-radius:12px;background:rgba(245,158,11,.18);display:flex;align-items:center;justify-content:center;flex:none">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+</div>
+<div style="flex:1">
+<div style="font-size:14px;font-weight:600;color:#F0B650">Novo horário sugerido</div>
+<div style="font-size:12.5px;color:#9A9A9A">Prof. Diego propôs sexta, 19:00</div>
+</div>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8E8E8E" stroke-width="2" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg>
+</button>
+</sc-if>
+
+<div style="font-family:'Bebas Neue',sans-serif;font-size:19px;letter-spacing:.08em;color:#fff;margin:4px 0 10px">PRÓXIMA AULA</div>
+<sc-if value="{{ hasNext }}" hint-placeholder-val="{{ true }}">
+<button type="button" onClick="{{ openNext }}" style="width:100%;text-align:left;background:#171717;border:1px solid #2A2A2A;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,.4);padding:16px;display:flex;gap:14px;align-items:center;cursor:pointer;margin-bottom:22px;transition:all .2s;animation:bbUp .55s ease both" style-active="transform:scale(.98)">
+<div style="width:54px;text-align:center;border-right:1px solid #2A2A2A;padding-right:12px">
+<div style="font-family:'Bebas Neue',sans-serif;font-size:30px;line-height:.9;color:#fff">{{ nextDay }}</div>
+<div style="font-size:11px;text-transform:uppercase;color:#8E8E8E;letter-spacing:.1em">{{ nextMonth }}</div>
+</div>
+<div style="flex:1">
+<div style="font-size:15px;font-weight:600;color:#fff;margin-bottom:5px">{{ nextTime }}</div>
+<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:4px 9px;border-radius:99px;background: {{ nextBadgeBg }};color: {{ nextBadgeFg }}">{{ nextBadge }}</span>
+</div>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8E8E8E" stroke-width="2" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg>
+</button>
+</sc-if>
+<sc-if value="{{ noNext }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px dashed #333;border-radius:16px;padding:26px 18px;text-align:center;margin-bottom:22px">
+<div style="font-size:14px;color:#B5B5B5;margin-bottom:4px">Nenhuma aula agendada</div>
+<div style="font-size:12.5px;color:#9A9A9A">Escolha um horário livre do professor.</div>
+</div>
+</sc-if>
+
+<button type="button" onClick="{{ primaryAction }}" style="width:100%;height:58px;border:none;border-radius:16px;background:#DE2323;color:#fff;font-size:16px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;transition:all .2s;box-shadow:0 8px 30px rgba(222,35,35,.32);animation:bbPulse 3.2s ease-in-out infinite" style-active="transform:scale(.96)" style-hover="background:#EC3030">
+<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>
+{{ primaryLabel }}
+</button>
+<div style="text-align:center;font-size:12px;color:#9A9A9A;margin-top:10px">{{ primaryHint }}</div>
+</div>
+</sc-if>
+
+<!-- ===================== ALUNO · AGENDAR ===================== -->
+<sc-if value="{{ isAgendar }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;overflow-y:auto;padding:56px 20px 130px;animation:bbIn .3s ease both">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
+<button type="button" onClick="{{ back }}" aria-label="Voltar" style="width:40px;height:40px;border-radius:12px;background:#1A1A1A;border:1px solid #2A2A2A;display:flex;align-items:center;justify-content:center;cursor:pointer" style-active="transform:scale(.94)">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E5E5E5" stroke-width="2" stroke-linecap="round"><path d="m15 6-6 6 6 6"/></svg>
+</button>
+<div>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.05em;color:#fff;line-height:1">AGENDAR AULA</div>
+<div style="font-size:12.5px;color:#8E8E8E">{{ credits }} crédito(s) disponível(is)</div>
+</div>
+</div>
+
+<div style="display:flex;gap:9px;overflow-x:auto;padding:2px 0 14px;margin:0 -20px;padding-left:20px;padding-right:20px">
+<sc-for list="{{ days }}" as="d" hint-placeholder-count="5">
+<button type="button" onClick="{{ d.onPick }}" style="flex:none;width:62px;padding:11px 0;border-radius:16px;border:1px solid {{ d.border }};background: {{ d.bg }};cursor:pointer;transition:all .22s cubic-bezier(.22,1,.36,1)" style-active="transform:scale(.94)">
+<div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color: {{ d.sub }}">{{ d.wd }}</div>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:26px;line-height:1.05;color: {{ d.fg }}">{{ d.dd }}</div>
+</button>
+</sc-for>
+</div>
+
+<div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.08em;color:#fff;margin:8px 0 10px">HORÁRIOS LIVRES</div>
+<sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<div style="height:66px;border-radius:14px;background:linear-gradient(90deg,#1A1A1A 25%,#242424 50%,#1A1A1A 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+<div style="height:66px;border-radius:14px;background:linear-gradient(90deg,#1A1A1A 25%,#242424 50%,#1A1A1A 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+<div style="height:66px;border-radius:14px;background:linear-gradient(90deg,#1A1A1A 25%,#242424 50%,#1A1A1A 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+<div style="height:66px;border-radius:14px;background:linear-gradient(90deg,#1A1A1A 25%,#242424 50%,#1A1A1A 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+</div>
+</sc-if>
+<sc-if value="{{ slotsReady }}" hint-placeholder-val="{{ true }}">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<sc-for list="{{ slots }}" as="s" hint-placeholder-count="4">
+<button type="button" onClick="{{ s.onPick }}" disabled="{{ s.disabled }}" style="height:66px;border-radius:14px;border:1px solid {{ s.border }};background: {{ s.bg }};cursor:pointer;text-align:left;padding:0 14px;transition:all .22s cubic-bezier(.22,1,.36,1)" style-active="transform:scale(.96)">
+<div style="font-size:16px;font-weight:600;color: {{ s.fg }}">{{ s.time }}</div>
+<div style="font-size:11.5px;color: {{ s.sub }}">{{ s.note }}</div>
+</button>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ slotsEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px dashed #333;border-radius:16px;padding:34px 18px;text-align:center">
+<div style="width:46px;height:46px;border-radius:50%;background:#1E1E1E;margin:0 auto 12px;display:flex;align-items:center;justify-content:center">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+</div>
+<div style="font-size:14.5px;color:#E5E5E5;font-weight:600;margin-bottom:4px">Sem horários nesse dia</div>
+<div style="font-size:12.5px;color:#9A9A9A;margin-bottom:14px">O professor não abriu disponibilidade.</div>
+<button type="button" onClick="{{ pickNextDay }}" style="height:42px;padding:0 18px;border-radius:12px;border:1px solid #3A3A3A;background:#1E1E1E;color:#fff;font-size:13.5px;font-weight:600;cursor:pointer" style-active="transform:scale(.95)">Ver próximo dia</button>
+</div>
+</sc-if>
+</div>
+<sc-if value="{{ hasSelSlot }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;left:0;right:0;bottom:84px;padding:12px 20px;background:linear-gradient(180deg,rgba(18,18,18,0),rgba(18,18,18,.96) 34%);animation:bbToast .25s ease both;z-index:20">
+<button type="button" onClick="{{ confirmBooking }}" style="width:100%;height:56px;border:none;border-radius:16px;background:#DE2323;color:#fff;font-size:16px;font-weight:600;cursor:pointer;box-shadow:0 8px 30px rgba(222,35,35,.4);transition:all .2s" style-active="transform:scale(.96)">Confirmar {{ selSlotLabel }}</button>
+</div>
+</sc-if>
+</sc-if>
+
+<!-- ===================== ALUNO · HISTÓRICO ===================== -->
+<sc-if value="{{ isHistorico }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;overflow-y:auto;padding:56px 20px 110px;animation:bbIn .3s ease both">
+<div style="font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:.05em;color:#fff;line-height:1;margin-bottom:4px">MINHAS AULAS</div>
+<div style="font-size:12.5px;color:#8E8E8E;margin-bottom:16px">Histórico completo do seu pacote</div>
+<div style="display:flex;gap:8px;margin-bottom:16px">
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+<button type="button" onClick="{{ t.onPick }}" style="flex:1;height:40px;border-radius:12px;border:1px solid {{ t.border }};background: {{ t.bg }};color: {{ t.fg }};font-size:13px;font-weight:600;cursor:pointer;transition:all .2s" style-active="transform:scale(.96)">{{ t.label }}</button>
+</sc-for>
+</div>
+<sc-if value="{{ error }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.08);border-radius:16px;padding:24px;text-align:center">
+<div style="font-size:14.5px;color:#F08A8A;font-weight:600;margin-bottom:4px">Não foi possível carregar</div>
+<div style="font-size:12.5px;color:#9A9A9A;margin-bottom:14px">Verifique sua conexão e tente novamente.</div>
+<button type="button" onClick="{{ retry }}" style="height:42px;padding:0 20px;border-radius:12px;border:none;background:#DE2323;color:#fff;font-size:13.5px;font-weight:600;cursor:pointer" style-active="transform:scale(.95)">Tentar novamente</button>
+</div>
+</sc-if>
+<sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="height:88px;border-radius:16px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+<div style="height:88px;border-radius:16px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+<div style="height:88px;border-radius:16px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+</div>
+</sc-if>
+<sc-if value="{{ listReady }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:10px">
+<sc-for list="{{ studentList }}" as="b" hint-placeholder-count="4">
+<button type="button" onClick="{{ b.onOpen }}" style="width:100%;text-align:left;background:#171717;border:1px solid #2A2A2A;border-radius:16px;padding:14px;display:flex;gap:13px;align-items:center;cursor:pointer;transition:all .2s" style-active="transform:scale(.985)" style-hover="border-color:#3A3A3A">
+<div style="width:46px;text-align:center;flex:none">
+<div style="font-family:'Bebas Neue',sans-serif;font-size:26px;line-height:.9;color:#fff">{{ b.dd }}</div>
+<div style="font-size:10.5px;text-transform:uppercase;color:#8E8E8E;letter-spacing:.1em">{{ b.mon }}</div>
+</div>
+<div style="flex:1">
+<div style="font-size:14.5px;font-weight:600;color:#fff;margin-bottom:6px">{{ b.time }}</div>
+<span style="display:inline-block;font-size:11px;font-weight:600;padding:4px 9px;border-radius:99px;background: {{ b.badgeBg }};color: {{ b.badgeFg }}">{{ b.badge }}</span>
+</div>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8E8E8E" stroke-width="2" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg>
+</button>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ listEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px dashed #333;border-radius:16px;padding:34px 18px;text-align:center">
+<div style="font-size:14.5px;color:#E5E5E5;font-weight:600;margin-bottom:4px">Nada por aqui</div>
+<div style="font-size:12.5px;color:#9A9A9A;margin-bottom:14px">Você ainda não tem aulas neste filtro.</div>
+<button type="button" onClick="{{ goAgendar }}" style="height:42px;padding:0 18px;border-radius:12px;border:none;background:#DE2323;color:#fff;font-size:13.5px;font-weight:600;cursor:pointer" style-active="transform:scale(.95)">Agendar aula</button>
+</div>
+</sc-if>
+</div>
+</sc-if>
+
+<!-- ===================== ALUNO · DETALHE DA AULA ===================== -->
+<sc-if value="{{ isAula }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;overflow-y:auto;padding:56px 20px 110px;animation:bbIn .3s ease both">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+<button type="button" onClick="{{ back }}" aria-label="Voltar" style="width:40px;height:40px;border-radius:12px;background:#1A1A1A;border:1px solid #2A2A2A;display:flex;align-items:center;justify-content:center;cursor:pointer" style-active="transform:scale(.94)">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E5E5E5" stroke-width="2" stroke-linecap="round"><path d="m15 6-6 6 6 6"/></svg>
+</button>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.05em;color:#fff">DETALHE DA AULA</div>
+</div>
+<div style="background:#171717;border:1px solid #2A2A2A;border-radius:20px;padding:20px;margin-bottom:14px">
+<span style="display:inline-block;font-size:11px;font-weight:600;padding:5px 10px;border-radius:99px;background: {{ detBadgeBg }};color: {{ detBadgeFg }};margin-bottom:12px">{{ detBadge }}</span>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:38px;letter-spacing:.04em;color:#fff;line-height:1">{{ detDate }}</div>
+<div style="font-size:15px;color:#B5B5B5;margin-top:2px">{{ detTime }}</div>
+<div style="height:1px;background:#262626;margin:16px 0"></div>
+<div style="display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:9px"><span style="color:#8E8E8E">Professor</span><span style="color:#fff">Diego Andrade</span></div>
+<div style="display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:9px"><span style="color:#8E8E8E">Local</span><span style="color:#fff">Academia Bahia Boxe</span></div>
+<div style="display:flex;justify-content:space-between;font-size:13.5px"><span style="color:#8E8E8E">Consome crédito</span><span style="color:#fff">1 aula</span></div>
+</div>
+<sc-if value="{{ detHasNote }}" hint-placeholder-val="{{ false }}">
+<div style="border-radius:16px;padding:16px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.28);margin-bottom:14px">
+<div style="font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:#C79A3C;font-weight:600;margin-bottom:6px">Observação do professor</div>
+<div style="font-size:13.5px;color:#DEDEDE;line-height:1.5">{{ detNote }}</div>
+</div>
+</sc-if>
+<sc-if value="{{ detCancelable }}" hint-placeholder-val="{{ false }}">
+<button type="button" onClick="{{ askCancel }}" style="width:100%;height:52px;border-radius:14px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.08);color:#F08A8A;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s" style-active="transform:scale(.97)">Cancelar aula</button>
+</sc-if>
+</div>
+</sc-if>
+
+<!-- ===================== ALUNO · ACEITE DE SUGESTÃO ===================== -->
+<sc-if value="{{ isSugestao }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;overflow-y:auto;padding:56px 20px 110px;animation:bbIn .3s ease both">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+<button type="button" onClick="{{ back }}" aria-label="Voltar" style="width:40px;height:40px;border-radius:12px;background:#1A1A1A;border:1px solid #2A2A2A;display:flex;align-items:center;justify-content:center;cursor:pointer" style-active="transform:scale(.94)">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E5E5E5" stroke-width="2" stroke-linecap="round"><path d="m15 6-6 6 6 6"/></svg>
+</button>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.05em;color:#fff">SUGESTÃO DE HORÁRIO</div>
+</div>
+<div style="border-radius:20px;padding:18px;background:#171717;border:1px solid #2A2A2A;margin-bottom:12px;opacity:.7">
+<div style="font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:#8E8E8E;font-weight:600;margin-bottom:8px">Horário recusado</div>
+<div style="font-size:17px;color:#B5B5B5;text-decoration:line-through">Qui, 03 set · 07:00 – 08:00</div>
+</div>
+<div style="display:flex;justify-content:center;margin:2px 0 12px">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="m6 13 6 6 6-6"/></svg>
+</div>
+<div style="border-radius:20px;padding:20px;background:linear-gradient(150deg,#1F1B0C,#171717 60%);border:1px solid rgba(245,158,11,.35);margin-bottom:16px">
+<div style="font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:#C79A3C;font-weight:600;margin-bottom:8px">Novo horário proposto</div>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:.04em;color:#fff;line-height:1">SEX, 04 SET</div>
+<div style="font-size:16px;color:#F9CB2E;margin-top:2px">19:00 – 20:00</div>
+<div style="height:1px;background:#2E2A1A;margin:14px 0"></div>
+<div style="font-size:13.5px;color:#C9C9C9;line-height:1.55">“Marina, nesse horário a turma está cheia. Consigo te encaixar sexta às 19h, pode ser?”</div>
+<div style="font-size:12px;color:#8E8E8E;margin-top:8px">— Prof. Diego</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<button type="button" onClick="{{ acceptSuggestion }}" style="width:100%;height:56px;border:none;border-radius:16px;background:#DE2323;color:#fff;font-size:16px;font-weight:600;cursor:pointer;box-shadow:0 8px 30px rgba(222,35,35,.3);transition:all .2s" style-active="transform:scale(.96)">Aceitar novo horário</button>
+<button type="button" onClick="{{ goAgendar }}" style="width:100%;height:52px;border-radius:14px;border:1px solid #3A3A3A;background:#1E1E1E;color:#E5E5E5;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s" style-active="transform:scale(.97)">Escolher outro horário</button>
+</div>
+</div>
+</sc-if>
+
+<!-- ===================== ALUNO · PACOTES ===================== -->
+<sc-if value="{{ isPacotes }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;overflow-y:auto;padding:56px 20px 110px;animation:bbIn .3s ease both">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
+<button type="button" onClick="{{ back }}" aria-label="Voltar" style="width:40px;height:40px;border-radius:12px;background:#1A1A1A;border:1px solid #2A2A2A;display:flex;align-items:center;justify-content:center;cursor:pointer" style-active="transform:scale(.94)">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E5E5E5" stroke-width="2" stroke-linecap="round"><path d="m15 6-6 6 6 6"/></svg>
+</button>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.05em;color:#fff">MEUS PACOTES</div>
+</div>
+<div style="border-radius:20px;padding:18px;background:#171717;border:1px solid #2A2A2A;margin-bottom:22px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+<span style="font-size:15px;font-weight:600;color:#fff">Pacote 10 aulas</span>
+<span style="font-size:11px;font-weight:600;padding:4px 9px;border-radius:99px;background:rgba(249,203,46,.16);color:#F9CB2E">Ativo</span>
+</div>
+<div style="height:8px;border-radius:99px;background:#2A2A2A;overflow:hidden;margin-bottom:8px">
+<div style="height:100%;border-radius:99px;background:linear-gradient(90deg,#F9CB2E,#D89A15);transform-origin:left;animation:bbBar .7s cubic-bezier(.22,1,.36,1) both;width: {{ pkgPct }}"></div>
+</div>
+<div style="font-size:12.5px;color:#9A9A9A">{{ pkgLabel }} · vence em 22/09</div>
+</div>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:19px;letter-spacing:.08em;color:#fff;margin-bottom:10px">SOLICITAR</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<sc-for list="{{ templates }}" as="t" hint-placeholder-count="3">
+<div style="background:#171717;border:1px solid #2A2A2A;border-radius:16px;padding:16px;display:flex;align-items:center;gap:12px">
+<div style="flex:1">
+<div style="font-size:15px;font-weight:600;color:#fff">{{ t.name }}</div>
+<div style="font-size:12.5px;color:#8E8E8E;margin-top:2px">{{ t.desc }}</div>
+<div style="font-size:16px;color:#F9CB2E;font-weight:600;margin-top:7px">{{ t.price }}</div>
+</div>
+<button type="button" onClick="{{ t.onRequest }}" style="height:42px;padding:0 16px;border-radius:12px;border:1px solid #3A3A3A;background:#1E1E1E;color:#fff;font-size:13.5px;font-weight:600;cursor:pointer;transition:all .2s;flex:none" style-active="transform:scale(.95)" style-hover="border-color:#DE2323;color:#FF8A8A">Pedir</button>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<!-- ===================== CONTA (aluno/professor) ===================== -->
+<sc-if value="{{ isConta }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;overflow-y:auto;padding:56px 20px 110px;animation:bbIn .3s ease both">
+<div style="font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:.05em;color:#fff;margin-bottom:16px">MINHA CONTA</div>
+<div style="display:flex;gap:14px;align-items:center;background:#171717;border:1px solid #2A2A2A;border-radius:20px;padding:16px;margin-bottom:16px">
+<div style="width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,#DE2323,#8C1616);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:24px;color:#fff">{{ initials }}</div>
+<div>
+<div style="font-size:16px;font-weight:600;color:#fff">{{ userName }}</div>
+<div style="font-size:12.5px;color:#8E8E8E">{{ userRole }} · desde mar/2025</div>
+</div>
+</div>
+<sc-if value="{{ isAdmin }}" hint-placeholder-val="{{ false }}">
+<div style="background:#171717;border:1px solid #2A2A2A;border-radius:16px;padding:16px;margin-bottom:14px;display:flex;align-items:center;gap:12px">
+<div style="flex:1">
+<div style="font-size:14.5px;font-weight:600;color:#fff">Falta consome crédito</div>
+<div style="font-size:12.5px;color:#8E8E8E;margin-top:2px">Aluno que não aparece perde a aula do pacote.</div>
+</div>
+<button type="button" onClick="{{ toggleNoShow }}" aria-label="Alternar consumo de crédito na falta" style="width:52px;height:31px;border-radius:99px;border:none;cursor:pointer;padding:3px;display:flex;transition:all .25s;background: {{ noShowBg }};justify-content: {{ noShowJustify }}">
+<span style="width:25px;height:25px;border-radius:50%;background:#fff;transition:all .25s"></span>
+</button>
+</div>
+</sc-if>
+<div style="display:flex;flex-direction:column;gap:2px;background:#171717;border:1px solid #2A2A2A;border-radius:16px;overflow:hidden;margin-bottom:14px">
+<sc-if value="{{ isAdmin }}" hint-placeholder-val="{{ false }}">
+<button type="button" onClick="{{ goDispo }}" style="width:100%;height:52px;padding:0 16px;background:transparent;border:none;border-bottom:1px solid #232323;color:#E5E5E5;font-size:14.5px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:10px" style-hover="background:#1E1E1E">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>
+<span style="flex:1">Minha disponibilidade</span>
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="2" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg>
+</button>
+</sc-if>
+<button type="button" style="height:52px;padding:0 16px;background:transparent;border:none;border-bottom:1px solid #232323;color:#E5E5E5;font-size:14.5px;text-align:left;cursor:pointer" style-hover="background:#1E1E1E">Editar perfil</button>
+<button type="button" onClick="{{ goSenha }}" style="width:100%;height:52px;padding:0 16px;background:transparent;border:none;border-bottom:1px solid #232323;color:#E5E5E5;font-size:14.5px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:10px" style-hover="background:#1E1E1E">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="2" stroke-linecap="round"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+<span style="flex:1">Alterar senha</span>
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="2" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg>
+</button>
+<button type="button" onClick="{{ toggleError }}" style="height:52px;padding:0 16px;background:transparent;border:none;color:#E5E5E5;font-size:14.5px;text-align:left;cursor:pointer" style-hover="background:#1E1E1E">{{ errorToggleLabel }}</button>
+</div>
+<div style="display:flex;gap:10px;align-items:center;padding:14px 16px;border-radius:16px;background:rgba(249,203,46,.07);border:1px solid rgba(249,203,46,.25);margin-bottom:14px">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F9CB2E" stroke-width="2" stroke-linecap="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+<div style="flex:1;font-size:13px;color:#D8C79A">Instalar o Bahia Boxe na tela inicial</div>
+<button type="button" style="height:34px;padding:0 13px;border-radius:10px;border:none;background:#F9CB2E;color:#1A1400;font-size:12.5px;font-weight:700;cursor:pointer" style-active="transform:scale(.95)">Instalar</button>
+</div>
+<button type="button" onClick="{{ askLogout }}" style="width:100%;height:52px;border-radius:14px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.08);color:#F08A8A;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s" style-active="transform:scale(.97)">Sair da conta</button>
+</div>
+</sc-if>
+
+<!-- ===================== PROFESSOR · DASHBOARD ===================== -->
+<sc-if value="{{ isAdmDash }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;overflow-y:auto;padding:56px 20px 110px;animation:bbIn .35s ease both">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+<div>
+<div style="font-size:13px;color:#8E8E8E">Terça, 01 de setembro</div>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.05em;color:#fff;line-height:1.05">PROF. DIEGO</div>
+</div>
+<button type="button" onClick="{{ openNotifs }}" aria-label="Notificações" style="position:relative;width:42px;height:42px;border-radius:13px;background:#1A1A1A;border:1px solid #2A2A2A;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s" style-active="transform:scale(.95)" style-hover="border-color:#3A3A3A">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E5E5E5" stroke-width="2" stroke-linecap="round"><path d="M18 9a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7"/><path d="M10.5 20a2 2 0 0 0 3 0"/></svg>
+<sc-if value="{{ hasUnread }}" hint-placeholder-val="{{ true }}">
+<span style="position:absolute;top:-6px;right:-6px;min-width:19px;height:19px;padding:0 5px;border-radius:99px;background:#DE2323;color:#fff;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #121212">{{ unread }}</span>
+</sc-if>
+</button>
+</div>
+
+<sc-if value="{{ hasPending }}" hint-placeholder-val="{{ true }}">
+<div style="border-radius:20px;padding:16px;background:linear-gradient(150deg,#211A0B,#171717 62%);border:1px solid rgba(245,158,11,.34);margin-bottom:16px;animation:bbUp .4s ease both">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+<span style="width:8px;height:8px;border-radius:50%;background:#F59E0B;animation:bbPulse 2s infinite"></span>
+<span style="font-size:13px;font-weight:600;color:#F0B650">{{ pendingLabel }}</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<sc-for list="{{ pendingList }}" as="p" hint-placeholder-count="2">
+<div style="background:#141414;border:1px solid #2A2A2A;border-radius:14px;padding:13px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px">
+<div>
+<div style="font-size:14.5px;font-weight:600;color:#fff">{{ p.student }}</div>
+<div style="font-size:12.5px;color:#8E8E8E;margin-top:1px">{{ p.when }}</div>
+</div>
+<span style="font-size:11px;font-weight:600;padding:4px 9px;border-radius:99px;background:rgba(245,158,11,.18);color:#F59E0B">Pendente</span>
+</div>
+<div style="display:flex;gap:8px">
+<button type="button" onClick="{{ p.onApprove }}" style="flex:1;height:44px;border:none;border-radius:12px;background:#DE2323;color:#fff;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s" style-active="transform:scale(.95)" style-hover="background:#EC3030">Aprovar</button>
+<button type="button" onClick="{{ p.onReject }}" style="flex:1;height:44px;border:1px solid #3A3A3A;border-radius:12px;background:#1E1E1E;color:#E5E5E5;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s" style-active="transform:scale(.95)">Recusar</button>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<div style="display:flex;gap:10px;margin-bottom:16px">
+<div style="flex:1;background:#171717;border:1px solid #2A2A2A;border-radius:16px;padding:13px">
+<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8E8E8E">Hoje</div>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:#fff;line-height:1.1">{{ kpiToday }}</div>
+<div style="font-size:11.5px;color:#9A9A9A">aulas</div>
+</div>
+<div style="flex:1;background:#171717;border:1px solid #2A2A2A;border-radius:16px;padding:13px">
+<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8E8E8E">Alunos</div>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:#fff;line-height:1.1">18</div>
+<div style="font-size:11.5px;color:#9A9A9A">ativos</div>
+</div>
+<div style="flex:1;background:#171717;border:1px solid #2A2A2A;border-radius:16px;padding:13px">
+<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8E8E8E">Mês</div>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:#F9CB2E;line-height:1.1">4,2</div>
+<div style="font-size:11.5px;color:#9A9A9A">mil R$</div>
+</div>
+</div>
+
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">
+<div style="font-family:'Bebas Neue',sans-serif;font-size:19px;letter-spacing:.08em;color:#fff">PRÓXIMAS AULAS</div>
+<button type="button" onClick="{{ goAgenda }}" style="background:none;border:none;color:#8E8E8E;font-size:12.5px;cursor:pointer">Ver agenda</button>
+</div>
+<sc-if value="{{ admLoading }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+<div style="height:66px;border-radius:16px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+<div style="height:66px;border-radius:16px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+<div style="height:66px;border-radius:16px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+</div>
+</sc-if>
+<sc-if value="{{ admError }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.08);border-radius:16px;padding:24px;text-align:center;margin-bottom:20px">
+<div style="font-size:14.5px;color:#F08A8A;font-weight:600;margin-bottom:4px">Não foi possível carregar as aulas</div>
+<div style="font-size:12.5px;color:#9A9A9A;margin-bottom:14px">Verifique sua conexão e tente novamente.</div>
+<button type="button" onClick="{{ retry }}" style="height:42px;padding:0 20px;border-radius:12px;border:none;background:#DE2323;color:#fff;font-size:13.5px;font-weight:600;cursor:pointer" style-active="transform:scale(.95)">Tentar novamente</button>
+</div>
+</sc-if>
+<sc-if value="{{ dashReady }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+<sc-for list="{{ adminUpcoming }}" as="b" hint-placeholder-count="3">
+<div style="background:#171717;border:1px solid #2A2A2A;border-radius:16px;padding:13px 14px;display:flex;align-items:center;gap:12px">
+<div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:#F9CB2E;width:52px">{{ b.hour }}</div>
+<div style="flex:1">
+<div style="font-size:14.5px;font-weight:600;color:#fff">{{ b.student }}</div>
+<div style="font-size:12px;color:#8E8E8E">{{ b.time }}</div>
+</div>
+<span style="font-size:11px;font-weight:600;padding:4px 9px;border-radius:99px;background: {{ b.badgeBg }};color: {{ b.badgeFg }}">{{ b.badge }}</span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<div style="font-family:'Bebas Neue',sans-serif;font-size:19px;letter-spacing:.08em;color:#fff;margin-bottom:10px">ALUNOS EM RISCO</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<sc-for list="{{ atRisk }}" as="s" hint-placeholder-count="2">
+<button type="button" onClick="{{ s.onOpen }}" style="width:100%;text-align:left;background:#171717;border:1px solid #2A2A2A;border-radius:16px;padding:13px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:all .2s" style-active="transform:scale(.985)">
+<div style="width:38px;height:38px;border-radius:50%;background:#262626;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#C9C9C9">{{ s.ini }}</div>
+<div style="flex:1">
+<div style="font-size:14.5px;font-weight:600;color:#fff">{{ s.name }}</div>
+<div style="font-size:12px;color: {{ s.riskFg }}">{{ s.risk }}</div>
+</div>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8E8E8E" stroke-width="2" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg>
+</button>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<!-- ===================== PROFESSOR · AGENDA (timeline) ===================== -->
+<sc-if value="{{ isAdmAgenda }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;overflow-y:auto;padding:56px 20px 110px;animation:bbIn .3s ease both">
+<div style="font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:.05em;color:#fff;line-height:1;margin-bottom:4px">AGENDA DO DIA</div>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+<div style="flex:1;font-size:12.5px;color:#8E8E8E">Terça, 01 de setembro · {{ kpiToday }} aulas</div>
+<button type="button" onClick="{{ goDispo }}" style="height:34px;padding:0 12px;border-radius:11px;border:1px solid #3A3A3A;background:#1E1E1E;color:#E5E5E5;font-size:12.5px;font-weight:600;cursor:pointer;transition:all .2s;flex:none" style-active="transform:scale(.95)" style-hover="border-color:#DE2323;color:#FF8A8A">Disponibilidade</button>
+</div>
+<div style="display:flex;gap:8px;overflow-x:auto;margin:0 -20px 16px;padding:0 20px 4px">
+<sc-for list="{{ days }}" as="d" hint-placeholder-count="5">
+<button type="button" onClick="{{ d.onPick }}" style="flex:none;width:56px;padding:9px 0;border-radius:14px;border:1px solid {{ d.border }};background: {{ d.bg }};cursor:pointer;transition:all .22s" style-active="transform:scale(.94)">
+<div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color: {{ d.sub }}">{{ d.wd }}</div>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:23px;line-height:1.05;color: {{ d.fg }}">{{ d.dd }}</div>
+</button>
+</sc-for>
+</div>
+<sc-if value="{{ admLoading }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="height:74px;border-radius:14px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+<div style="height:74px;border-radius:14px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+<div style="height:74px;border-radius:14px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+<div style="height:74px;border-radius:14px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+</div>
+</sc-if>
+<sc-if value="{{ admError }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.08);border-radius:16px;padding:24px;text-align:center">
+<div style="font-size:14.5px;color:#F08A8A;font-weight:600;margin-bottom:4px">Não foi possível carregar a agenda</div>
+<div style="font-size:12.5px;color:#9A9A9A;margin-bottom:14px">Verifique sua conexão e tente novamente.</div>
+<button type="button" onClick="{{ retry }}" style="height:42px;padding:0 20px;border-radius:12px;border:none;background:#DE2323;color:#fff;font-size:13.5px;font-weight:600;cursor:pointer" style-active="transform:scale(.95)">Tentar novamente</button>
+</div>
+</sc-if>
+<sc-if value="{{ timelineReady }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column">
+<sc-for list="{{ timeline }}" as="t" hint-placeholder-count="6">
+<div style="display:flex;gap:12px;min-height:74px">
+<div style="width:44px;flex:none;text-align:right;padding-top:2px">
+<div style="font-size:12px;color:#9A9A9A;font-variant-numeric:tabular-nums">{{ t.hour }}</div>
+</div>
+<div style="width:2px;background:#262626;flex:none;position:relative">
+<span style="position:absolute;top:6px;left:-3px;width:8px;height:8px;border-radius:50%;background: {{ t.dot }}"></span>
+</div>
+<div style="flex:1;padding-bottom:12px">
+<sc-if value="{{ t.free }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px dashed #2E2E2E;border-radius:14px;padding:14px;font-size:12.5px;color:#9A9A9A">Horário livre</div>
+</sc-if>
+<sc-if value="{{ t.busy }}" hint-placeholder-val="{{ true }}">
+<div style="background:#171717;border:1px solid {{ t.cardBorder }};border-radius:14px;padding:13px">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px">
+<div>
+<div style="font-size:14.5px;font-weight:600;color:#fff">{{ t.student }}</div>
+<div style="font-size:12px;color:#8E8E8E;margin-top:1px">{{ t.time }}</div>
+</div>
+<span style="font-size:11px;font-weight:600;padding:4px 9px;border-radius:99px;background: {{ t.badgeBg }};color: {{ t.badgeFg }};white-space:nowrap">{{ t.badge }}</span>
+</div>
+<sc-if value="{{ t.actionsPending }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;gap:8px">
+<button type="button" onClick="{{ t.onApprove }}" style="flex:1;height:40px;border:none;border-radius:11px;background:#DE2323;color:#fff;font-size:13.5px;font-weight:600;cursor:pointer" style-active="transform:scale(.95)">Aprovar</button>
+<button type="button" onClick="{{ t.onReject }}" style="flex:1;height:40px;border:1px solid #3A3A3A;border-radius:11px;background:#1E1E1E;color:#E5E5E5;font-size:13.5px;font-weight:600;cursor:pointer" style-active="transform:scale(.95)">Recusar</button>
+</div>
+</sc-if>
+<sc-if value="{{ t.actionsScheduled }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;gap:8px">
+<button type="button" onClick="{{ t.onComplete }}" style="flex:1;height:40px;border:1px solid rgba(249,203,46,.4);border-radius:11px;background:rgba(249,203,46,.1);color:#F9CB2E;font-size:13.5px;font-weight:600;cursor:pointer" style-active="transform:scale(.95)">Concluir</button>
+<button type="button" onClick="{{ t.onNoShow }}" style="flex:1;height:40px;border:1px solid #3A3A3A;border-radius:11px;background:#1E1E1E;color:#E5E5E5;font-size:13.5px;font-weight:600;cursor:pointer" style-active="transform:scale(.95)">Falta</button>
+</div>
+</sc-if>
+</div>
+</sc-if>
+</div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+</div>
+</sc-if>
+
+<!-- ===================== PROFESSOR · ALUNOS ===================== -->
+<sc-if value="{{ isAdmAlunos }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;overflow-y:auto;padding:56px 20px 110px;animation:bbIn .3s ease both">
+<div style="font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:.05em;color:#fff;line-height:1;margin-bottom:14px">ALUNOS</div>
+<input type="text" value="{{ search }}" onChange="{{ onSearch }}" placeholder="Buscar aluno" style="width:100%;height:46px;border-radius:13px;background:#1A1A1A;border:1px solid #2A2A2A;color:#fff;padding:0 14px;font-size:14.5px;outline:none;margin-bottom:14px" />
+<sc-if value="{{ admLoading }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="height:72px;border-radius:16px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+<div style="height:72px;border-radius:16px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+<div style="height:72px;border-radius:16px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+<div style="height:72px;border-radius:16px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+</div>
+</sc-if>
+<sc-if value="{{ admError }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.08);border-radius:16px;padding:24px;text-align:center">
+<div style="font-size:14.5px;color:#F08A8A;font-weight:600;margin-bottom:4px">Não foi possível carregar os alunos</div>
+<div style="font-size:12.5px;color:#9A9A9A;margin-bottom:14px">Verifique sua conexão e tente novamente.</div>
+<button type="button" onClick="{{ retry }}" style="height:42px;padding:0 20px;border-radius:12px;border:none;background:#DE2323;color:#fff;font-size:13.5px;font-weight:600;cursor:pointer" style-active="transform:scale(.95)">Tentar novamente</button>
+</div>
+</sc-if>
+<sc-if value="{{ studentsReady }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:10px">
+<sc-for list="{{ studentsList }}" as="s" hint-placeholder-count="5">
+<button type="button" onClick="{{ s.onOpen }}" style="width:100%;text-align:left;background:#171717;border:1px solid #2A2A2A;border-radius:16px;padding:14px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:all .2s" style-active="transform:scale(.985)" style-hover="border-color:#3A3A3A">
+<div style="width:42px;height:42px;border-radius:50%;background:#262626;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#C9C9C9">{{ s.ini }}</div>
+<div style="flex:1">
+<div style="font-size:15px;font-weight:600;color:#fff">{{ s.name }}</div>
+<div style="font-size:12.5px;color:#8E8E8E">{{ s.sub }}</div>
+</div>
+<div style="text-align:right">
+<div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color: {{ s.creditFg }};line-height:1">{{ s.credits }}</div>
+<div style="font-size:10.5px;color:#9A9A9A;text-transform:uppercase;letter-spacing:.08em">créditos</div>
+</div>
+</button>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ studentsEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px dashed #333;border-radius:16px;padding:34px 18px;text-align:center">
+<div style="font-size:14.5px;color:#E5E5E5;font-weight:600;margin-bottom:4px">Nenhum aluno encontrado</div>
+<div style="font-size:12.5px;color:#9A9A9A">Tente outro nome ou convide um novo aluno.</div>
+</div>
+</sc-if>
+</div>
+</sc-if>
+
+<!-- ===================== PROFESSOR · DETALHE DO ALUNO ===================== -->
+<sc-if value="{{ isAdmAluno }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;overflow-y:auto;padding:56px 20px 110px;animation:bbIn .3s ease both">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
+<button type="button" onClick="{{ back }}" aria-label="Voltar" style="width:40px;height:40px;border-radius:12px;background:#1A1A1A;border:1px solid #2A2A2A;display:flex;align-items:center;justify-content:center;cursor:pointer" style-active="transform:scale(.94)">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E5E5E5" stroke-width="2" stroke-linecap="round"><path d="m15 6-6 6 6 6"/></svg>
+</button>
+<div>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.05em;color:#fff;line-height:1">{{ detStudentName }}</div>
+<div style="font-size:12px;color:#8E8E8E">Aluno desde mar/2025</div>
+</div>
+</div>
+<div style="border-radius:20px;padding:18px;background:linear-gradient(150deg,#1F1B0C,#171717 60%);border:1px solid #35301A;margin-bottom:14px">
+<div style="font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:#A79A63;font-weight:600">Pacote ativo</div>
+<div style="display:flex;align-items:flex-end;gap:8px;margin:4px 0 12px">
+<span style="font-family:'Bebas Neue',sans-serif;font-size:56px;line-height:.85;color:#F9CB2E">{{ detStudentCredits }}</span>
+<span style="font-size:13px;color:#8E8E8E;padding-bottom:8px">créditos disponíveis</span>
+</div>
+<div style="height:8px;border-radius:99px;background:#2A2A2A;overflow:hidden;margin-bottom:8px">
+<div style="height:100%;border-radius:99px;background:linear-gradient(90deg,#F9CB2E,#D89A15);transform-origin:left;animation:bbBar .7s cubic-bezier(.22,1,.36,1) both;width: {{ detStudentPct }}"></div>
+</div>
+<div style="font-size:12.5px;color:#9A9A9A">{{ detStudentPkg }}</div>
+</div>
+<div style="display:flex;gap:10px;margin-bottom:16px">
+<div style="flex:1;background:#171717;border:1px solid #2A2A2A;border-radius:16px;padding:13px">
+<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8E8E8E">Frequência</div>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:#fff;line-height:1.1">86%</div>
+</div>
+<div style="flex:1;background:#171717;border:1px solid #2A2A2A;border-radius:16px;padding:13px">
+<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8E8E8E">Faltas</div>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:#EF4444;line-height:1.1">2</div>
+</div>
+</div>
+<div style="display:flex;gap:10px;margin-bottom:18px">
+<button type="button" onClick="{{ assignPackage }}" style="flex:1;height:48px;border:none;border-radius:14px;background:#DE2323;color:#fff;font-size:14.5px;font-weight:600;cursor:pointer" style-active="transform:scale(.96)">Atribuir pacote</button>
+<button type="button" onClick="{{ askRemovePkg }}" style="flex:1;height:48px;border:1px solid #3A3A3A;border-radius:14px;background:#1E1E1E;color:#E5E5E5;font-size:14.5px;font-weight:600;cursor:pointer" style-active="transform:scale(.96)">Remover pacote</button>
+</div>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.08em;color:#fff;margin-bottom:10px">ÚLTIMAS AULAS</div>
+<div style="display:flex;flex-direction:column;gap:9px">
+<sc-for list="{{ detStudentHistory }}" as="h" hint-placeholder-count="3">
+<div style="background:#171717;border:1px solid #2A2A2A;border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:10px">
+<div style="flex:1;font-size:13.5px;color:#DEDEDE">{{ h.when }}</div>
+<span style="font-size:11px;font-weight:600;padding:4px 9px;border-radius:99px;background: {{ h.badgeBg }};color: {{ h.badgeFg }}">{{ h.badge }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<!-- ===================== PROFESSOR · HISTÓRICO ===================== -->
+<sc-if value="{{ isAdmHist }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;overflow-y:auto;padding:56px 20px 110px;animation:bbIn .3s ease both">
+<div style="font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:.05em;color:#fff;line-height:1;margin-bottom:14px">HISTÓRICO</div>
+<input type="text" value="{{ search }}" onChange="{{ onSearch }}" placeholder="Buscar por aluno" style="width:100%;height:46px;border-radius:13px;background:#1A1A1A;border:1px solid #2A2A2A;color:#fff;padding:0 14px;font-size:14.5px;outline:none;margin-bottom:12px" />
+<div style="display:flex;gap:8px;overflow-x:auto;margin:0 -20px 14px;padding:0 20px 4px">
+<sc-for list="{{ statusFilters }}" as="f" hint-placeholder-count="4">
+<button type="button" onClick="{{ f.onPick }}" style="flex:none;height:36px;padding:0 14px;border-radius:99px;border:1px solid {{ f.border }};background: {{ f.bg }};color: {{ f.fg }};font-size:12.5px;font-weight:600;cursor:pointer;transition:all .2s" style-active="transform:scale(.95)">{{ f.label }}</button>
+</sc-for>
+</div>
+<sc-if value="{{ admLoading }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="height:104px;border-radius:16px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+<div style="height:104px;border-radius:16px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+<div style="height:104px;border-radius:16px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+</div>
+</sc-if>
+<sc-if value="{{ admError }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.08);border-radius:16px;padding:24px;text-align:center">
+<div style="font-size:14.5px;color:#F08A8A;font-weight:600;margin-bottom:4px">Não foi possível carregar o histórico</div>
+<div style="font-size:12.5px;color:#9A9A9A;margin-bottom:14px">Verifique sua conexão e tente novamente.</div>
+<button type="button" onClick="{{ retry }}" style="height:42px;padding:0 20px;border-radius:12px;border:none;background:#DE2323;color:#fff;font-size:13.5px;font-weight:600;cursor:pointer" style-active="transform:scale(.95)">Tentar novamente</button>
+</div>
+</sc-if>
+<sc-if value="{{ adminHistReady }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:10px">
+<sc-for list="{{ adminHistory }}" as="b" hint-placeholder-count="4">
+<div style="background:#171717;border:1px solid #2A2A2A;border-radius:16px;padding:14px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+<div style="flex:1">
+<div style="font-size:14.5px;font-weight:600;color:#fff">{{ b.student }}</div>
+<div style="font-size:12.5px;color:#8E8E8E;margin-top:1px">{{ b.when }}</div>
+</div>
+<span style="font-size:11px;font-weight:600;padding:4px 9px;border-radius:99px;background: {{ b.badgeBg }};color: {{ b.badgeFg }}">{{ b.badge }}</span>
+</div>
+<div style="display:flex;gap:8px">
+<button type="button" onClick="{{ b.onRefund }}" style="flex:1;height:38px;border:1px solid #3A3A3A;border-radius:11px;background:#1E1E1E;color:#D8D8D8;font-size:12.5px;font-weight:600;cursor:pointer" style-active="transform:scale(.95)">Reembolsar aula</button>
+<button type="button" onClick="{{ b.onMakeup }}" style="flex:1;height:38px;border:1px solid #3A3A3A;border-radius:11px;background:#1E1E1E;color:#D8D8D8;font-size:12.5px;font-weight:600;cursor:pointer" style-active="transform:scale(.95)">Marcar reposição</button>
+</div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ adminHistEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px dashed #333;border-radius:16px;padding:34px 18px;text-align:center">
+<div style="font-size:14.5px;color:#E5E5E5;font-weight:600;margin-bottom:4px">Nenhuma aula nesse filtro</div>
+<div style="font-size:12.5px;color:#9A9A9A">Ajuste a busca ou o status.</div>
+</div>
+</sc-if>
+</div>
+</sc-if>
+
+<!-- ===================== PROFESSOR · PEDIDOS ===================== -->
+<sc-if value="{{ isAdmPedidos }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;overflow-y:auto;padding:56px 20px 110px;animation:bbIn .3s ease both">
+<div style="font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:.05em;color:#fff;line-height:1;margin-bottom:4px">PEDIDOS</div>
+<div style="font-size:12.5px;color:#8E8E8E;margin-bottom:16px">Solicitações de pacote e aula avulsa</div>
+<sc-if value="{{ admLoading }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="height:118px;border-radius:16px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+<div style="height:118px;border-radius:16px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+</div>
+</sc-if>
+<sc-if value="{{ admError }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.08);border-radius:16px;padding:24px;text-align:center">
+<div style="font-size:14.5px;color:#F08A8A;font-weight:600;margin-bottom:4px">Não foi possível carregar os pedidos</div>
+<div style="font-size:12.5px;color:#9A9A9A;margin-bottom:14px">Verifique sua conexão e tente novamente.</div>
+<button type="button" onClick="{{ retry }}" style="height:42px;padding:0 20px;border-radius:12px;border:none;background:#DE2323;color:#fff;font-size:13.5px;font-weight:600;cursor:pointer" style-active="transform:scale(.95)">Tentar novamente</button>
+</div>
+</sc-if>
+<sc-if value="{{ requestsReady }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:10px">
+<sc-for list="{{ requests }}" as="r" hint-placeholder-count="2">
+<div style="background:#171717;border:1px solid #2A2A2A;border-radius:16px;padding:15px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+<div style="flex:1">
+<div style="font-size:15px;font-weight:600;color:#fff">{{ r.student }}</div>
+<div style="font-size:12.5px;color:#8E8E8E;margin-top:2px">{{ r.detail }}</div>
+</div>
+<span style="font-size:11px;font-weight:600;padding:4px 9px;border-radius:99px;background: {{ r.kindBg }};color: {{ r.kindFg }};white-space:nowrap">{{ r.kindLabel }}</span>
+</div>
+<div style="display:flex;gap:8px">
+<button type="button" onClick="{{ r.onApprove }}" style="flex:1;height:44px;border:none;border-radius:12px;background:#DE2323;color:#fff;font-size:14px;font-weight:600;cursor:pointer" style-active="transform:scale(.95)">Aprovar</button>
+<button type="button" onClick="{{ r.onReject }}" style="flex:1;height:44px;border:1px solid #3A3A3A;border-radius:12px;background:#1E1E1E;color:#E5E5E5;font-size:14px;font-weight:600;cursor:pointer" style-active="transform:scale(.95)">Recusar</button>
+</div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ requestsEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px dashed #333;border-radius:16px;padding:36px 18px;text-align:center">
+<div style="width:46px;height:46px;border-radius:50%;background:#1E1E1E;margin:0 auto 12px;display:flex;align-items:center;justify-content:center">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="2" stroke-linecap="round"><path d="M3 12h5l2 3h4l2-3h5"/><path d="M5 6h14l2 6v6H3v-6Z"/></svg>
+</div>
+<div style="font-size:14.5px;color:#E5E5E5;font-weight:600;margin-bottom:4px">Nenhum pedido pendente</div>
+<div style="font-size:12.5px;color:#9A9A9A">Tudo em dia por aqui.</div>
+</div>
+</sc-if>
+</div>
+</sc-if>
+
+<!-- ===================== PROFESSOR · DISPONIBILIDADE ===================== -->
+<sc-if value="{{ isAdmDispo }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;overflow-y:auto;padding:56px 20px 110px;animation:bbIn .3s ease both">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+<button type="button" onClick="{{ back }}" aria-label="Voltar" style="width:40px;height:40px;border-radius:12px;background:#1A1A1A;border:1px solid #2A2A2A;display:flex;align-items:center;justify-content:center;cursor:pointer" style-active="transform:scale(.94)">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E5E5E5" stroke-width="2" stroke-linecap="round"><path d="m15 6-6 6 6 6"/></svg>
+</button>
+<div>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.05em;color:#fff;line-height:1">MINHA DISPONIBILIDADE</div>
+<div style="font-size:12px;color:#9A9A9A">Grade semanal recorrente</div>
+</div>
+</div>
+
+<div style="border-radius:18px;padding:15px 16px;background:linear-gradient(150deg,#1F1B0C,#171717 62%);border:1px solid #35301A;margin-bottom:16px;display:flex;align-items:center;gap:14px">
+<div>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:34px;line-height:.9;color:#F9CB2E">{{ openSlots }}</div>
+<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#A79A63">intervalos</div>
+</div>
+<div style="width:1px;height:36px;background:#2E2A1A"></div>
+<div style="flex:1;font-size:12.5px;color:#C9C9C9;line-height:1.45">Alunos podem agendar em <strong style="color:#fff">{{ openDays }} dias</strong> da semana. Aulas já marcadas não são afetadas por mudanças aqui.</div>
+</div>
+
+<sc-if value="{{ admLoading }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="height:112px;border-radius:18px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+<div style="height:112px;border-radius:18px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+<div style="height:112px;border-radius:18px;background:linear-gradient(90deg,#171717 25%,#222 50%,#171717 75%);background-size:260px 100%;animation:bbShim 1.1s infinite"></div>
+</div>
+</sc-if>
+<sc-if value="{{ admError }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.08);border-radius:16px;padding:24px;text-align:center">
+<div style="font-size:14.5px;color:#F08A8A;font-weight:600;margin-bottom:4px">Não foi possível carregar a disponibilidade</div>
+<div style="font-size:12.5px;color:#9A9A9A;margin-bottom:14px">Verifique sua conexão e tente novamente.</div>
+<button type="button" onClick="{{ retry }}" style="height:42px;padding:0 20px;border-radius:12px;border:none;background:#DE2323;color:#fff;font-size:13.5px;font-weight:600;cursor:pointer" style-active="transform:scale(.95)">Tentar novamente</button>
+</div>
+</sc-if>
+<sc-if value="{{ dashReady }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:12px">
+<sc-for list="{{ week }}" as="d" hint-placeholder-count="7">
+<div style="background:#171717;border:1px solid #2A2A2A;border-radius:18px;padding:15px">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+<div style="flex:1">
+<div style="font-size:15px;font-weight:600;color: {{ d.nameFg }}">{{ d.name }}</div>
+<div style="font-size:12px;color:#9A9A9A;margin-top:2px">{{ d.summary }}</div>
+</div>
+<button type="button" onClick="{{ d.onToggle }}" aria-label="Alternar disponibilidade do dia" style="width:52px;height:31px;border-radius:99px;border:none;cursor:pointer;padding:3px;display:flex;transition:all .25s;background: {{ d.toggleBg }};justify-content: {{ d.toggleJustify }}">
+<span style="width:25px;height:25px;border-radius:50%;background:#fff;transition:all .25s"></span>
+</button>
+</div>
+<sc-if value="{{ d.hasSlots }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
+<sc-for list="{{ d.slots }}" as="sl" hint-placeholder-count="2">
+<div style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:13px;background:#141414;border:1px solid #262626">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F9CB2E" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+<div style="flex:1">
+<div style="font-size:14.5px;font-weight:600;color:#fff">{{ sl.label }}</div>
+<div style="font-size:11.5px;color: {{ sl.subFg }};margin-top:1px">{{ sl.sub }}</div>
+</div>
+<button type="button" onClick="{{ sl.onEdit }}" aria-label="Editar horário" style="width:44px;height:44px;border-radius:10px;border:1px solid #333;background:#1E1E1E;display:flex;align-items:center;justify-content:center;cursor:pointer" style-active="transform:scale(.92)">
+<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C9C9C9" stroke-width="2" stroke-linecap="round"><path d="M4 20h4L20 8l-4-4L4 16v4Z"/></svg>
+</button>
+<button type="button" onClick="{{ sl.onDelete }}" aria-label="Remover horário" style="width:44px;height:44px;border-radius:10px;border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.08);display:flex;align-items:center;justify-content:center;cursor:pointer" style-active="transform:scale(.92)">
+<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F08A8A" stroke-width="2" stroke-linecap="round"><path d="M5 7h14"/><path d="M9 7V5h6v2"/><path d="M7 7v13h10V7"/></svg>
+</button>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ d.isEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px dashed #2E2E2E;border-radius:13px;padding:16px;text-align:center;margin-bottom:10px">
+<div style="font-size:12.5px;color:#9A9A9A">Nenhum intervalo — alunos não conseguem agendar neste dia.</div>
+</div>
+</sc-if>
+<button type="button" onClick="{{ d.onAdd }}" style="width:100%;height:44px;border-radius:12px;border:1px solid #3A3A3A;background:#1E1E1E;color:#E5E5E5;font-size:13.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:all .2s" style-active="transform:scale(.97)" style-hover="border-color:#DE2323;color:#FF8A8A">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+Adicionar horário
+</button>
+</div>
+</sc-for>
+</div>
+</sc-if>
+</div>
+</sc-if>
+
+<!-- ===================== ALTERAR SENHA ===================== -->
+<sc-if value="{{ isSenha }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;overflow-y:auto;padding:56px 20px 110px;animation:bbIn .3s ease both">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+<button type="button" onClick="{{ back }}" aria-label="Voltar" style="width:40px;height:40px;border-radius:12px;background:#1A1A1A;border:1px solid #2A2A2A;display:flex;align-items:center;justify-content:center;cursor:pointer" style-active="transform:scale(.94)">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E5E5E5" stroke-width="2" stroke-linecap="round"><path d="m15 6-6 6 6 6"/></svg>
+</button>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.05em;color:#fff">ALTERAR SENHA</div>
+</div>
+<sc-if value="{{ pwdForm }}" hint-placeholder-val="{{ true }}">
+<div style="background:#171717;border:1px solid #2A2A2A;border-radius:20px;padding:18px;margin-bottom:14px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+<label style="font-size:12px;color:#9A9A9A">Senha atual</label>
+<button type="button" onClick="{{ togglePwdShow }}" style="background:none;border:none;color:#F9CB2E;font-size:12px;font-weight:600;cursor:pointer;padding:2px 4px">{{ pwdShowLabel }}</button>
+</div>
+<input type="{{ pwdType }}" value="{{ pwdCurrent }}" onChange="{{ onPwdCurrent }}" placeholder="Sua senha de hoje" style="width:100%;height:50px;border-radius:12px;background:#1E1E1E;border:1px solid #333;color:#fff;padding:0 14px;font-size:15px;outline:none;margin-bottom:14px" />
+<label style="display:block;font-size:12px;color:#9A9A9A;margin-bottom:6px">Nova senha</label>
+<input type="{{ pwdType }}" value="{{ pwdNext }}" onChange="{{ onPwdNext }}" placeholder="Mínimo 8 caracteres" style="width:100%;height:50px;border-radius:12px;background:#1E1E1E;border:1px solid #333;color:#fff;padding:0 14px;font-size:15px;outline:none;margin-bottom:12px" />
+<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px">
+<div style="display:flex;align-items:center;gap:7px;font-size:12px;color: {{ ruleLenFg }}"><span style="width:5px;height:5px;border-radius:50%;background:currentColor"></span>Pelo menos 8 caracteres</div>
+<div style="display:flex;align-items:center;gap:7px;font-size:12px;color: {{ ruleNumFg }}"><span style="width:5px;height:5px;border-radius:50%;background:currentColor"></span>Pelo menos 1 número</div>
+<div style="display:flex;align-items:center;gap:7px;font-size:12px;color: {{ ruleUpFg }}"><span style="width:5px;height:5px;border-radius:50%;background:currentColor"></span>Pelo menos 1 letra maiúscula</div>
+</div>
+<label style="display:block;font-size:12px;color:#9A9A9A;margin-bottom:6px">Confirmar nova senha</label>
+<input type="{{ pwdType }}" value="{{ pwdConfirm }}" onChange="{{ onPwdConfirm }}" placeholder="Repita a nova senha" style="width:100%;height:50px;border-radius:12px;background:#1E1E1E;border:1px solid #333;color:#fff;padding:0 14px;font-size:15px;outline:none" />
+<sc-if value="{{ pwdMismatch }}" hint-placeholder-val="{{ false }}">
+<div style="font-size:12.5px;color:#F08A8A;margin-top:8px">As senhas não coincidem.</div>
+</sc-if>
+</div>
+<sc-if value="{{ pwdHasError }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.08);border-radius:14px;padding:14px;margin-bottom:14px;font-size:13px;color:#F08A8A">{{ pwdError }}</div>
+</sc-if>
+<button type="button" onClick="{{ submitPwd }}" disabled="{{ pwdDisabled }}" style="width:100%;height:56px;border:none;border-radius:16px;background: {{ pwdBtnBg }};color: {{ pwdBtnFg }};font-size:16px;font-weight:600;cursor:pointer;transition:all .2s" style-active="transform:scale(.97)">{{ pwdCta }}</button>
+<div style="text-align:center;font-size:12px;color:#9A9A9A;margin-top:10px">Demo: a senha atual é 123456</div>
+</sc-if>
+<sc-if value="{{ pwdDone }}" hint-placeholder-val="{{ false }}">
+<div style="background:#171717;border:1px solid rgba(249,203,46,.3);border-radius:20px;padding:28px 20px;text-align:center;animation:bbUp .35s ease both">
+<div style="width:56px;height:56px;border-radius:50%;background:rgba(249,203,46,.14);margin:0 auto 14px;display:flex;align-items:center;justify-content:center">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F9CB2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg>
+</div>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.05em;color:#fff;margin-bottom:6px">SENHA ALTERADA</div>
+<div style="font-size:13.5px;color:#9A9A9A;line-height:1.5;margin-bottom:20px">Sua nova senha já está valendo. Use-a no próximo login.</div>
+<button type="button" onClick="{{ back }}" style="width:100%;height:52px;border:none;border-radius:14px;background:#DE2323;color:#fff;font-size:15px;font-weight:600;cursor:pointer" style-active="transform:scale(.96)">Voltar para a conta</button>
+</div>
+</sc-if>
+</div>
+</sc-if>
+
+<!-- ===================== CENTRAL DE NOTIFICAÇÕES ===================== -->
+<sc-if value="{{ notifOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;z-index:72;background:rgba(0,0,0,.62);backdrop-filter:blur(3px);display:flex;align-items:flex-end;animation:bbUp .2s ease both">
+<div style="width:100%;max-height:78%;display:flex;flex-direction:column;background:#161616;border-top-left-radius:26px;border-top-right-radius:26px;border-top:1px solid #2E2E2E;padding:18px 20px 26px;animation:bbToast .3s cubic-bezier(.22,1,.36,1) both">
+<div style="width:38px;height:4px;border-radius:99px;background:#3A3A3A;margin:0 auto 14px;flex:none"></div>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex:none">
+<div style="flex:1">
+<div style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.05em;color:#fff;line-height:1">NOTIFICAÇÕES</div>
+<div style="font-size:12px;color:#9A9A9A;margin-top:2px">{{ unread }} não lida(s)</div>
+</div>
+<button type="button" onClick="{{ markAllRead }}" style="height:44px;padding:0 12px;border-radius:11px;border:1px solid #3A3A3A;background:#1E1E1E;color:#E5E5E5;font-size:12.5px;font-weight:600;cursor:pointer" style-active="transform:scale(.95)">Marcar todas</button>
+<button type="button" onClick="{{ closeNotifs }}" aria-label="Fechar" style="width:44px;height:44px;border-radius:11px;border:1px solid #333;background:#1E1E1E;display:flex;align-items:center;justify-content:center;cursor:pointer" style-active="transform:scale(.92)">
+<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C9C9C9" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+</button>
+</div>
+<div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:9px">
+<sc-for list="{{ notifList }}" as="n" hint-placeholder-count="4">
+<button type="button" onClick="{{ n.onOpen }}" style="width:100%;text-align:left;display:flex;gap:11px;align-items:flex-start;padding:13px;border-radius:14px;background: {{ n.bg }};border:1px solid {{ n.border }};cursor:pointer;transition:all .2s" style-active="transform:scale(.985)">
+<span style="width:8px;height:8px;border-radius:50%;flex:none;margin-top:5px;background: {{ n.dot }}"></span>
+<div style="flex:1">
+<div style="font-size:14px;font-weight:600;color: {{ n.titleFg }}">{{ n.title }}</div>
+<div style="font-size:12.5px;color:#9A9A9A;margin-top:2px;line-height:1.4">{{ n.desc }}</div>
+<div style="font-size:11px;color:#7E7E7E;margin-top:5px">{{ n.when }}</div>
+</div>
+<sc-if value="{{ n.unread }}" hint-placeholder-val="{{ false }}">
+<span style="font-size:10px;font-weight:700;padding:3px 7px;border-radius:99px;background:rgba(222,35,35,.18);color:#F26A6A;flex:none">Nova</span>
+</sc-if>
+</button>
+</sc-for>
+<sc-if value="{{ notifEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px dashed #333;border-radius:16px;padding:34px 18px;text-align:center">
+<div style="width:46px;height:46px;border-radius:50%;background:#1E1E1E;margin:0 auto 12px;display:flex;align-items:center;justify-content:center">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="2" stroke-linecap="round"><path d="M18 9a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7"/><path d="M10.5 20a2 2 0 0 0 3 0"/></svg>
+</div>
+<div style="font-size:14.5px;color:#E5E5E5;font-weight:600;margin-bottom:4px">Nenhuma notificação</div>
+<div style="font-size:12.5px;color:#9A9A9A">Novos agendamentos e avisos aparecem aqui.</div>
+</div>
+</sc-if>
+</div>
+<button type="button" onClick="{{ clearNotifs }}" style="margin-top:12px;height:44px;border-radius:13px;border:1px solid #3A3A3A;background:#1E1E1E;color:#B5B5B5;font-size:13.5px;font-weight:600;cursor:pointer;flex:none" style-active="transform:scale(.97)">Limpar central</button>
+</div>
+</div>
+</sc-if>
+
+<!-- ===================== DRAWER DE HORÁRIO ===================== -->
+<sc-if value="{{ showSlotEditor }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;z-index:74;background:rgba(0,0,0,.62);backdrop-filter:blur(3px);display:flex;align-items:flex-end;animation:bbUp .2s ease both">
+<div style="width:100%;background:#161616;border-top-left-radius:26px;border-top-right-radius:26px;border-top:1px solid #2E2E2E;padding:20px 20px 26px;animation:bbToast .3s cubic-bezier(.22,1,.36,1) both">
+<div style="width:38px;height:4px;border-radius:99px;background:#3A3A3A;margin:0 auto 16px"></div>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.05em;color:#fff;margin-bottom:4px">{{ editorTitle }}</div>
+<div style="font-size:13px;color:#9A9A9A;margin-bottom:16px">{{ editorDay }} · repete toda semana</div>
+<div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#9A9A9A;font-weight:600;margin-bottom:8px">Início</div>
+<div style="display:flex;gap:8px;overflow-x:auto;margin:0 -20px 14px;padding:0 20px 4px">
+<sc-for list="{{ startOptions }}" as="o" hint-placeholder-count="6">
+<button type="button" onClick="{{ o.onPick }}" style="flex:none;height:44px;padding:0 16px;border-radius:12px;border:1px solid {{ o.border }};background: {{ o.bg }};color: {{ o.fg }};font-size:14px;font-weight:600;cursor:pointer;transition:all .2s" style-active="transform:scale(.95)">{{ o.label }}</button>
+</sc-for>
+</div>
+<div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#9A9A9A;font-weight:600;margin-bottom:8px">Fim</div>
+<div style="display:flex;gap:8px;overflow-x:auto;margin:0 -20px 14px;padding:0 20px 4px">
+<sc-for list="{{ endOptions }}" as="o" hint-placeholder-count="6">
+<button type="button" onClick="{{ o.onPick }}" style="flex:none;height:44px;padding:0 16px;border-radius:12px;border:1px solid {{ o.border }};background: {{ o.bg }};color: {{ o.fg }};font-size:14px;font-weight:600;cursor:pointer;transition:all .2s" style-active="transform:scale(.95)">{{ o.label }}</button>
+</sc-for>
+</div>
+<sc-if value="{{ editorHasError }}" hint-placeholder-val="{{ false }}">
+<div style="border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.08);border-radius:13px;padding:12px 13px;margin-bottom:14px;font-size:12.5px;color:#F08A8A">{{ editorError }}</div>
+</sc-if>
+<div style="display:flex;gap:10px">
+<button type="button" onClick="{{ closeSlotEditor }}" style="flex:1;height:52px;border-radius:14px;border:1px solid #3A3A3A;background:#1E1E1E;color:#E5E5E5;font-size:15px;font-weight:600;cursor:pointer" style-active="transform:scale(.96)">Voltar</button>
+<button type="button" onClick="{{ saveSlot }}" style="flex:1.4;height:52px;border-radius:14px;border:none;background:#DE2323;color:#fff;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 8px 26px rgba(222,35,35,.3)" style-active="transform:scale(.96)">{{ editorCta }}</button>
+</div>
+</div>
+</div>
+</sc-if>
+
+<!-- ===================== BOTTOM NAV ALUNO ===================== -->
+<sc-if value="{{ showStudentNav }}" hint-placeholder-val="{{ false }}">
+<nav aria-label="Navegação principal" style="position:absolute;left:0;right:0;bottom:0;height:84px;padding:10px 14px 22px;background:rgba(16,16,16,.92);backdrop-filter:blur(18px);border-top:1px solid #232323;display:flex;align-items:center;gap:4px;z-index:30">
+<button type="button" onClick="{{ goHome }}" aria-label="Início" style="flex:1;height:52px;border:none;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;color: {{ navHome }};transition:color .2s" style-active="transform:scale(.92)">
+<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V21h13V9.5"/></svg>
+<span style="font-size:10.5px;font-weight:600">Início</span>
+</button>
+<button type="button" onClick="{{ goAgendar }}" aria-label="Agendar" style="flex:1;height:52px;border:none;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;color: {{ navAgendar }};transition:color .2s" style-active="transform:scale(.92)">
+<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>
+<span style="font-size:10.5px;font-weight:600">Agendar</span>
+</button>
+<button type="button" onClick="{{ goHistorico }}" aria-label="Aulas" style="flex:1;height:52px;border:none;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;color: {{ navAulas }};transition:color .2s" style-active="transform:scale(.92)">
+<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+<span style="font-size:10.5px;font-weight:600">Aulas</span>
+</button>
+<button type="button" onClick="{{ goConta }}" aria-label="Conta" style="flex:1;height:52px;border:none;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;color: {{ navConta }};transition:color .2s" style-active="transform:scale(.92)">
+<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>
+<span style="font-size:10.5px;font-weight:600">Conta</span>
+</button>
+</nav>
+</sc-if>
+
+<!-- ===================== BOTTOM NAV PROFESSOR ===================== -->
+<sc-if value="{{ showAdminNav }}" hint-placeholder-val="{{ false }}">
+<nav aria-label="Navegação principal" style="position:absolute;left:0;right:0;bottom:0;height:84px;padding:10px 8px 22px;background:rgba(16,16,16,.92);backdrop-filter:blur(18px);border-top:1px solid #232323;display:flex;align-items:center;gap:2px;z-index:30">
+<button type="button" onClick="{{ goDash }}" aria-label="Dashboard" style="flex:1;height:52px;border:none;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;color: {{ navDash }};transition:color .2s" style-active="transform:scale(.92)">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/></svg>
+<span style="font-size:9.5px;font-weight:600">Painel</span>
+</button>
+<button type="button" onClick="{{ goAgenda }}" aria-label="Agenda" style="flex:1;height:52px;border:none;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;color: {{ navAgenda }};transition:color .2s" style-active="transform:scale(.92)">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>
+<span style="font-size:9.5px;font-weight:600">Agenda</span>
+</button>
+<button type="button" onClick="{{ goAlunos }}" aria-label="Alunos" style="flex:1;height:52px;border:none;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;color: {{ navAlunos }};transition:color .2s" style-active="transform:scale(.92)">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 19a6 6 0 0 1 12 0"/><path d="M16 6.5a3 3 0 0 1 0 5.6"/><path d="M18 19a5.5 5.5 0 0 0-2-4"/></svg>
+<span style="font-size:9.5px;font-weight:600">Alunos</span>
+</button>
+<button type="button" onClick="{{ goAdmHist }}" aria-label="Histórico" style="flex:1;height:52px;border:none;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;color: {{ navAdmHist }};transition:color .2s" style-active="transform:scale(.92)">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+<span style="font-size:9.5px;font-weight:600">Aulas</span>
+</button>
+<button type="button" onClick="{{ goPedidos }}" aria-label="Pedidos" style="position:relative;flex:1;height:52px;border:none;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;color: {{ navPedidos }};transition:color .2s" style-active="transform:scale(.92)">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h5l2 3h4l2-3h5"/><path d="M5 6h14l2 6v6H3v-6Z"/></svg>
+<span style="font-size:9.5px;font-weight:600">Pedidos</span>
+<sc-if value="{{ hasRequests }}" hint-placeholder-val="{{ true }}">
+<span style="position:absolute;top:2px;right:16px;min-width:17px;height:17px;padding:0 4px;border-radius:99px;background:#DE2323;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ requestCount }}</span>
+</sc-if>
+</button>
+<button type="button" onClick="{{ goConta }}" aria-label="Conta" style="flex:1;height:52px;border:none;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;color: {{ navConta }};transition:color .2s" style-active="transform:scale(.92)">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>
+<span style="font-size:9.5px;font-weight:600">Conta</span>
+</button>
+</nav>
+</sc-if>
+
+<!-- ===================== TOAST (Sonner) ===================== -->
+<sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;left:14px;right:14px;bottom:100px;z-index:60;animation:bbToast .28s cubic-bezier(.22,1,.36,1) both">
+<div style="display:flex;align-items:center;gap:11px;padding:13px 14px;border-radius:14px;background:#1E1E1E;border:1px solid #343434;box-shadow:0 12px 40px rgba(0,0,0,.6)">
+<span style="width:9px;height:9px;border-radius:50%;flex:none;background: {{ toastDot }}"></span>
+<span style="flex:1;font-size:13.5px;color:#EDEDED">{{ toastMsg }}</span>
+<sc-if value="{{ toastHasUndo }}" hint-placeholder-val="{{ false }}">
+<button type="button" onClick="{{ undo }}" style="height:32px;padding:0 12px;border-radius:9px;border:1px solid #444;background:#262626;color:#F9CB2E;font-size:12.5px;font-weight:700;cursor:pointer" style-active="transform:scale(.94)">Desfazer</button>
+</sc-if>
+</div>
+</div>
+</sc-if>
+
+<!-- ===================== MODAL DE RECUSA ===================== -->
+<sc-if value="{{ showReject }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;z-index:70;background:rgba(0,0,0,.62);backdrop-filter:blur(3px);display:flex;align-items:flex-end;animation:bbUp .2s ease both">
+<div style="width:100%;background:#161616;border-top-left-radius:26px;border-top-right-radius:26px;border-top:1px solid #2E2E2E;padding:20px 20px 26px;animation:bbToast .3s cubic-bezier(.22,1,.36,1) both">
+<div style="width:38px;height:4px;border-radius:99px;background:#3A3A3A;margin:0 auto 16px"></div>
+<div style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.05em;color:#fff;margin-bottom:4px">RECUSAR AGENDAMENTO</div>
+<div style="font-size:13px;color:#8E8E8E;margin-bottom:14px">{{ rejectSubtitle }}</div>
+<textarea value="{{ rejectNote }}" onChange="{{ onRejectNote }}" placeholder="Observação para o aluno (opcional)" style="width:100%;height:82px;border-radius:13px;background:#1E1E1E;border:1px solid #333;color:#fff;padding:12px 14px;font-size:14px;outline:none;resize:none;margin-bottom:14px"></textarea>
+<div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#8E8E8E;font-weight:600;margin-bottom:8px">Sugerir outro horário</div>
+<div style="display:flex;gap:8px;margin-bottom:18px">
+<sc-for list="{{ suggestOptions }}" as="o" hint-placeholder-count="3">
+<button type="button" onClick="{{ o.onPick }}" style="flex:1;height:44px;border-radius:12px;border:1px solid {{ o.border }};background: {{ o.bg }};color: {{ o.fg }};font-size:13.5px;font-weight:600;cursor:pointer;transition:all .2s" style-active="transform:scale(.95)">{{ o.label }}</button>
+</sc-for>
+</div>
+<div style="display:flex;gap:10px">
+<button type="button" onClick="{{ closeReject }}" style="flex:1;height:52px;border-radius:14px;border:1px solid #3A3A3A;background:#1E1E1E;color:#E5E5E5;font-size:15px;font-weight:600;cursor:pointer" style-active="transform:scale(.96)">Voltar</button>
+<button type="button" onClick="{{ confirmReject }}" style="flex:1.4;height:52px;border-radius:14px;border:none;background:#DE2323;color:#fff;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 8px 26px rgba(222,35,35,.3)" style-active="transform:scale(.96)">{{ rejectCta }}</button>
+</div>
+</div>
+</div>
+</sc-if>
+
+<!-- ===================== CONFIRM DIALOG ===================== -->
+<sc-if value="{{ showConfirm }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;z-index:80;background:rgba(0,0,0,.66);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:26px;animation:bbUp .18s ease both">
+<div style="width:100%;background:#171717;border:1px solid #2E2E2E;border-radius:22px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.7)">
+<div style="font-family:'Bebas Neue',sans-serif;font-size:23px;letter-spacing:.05em;color:#fff;margin-bottom:6px">{{ confirmTitle }}</div>
+<div style="font-size:13.5px;color:#9A9A9A;line-height:1.5;margin-bottom:20px">{{ confirmDesc }}</div>
+<div style="display:flex;gap:10px">
+<button type="button" onClick="{{ closeConfirm }}" style="flex:1;height:48px;border-radius:13px;border:1px solid #3A3A3A;background:#1E1E1E;color:#E5E5E5;font-size:14.5px;font-weight:600;cursor:pointer" style-active="transform:scale(.96)">Voltar</button>
+<button type="button" onClick="{{ runConfirm }}" style="flex:1;height:48px;border-radius:13px;border:none;background:#EF4444;color:#fff;font-size:14.5px;font-weight:600;cursor:pointer" style-active="transform:scale(.96)">{{ confirmCta }}</button>
+</div>
+</div>
+</div>
+</sc-if>
+
+</div>
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:460,&quot;height&quot;:900},&quot;startRole&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;login&quot;,&quot;student&quot;,&quot;admin&quot;],&quot;default&quot;:&quot;login&quot;,&quot;tsType&quot;:&quot;'login' | 'student' | 'admin'&quot;,&quot;section&quot;:&quot;Protótipo&quot;},&quot;noShowConsumesClass&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Regras&quot;}}">
+class Component extends DCLogic {
+  STATUS = {
+    scheduled: { label: 'Agendada', bg: 'rgba(222,35,35,.18)', fg: '#F26A6A' },
+    completed: { label: 'Concluída', bg: 'rgba(249,203,46,.16)', fg: '#F9CB2E' },
+    cancelled: { label: 'Cancelada', bg: '#2A2A2A', fg: '#9A9A9A' },
+    no_show: { label: 'Faltou', bg: 'rgba(239,68,68,.18)', fg: '#EF4444' },
+    pending_confirmation: { label: 'Pendente', bg: 'rgba(245,158,11,.18)', fg: '#F59E0B' },
+    rejected: { label: 'Rejeitada', bg: 'rgba(239,68,68,.18)', fg: '#EF4444' },
+    rejected_with_suggestion: { label: 'Sugestão enviada', bg: 'rgba(245,158,11,.18)', fg: '#F59E0B' }
+  };
+
+  cfg(s) { return this.STATUS[s] || { label: '—', bg: '#2A2A2A', fg: '#9A9A9A' }; }
+
+  state = {
+    role: null,
+    route: 'login',
+    stack: [],
+    loading: false,
+    error: false,
+    toast: null,
+    confirm: null,
+    rejectFor: null,
+    rejectNote: '',
+    rejectTime: null,
+    selDay: 0,
+    selSlot: null,
+    tab: 'proximas',
+    admFilter: 'todas',
+    search: '',
+    noShowConsumes: true,
+    openBooking: null,
+    openStudent: 'Marina Souza',
+    pkg: { total: 10, used: 5 },
+    myBookings: [
+      { id: 'b1', dd: '01', mon: 'set', date: 'Ter, 01 set', time: '07:00 – 08:00', status: 'scheduled', future: true },
+      { id: 'b2', dd: '03', mon: 'set', date: 'Qui, 03 set', time: '19:00 – 20:00', status: 'pending_confirmation', future: true },
+      { id: 'b5', dd: '29', mon: 'ago', date: 'Sex, 29 ago', time: '07:00 – 08:00', status: 'rejected_with_suggestion', future: false, note: 'Marina, nesse horário a turma está cheia. Consigo te encaixar sexta às 19h.' },
+      { id: 'b3', dd: '28', mon: 'ago', date: 'Qui, 28 ago', time: '07:00 – 08:00', status: 'completed', future: false },
+      { id: 'b4', dd: '26', mon: 'ago', date: 'Ter, 26 ago', time: '07:00 – 08:00', status: 'no_show', future: false },
+      { id: 'b6', dd: '22', mon: 'ago', date: 'Sex, 22 ago', time: '07:00 – 08:00', status: 'completed', future: false }
+    ],
+    agenda: [
+      { hour: '06:00', free: true },
+      { hour: '07:00', student: 'Marina Souza', time: '07:00 – 08:00', status: 'scheduled', id: 'a1' },
+      { hour: '08:00', student: 'Rafael Lima', time: '08:00 – 09:00', status: 'pending_confirmation', id: 'a2' },
+      { hour: '09:00', free: true },
+      { hour: '17:00', student: 'Júlia Prado', time: '17:00 – 18:00', status: 'scheduled', id: 'a3' },
+      { hour: '18:00', student: 'Caio Menezes', time: '18:00 – 19:00', status: 'pending_confirmation', id: 'a4' },
+      { hour: '19:00', student: 'Bruno Tavares', time: '19:00 – 20:00', status: 'completed', id: 'a5' }
+    ],
+    students: [
+      { id: 's1', name: 'Marina Souza', sub: '3 aulas nesta semana', credits: 3, total: 10, used: 5 },
+      { id: 's2', name: 'Rafael Lima', sub: 'Última aula há 3 dias', credits: 6, total: 10, used: 4 },
+      { id: 's3', name: 'Júlia Prado', sub: 'Pacote vence em 5 dias', credits: 1, total: 8, used: 7 },
+      { id: 's4', name: 'Caio Menezes', sub: 'Sem aula há 14 dias', credits: 0, total: 10, used: 10 },
+      { id: 's5', name: 'Bruno Tavares', sub: 'Frequência alta', credits: 4, total: 12, used: 8 }
+    ],
+    requests: [
+      { id: 'r1', student: 'Caio Menezes', kind: 'package', detail: 'Pacote 10 aulas · R$ 480,00' },
+      { id: 'r2', student: 'Júlia Prado', kind: 'single_class', detail: 'Aula avulsa · R$ 60,00' }
+    ],
+    notifOpen: false,
+    notifs: [
+      { id: 'n1', kind: 'booking', title: 'Novo agendamento', desc: 'Caio Menezes pediu aula hoje às 18:00', when: 'há 4 min', read: false },
+      { id: 'n2', kind: 'booking', title: 'Novo agendamento', desc: 'Rafael Lima pediu aula hoje às 08:00', when: 'há 26 min', read: false },
+      { id: 'n3', kind: 'cancel', title: 'Aula cancelada', desc: 'Júlia Prado cancelou a aula de quinta, 17:00', when: 'há 2 h', read: false },
+      { id: 'n4', kind: 'confirm', title: 'Horário aceito', desc: 'Marina Souza aceitou a sugestão de sexta, 19:00', when: 'ontem', read: true },
+      { id: 'n5', kind: 'system', title: 'Pacote vencendo', desc: 'O pacote de Júlia Prado vence em 5 dias', when: 'ontem', read: true }
+    ],
+    studentNotifs: [
+      { id: 'sn1', kind: 'confirm', title: 'Aula aprovada', desc: 'Prof. Diego confirmou terça, 07:00', when: 'há 12 min', read: false },
+      { id: 'sn2', kind: 'cancel', title: 'Horário sugerido', desc: 'Prof. Diego propôs sexta, 19:00 no lugar de quinta', when: 'há 3 h', read: false },
+      { id: 'sn3', kind: 'system', title: 'Pacote acabando', desc: 'Restam poucas aulas no seu pacote de 10', when: 'ontem', read: true }
+    ],
+    availability: [
+      { d: 'Segunda', on: true, slots: [{ id: 'v1', start: '06:00', end: '09:00' }, { id: 'v2', start: '17:00', end: '21:00' }] },
+      { d: 'Terça', on: true, slots: [{ id: 'v3', start: '06:00', end: '09:00' }, { id: 'v4', start: '17:00', end: '20:00' }] },
+      { d: 'Quarta', on: true, slots: [{ id: 'v5', start: '06:00', end: '09:00' }] },
+      { d: 'Quinta', on: true, slots: [{ id: 'v6', start: '17:00', end: '21:00' }] },
+      { d: 'Sexta', on: true, slots: [{ id: 'v7', start: '06:00', end: '09:00' }, { id: 'v8', start: '17:00', end: '20:00' }] },
+      { d: 'Sábado', on: true, slots: [{ id: 'v9', start: '09:00', end: '11:00' }] },
+      { d: 'Domingo', on: false, slots: [] }
+    ],
+    slotEditor: null,
+    pwd: { current: '', next: '', confirm: '', show: false, loading: false, done: false, error: null },
+    templates: [
+      { id: 't1', name: 'Pacote 4 aulas', desc: '1x por semana · 30 dias', price: 'R$ 220,00' },
+      { id: 't2', name: 'Pacote 10 aulas', desc: '2x por semana · 60 dias', price: 'R$ 480,00' },
+      { id: 't3', name: 'Aula avulsa', desc: 'Uma aula, sem validade', price: 'R$ 60,00' }
+    ]
+  };
+
+  componentDidMount() {
+    const r = this.props.startRole;
+    if (r === 'student' || r === 'admin') this.login(r);
+    if (typeof this.props.noShowConsumesClass === 'boolean') this.setState({ noShowConsumes: this.props.noShowConsumesClass });
+  }
+
+  componentWillUnmount() { clearTimeout(this._t); clearTimeout(this._l); }
+
+  go(route, opts) {
+    const o = opts || {};
+    this.setState(s => ({ route, stack: o.replace ? s.stack : s.stack.concat([s.route]), loading: !!o.loading, selSlot: null }));
+    if (o.loading) { clearTimeout(this._l); this._l = setTimeout(() => this.setState({ loading: false }), 620); }
+  }
+
+  login(role) { this.setState({ role, route: role === 'admin' ? 'admDash' : 'home', stack: [] }); }
+
+  toast(msg, undoFn, tone) {
+    clearTimeout(this._t);
+    this.setState({ toast: { msg, undo: undoFn || null, dot: tone === 'error' ? '#EF4444' : tone === 'warn' ? '#F59E0B' : '#F9CB2E' } });
+    this._t = setTimeout(() => this.setState({ toast: null }), undoFn ? 5200 : 2800);
+  }
+
+  credits() {
+    const p = this.state.pkg;
+    const future = this.state.myBookings.filter(b => b.future && (b.status === 'scheduled' || b.status === 'pending_confirmation')).length;
+    return Math.max(0, (p.total - p.used) - future);
+  }
+
+  daySlots(i) {
+    const table = [
+      [['06:00', 'livre'], ['07:00', 'seu horário'], ['17:00', 'livre'], ['18:00', 'lotado'], ['19:00', 'livre'], ['20:00', 'livre']],
+      [['07:00', 'livre'], ['08:00', 'livre'], ['18:00', 'lotado'], ['19:00', 'livre']],
+      [],
+      [['06:00', 'livre'], ['07:00', 'livre'], ['19:00', 'livre']],
+      [['08:00', 'livre'], ['17:00', 'livre'], ['18:00', 'livre'], ['19:00', 'lotado']],
+      [['09:00', 'livre'], ['10:00', 'livre']],
+      [['09:00', 'livre']]
+    ];
+    return table[i % 7];
+  }
+
+  renderVals() {
+    const st = this.state;
+    const role = st.role;
+    const credits = this.credits();
+    const pkg = st.pkg;
+    const usedPct = Math.round((pkg.used / pkg.total) * 100);
+    const suggestion = st.myBookings.find(b => b.status === 'rejected_with_suggestion');
+    const next = st.myBookings.find(b => b.future && (b.status === 'scheduled' || b.status === 'pending_confirmation'));
+    const nextCfg = this.cfg(next && next.status);
+    const det = st.myBookings.find(b => b.id === st.openBooking) || st.myBookings[0];
+    const detCfg = this.cfg(det.status);
+    const pendingBookings = st.agenda.filter(a => a.status === 'pending_confirmation');
+
+    const dayDefs = [['Ter', '01'], ['Qua', '02'], ['Qui', '03'], ['Sex', '04'], ['Sáb', '05'], ['Seg', '07'], ['Ter', '08']];
+    const days = dayDefs.map((d, i) => {
+      const on = st.selDay === i;
+      return {
+        wd: d[0], dd: d[1], onPick: () => { this.setState({ selDay: i, selSlot: null, loading: true }); clearTimeout(this._l); this._l = setTimeout(() => this.setState({ loading: false }), 480); },
+        bg: on ? '#DE2323' : '#1A1A1A', border: on ? '#DE2323' : '#2A2A2A',
+        fg: on ? '#fff' : '#E5E5E5', sub: on ? 'rgba(255,255,255,.8)' : '#8E8E8E'
+      };
+    });
+
+    const rawSlots = this.daySlots(st.selDay);
+    const slots = rawSlots.map(s => {
+      const full = s[1] === 'lotado';
+      const on = st.selSlot === s[0];
+      return {
+        time: s[0], note: full ? 'Sem vaga' : on ? 'Selecionado' : 'Disponível', disabled: full,
+        onPick: full ? () => {} : () => this.setState({ selSlot: s[0] }),
+        bg: full ? '#141414' : on ? 'rgba(222,35,35,.16)' : '#1A1A1A',
+        border: full ? '#222' : on ? '#DE2323' : '#2A2A2A',
+        fg: full ? '#5A5A5A' : '#fff', sub: full ? '#4A4A4A' : on ? '#F26A6A' : '#8E8E8E'
+      };
+    });
+
+    const tabDefs = [['proximas', 'Próximas'], ['anteriores', 'Anteriores'], ['todas', 'Todas']];
+    const tabs = tabDefs.map(t => {
+      const on = st.tab === t[0];
+      return { label: t[1], onPick: () => this.setState({ tab: t[0] }), bg: on ? '#DE2323' : '#1A1A1A', border: on ? '#DE2323' : '#2A2A2A', fg: on ? '#fff' : '#B5B5B5' };
+    });
+
+    const studentList = st.myBookings.filter(b => st.tab === 'todas' ? true : st.tab === 'proximas' ? b.future : !b.future).map(b => {
+      const c = this.cfg(b.status);
+      return { dd: b.dd, mon: b.mon, time: b.time, badge: c.label, badgeBg: c.bg, badgeFg: c.fg, onOpen: () => { this.setState({ openBooking: b.id }); this.go(b.status === 'rejected_with_suggestion' ? 'sugestao' : 'aula'); } };
+    });
+
+    const filterDefs = [['todas', 'Todas'], ['completed', 'Concluídas'], ['no_show', 'Faltas'], ['cancelled', 'Canceladas'], ['scheduled', 'Agendadas']];
+    const statusFilters = filterDefs.map(f => {
+      const on = st.admFilter === f[0];
+      return { label: f[1], onPick: () => this.setState({ admFilter: f[0] }), bg: on ? '#DE2323' : '#1A1A1A', border: on ? '#DE2323' : '#2A2A2A', fg: on ? '#fff' : '#B5B5B5' };
+    });
+
+    const histSeed = [
+      { id: 'h1', student: 'Bruno Tavares', when: 'Seg, 31 ago · 19:00', status: 'completed' },
+      { id: 'h2', student: 'Júlia Prado', when: 'Seg, 31 ago · 17:00', status: 'no_show' },
+      { id: 'h3', student: 'Marina Souza', when: 'Sex, 28 ago · 07:00', status: 'completed' },
+      { id: 'h4', student: 'Caio Menezes', when: 'Qui, 27 ago · 18:00', status: 'cancelled' },
+      { id: 'h5', student: 'Rafael Lima', when: 'Qua, 26 ago · 08:00', status: 'completed' }
+    ];
+    const q = st.search.trim().toLowerCase();
+    const adminHistory = histSeed
+      .filter(h => (st.admFilter === 'todas' || h.status === st.admFilter) && (!q || h.student.toLowerCase().includes(q)))
+      .map(h => {
+        const c = this.cfg(h.status);
+        return {
+          student: h.student, when: h.when, badge: c.label, badgeBg: c.bg, badgeFg: c.fg,
+          onRefund: () => this.toast('Crédito devolvido para ' + h.student.split(' ')[0], () => this.toast('Reembolso desfeito', null, 'warn')),
+          onMakeup: () => this.toast('Aula marcada como reposição')
+        };
+      });
+
+    const studentsList = st.students.filter(s => !q || s.name.toLowerCase().includes(q)).map(s => ({
+      name: s.name, sub: s.sub, credits: s.credits, ini: s.name.split(' ').map(x => x[0]).join('').slice(0, 2),
+      creditFg: s.credits === 0 ? '#EF4444' : s.credits <= 2 ? '#F59E0B' : '#F9CB2E',
+      onOpen: () => { this.setState({ openStudent: s.id }); this.go('admAluno'); }
+    }));
+
+    const openS = st.students.find(s => s.id === st.openStudent) || st.students[0];
+
+    const timeline = st.agenda.map(a => {
+      if (a.free) return { hour: a.hour, free: true, busy: false, dot: '#2E2E2E' };
+      const c = this.cfg(a.status);
+      const pend = a.status === 'pending_confirmation';
+      return {
+        hour: a.hour, free: false, busy: true, student: a.student, time: a.time,
+        badge: c.label, badgeBg: c.bg, badgeFg: c.fg, dot: c.fg,
+        cardBorder: pend ? 'rgba(245,158,11,.35)' : '#2A2A2A',
+        actionsPending: pend, actionsScheduled: a.status === 'scheduled',
+        onApprove: () => this.approve(a.id, a.student),
+        onReject: () => this.setState({ rejectFor: { id: a.id, student: a.student, time: a.time }, rejectNote: '', rejectTime: null }),
+        onComplete: () => this.markStatus(a.id, 'completed', a.student),
+        onNoShow: () => this.markStatus(a.id, 'no_show', a.student)
+      };
+    });
+
+    const requests = st.requests.map(r => ({
+      student: r.student, detail: r.detail,
+      kindLabel: r.kind === 'package' ? 'Pacote' : 'Aula avulsa',
+      kindBg: r.kind === 'package' ? 'rgba(249,203,46,.16)' : 'rgba(222,35,35,.16)',
+      kindFg: r.kind === 'package' ? '#F9CB2E' : '#F26A6A',
+      onApprove: () => { this.setState(s => ({ requests: s.requests.filter(x => x.id !== r.id) })); this.toast('Pedido aprovado · pacote criado', () => this.setState(s => ({ requests: s.requests.concat([r]) }))); },
+      onReject: () => this.setState({ confirm: { title: 'RECUSAR PEDIDO', desc: 'O pedido de ' + r.student + ' será recusado. O aluno recebe um aviso no app.', cta: 'Recusar', run: () => { this.setState(s => ({ requests: s.requests.filter(x => x.id !== r.id) })); this.toast('Pedido recusado', null, 'warn'); } } })
+    }));
+
+    const suggestDefs = ['Sex 19:00', 'Sáb 09:00', 'Seg 07:00'];
+    const suggestOptions = suggestDefs.map(l => {
+      const on = st.rejectTime === l;
+      return { label: l, onPick: () => this.setState({ rejectTime: on ? null : l }), bg: on ? 'rgba(245,158,11,.16)' : '#1E1E1E', border: on ? '#F59E0B' : '#333', fg: on ? '#F0B650' : '#C9C9C9' };
+    });
+
+    const atRisk = st.students.filter(s => s.credits <= 1).map(s => ({
+      name: s.name, ini: s.name.split(' ').map(x => x[0]).join('').slice(0, 2),
+      risk: s.credits === 0 ? 'Sem créditos · 14 dias sem treinar' : 'Resta 1 crédito',
+      riskFg: s.credits === 0 ? '#EF4444' : '#F59E0B',
+      onOpen: () => { this.setState({ openStudent: s.id }); this.go('admAluno'); }
+    }));
+
+    const nkey = role === 'admin' ? 'notifs' : 'studentNotifs';
+    const nsrc = st[nkey];
+    const navC = (r) => st.route === r ? '#DE2323' : '#7A7A7A';
+    const modal = !!st.rejectFor;
+
+    return {
+      isLogin: st.route === 'login',
+      isHome: st.route === 'home', isAgendar: st.route === 'agendar', isHistorico: st.route === 'historico',
+      isAula: st.route === 'aula', isSugestao: st.route === 'sugestao', isPacotes: st.route === 'pacotes',
+      isConta: st.route === 'conta',
+      isAdmDash: st.route === 'admDash', isAdmAgenda: st.route === 'admAgenda', isAdmAlunos: st.route === 'admAlunos',
+      isAdmAluno: st.route === 'admAluno', isAdmHist: st.route === 'admHist', isAdmPedidos: st.route === 'admPedidos',
+      isAdmDispo: st.route === 'admDispo', isSenha: st.route === 'senha',
+      isAdmin: role === 'admin',
+      showStudentNav: role === 'student' && ['home', 'agendar', 'historico', 'conta', 'pacotes', 'aula', 'sugestao', 'senha'].includes(st.route),
+      showAdminNav: role === 'admin' && ['admDash', 'admAgenda', 'admAlunos', 'admAluno', 'admHist', 'admPedidos', 'conta', 'admDispo', 'senha'].includes(st.route),
+
+      credits, pkgPct: usedPct + '%', pkgLabel: pkg.used + ' de ' + pkg.total + ' usadas · ' + credits + ' disponíveis',
+      lowCredits: credits <= 2,
+      hasSuggestion: !!suggestion,
+      hasNext: !!next, noNext: !next,
+      nextDay: next ? next.dd : '', nextMonth: next ? next.mon : '', nextTime: next ? next.date + ' · ' + next.time : '',
+      nextBadge: nextCfg.label, nextBadgeBg: nextCfg.bg, nextBadgeFg: nextCfg.fg,
+      primaryLabel: credits === 0 ? 'Solicitar pacote' : 'Agendar aula',
+      primaryHint: credits === 0 ? 'Seu pacote acabou — peça a renovação' : 'Escolha dia e horário em 2 toques',
+      primaryAction: () => this.go(credits === 0 ? 'pacotes' : 'agendar'),
+      openNext: () => { if (next) { this.setState({ openBooking: next.id }); this.go('aula'); } },
+      openSuggestion: () => { if (suggestion) { this.setState({ openBooking: suggestion.id }); this.go('sugestao'); } },
+
+      days, slots,
+      loading: st.loading,
+      slotsReady: !st.loading && slots.length > 0,
+      slotsEmpty: !st.loading && slots.length === 0,
+      hasSelSlot: !!st.selSlot, selSlotLabel: st.selSlot || '',
+      confirmBooking: () => {
+        const t = st.selSlot; const d = dayDefs[st.selDay];
+        this.setState(s => ({
+          selSlot: null,
+          myBookings: [{ id: 'n' + Date.now(), dd: d[1], mon: 'set', date: d[0] + ', ' + d[1] + ' set', time: t + ' – ' + String(parseInt(t, 10) + 1).padStart(2, '0') + ':00', status: 'pending_confirmation', future: true }].concat(s.myBookings)
+        }));
+        this.go('home');
+        this.toast('Enviado! Aguarde a aprovação do professor');
+      },
+      pickNextDay: () => this.setState({ selDay: (st.selDay + 1) % 7 }),
+
+      tabs, studentList,
+      listReady: !st.loading && !st.error && studentList.length > 0,
+      listEmpty: !st.loading && !st.error && studentList.length === 0,
+      error: st.error,
+      retry: () => { this.setState({ error: false, loading: true }); clearTimeout(this._l); this._l = setTimeout(() => this.setState({ loading: false }), 700); },
+
+      detDate: det.date, detTime: det.time, detBadge: detCfg.label, detBadgeBg: detCfg.bg, detBadgeFg: detCfg.fg,
+      detHasNote: !!det.note, detNote: det.note || '',
+      detCancelable: det.future,
+      askCancel: () => this.setState({ confirm: { title: 'CANCELAR AULA', desc: 'A aula de ' + det.date + ' será cancelada e o crédito volta para o seu pacote.', cta: 'Cancelar aula', run: () => { this.setState(s => ({ myBookings: s.myBookings.map(b => b.id === det.id ? Object.assign({}, b, { status: 'cancelled', future: false }) : b) })); this.go('home'); this.toast('Aula cancelada · crédito devolvido', null, 'warn'); } } }),
+      acceptSuggestion: () => {
+        this.setState(s => ({ myBookings: s.myBookings.map(b => b.status === 'rejected_with_suggestion' ? Object.assign({}, b, { status: 'scheduled', future: true, dd: '04', mon: 'set', date: 'Sex, 04 set', time: '19:00 – 20:00', note: null }) : b) }));
+        this.go('home'); this.toast('Horário confirmado para sexta, 19:00');
+      },
+
+      templates: st.templates.map(t => ({ name: t.name, desc: t.desc, price: t.price, onRequest: () => this.toast('Pedido de ' + t.name.toLowerCase() + ' enviado') })),
+
+      initials: role === 'admin' ? 'DA' : 'MS',
+      userName: role === 'admin' ? 'Diego Andrade' : 'Marina Souza',
+      userRole: role === 'admin' ? 'Professor' : 'Aluna',
+      noShowBg: st.noShowConsumes ? '#DE2323' : '#3A3A3A',
+      noShowJustify: st.noShowConsumes ? 'flex-end' : 'flex-start',
+      toggleNoShow: () => { this.setState(s => ({ noShowConsumes: !s.noShowConsumes })); this.toast(st.noShowConsumes ? 'Falta não consome mais crédito' : 'Falta passa a consumir crédito'); },
+      errorToggleLabel: st.error ? 'Desligar simulação de erro' : 'Simular erro de rede',
+      toggleError: () => { this.setState(s => ({ error: !s.error })); this.toast(st.error ? 'Simulação desligada' : 'Erro simulado — abra "Aulas"', null, 'warn'); },
+      askLogout: () => this.setState({ confirm: { title: 'SAIR DA CONTA', desc: 'Você precisará entrar novamente com e-mail e senha.', cta: 'Sair', run: () => this.setState({ role: null, route: 'login', stack: [], confirm: null }) } }),
+
+      kpiToday: st.agenda.filter(a => !a.free).length,
+      hasPending: pendingBookings.length > 0,
+      pendingLabel: pendingBookings.length + ' agendamento(s) aguardando aprovação',
+      pendingList: pendingBookings.map(p => ({
+        student: p.student, when: 'Hoje · ' + p.time,
+        onApprove: () => this.approve(p.id, p.student),
+        onReject: () => this.setState({ rejectFor: { id: p.id, student: p.student, time: p.time }, rejectNote: '', rejectTime: null })
+      })),
+      adminUpcoming: st.agenda.filter(a => !a.free && a.status !== 'completed').slice(0, 3).map(a => {
+        const c = this.cfg(a.status);
+        return { hour: a.hour, student: a.student, time: a.time, badge: c.label, badgeBg: c.bg, badgeFg: c.fg };
+      }),
+      atRisk, timeline, studentsList, requests, statusFilters, adminHistory,
+      admLoading: st.loading,
+      admError: st.error && !st.loading,
+      studentsReady: !st.loading && !st.error && studentsList.length > 0,
+      studentsEmpty: !st.loading && !st.error && studentsList.length === 0,
+      adminHistReady: !st.loading && !st.error && adminHistory.length > 0,
+      adminHistEmpty: !st.loading && !st.error && adminHistory.length === 0,
+      timelineReady: !st.loading && !st.error,
+      dashReady: !st.loading && !st.error,
+      requestsReady: !st.loading && !st.error && st.requests.length > 0,
+      requestsEmpty: !st.loading && !st.error && st.requests.length === 0,
+      hasRequests: st.requests.length > 0, requestCount: st.requests.length,
+      search: st.search, onSearch: (e) => this.setState({ search: e.target.value }),
+
+      detStudentName: openS.name.toUpperCase(), detStudentCredits: openS.credits,
+      detStudentPct: Math.round((openS.used / openS.total) * 100) + '%',
+      detStudentPkg: openS.used + ' de ' + openS.total + ' usadas',
+      detStudentHistory: [
+        { when: 'Seg, 31 ago · 07:00', status: 'completed' },
+        { when: 'Sex, 28 ago · 07:00', status: 'completed' },
+        { when: 'Ter, 26 ago · 07:00', status: 'no_show' }
+      ].map(h => { const c = this.cfg(h.status); return { when: h.when, badge: c.label, badgeBg: c.bg, badgeFg: c.fg }; }),
+      assignPackage: () => this.toast('Pacote 10 aulas atribuído a ' + openS.name.split(' ')[0]),
+      askRemovePkg: () => this.setState({ confirm: { title: 'REMOVER PACOTE', desc: 'O pacote ativo de ' + openS.name + ' será encerrado. Créditos restantes serão perdidos.', cta: 'Remover', run: () => this.toast('Pacote removido', null, 'warn') } }),
+
+      showReject: modal,
+      rejectSubtitle: modal ? st.rejectFor.student + ' · ' + st.rejectFor.time : '',
+      rejectNote: st.rejectNote,
+      onRejectNote: (e) => this.setState({ rejectNote: e.target.value }),
+      suggestOptions,
+      rejectCta: st.rejectTime ? 'Recusar e sugerir' : 'Recusar',
+      closeReject: () => this.setState({ rejectFor: null }),
+      confirmReject: () => {
+        const f = st.rejectFor; const withSug = !!st.rejectTime;
+        this.setState(s => ({ rejectFor: null, agenda: s.agenda.map(a => a.id === f.id ? Object.assign({}, a, { status: withSug ? 'rejected_with_suggestion' : 'rejected' }) : a) }));
+        this.toast(withSug ? 'Recusado com sugestão de ' + st.rejectTime : 'Agendamento recusado', null, 'warn');
+      },
+
+      showConfirm: !!st.confirm,
+      confirmTitle: st.confirm ? st.confirm.title : '',
+      confirmDesc: st.confirm ? st.confirm.desc : '',
+      confirmCta: st.confirm ? st.confirm.cta : '',
+      closeConfirm: () => this.setState({ confirm: null }),
+      runConfirm: () => { const c = st.confirm; this.setState({ confirm: null }); if (c) c.run(); },
+
+      hasToast: !!st.toast, toastMsg: st.toast ? st.toast.msg : '', toastDot: st.toast ? st.toast.dot : '#F9CB2E',
+      toastHasUndo: !!(st.toast && st.toast.undo),
+      undo: () => { const u = st.toast && st.toast.undo; this.setState({ toast: null }); if (u) u(); },
+
+      loginStudent: () => this.login('student'),
+      loginAdmin: () => this.login('admin'),
+      back: () => this.setState(s => { const st2 = s.stack.slice(); const prev = st2.pop(); return { route: prev || (s.role === 'admin' ? 'admDash' : 'home'), stack: st2 }; }),
+      goHome: () => this.go('home', { replace: true }),
+      goAgendar: () => this.go('agendar'),
+      goHistorico: () => this.go('historico', { loading: true, replace: true }),
+      goConta: () => this.go('conta', { replace: true }),
+      goPacotes: () => this.go('pacotes'),
+      goDash: () => this.go('admDash', { loading: true, replace: true }),
+      goAgenda: () => this.go('admAgenda', { loading: true, replace: true }),
+      goAlunos: () => this.go('admAlunos', { loading: true, replace: true }),
+      goAdmHist: () => this.go('admHist', { loading: true, replace: true }),
+      goPedidos: () => this.go('admPedidos', { loading: true, replace: true }),
+
+      // --- Disponibilidade ---
+      goDispo: () => this.go('admDispo', { loading: true }),
+      week: st.availability.map((d, i) => {
+        const booked = d.slots.reduce((n, sl) => n + this.bookingsIn(d.d, sl.start, sl.end), 0);
+        return {
+          name: d.d, on: d.on,
+          toggleBg: d.on ? '#DE2323' : '#3A3A3A', toggleJustify: d.on ? 'flex-end' : 'flex-start',
+          nameFg: d.on ? '#fff' : '#9A9A9A',
+          summary: !d.on ? 'Indisponível' : d.slots.length === 0 ? 'Sem horários' : d.slots.length + ' intervalo(s) · ' + booked + ' aula(s) marcada(s)',
+          hasSlots: d.on && d.slots.length > 0,
+          isEmpty: d.on && d.slots.length === 0,
+          onToggle: () => {
+            if (d.on && booked > 0) {
+              this.setState({ confirm: { title: 'DESATIVAR ' + d.d.toUpperCase(), desc: 'Há ' + booked + ' aula(s) já marcada(s) nesse dia. Elas continuam válidas, mas o dia deixa de aceitar novos agendamentos.', cta: 'Desativar', run: () => { this.setState(s2 => ({ availability: s2.availability.map((x, j) => j === i ? Object.assign({}, x, { on: false }) : x) })); this.toast(d.d + ' indisponível para novos agendamentos', null, 'warn'); } } });
+            } else {
+              this.setState(s2 => ({ availability: s2.availability.map((x, j) => j === i ? Object.assign({}, x, { on: !x.on }) : x) }));
+              this.toast(d.on ? d.d + ' indisponível' : d.d + ' disponível para agendamento', null, d.on ? 'warn' : 'ok');
+            }
+          },
+          onAdd: () => this.setState({ slotEditor: { dayIdx: i, id: null, start: '06:00', end: '09:00', error: null } }),
+          slots: d.slots.map(sl => {
+            const n = this.bookingsIn(d.d, sl.start, sl.end);
+            return {
+              label: sl.start + ' – ' + sl.end,
+              sub: n > 0 ? n + ' aula(s) marcada(s) neste intervalo' : 'Aberto para agendamento',
+              subFg: n > 0 ? '#F0B650' : '#9A9A9A',
+              onEdit: () => this.setState({ slotEditor: { dayIdx: i, id: sl.id, start: sl.start, end: sl.end, error: null } }),
+              onDelete: () => {
+                if (n > 0) this.setState({ confirm: { title: 'REMOVER HORÁRIO', desc: 'Há ' + n + ' aula(s) marcada(s) entre ' + sl.start + ' e ' + sl.end + '. Remover o intervalo não cancela essas aulas, mas bloqueia novos agendamentos.', cta: 'Remover', run: () => this.removeSlot(i, sl.id) } });
+                else this.removeSlot(i, sl.id);
+              }
+            };
+          })
+        };
+      }),
+      openSlots: st.availability.filter(d => d.on).reduce((n, d) => n + d.slots.length, 0),
+      openDays: st.availability.filter(d => d.on && d.slots.length > 0).length,
+      showSlotEditor: !!st.slotEditor,
+      editorTitle: st.slotEditor ? (st.slotEditor.id ? 'EDITAR HORÁRIO' : 'ADICIONAR HORÁRIO') : '',
+      editorDay: st.slotEditor ? st.availability[st.slotEditor.dayIdx].d : '',
+      editorCta: st.slotEditor && st.slotEditor.id ? 'Salvar alterações' : 'Adicionar horário',
+      editorHasError: !!(st.slotEditor && st.slotEditor.error),
+      editorError: st.slotEditor ? st.slotEditor.error || '' : '',
+      startOptions: [6, 7, 8, 9, 10, 17, 18, 19, 20].map(h => {
+        const v = this.hhmm(h); const on = st.slotEditor && st.slotEditor.start === v;
+        return { label: v, onPick: () => this.setState(s2 => ({ slotEditor: Object.assign({}, s2.slotEditor, { start: v, error: null }) })), bg: on ? 'rgba(222,35,35,.16)' : '#1E1E1E', border: on ? '#DE2323' : '#333', fg: on ? '#F26A6A' : '#C9C9C9' };
+      }),
+      endOptions: [7, 8, 9, 10, 11, 18, 19, 20, 21].map(h => {
+        const v = this.hhmm(h); const on = st.slotEditor && st.slotEditor.end === v;
+        return { label: v, onPick: () => this.setState(s2 => ({ slotEditor: Object.assign({}, s2.slotEditor, { end: v, error: null }) })), bg: on ? 'rgba(222,35,35,.16)' : '#1E1E1E', border: on ? '#DE2323' : '#333', fg: on ? '#F26A6A' : '#C9C9C9' };
+      }),
+      saveSlot: () => this.saveSlot(),
+      closeSlotEditor: () => this.setState({ slotEditor: null }),
+
+      // --- Notificações ---
+      notifOpen: st.notifOpen,
+      unread: nsrc.filter(n => !n.read).length,
+      hasUnread: nsrc.filter(n => !n.read).length > 0,
+      openNotifs: () => this.setState({ notifOpen: true }),
+      closeNotifs: () => this.setState({ notifOpen: false }),
+      notifList: nsrc.map(n => ({
+        title: n.title, desc: n.desc, when: n.when, read: n.read, unread: !n.read,
+        bg: n.read ? '#161616' : 'rgba(222,35,35,.07)',
+        border: n.read ? '#242424' : 'rgba(222,35,35,.28)',
+        titleFg: n.read ? '#B5B5B5' : '#fff',
+        dot: n.kind === 'cancel' ? '#EF4444' : n.kind === 'confirm' ? '#F9CB2E' : n.kind === 'system' ? '#9A9A9A' : '#F59E0B',
+        onOpen: () => {
+          const upd = {}; upd[nkey] = nsrc.map(x => x.id === n.id ? Object.assign({}, x, { read: true }) : x); upd.notifOpen = false;
+          this.setState(upd);
+          if (n.kind === 'booking') this.go('admAgenda', { replace: true });
+          if (n.kind === 'cancel' && role === 'student') this.go('sugestao', { replace: true });
+        }
+      })),
+      notifEmpty: nsrc.length === 0,
+      markAllRead: () => { const upd = {}; upd[nkey] = nsrc.map(x => Object.assign({}, x, { read: true })); this.setState(upd); this.toast('Todas as notificações marcadas como lidas'); },
+      clearNotifs: () => this.setState({ confirm: { title: 'LIMPAR NOTIFICAÇÕES', desc: 'Todas as notificações serão removidas da central.', cta: 'Limpar', run: () => { const prev = nsrc; const upd = {}; upd[nkey] = []; this.setState(upd); this.toast('Central limpa', () => { const back = {}; back[nkey] = prev; this.setState(back); }, 'warn'); } } }),
+
+      // --- Alterar senha ---
+      goSenha: () => { this.setState({ pwd: { current: '', next: '', confirm: '', show: false, loading: false, done: false, error: null } }); this.go('senha'); },
+      pwdCurrent: st.pwd.current, pwdNext: st.pwd.next, pwdConfirm: st.pwd.confirm,
+      pwdType: st.pwd.show ? 'text' : 'password',
+      pwdShowLabel: st.pwd.show ? 'Ocultar' : 'Mostrar',
+      onPwdCurrent: (e) => { const v = e.target.value; this.setState(s2 => ({ pwd: Object.assign({}, s2.pwd, { current: v, error: null }) })); },
+      onPwdNext: (e) => { const v = e.target.value; this.setState(s2 => ({ pwd: Object.assign({}, s2.pwd, { next: v }) })); },
+      onPwdConfirm: (e) => { const v = e.target.value; this.setState(s2 => ({ pwd: Object.assign({}, s2.pwd, { confirm: v }) })); },
+      togglePwdShow: () => this.setState(s2 => ({ pwd: Object.assign({}, s2.pwd, { show: !s2.pwd.show }) })),
+      ruleLenFg: st.pwd.next.length >= 8 ? '#F9CB2E' : '#9A9A9A',
+      ruleNumFg: /\d/.test(st.pwd.next) ? '#F9CB2E' : '#9A9A9A',
+      ruleUpFg: /[A-Z]/.test(st.pwd.next) ? '#F9CB2E' : '#9A9A9A',
+      pwdMismatch: st.pwd.confirm.length > 0 && st.pwd.confirm !== st.pwd.next,
+      pwdHasError: !!st.pwd.error,
+      pwdError: st.pwd.error || '',
+      pwdLoading: st.pwd.loading,
+      pwdDone: st.pwd.done,
+      pwdForm: !st.pwd.done,
+      pwdCta: st.pwd.loading ? 'Salvando…' : 'Alterar senha',
+      pwdDisabled: !(st.pwd.current.length > 0 && st.pwd.next.length >= 8 && /\d/.test(st.pwd.next) && /[A-Z]/.test(st.pwd.next) && st.pwd.next === st.pwd.confirm) || st.pwd.loading,
+      pwdBtnBg: (!(st.pwd.current.length > 0 && st.pwd.next.length >= 8 && /\d/.test(st.pwd.next) && /[A-Z]/.test(st.pwd.next) && st.pwd.next === st.pwd.confirm) || st.pwd.loading) ? '#2A2A2A' : '#DE2323',
+      pwdBtnFg: (!(st.pwd.current.length > 0 && st.pwd.next.length >= 8 && /\d/.test(st.pwd.next) && /[A-Z]/.test(st.pwd.next) && st.pwd.next === st.pwd.confirm) || st.pwd.loading) ? '#6E6E6E' : '#fff',
+      submitPwd: () => this.submitPassword(),
+
+      navHome: navC('home'), navAgendar: navC('agendar'), navAulas: navC('historico'),
+      navConta: ['conta', 'senha', 'admDispo'].includes(st.route) ? '#DE2323' : '#7A7A7A',
+      navDash: navC('admDash'), navAgenda: navC('admAgenda'),
+      navAlunos: st.route === 'admAlunos' || st.route === 'admAluno' ? '#DE2323' : '#7A7A7A',
+      navAdmHist: navC('admHist'), navPedidos: navC('admPedidos')
+    };
+  }
+
+  hhmm(h) { return String(h).padStart(2, '0') + ':00'; }
+
+  bookingsIn(dayName, start, end) {
+    if (dayName !== 'Terça') return 0;
+    const s = parseInt(start, 10), e = parseInt(end, 10);
+    return this.state.agenda.filter(a => !a.free && parseInt(a.hour, 10) >= s && parseInt(a.hour, 10) < e).length;
+  }
+
+  saveSlot() {
+    const ed = this.state.slotEditor;
+    const s = parseInt(ed.start, 10), e = parseInt(ed.end, 10);
+    if (e <= s) { this.setState({ slotEditor: Object.assign({}, ed, { error: 'O fim precisa ser depois do início.' }) }); return; }
+    const day = this.state.availability[ed.dayIdx];
+    const clash = day.slots.some(sl => sl.id !== ed.id && parseInt(sl.start, 10) < e && s < parseInt(sl.end, 10));
+    if (clash) { this.setState({ slotEditor: Object.assign({}, ed, { error: 'Esse intervalo conflita com outro já cadastrado em ' + day.d + '.' }) }); return; }
+    this.setState(st => ({
+      slotEditor: null,
+      availability: st.availability.map((d, i) => i !== ed.dayIdx ? d : Object.assign({}, d, {
+        on: true,
+        slots: (ed.id ? d.slots.map(sl => sl.id === ed.id ? { id: sl.id, start: ed.start, end: ed.end } : sl)
+          : d.slots.concat([{ id: 'v' + Date.now(), start: ed.start, end: ed.end }]))
+          .sort((a, b) => parseInt(a.start, 10) - parseInt(b.start, 10))
+      }))
+    }));
+    this.toast(ed.id ? 'Horário atualizado' : 'Horário adicionado em ' + day.d);
+  }
+
+  removeSlot(dayIdx, id) {
+    const prev = this.state.availability;
+    this.setState(st => ({ availability: st.availability.map((d, i) => i !== dayIdx ? d : Object.assign({}, d, { slots: d.slots.filter(sl => sl.id !== id) })) }));
+    this.toast('Horário removido', () => this.setState({ availability: prev }), 'warn');
+  }
+
+  submitPassword() {
+    this.setState(st => ({ pwd: Object.assign({}, st.pwd, { loading: true, error: null }) }));
+    clearTimeout(this._p);
+    this._p = setTimeout(() => {
+      const p = this.state.pwd;
+      if (p.current !== '123456') {
+        this.setState(st => ({ pwd: Object.assign({}, st.pwd, { loading: false, error: 'Senha atual incorreta. Tente novamente.' }) }));
+        this.toast('Não foi possível alterar a senha', null, 'error');
+      } else {
+        this.setState(st => ({ pwd: Object.assign({}, st.pwd, { loading: false, done: true, error: null }) }));
+        this.toast('Senha alterada com sucesso');
+      }
+    }, 950);
+  }
+
+  approve(id, student) {
+    const prev = this.state.agenda;
+    this.setState(s => ({ agenda: s.agenda.map(a => a.id === id ? Object.assign({}, a, { status: 'scheduled' }) : a) }));
+    this.toast('Aula de ' + student.split(' ')[0] + ' aprovada', () => this.setState({ agenda: prev }));
+  }
+
+  markStatus(id, status, student) {
+    const prev = this.state.agenda;
+    this.setState(s => ({ agenda: s.agenda.map(a => a.id === id ? Object.assign({}, a, { status }) : a) }));
+    const msg = status === 'completed' ? 'Aula de ' + student.split(' ')[0] + ' concluída' : 'Falta registrada' + (this.state.noShowConsumes ? ' · crédito consumido' : ' · crédito mantido');
+    this.toast(msg, () => this.setState({ agenda: prev }), status === 'completed' ? 'ok' : 'warn');
+  }
+}
+
+</script>
+</body>
+</html>
