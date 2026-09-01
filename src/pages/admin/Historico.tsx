@@ -5,12 +5,14 @@ import { useAuth } from "@/context/AuthContext";
 import { BookingFilters } from "@/components/BookingFilters";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SkeletonList } from "@/components/SkeletonCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getStatusConfig } from "@/lib/bookingStatus";
 import { formatDateTime } from "@/lib/dateUtils";
 import {
+  canRefundBooking,
   getAdminBookingHistory,
   markBookingAsMakeup,
   refundBooking,
@@ -31,6 +33,7 @@ export default function AdminHistorico() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("todas");
+  const [refundTarget, setRefundTarget] = useState<{ id: string; studentName: string } | null>(null);
 
   const key = ["admin-history", profile?.id, search, statusFilter];
   const { data, isLoading, isError, refetch } = useQuery({
@@ -45,6 +48,7 @@ export default function AdminHistorico() {
       queryClient.invalidateQueries({ queryKey: ["admin-history"] });
       const studentName = data?.find((x) => x.booking.id === bookingId)?.studentName ?? "";
       toast.warning(`Crédito devolvido para ${studentName.split(" ")[0]}`, {
+        duration: 8000,
         action: {
           label: "Desfazer",
           onClick: async () => {
@@ -67,7 +71,7 @@ export default function AdminHistorico() {
 
   return (
     <div className="page-container">
-      <div className="font-display text-3xl tracking-wide text-foreground leading-none mb-3.5">HISTÓRICO</div>
+      <h1 className="font-display text-3xl tracking-wide text-foreground leading-none mb-3.5">HISTÓRICO</h1>
       <BookingFilters
         search={search}
         onSearchChange={setSearch}
@@ -93,10 +97,17 @@ export default function AdminHistorico() {
                   </div>
                   <Badge className={cfg.badgeClass}>{cfg.label}</Badge>
                   {booking.isMakeup && <Badge className="bg-secondary text-muted-foreground">Reposição</Badge>}
+                  {booking.refunded && <Badge className="bg-accent/15 text-accent">Reembolsada</Badge>}
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="secondary" size="sm" className="flex-1" onClick={() => refund.mutate(booking.id)}>
-                    Reembolsar aula
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="flex-1"
+                    disabled={!canRefundBooking(booking)}
+                    onClick={() => setRefundTarget({ id: booking.id, studentName })}
+                  >
+                    {booking.refunded ? "Reembolsada" : "Reembolsar aula"}
                   </Button>
                   <Button
                     variant="secondary"
@@ -117,6 +128,15 @@ export default function AdminHistorico() {
       {!isLoading && !isError && data && data.length === 0 && (
         <EmptyState icon={CalendarX} title="Nenhuma aula nesse filtro" description="Ajuste a busca ou o status." />
       )}
+
+      <ConfirmDialog
+        open={!!refundTarget}
+        onOpenChange={(o) => !o && setRefundTarget(null)}
+        title="REEMBOLSAR AULA"
+        description={`O crédito desta aula será devolvido ao pacote de ${refundTarget?.studentName}. Essa ação pode ser desfeita logo em seguida, pelo toast.`}
+        confirmLabel="Reembolsar"
+        onConfirm={() => refundTarget && refund.mutate(refundTarget.id)}
+      />
     </div>
   );
 }

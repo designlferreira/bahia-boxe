@@ -78,7 +78,9 @@ function seed(): DbShape {
   ];
 
   const bookings: Booking[] = [
-    { id: "b1", studentId: "student-1", adminId: ADMIN_ID, startTime: brt(2026, 9, 1, 7), endTime: brt(2026, 9, 1, 8), status: "scheduled" },
+    // Ter 01 set 07:00 (scheduled) and Sex 28 ago 07:00 (completed) are represented
+    // once each — by "a1" and "h3" below — since a single booking row is shared by
+    // both the student's and the admin's queries (both filter the same list).
     { id: "b2", studentId: "student-1", adminId: ADMIN_ID, startTime: brt(2026, 9, 3, 19), endTime: brt(2026, 9, 3, 20), status: "pending_confirmation" },
     {
       id: "b5",
@@ -91,7 +93,6 @@ function seed(): DbShape {
       suggestedStartTime: brt(2026, 9, 4, 19),
       suggestedEndTime: brt(2026, 9, 4, 20),
     },
-    { id: "b3", studentId: "student-1", adminId: ADMIN_ID, startTime: brt(2026, 8, 28, 7), endTime: brt(2026, 8, 28, 8), status: "completed" },
     { id: "b4", studentId: "student-1", adminId: ADMIN_ID, startTime: brt(2026, 8, 26, 7), endTime: brt(2026, 8, 26, 8), status: "no_show" },
     { id: "b6", studentId: "student-1", adminId: ADMIN_ID, startTime: brt(2026, 8, 22, 7), endTime: brt(2026, 8, 22, 8), status: "completed" },
 

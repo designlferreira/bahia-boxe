@@ -81,6 +81,7 @@ export default function AdminDisponibilidade() {
     onSuccess: (_r, slot) => {
       invalidate();
       toast.warning("Horário removido", {
+        duration: 8000,
         action: {
           label: "Desfazer",
           onClick: async () => {
@@ -221,7 +222,7 @@ export default function AdminDisponibilidade() {
             <div className="text-[13px] text-muted-foreground mb-4">{editor.dayName} · repete toda semana</div>
 
             <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Início</div>
-            <div className="flex gap-2 overflow-x-auto -mx-5 px-5 mb-3.5 pb-1">
+            <div className="flex gap-2 overflow-x-auto -mx-5 px-5 mb-3.5 pb-1 scroll-fade-x">
               {START_HOURS.map((h) => {
                 const v = hhmm(h);
                 const on = editor.start === v;
@@ -242,7 +243,7 @@ export default function AdminDisponibilidade() {
             </div>
 
             <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Fim</div>
-            <div className="flex gap-2 overflow-x-auto -mx-5 px-5 mb-3.5 pb-1">
+            <div className="flex gap-2 overflow-x-auto -mx-5 px-5 mb-3.5 pb-1 scroll-fade-x">
               {END_HOURS.map((h) => {
                 const v = hhmm(h);
                 const on = editor.end === v;

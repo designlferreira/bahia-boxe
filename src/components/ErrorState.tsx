@@ -12,7 +12,7 @@ export function ErrorState({
   onRetry,
 }: ErrorStateProps) {
   return (
-    <div className="rounded-2xl border border-destructive/35 bg-destructive/10 p-6 text-center">
+    <div role="alert" className="rounded-2xl border border-destructive/35 bg-destructive/10 p-6 text-center">
       <div className="text-[14.5px] font-semibold text-destructive/90 mb-1">{title}</div>
       <div className="text-[12.5px] text-muted-foreground mb-3.5">{description}</div>
       <Button size="sm" onClick={onRetry}>

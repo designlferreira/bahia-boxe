@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Bell, CalendarClock, XCircle, CheckCircle2, Info } from "lucide-react";
+import { Bell, CalendarClock, XCircle, CheckCircle2, Info, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetClose, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -61,6 +61,7 @@ export function NotificationBell({ userId, bookingRoute, cancelRoute }: Notifica
     onSuccess: (removed) => {
       queryClient.invalidateQueries({ queryKey: key });
       toast.warning("Central limpa", {
+        duration: 8000,
         action: {
           label: "Desfazer",
           onClick: async () => {
@@ -78,7 +79,7 @@ export function NotificationBell({ userId, bookingRoute, cancelRoute }: Notifica
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Notificações"
-        className="relative h-[42px] w-[42px] rounded-[13px] bg-secondary border border-border flex items-center justify-center active:scale-95 transition-transform"
+        className="relative h-11 w-11 rounded-[13px] bg-secondary border border-border flex items-center justify-center active:scale-95 transition-transform"
       >
         <Bell className="h-[18px] w-[18px] text-foreground/90" />
         {unread > 0 && (
@@ -100,6 +101,15 @@ export function NotificationBell({ userId, bookingRoute, cancelRoute }: Notifica
                 Marcar todas
               </Button>
             )}
+            <SheetClose asChild>
+              <button
+                type="button"
+                aria-label="Fechar"
+                className="h-11 w-11 shrink-0 rounded-[11px] border border-[#333] bg-secondary flex items-center justify-center active:scale-95 transition-transform"
+              >
+                <X className="h-[15px] w-[15px] text-foreground/80" />
+              </button>
+            </SheetClose>
           </div>
 
           <div className="flex-1 overflow-y-auto flex flex-col gap-2.5">

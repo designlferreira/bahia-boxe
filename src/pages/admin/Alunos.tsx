@@ -22,7 +22,7 @@ export default function AdminAlunos() {
 
   return (
     <div className="page-container">
-      <div className="font-display text-3xl tracking-wide text-foreground leading-none mb-3.5">ALUNOS</div>
+      <h1 className="font-display text-3xl tracking-wide text-foreground leading-none mb-3.5">ALUNOS</h1>
       <BookingFilters search={search} onSearchChange={setSearch} searchPlaceholder="Buscar aluno" />
 
       {isError && <ErrorState title="Não foi possível carregar os alunos" onRetry={() => refetch()} />}
@@ -59,7 +59,13 @@ export default function AdminAlunos() {
       )}
 
       {!isLoading && !isError && data && data.length === 0 && (
-        <EmptyState icon={Users} title="Nenhum aluno encontrado" description="Tente outro nome ou convide um novo aluno." />
+        <EmptyState
+          icon={Users}
+          title="Nenhum aluno encontrado"
+          description={search ? `Nenhum resultado para "${search}".` : "Convide um novo aluno para começar."}
+          ctaLabel={search ? "Limpar busca" : undefined}
+          onCta={search ? () => setSearch("") : undefined}
+        />
       )}
     </div>
   );

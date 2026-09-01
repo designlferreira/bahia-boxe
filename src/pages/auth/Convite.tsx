@@ -31,28 +31,28 @@ export default function Convite() {
 
   if (isLoading) {
     return (
-      <div className="min-h-dvh flex flex-col justify-center bg-background px-6">
+      <main className="min-h-dvh flex flex-col justify-center bg-background px-6">
         <SkeletonCard height={220} />
-      </div>
+      </main>
     );
   }
 
   if (!data) {
     return (
-      <div className="min-h-dvh flex flex-col items-center justify-center bg-background px-6 text-center">
-        <div className="font-display text-2xl tracking-wide text-foreground mb-1.5">CONVITE INVÁLIDO</div>
+      <main className="min-h-dvh flex flex-col items-center justify-center bg-background px-6 text-center">
+        <h1 className="font-display text-2xl tracking-wide text-foreground mb-1.5">CONVITE INVÁLIDO</h1>
         <p className="text-[13.5px] text-muted-foreground">Esse link de convite expirou ou já foi utilizado.</p>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-dvh flex flex-col justify-center bg-background px-6">
-      <div className="font-display text-3xl tracking-wide text-foreground mb-1.5">VOCÊ FOI CONVIDADO</div>
+    <main className="min-h-dvh flex flex-col justify-center bg-background px-6">
+      <h1 className="font-display text-3xl tracking-wide text-foreground mb-1.5">VOCÊ FOI CONVIDADO</h1>
       <p className="text-[13.5px] text-muted-foreground mb-6">
         {data.adminName} está te convidando para gerenciar suas aulas no Bahia Boxe.
       </p>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-3.5">
         <div>
           <Label htmlFor="name">Seu nome</Label>
           <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome completo" />
@@ -61,6 +61,6 @@ export default function Convite() {
           {loading ? "Entrando…" : "Aceitar convite"}
         </Button>
       </form>
-    </div>
+    </main>
   );
 }

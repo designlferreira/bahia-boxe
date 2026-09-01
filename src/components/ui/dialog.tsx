@@ -28,8 +28,9 @@ const DialogContent = React.forwardRef<
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
+      aria-modal="true"
       className={cn(
-        "fixed left-1/2 top-1/2 z-[80] w-[calc(100%-52px)] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-[22px] border border-border bg-card p-[22px] shadow-[0_24px_70px_rgba(0,0,0,.7)] data-[state=open]:animate-bb-in",
+        "fixed left-1/2 top-1/2 z-[80] w-[calc(100%-52px)] max-w-sm rounded-[22px] border border-border bg-card p-[22px] shadow-[0_24px_70px_rgba(0,0,0,.7)] data-[state=open]:animate-dialog-in",
         className,
       )}
       {...props}

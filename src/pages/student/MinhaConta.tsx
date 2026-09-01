@@ -20,7 +20,7 @@ export default function StudentMinhaConta() {
 
   return (
     <div className="page-container">
-      <div className="font-display text-3xl tracking-wide text-foreground mb-4">MINHA CONTA</div>
+      <h1 className="font-display text-3xl tracking-wide text-foreground mb-4">MINHA CONTA</h1>
 
       <div className="card-dark p-4 flex items-center gap-3.5 mb-4">
         <Avatar initials={initials} size="md" />

@@ -37,7 +37,7 @@ export function BookingFilters({
         />
       </div>
       {filters && (
-        <div className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-1 mb-3.5">
+        <div className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-1 mb-3.5 scroll-fade-x">
           {filters.map((f) => {
             const on = activeFilter === f.value;
             return (

@@ -42,6 +42,7 @@ export default function AdminPedidos() {
     onSuccess: (_r, id) => {
       queryClient.invalidateQueries({ queryKey: key });
       toast.warning("Pedido recusado", {
+        duration: 8000,
         action: {
           label: "Desfazer",
           onClick: async () => {
@@ -55,7 +56,7 @@ export default function AdminPedidos() {
 
   return (
     <div className="page-container">
-      <div className="font-display text-3xl tracking-wide text-foreground leading-none mb-1">PEDIDOS</div>
+      <h1 className="font-display text-3xl tracking-wide text-foreground leading-none mb-1">PEDIDOS</h1>
       <div className="text-[12.5px] text-muted-foreground mb-4">Solicitações de pacote e aula avulsa</div>
 
       {isError && <ErrorState title="Não foi possível carregar os pedidos" onRetry={() => refetch()} />}

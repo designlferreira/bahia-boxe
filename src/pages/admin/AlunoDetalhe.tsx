@@ -2,11 +2,12 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { X } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard, SkeletonList } from "@/components/SkeletonCard";
 import { ErrorState } from "@/components/ErrorState";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetClose, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getStatusConfig } from "@/lib/bookingStatus";
@@ -148,8 +149,21 @@ export default function AdminAlunoDetalhe() {
 
       <Sheet open={assignOpen} onOpenChange={setAssignOpen}>
         <SheetContent>
-          <SheetTitle>ATRIBUIR PACOTE</SheetTitle>
-          <div className="text-[13px] text-muted-foreground mb-4">Escolha um modelo para {student.name}</div>
+          <div className="flex items-start gap-2.5 mb-4">
+            <div className="flex-1">
+              <SheetTitle>ATRIBUIR PACOTE</SheetTitle>
+              <div className="text-[13px] text-muted-foreground mt-0.5">Escolha um modelo para {student.name}</div>
+            </div>
+            <SheetClose asChild>
+              <button
+                type="button"
+                aria-label="Fechar"
+                className="h-11 w-11 shrink-0 rounded-[11px] border border-[#333] bg-secondary flex items-center justify-center active:scale-95 transition-transform"
+              >
+                <X className="h-[15px] w-[15px] text-foreground/80" />
+              </button>
+            </SheetClose>
+          </div>
           <div className="flex flex-col gap-2.5">
             {templates?.map((t) => (
               <button

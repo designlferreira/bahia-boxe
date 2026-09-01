@@ -61,7 +61,7 @@ export default function StudentAgendar() {
         subtitle={home ? `${home.credits} crédito(s) disponível(is)` : undefined}
       />
 
-      <div className="flex gap-2.5 overflow-x-auto -mx-5 px-5 pb-3.5">
+      <div className="flex gap-2.5 overflow-x-auto -mx-5 px-5 pb-3.5 scroll-fade-x">
         {days.map((d, i) => {
           const on = dayOffset === i;
           return (

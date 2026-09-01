@@ -451,22 +451,29 @@ export async function getAdminBookingHistory(adminId: string, search: string, st
     .map((b) => ({ booking: b, studentName: db.students.find((s) => s.id === b.studentId)?.name ?? "Aluno" }));
 }
 
+/** Only completed/no_show bookings consumed a credit, and a booking can only be refunded once. */
+export function canRefundBooking(booking: Pick<Booking, "status" | "refunded">) {
+  return (booking.status === "completed" || booking.status === "no_show") && !booking.refunded;
+}
+
 export async function refundBooking(bookingId: string) {
   await delay(300);
   return mutate((db) => {
     const b = db.bookings.find((x) => x.id === bookingId);
-    if (!b) return;
+    if (!b || !canRefundBooking(b)) return;
     const pkg = db.packages.find((p) => p.studentId === b.studentId && p.status === "active");
     if (pkg && pkg.usedClasses > 0) pkg.usedClasses -= 1;
+    b.refunded = true;
   });
 }
 
 export async function undoRefundBooking(bookingId: string) {
   return mutate((db) => {
     const b = db.bookings.find((x) => x.id === bookingId);
-    if (!b) return;
+    if (!b || !b.refunded) return;
     const pkg = db.packages.find((p) => p.studentId === b.studentId && p.status === "active");
     if (pkg) pkg.usedClasses += 1;
+    b.refunded = false;
   });
 }
 

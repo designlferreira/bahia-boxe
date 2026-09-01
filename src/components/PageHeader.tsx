@@ -19,13 +19,13 @@ export function PageHeader({ title, subtitle, back, action, className }: PageHea
           type="button"
           onClick={() => navigate(-1)}
           aria-label="Voltar"
-          className="h-10 w-10 shrink-0 rounded-xl bg-secondary border border-border flex items-center justify-center active:scale-95 transition-transform"
+          className="h-11 w-11 shrink-0 rounded-xl bg-secondary border border-border flex items-center justify-center active:scale-95 transition-transform"
         >
           <ChevronLeft className="h-[18px] w-[18px] text-foreground" />
         </button>
       )}
       <div className="flex-1 min-w-0">
-        <div className="page-title truncate">{title}</div>
+        <h1 className="page-title">{title}</h1>
         {subtitle && <div className="text-[12.5px] text-muted-foreground mt-0.5">{subtitle}</div>}
       </div>
       {action}

@@ -63,6 +63,7 @@ export default function AlterarSenha({ backTo }: { backTo: string }) {
           <Input
             id="current"
             type={show ? "text" : "password"}
+            autoComplete="current-password"
             value={current}
             onChange={(e) => {
               setCurrent(e.target.value);
@@ -70,12 +71,15 @@ export default function AlterarSenha({ backTo }: { backTo: string }) {
             }}
             placeholder="Sua senha de hoje"
             className="mb-3.5"
+            aria-invalid={!!error}
+            aria-describedby={error ? "current-error" : undefined}
           />
 
           <Label htmlFor="next">Nova senha</Label>
           <Input
             id="next"
             type={show ? "text" : "password"}
+            autoComplete="new-password"
             value={next}
             onChange={(e) => setNext(e.target.value)}
             placeholder="Mínimo 8 caracteres"
@@ -91,14 +95,21 @@ export default function AlterarSenha({ backTo }: { backTo: string }) {
           <Input
             id="confirm"
             type={show ? "text" : "password"}
+            autoComplete="new-password"
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             placeholder="Repita a nova senha"
+            aria-invalid={mismatch}
+            aria-describedby={mismatch ? "confirm-mismatch" : undefined}
           />
-          {mismatch && <div className="text-[12.5px] text-destructive mt-2">As senhas não coincidem.</div>}
+          {mismatch && (
+            <div id="confirm-mismatch" role="alert" className="text-[12.5px] text-destructive mt-2">
+              As senhas não coincidem.
+            </div>
+          )}
 
           {error && (
-            <div className="mt-3.5 rounded-2xl border border-destructive/35 bg-destructive/10 p-3.5 text-[13px] text-destructive">
+            <div id="current-error" role="alert" className="mt-3.5 rounded-2xl border border-destructive/35 bg-destructive/10 p-3.5 text-[13px] text-destructive">
               {error}
             </div>
           )}

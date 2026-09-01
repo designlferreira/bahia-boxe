@@ -26,6 +26,7 @@ const SheetContent = React.forwardRef<
     <SheetOverlay />
     <DialogPrimitive.Content
       ref={ref}
+      aria-modal="true"
       className={cn(
         "fixed inset-x-0 bottom-0 z-[74] max-h-[85vh] overflow-y-auto rounded-t-[26px] border-t border-border bg-[#161616] px-5 pt-5 pb-8 data-[state=open]:animate-bb-toast",
         className,

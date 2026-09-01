@@ -23,6 +23,11 @@
     --ring: 0 72% 51%;
     --radius: 0.75rem;
 
+    /* --primary on --background is ~3.9:1 — fine for buttons (large filled area, white text
+       on top), not enough for small text set directly in the color (WCAG AA needs 4.5:1 under
+       18px). Used for the active bottom-nav label/icon, which is exactly that case. */
+    --nav-active: 0 85% 68%;
+
     --gradient-hero: linear-gradient(135deg, hsl(0 72% 51%), hsl(0 72% 35%));
     --gradient-gold: linear-gradient(135deg, hsl(45 93% 58%), hsl(35 93% 45%));
     --shadow-glow: 0 0 30px hsl(0 72% 51% / 0.3);
@@ -68,7 +73,8 @@
   }
 
   .input-dark {
-    @apply w-full rounded-xl border border-border bg-input px-3.5 text-[15px] text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors;
+    /* text-base (16px), not 15px: iOS Safari auto-zooms on focus for inputs under 16px */
+    @apply w-full rounded-xl border border-border bg-input px-3.5 text-base text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors;
   }
 
   .page-container {
@@ -77,5 +83,12 @@
 
   .page-title {
     @apply font-display text-3xl tracking-wide text-foreground leading-none;
+  }
+
+  /* Right-edge fade cue for horizontally-scrollable rows (day pickers, chip lists) —
+     signals there's more to scroll to, independent of current scroll position. */
+  .scroll-fade-x {
+    mask-image: linear-gradient(to right, black 0, black calc(100% - 28px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black 0, black calc(100% - 28px), transparent 100%);
   }
 }

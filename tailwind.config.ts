@@ -83,6 +83,10 @@ export default {
           from: { opacity: "0", transform: "translateY(16px)" },
           to: { opacity: "1", transform: "none" },
         },
+        "dialog-in": {
+          from: { opacity: "0", transform: "translate(-50%, -50%) scale(.98)" },
+          to: { opacity: "1", transform: "translate(-50%, -50%) scale(1)" },
+        },
       },
       animation: {
         "bb-in": "bb-in .35s ease both",
@@ -91,6 +95,7 @@ export default {
         "bb-shimmer": "bb-shimmer 1.1s infinite",
         "bb-bar": "bb-bar .7s cubic-bezier(.22,1,.36,1) both",
         "bb-toast": "bb-toast .3s cubic-bezier(.22,1,.36,1) both",
+        "dialog-in": "dialog-in .18s ease both",
       },
     },
   },

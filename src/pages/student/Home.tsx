@@ -30,9 +30,9 @@ export default function StudentHome() {
       <div className="flex items-center justify-between mb-5">
         <div>
           <div className="text-[13px] text-muted-foreground">Bom treino,</div>
-          <div className="font-display text-[28px] leading-tight tracking-wide text-foreground uppercase">
+          <h1 className="font-display text-[28px] leading-tight tracking-wide text-foreground uppercase">
             {profile.name}
-          </div>
+          </h1>
         </div>
         <NotificationBell userId={profile.id} bookingRoute="/app/historico" cancelRoute={data?.suggestion ? `/app/aula/${data.suggestion.id}` : "/app/historico"} />
       </div>

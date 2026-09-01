@@ -24,7 +24,7 @@ export function StudentBottomNav() {
           className={({ isActive }) =>
             cn(
               "flex-1 h-[52px] flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform",
-              isActive ? "text-primary" : "text-muted-foreground/70",
+              isActive ? "text-[hsl(var(--nav-active))]" : "text-muted-foreground/70",
             )
           }
         >

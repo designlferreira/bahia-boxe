@@ -51,6 +51,7 @@ export interface Booking {
   suggestedStartTime?: string | null;
   suggestedEndTime?: string | null;
   isMakeup?: boolean;
+  refunded?: boolean;
 }
 
 export interface AvailabilitySlot {

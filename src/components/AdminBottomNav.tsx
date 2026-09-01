@@ -40,7 +40,7 @@ export function AdminBottomNav() {
             cn(
               "relative flex-1 h-[52px] flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform",
               isActive || (to === "/admin/alunos" && location.pathname.startsWith("/admin/alunos/"))
-                ? "text-primary"
+                ? "text-[hsl(var(--nav-active))]"
                 : "text-muted-foreground/70",
             )
           }

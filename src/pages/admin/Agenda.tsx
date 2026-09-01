@@ -98,7 +98,7 @@ export default function AdminAgenda() {
 
   return (
     <div className="page-container">
-      <div className="font-display text-3xl tracking-wide text-foreground leading-none mb-1">AGENDA DO DIA</div>
+      <h1 className="font-display text-3xl tracking-wide text-foreground leading-none mb-1">AGENDA DO DIA</h1>
       <div className="flex items-center gap-2.5 mb-3.5">
         <div className="flex-1 text-[12.5px] text-muted-foreground">
           {formatDate(selectedDate)} · {data?.filter((t) => !t.free).length ?? 0} aulas
@@ -108,7 +108,7 @@ export default function AdminAgenda() {
         </Button>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto -mx-5 px-5 mb-4 pb-1">
+      <div className="flex gap-2 overflow-x-auto -mx-5 px-5 mb-4 pb-1 scroll-fade-x">
         {days.map((d, i) => {
           const on = dayOffset === i;
           return (

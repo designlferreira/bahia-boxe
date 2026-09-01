@@ -56,9 +56,9 @@ export default function AdminDashboard() {
       <div className="flex items-center justify-between mb-4.5 mb-5">
         <div>
           <div className="text-[13px] text-muted-foreground">{formatDate(new Date())}</div>
-          <div className="font-display text-[28px] leading-tight tracking-wide text-foreground uppercase">
+          <h1 className="font-display text-[28px] leading-tight tracking-wide text-foreground uppercase">
             Prof. {profile.name.split(" ")[0]}
-          </div>
+          </h1>
         </div>
         <NotificationBell userId={profile.id} bookingRoute="/admin/agenda" />
       </div>
@@ -116,7 +116,11 @@ export default function AdminDashboard() {
 
           <div className="flex justify-between items-baseline mb-2.5">
             <div className="font-display text-[19px] tracking-wide text-foreground">PRÓXIMAS AULAS</div>
-            <button type="button" onClick={() => navigate("/admin/agenda")} className="text-[12.5px] text-muted-foreground">
+            <button
+              type="button"
+              onClick={() => navigate("/admin/agenda")}
+              className="min-h-11 min-w-11 px-2 -mr-2 flex items-center text-[12.5px] text-muted-foreground"
+            >
               Ver agenda
             </button>
           </div>

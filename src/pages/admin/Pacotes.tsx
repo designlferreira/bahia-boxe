@@ -87,7 +87,7 @@ export default function AdminPacotes() {
   return (
     <div className="page-container">
       <div className="flex items-center justify-between mb-4">
-        <div className="font-display text-3xl tracking-wide text-foreground leading-none">PACOTES</div>
+        <h1 className="font-display text-3xl tracking-wide text-foreground leading-none">PACOTES</h1>
         <Button size="sm" onClick={openCreate}>
           Novo modelo
         </Button>

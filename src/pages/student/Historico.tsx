@@ -26,7 +26,7 @@ export default function StudentHistorico() {
 
   return (
     <div className="page-container">
-      <div className="font-display text-3xl tracking-wide text-foreground leading-none mb-1">MINHAS AULAS</div>
+      <h1 className="font-display text-3xl tracking-wide text-foreground leading-none mb-1">MINHAS AULAS</h1>
       <div className="text-[12.5px] text-muted-foreground mb-4">Histórico completo do seu pacote</div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="mb-4">
