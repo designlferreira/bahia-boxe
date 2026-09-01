@@ -30,6 +30,8 @@ dados reais. Forçar as migrations daqui por cima seria destrutivo.
 ## O que fazer
 
 1. Rode `introspect.sql` no SQL Editor (é só leitura) e cole o resultado no chat.
+   É **uma única consulta**, de propósito: o SQL Editor só exibe o resultado da última
+   instrução de um script, então um arquivo com vários `select` devolve só o último.
 2. Com o schema real em mãos, o cliente em `src/integrations/backend/` é adaptado ao banco
    existente — e não o contrário.
 
