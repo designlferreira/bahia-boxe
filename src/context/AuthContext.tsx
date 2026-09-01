@@ -17,9 +17,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setProfile(getCurrentProfile());
-    setLoading(false);
-    return onAuthStateChange(setProfile);
+    let active = true;
+    getCurrentProfile()
+      .then((p) => {
+        if (active) setProfile(p);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    const unsubscribe = onAuthStateChange((p) => {
+      if (active) setProfile(p);
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
   const value: AuthContextValue = {
@@ -34,7 +46,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await apiSignOut();
       setProfile(null);
     },
-    refreshProfile: () => setProfile(getCurrentProfile()),
+    refreshProfile: () => {
+      getCurrentProfile().then(setProfile);
+    },
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

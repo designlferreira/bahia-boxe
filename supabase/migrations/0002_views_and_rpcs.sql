@@ -7,7 +7,7 @@
 create view public.admin_student_header as
 select s.id as student_id, p.name as student_name, s.created_at as student_since, p.created_at as profile_created_at, s.admin_id
 from public.students s
-join public.profiles p on p.id = s.profile_id;
+join public.profiles p on p.id = s.id;
 
 create view public.admin_dashboard_kpis as
 select
@@ -22,7 +22,7 @@ create view public.admin_dashboard_upcoming_bookings as
 select b.*, p.name as student_name
 from public.bookings b
 join public.students s on s.id = b.student_id
-join public.profiles p on p.id = s.profile_id
+join public.profiles p on p.id = s.id
 where b.status in ('scheduled', 'pending_confirmation') and b.start_time > now()
 order by b.start_time asc;
 
@@ -30,7 +30,7 @@ create view public.admin_dashboard_students_at_risk as
 select s.id as student_id, s.admin_id, p.name as student_name,
   coalesce(pkg.total_classes - pkg.used_classes, 0) as credits_remaining
 from public.students s
-join public.profiles p on p.id = s.profile_id
+join public.profiles p on p.id = s.id
 left join public.packages pkg on pkg.student_id = s.id and pkg.status = 'active'
 where coalesce(pkg.total_classes - pkg.used_classes, 0) <= 1;
 
@@ -62,7 +62,7 @@ select
   ap.name as admin_name
 from public.bookings b
 join public.students s on s.id = b.student_id
-join public.profiles sp on sp.id = s.profile_id
+join public.profiles sp on sp.id = s.id
 join public.profiles ap on ap.id = b.admin_id;
 
 grant select on public.admin_student_header, public.admin_dashboard_kpis, public.admin_dashboard_upcoming_bookings,
@@ -77,9 +77,9 @@ grant select on public.admin_student_header, public.admin_dashboard_kpis, public
 create or replace function public.ensure_student_default_admin(p_admin_id uuid)
 returns void language plpgsql security definer set search_path = public as $$
 begin
-  insert into public.students (profile_id, admin_id)
+  insert into public.students (id, admin_id)
   values (auth.uid(), p_admin_id)
-  on conflict (profile_id) do nothing;
+  on conflict (id) do nothing;
 end;
 $$;
 
@@ -87,16 +87,14 @@ $$;
 create or replace function public.schedule_booking(p_admin_id uuid, p_start timestamptz, p_end timestamptz)
 returns public.bookings language plpgsql security definer set search_path = public as $$
 declare
-  v_student_id uuid;
   v_booking public.bookings;
 begin
-  select id into v_student_id from public.students where profile_id = auth.uid() and admin_id = p_admin_id;
-  if v_student_id is null then
+  if not exists (select 1 from public.students where id = auth.uid() and admin_id = p_admin_id) then
     raise exception 'not a student of this admin';
   end if;
 
   insert into public.bookings (student_id, admin_id, start_time, end_time, status)
-  values (v_student_id, p_admin_id, p_start, p_end, 'pending_confirmation')
+  values (auth.uid(), p_admin_id, p_start, p_end, 'pending_confirmation')
   returning * into v_booking;
 
   return v_booking;
@@ -152,12 +150,10 @@ $$;
 create or replace function public.request_package(p_admin_id uuid, p_template_id uuid, p_notes text default null)
 returns public.purchase_requests language plpgsql security definer set search_path = public as $$
 declare
-  v_student_id uuid;
   v_req public.purchase_requests;
 begin
-  select id into v_student_id from public.students where profile_id = auth.uid() and admin_id = p_admin_id;
   insert into public.purchase_requests (student_id, admin_id, kind, template_id, notes)
-  values (v_student_id, p_admin_id, 'package', p_template_id, p_notes)
+  values (auth.uid(), p_admin_id, 'package', p_template_id, p_notes)
   returning * into v_req;
   return v_req;
 end;
@@ -166,12 +162,10 @@ $$;
 create or replace function public.request_single_class(p_admin_id uuid, p_template_id uuid, p_notes text default null)
 returns public.purchase_requests language plpgsql security definer set search_path = public as $$
 declare
-  v_student_id uuid;
   v_req public.purchase_requests;
 begin
-  select id into v_student_id from public.students where profile_id = auth.uid() and admin_id = p_admin_id;
   insert into public.purchase_requests (student_id, admin_id, kind, template_id, notes)
-  values (v_student_id, p_admin_id, 'single_class', p_template_id, p_notes)
+  values (auth.uid(), p_admin_id, 'single_class', p_template_id, p_notes)
   returning * into v_req;
   return v_req;
 end;
@@ -248,8 +242,8 @@ begin
   select admin_id into v_admin_id from public.invites where token = p_token and used_at is null;
   if v_admin_id is null then raise exception 'invalid or used invite'; end if;
 
-  insert into public.students (profile_id, admin_id) values (auth.uid(), v_admin_id)
-  on conflict (profile_id) do nothing;
+  insert into public.students (id, admin_id) values (auth.uid(), v_admin_id)
+  on conflict (id) do nothing;
 
   update public.invites set used_at = now() where token = p_token;
 end;
@@ -259,7 +253,7 @@ create or replace function public.get_student_booking_history(p_cursor timestamp
 returns setof public.booking_history_app language sql stable security definer set search_path = public as $$
   select * from public.booking_history_app
   where student_name is not null
-    and exists (select 1 from public.students s where s.profile_id = auth.uid() and s.id = booking_history_app.student_id)
+    and student_id = auth.uid()
     and (p_cursor is null or start_time < p_cursor)
   order by start_time desc
   limit p_limit;

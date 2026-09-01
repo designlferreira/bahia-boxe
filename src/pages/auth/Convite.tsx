@@ -6,13 +6,16 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { acceptInvite, validateInvite } from "@/integrations/backend/api";
-import { signInAsProfile } from "@/integrations/backend/auth";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Convite() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["invite", token],
@@ -22,11 +25,23 @@ export default function Convite() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!token || !name.trim()) return;
+    if (!token || !supabase) return;
     setLoading(true);
-    const profileId = await acceptInvite(token, name.trim());
-    signInAsProfile(profileId);
-    navigate("/app/home", { replace: true });
+    setError(null);
+    try {
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: { data: { name: name.trim() } },
+      });
+      if (signUpError) throw signUpError;
+      await acceptInvite(token);
+      navigate("/app/home", { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível aceitar o convite.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (isLoading) {
@@ -57,7 +72,28 @@ export default function Convite() {
           <Label htmlFor="name">Seu nome</Label>
           <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome completo" />
         </div>
-        <Button type="submit" size="lg" className="mt-1.5" disabled={loading || !name.trim()}>
+        <div>
+          <Label htmlFor="email">E-mail</Label>
+          <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@email.com" />
+        </div>
+        <div>
+          <Label htmlFor="password">Crie uma senha</Label>
+          <Input
+            id="password"
+            type="password"
+            required
+            minLength={8}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Mínimo 8 caracteres"
+          />
+        </div>
+        {error && (
+          <div role="alert" className="text-[12.5px] text-destructive">
+            {error}
+          </div>
+        )}
+        <Button type="submit" size="lg" className="mt-1.5" disabled={loading || !name.trim() || !email.trim() || password.length < 8}>
           {loading ? "Entrando…" : "Aceitar convite"}
         </Button>
       </form>

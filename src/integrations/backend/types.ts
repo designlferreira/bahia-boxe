@@ -11,8 +11,8 @@ export interface Profile {
 }
 
 export interface StudentRecord {
+  /** Same value as the student's own Profile.id (== auth.users.id) — see supabase/migrations/0001_init.sql. */
   id: string;
-  profileId: string;
   adminId: string;
   name: string;
   createdAt: string;

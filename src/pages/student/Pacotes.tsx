@@ -7,8 +7,7 @@ import { Button } from "@/components/ui/button";
 import { SkeletonList } from "@/components/SkeletonCard";
 import { formatCentsToBRL, packageProgressPct } from "@/lib/packageUtils";
 import { formatDateShort } from "@/lib/dateUtils";
-import { getPackageTemplates, getStudentHome, requestPackage, requestSingleClass } from "@/integrations/backend/api";
-import { DEMO_ADMIN_ID } from "@/integrations/backend/store";
+import { getPackageTemplates, getStudentAdminId, getStudentHome, requestPackage, requestSingleClass } from "@/integrations/backend/api";
 import type { PackageTemplate } from "@/integrations/backend/types";
 
 export default function StudentPacotes() {
@@ -21,16 +20,24 @@ export default function StudentPacotes() {
     enabled: !!profile,
   });
 
+  const { data: adminId } = useQuery({
+    queryKey: ["student-admin-id", profile?.id],
+    queryFn: () => getStudentAdminId(profile!.id),
+    enabled: !!profile,
+    staleTime: Infinity,
+  });
+
   const { data: templates, isLoading } = useQuery({
-    queryKey: ["package-templates", DEMO_ADMIN_ID],
-    queryFn: () => getPackageTemplates(DEMO_ADMIN_ID),
+    queryKey: ["package-templates", adminId],
+    queryFn: () => getPackageTemplates(adminId!),
+    enabled: !!adminId,
   });
 
   const request = useMutation({
     mutationFn: (t: PackageTemplate) =>
       t.totalClasses > 1
-        ? requestPackage(profile!.id, DEMO_ADMIN_ID, t.id)
-        : requestSingleClass(profile!.id, DEMO_ADMIN_ID, t.id),
+        ? requestPackage(profile!.id, adminId!, t.id)
+        : requestSingleClass(profile!.id, adminId!, t.id),
     onSuccess: (_r, t) => {
       queryClient.invalidateQueries({ queryKey: ["purchase-requests"] });
       toast.success(`Pedido de ${t.name.toLowerCase()} enviado`);

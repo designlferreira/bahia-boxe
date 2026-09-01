@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { X } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard, SkeletonList } from "@/components/SkeletonCard";
 import { ErrorState } from "@/components/ErrorState";
@@ -22,6 +23,7 @@ import {
 
 export default function AdminAlunoDetalhe() {
   const { studentId } = useParams<{ studentId: string }>();
+  const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [assignOpen, setAssignOpen] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -33,9 +35,9 @@ export default function AdminAlunoDetalhe() {
   });
 
   const { data: templates } = useQuery({
-    queryKey: ["package-templates-admin"],
-    queryFn: () => getPackageTemplates(),
-    enabled: assignOpen,
+    queryKey: ["package-templates-admin", profile?.id],
+    queryFn: () => getPackageTemplates(profile!.id),
+    enabled: assignOpen && !!profile,
   });
 
   function invalidate() {

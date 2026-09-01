@@ -21,9 +21,11 @@ create table public.user_roles (
   primary key (user_id, role)
 );
 
+-- id is the student's own profiles.id (== auth.users.id), not a separate surrogate key —
+-- every table below stores student_id as this same value, so no join through a profile_id
+-- indirection is ever needed to go from "the logged-in user" to "their student row".
 create table public.students (
-  id uuid primary key default gen_random_uuid(),
-  profile_id uuid not null unique references public.profiles(id) on delete cascade,
+  id uuid primary key references public.profiles(id) on delete cascade,
   admin_id uuid not null references public.profiles(id) on delete cascade,
   created_at timestamptz not null default now()
 );
@@ -72,6 +74,7 @@ create table public.bookings (
   suggested_start_time timestamptz,
   suggested_end_time timestamptz,
   is_makeup boolean not null default false,
+  refunded boolean not null default false,
   created_at timestamptz not null default now()
 );
 
@@ -107,7 +110,10 @@ create table public.notifications (
 
 create table public.admin_settings (
   admin_id uuid primary key references public.profiles(id) on delete cascade,
-  no_show_consumes_class boolean not null default true
+  no_show_consumes_class boolean not null default true,
+  -- { "0": false, "3": true, ... } keyed by weekday (0=domingo..6=sábado); a missing key means
+  -- "active" (default true) — only explicit false toggles are stored.
+  availability_day_active jsonb not null default '{}'::jsonb
 );
 
 -- ---------------------------------------------------------------------------
@@ -145,41 +151,37 @@ alter table public.admin_settings enable row level security;
 create policy "profiles: read own or as admin of own students" on public.profiles
   for select using (
     id = auth.uid()
-    or exists (select 1 from public.students s where s.profile_id = profiles.id and s.admin_id = auth.uid())
+    or exists (select 1 from public.students s where s.id = profiles.id and s.admin_id = auth.uid())
   );
 create policy "profiles: update own" on public.profiles for update using (id = auth.uid());
 
 create policy "user_roles: read own" on public.user_roles for select using (user_id = auth.uid());
 
-create policy "students: student reads own row" on public.students for select using (profile_id = auth.uid());
+-- students.id IS the student's own auth uid (see table comment above), so a student's own row
+-- (and everything keyed by student_id elsewhere) needs no join at all to check ownership.
+create policy "students: student reads own row" on public.students for select using (id = auth.uid());
 create policy "students: admin reads own students" on public.students for select using (admin_id = auth.uid());
 create policy "students: admin manages own students" on public.students for all using (admin_id = auth.uid());
 
 create policy "package_templates: admin manages own" on public.package_templates for all using (admin_id = auth.uid());
 create policy "package_templates: students of admin can read" on public.package_templates for select using (
-  exists (select 1 from public.students s where s.admin_id = package_templates.admin_id and s.profile_id = auth.uid())
+  exists (select 1 from public.students s where s.admin_id = package_templates.admin_id and s.id = auth.uid())
 );
 
-create policy "packages: student reads own" on public.packages for select using (
-  exists (select 1 from public.students s where s.id = packages.student_id and s.profile_id = auth.uid())
-);
+create policy "packages: student reads own" on public.packages for select using (student_id = auth.uid());
 create policy "packages: admin manages students' packages" on public.packages for all using (
   exists (select 1 from public.students s where s.id = packages.student_id and s.admin_id = auth.uid())
 );
 
 create policy "availability_slots: admin manages own" on public.availability_slots for all using (admin_id = auth.uid());
 create policy "availability_slots: students of admin can read" on public.availability_slots for select using (
-  exists (select 1 from public.students s where s.admin_id = availability_slots.admin_id and s.profile_id = auth.uid())
+  exists (select 1 from public.students s where s.admin_id = availability_slots.admin_id and s.id = auth.uid())
 );
 
-create policy "bookings: student manages own" on public.bookings for all using (
-  exists (select 1 from public.students s where s.id = bookings.student_id and s.profile_id = auth.uid())
-);
+create policy "bookings: student manages own" on public.bookings for all using (student_id = auth.uid());
 create policy "bookings: admin manages own" on public.bookings for all using (admin_id = auth.uid());
 
-create policy "purchase_requests: student manages own" on public.purchase_requests for all using (
-  exists (select 1 from public.students s where s.id = purchase_requests.student_id and s.profile_id = auth.uid())
-);
+create policy "purchase_requests: student manages own" on public.purchase_requests for all using (student_id = auth.uid());
 create policy "purchase_requests: admin manages own" on public.purchase_requests for all using (admin_id = auth.uid());
 
 create policy "invites: admin manages own" on public.invites for all using (admin_id = auth.uid());
@@ -189,7 +191,7 @@ create policy "notifications: user manages own" on public.notifications for all 
 
 create policy "admin_settings: admin manages own" on public.admin_settings for all using (admin_id = auth.uid());
 create policy "admin_settings: students of admin can read" on public.admin_settings for select using (
-  exists (select 1 from public.students s where s.admin_id = admin_settings.admin_id and s.profile_id = auth.uid())
+  exists (select 1 from public.students s where s.admin_id = admin_settings.admin_id and s.id = auth.uid())
 );
 
 grant usage on schema public to authenticated, service_role;

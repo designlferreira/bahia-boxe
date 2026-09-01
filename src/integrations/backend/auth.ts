@@ -1,74 +1,89 @@
-import { DEMO_PASSWORD, getDb } from "./store";
-import type { Profile } from "./types";
-
-const SESSION_KEY = "bahia-boxe-mock-session-v1";
-
-type Listener = (profile: Profile | null) => void;
-const listeners = new Set<Listener>();
+import { supabase } from "@/integrations/supabase/client";
+import type { Profile, Role } from "./types";
 
 export class AuthError extends Error {}
 
-function readSessionProfileId(): string | null {
-  try {
-    return localStorage.getItem(SESSION_KEY);
-  } catch {
-    return null;
-  }
+type Listener = (profile: Profile | null) => void;
+
+function client() {
+  if (!supabase) throw new AuthError("Supabase não configurado (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY ausentes).");
+  return supabase;
 }
 
-function writeSessionProfileId(id: string | null) {
-  try {
-    if (id) localStorage.setItem(SESSION_KEY, id);
-    else localStorage.removeItem(SESSION_KEY);
-  } catch {
-    // ignore
-  }
+async function loadProfile(userId: string, email: string | undefined): Promise<Profile | null> {
+  const { data, error } = await client()
+    .from("profiles")
+    .select("id, name, role, created_at")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return {
+    id: data.id,
+    name: data.name,
+    role: data.role as Role,
+    email: email ?? "",
+    createdAt: data.created_at,
+  };
 }
 
-function notify(profile: Profile | null) {
-  listeners.forEach((l) => l(profile));
+export async function getCurrentProfile(): Promise<Profile | null> {
+  const { data } = await client().auth.getSession();
+  const session = data.session;
+  if (!session) return null;
+  return loadProfile(session.user.id, session.user.email ?? undefined);
 }
 
-export function getCurrentProfile(): Profile | null {
-  const id = readSessionProfileId();
-  if (!id) return null;
-  return getDb().profiles.find((p) => p.id === id) ?? null;
-}
-
-/** Demo credentials: any seeded profile's email + "123456". */
 export async function signInWithPassword(email: string, password: string): Promise<Profile> {
-  await new Promise((r) => setTimeout(r, 450));
-  const profile = getDb().profiles.find((p) => p.email.toLowerCase() === email.trim().toLowerCase());
-  if (!profile || password !== DEMO_PASSWORD) {
-    throw new AuthError("E-mail ou senha incorretos.");
+  const { data, error } = await client().auth.signInWithPassword({ email: email.trim(), password });
+  if (error || !data.user) {
+    // Only an actual credential rejection should be reported as one. A dropped connection
+    // (no status) or a server/gateway problem (403/5xx) would otherwise tell users their
+    // password is wrong when it isn't.
+    const status = error?.status;
+    const isCredentialRejection = status === 400 || status === 401 || status === 422;
+    throw new AuthError(
+      isCredentialRejection
+        ? "E-mail ou senha incorretos."
+        : "Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.",
+    );
   }
-  writeSessionProfileId(profile.id);
-  notify(profile);
+  const profile = await loadProfile(data.user.id, data.user.email ?? undefined);
+  if (!profile) {
+    throw new AuthError("Sua conta ainda não tem um perfil configurado. Fale com o professor.");
+  }
   return profile;
 }
 
 export async function signOut(): Promise<void> {
-  writeSessionProfileId(null);
-  notify(null);
+  await client().auth.signOut();
 }
 
+/** Fires on sign-in, sign-out, and token refresh — including changes from other tabs. */
 export function onAuthStateChange(cb: Listener): () => void {
-  listeners.add(cb);
-  return () => listeners.delete(cb);
+  const { data: sub } = client().auth.onAuthStateChange((_event, session) => {
+    if (!session) {
+      cb(null);
+      return;
+    }
+    loadProfile(session.user.id, session.user.email ?? undefined).then(cb);
+  });
+  return () => sub.subscription.unsubscribe();
 }
 
-/** Used by the invite-acceptance flow to sign the new profile in without a password step. */
-export function signInAsProfile(profileId: string) {
-  writeSessionProfileId(profileId);
-  const profile = getCurrentProfile();
-  notify(profile);
-  return profile;
-}
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  const { data: sessionData } = await client().auth.getSession();
+  const email = sessionData.session?.user.email;
+  if (!email) throw new AuthError("Sessão expirada. Entre novamente.");
 
-export async function changePassword(currentPassword: string, _newPassword: string): Promise<void> {
-  await new Promise((r) => setTimeout(r, 700));
-  if (currentPassword !== DEMO_PASSWORD) {
+  // Supabase's updateUser() doesn't ask for the current password — re-authenticate first so a
+  // wrong "current password" is caught explicitly, matching the UI's error state for that case.
+  const { error: reauthError } = await client().auth.signInWithPassword({ email, password: currentPassword });
+  if (reauthError) {
     throw new AuthError("Senha atual incorreta. Tente novamente.");
   }
-  // Mock has a single fixed demo password; a real backend would persist the new hash here.
+
+  const { error } = await client().auth.updateUser({ password: newPassword });
+  if (error) {
+    throw new AuthError("Não foi possível alterar a senha. Tente novamente.");
+  }
 }

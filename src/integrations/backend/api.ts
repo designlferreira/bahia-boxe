@@ -1,9 +1,9 @@
-import { addDays, startOfDay } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { calcCreditsAvailable } from "@/lib/packageUtils";
 import { TIMEZONE } from "@/lib/dateUtils";
-import { getDb, mutate, genId, DEMO_ADMIN_ID } from "./store";
+import { supabase } from "@/integrations/supabase/client";
 import type {
+  AdminSettings,
   AppNotification,
   AvailabilitySlot,
   Booking,
@@ -14,69 +14,194 @@ import type {
 } from "./types";
 import type { BookingStatus } from "@/lib/bookingStatus";
 
-// ---------------------------------------------------------------------------
-// helpers
-// ---------------------------------------------------------------------------
-
-function futureScheduledCount(bookings: Booking[], studentId: string) {
-  const now = Date.now();
-  return bookings.filter(
-    (b) =>
-      b.studentId === studentId &&
-      (b.status === "scheduled" || b.status === "pending_confirmation") &&
-      new Date(b.startTime).getTime() > now,
-  ).length;
+function client() {
+  if (!supabase) throw new Error("Supabase não configurado (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY ausentes).");
+  return supabase;
 }
 
-export function activePackageFor(studentId: string): PackageRecord | undefined {
-  return getDb().packages.find((p) => p.studentId === studentId && p.status === "active");
+function unwrap<T>({ data, error }: { data: T | null; error: { message: string } | null }): T {
+  if (error) throw new Error(error.message);
+  return data as T;
 }
 
-export function creditsAvailableFor(studentId: string): number {
-  const pkg = activePackageFor(studentId);
-  if (!pkg) return 0;
-  const future = futureScheduledCount(getDb().bookings, studentId);
-  return calcCreditsAvailable(pkg.totalClasses, pkg.usedClasses, future);
+// ---------------------------------------------------------------------------
+// row → app-type mappers (snake_case DB rows → the camelCase shapes every page already uses)
+// ---------------------------------------------------------------------------
+
+function mapBooking(r: any): Booking {
+  return {
+    id: r.id,
+    studentId: r.student_id,
+    adminId: r.admin_id,
+    startTime: r.start_time,
+    endTime: r.end_time,
+    status: r.status,
+    cancelReason: r.cancel_reason,
+    teacherNote: r.teacher_note,
+    suggestedStartTime: r.suggested_start_time,
+    suggestedEndTime: r.suggested_end_time,
+    isMakeup: r.is_makeup,
+    refunded: r.refunded,
+  };
+}
+
+function mapPackage(r: any): PackageRecord {
+  return {
+    id: r.id,
+    studentId: r.student_id,
+    totalClasses: r.total_classes,
+    usedClasses: r.used_classes,
+    status: r.status,
+    templateName: r.template_name,
+    createdAt: r.created_at,
+    expiresAt: r.expires_at,
+  };
+}
+
+function mapTemplate(r: any): PackageTemplate {
+  return {
+    id: r.id,
+    adminId: r.admin_id,
+    name: r.name,
+    description: r.description,
+    totalClasses: r.total_classes,
+    priceCents: r.price_cents,
+    validityDays: r.validity_days,
+  };
+}
+
+function mapRequest(r: any): PurchaseRequest {
+  return {
+    id: r.id,
+    studentId: r.student_id,
+    adminId: r.admin_id,
+    kind: r.kind,
+    templateId: r.template_id,
+    status: r.status,
+    notes: r.notes,
+    createdAt: r.created_at,
+    decidedAt: r.decided_at,
+  };
+}
+
+function mapNotification(r: any): AppNotification {
+  return {
+    id: r.id,
+    userId: r.user_id,
+    kind: r.kind,
+    title: r.title,
+    description: r.description,
+    createdAt: r.created_at,
+    read: r.read,
+    relatedBookingId: r.related_booking_id,
+  };
+}
+
+function mapSlot(r: any): AvailabilitySlot {
+  return { id: r.id, adminId: r.admin_id, weekday: r.weekday, startTime: r.start_time.slice(0, 5), endTime: r.end_time.slice(0, 5) };
+}
+
+function mapSettings(r: any): AdminSettings {
+  return { adminId: r.admin_id, noShowConsumesClass: r.no_show_consumes_class, availabilityDayActive: r.availability_day_active ?? {} };
+}
+
+/** Fetches {id: name} for a set of profile ids in one round trip. */
+async function namesFor(ids: string[]): Promise<Record<string, string>> {
+  const unique = Array.from(new Set(ids)).filter(Boolean);
+  if (unique.length === 0) return {};
+  const { data, error } = await client().from("profiles").select("id, name").in("id", unique);
+  if (error) throw new Error(error.message);
+  const map: Record<string, string> = {};
+  for (const row of data ?? []) map[row.id] = row.name;
+  return map;
 }
 
 function weekdayOf(date: Date) {
   return toZonedTime(date, TIMEZONE).getDay();
 }
 
-async function delay(ms = 350) {
-  await new Promise((r) => setTimeout(r, ms));
+function dayBoundsUtcIso(date: Date) {
+  const zoned = toZonedTime(date, TIMEZONE);
+  const start = new Date(zoned);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { startIso: start.toISOString(), endIso: end.toISOString() };
 }
 
 // ---------------------------------------------------------------------------
 // student · home / package
 // ---------------------------------------------------------------------------
 
-export async function getStudentHome(studentId: string) {
-  await delay();
-  const db = getDb();
-  const pkg = activePackageFor(studentId);
-  const credits = creditsAvailableFor(studentId);
-  const now = Date.now();
-  const upcoming = db.bookings
-    .filter(
-      (b) =>
-        b.studentId === studentId &&
-        (b.status === "scheduled" || b.status === "pending_confirmation") &&
-        new Date(b.startTime).getTime() > now,
-    )
-    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())[0];
-  const suggestion = db.bookings.find((b) => b.studentId === studentId && b.status === "rejected_with_suggestion");
-  return { package: pkg ?? null, credits, nextBooking: upcoming ?? null, suggestion: suggestion ?? null };
+export async function activePackageFor(studentId: string): Promise<PackageRecord | null> {
+  const { data, error } = await client()
+    .from("packages")
+    .select("*")
+    .eq("student_id", studentId)
+    .eq("status", "active")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? mapPackage(data) : null;
 }
 
-export async function getPackageTemplates(adminId = DEMO_ADMIN_ID): Promise<PackageTemplate[]> {
-  await delay(200);
-  return getDb().packageTemplates.filter((t) => t.adminId === adminId);
+async function futureScheduledCount(studentId: string): Promise<number> {
+  const { count, error } = await client()
+    .from("bookings")
+    .select("id", { count: "exact", head: true })
+    .eq("student_id", studentId)
+    .in("status", ["scheduled", "pending_confirmation"])
+    .gt("start_time", new Date().toISOString());
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
+export async function creditsAvailableFor(studentId: string): Promise<number> {
+  const pkg = await activePackageFor(studentId);
+  if (!pkg) return 0;
+  const future = await futureScheduledCount(studentId);
+  return calcCreditsAvailable(pkg.totalClasses, pkg.usedClasses, future);
+}
+
+export async function getStudentHome(studentId: string) {
+  const [pkg, credits, upcomingRes, suggestionRes] = await Promise.all([
+    activePackageFor(studentId),
+    creditsAvailableFor(studentId),
+    client()
+      .from("bookings")
+      .select("*")
+      .eq("student_id", studentId)
+      .in("status", ["scheduled", "pending_confirmation"])
+      .gt("start_time", new Date().toISOString())
+      .order("start_time", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    client().from("bookings").select("*").eq("student_id", studentId).eq("status", "rejected_with_suggestion").maybeSingle(),
+  ]);
+  return {
+    package: pkg,
+    credits,
+    nextBooking: upcomingRes.data ? mapBooking(upcomingRes.data) : null,
+    suggestion: suggestionRes.data ? mapBooking(suggestionRes.data) : null,
+  };
+}
+
+export async function getPackageTemplates(adminId: string): Promise<PackageTemplate[]> {
+  const { data, error } = await client().from("package_templates").select("*").eq("admin_id", adminId).order("total_classes");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapTemplate);
 }
 
 export async function getStudentPackages(studentId: string) {
-  await delay(250);
-  return getDb().packages.filter((p) => p.studentId === studentId);
+  const { data, error } = await client().from("packages").select("*").eq("student_id", studentId).order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapPackage);
+}
+
+/** The admin_id of the (single, per spec §1) admin a student belongs to. */
+export async function getStudentAdminId(studentId: string): Promise<string> {
+  const { data, error } = await client().from("students").select("admin_id").eq("id", studentId).single();
+  if (error) throw new Error(error.message);
+  return data.admin_id;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,196 +214,176 @@ export interface DaySlot {
 }
 
 export async function getAvailableSlotsForDay(adminId: string, date: Date): Promise<DaySlot[]> {
-  await delay(300);
-  const db = getDb();
   const wd = weekdayOf(date);
-  const settings = db.adminSettings.find((s) => s.adminId === adminId);
-  if (settings && settings.availabilityDayActive[wd] === false) return [];
+  const { data: settingsRow } = await client().from("admin_settings").select("availability_day_active").eq("admin_id", adminId).maybeSingle();
+  const dayActive = settingsRow?.availability_day_active?.[String(wd)];
+  if (dayActive === false) return [];
 
-  const daySlots = db.availabilitySlots.filter((s) => s.adminId === adminId && s.weekday === wd);
-  const dayStr = startOfDay(toZonedTime(date, TIMEZONE)).toISOString().slice(0, 10);
-  const dayBookings = db.bookings.filter(
-    (b) =>
-      b.adminId === adminId &&
-      (b.status === "scheduled" || b.status === "pending_confirmation") &&
-      toZonedTime(new Date(b.startTime), TIMEZONE).toISOString().slice(0, 10) === dayStr,
-  );
+  const { data: slots, error: slotsErr } = await client()
+    .from("availability_slots")
+    .select("start_time, end_time")
+    .eq("admin_id", adminId)
+    .eq("weekday", wd);
+  if (slotsErr) throw new Error(slotsErr.message);
+
+  const { startIso, endIso } = dayBoundsUtcIso(date);
+  const { data: bookings, error: bookErr } = await client()
+    .from("bookings")
+    .select("start_time")
+    .eq("admin_id", adminId)
+    .in("status", ["scheduled", "pending_confirmation"])
+    .gte("start_time", startIso)
+    .lt("start_time", endIso);
+  if (bookErr) throw new Error(bookErr.message);
 
   const hours: string[] = [];
-  for (const slot of daySlots) {
-    const startH = parseInt(slot.startTime, 10);
-    const endH = parseInt(slot.endTime, 10);
+  for (const slot of slots ?? []) {
+    const startH = parseInt(slot.start_time, 10);
+    const endH = parseInt(slot.end_time, 10);
     for (let h = startH; h < endH; h++) hours.push(String(h).padStart(2, "0") + ":00");
   }
   const uniqueHours = Array.from(new Set(hours)).sort();
+  const bookedHours = new Set((bookings ?? []).map((b) => toZonedTime(new Date(b.start_time), TIMEZONE).getHours()));
 
-  return uniqueHours.map((time) => {
-    const hour = parseInt(time, 10);
-    const booked = dayBookings.some((b) => toZonedTime(new Date(b.startTime), TIMEZONE).getHours() === hour);
-    return { time, status: booked ? "booked" : "free" };
-  });
+  return uniqueHours.map((time) => ({ time, status: bookedHours.has(parseInt(time, 10)) ? "booked" : "free" }));
 }
 
-export async function scheduleBooking(studentId: string, adminId: string, startTime: string, endTime: string) {
-  await delay(400);
-  return mutate((db) => {
-    const booking: Booking = {
-      id: genId("bk"),
-      studentId,
-      adminId,
-      startTime,
-      endTime,
-      status: "pending_confirmation",
-    };
-    db.bookings.unshift(booking);
-    return booking;
-  });
+export async function scheduleBooking(_studentId: string, adminId: string, startTime: string, endTime: string) {
+  const { data, error } = await client().rpc("schedule_booking", { p_admin_id: adminId, p_start: startTime, p_end: endTime });
+  if (error) throw new Error(error.message);
+  return mapBooking(data);
 }
 
 export async function cancelBooking(bookingId: string) {
-  await delay(300);
-  return mutate((db) => {
-    const b = db.bookings.find((x) => x.id === bookingId);
-    if (b) b.status = "cancelled";
-    return b;
-  });
+  const { data, error } = await client().from("bookings").update({ status: "cancelled" }).eq("id", bookingId).select().single();
+  if (error) throw new Error(error.message);
+  return mapBooking(data);
 }
 
 export async function acceptSuggestion(bookingId: string) {
-  await delay(400);
-  return mutate((db) => {
-    const b = db.bookings.find((x) => x.id === bookingId);
-    if (b && b.suggestedStartTime && b.suggestedEndTime) {
-      b.startTime = b.suggestedStartTime;
-      b.endTime = b.suggestedEndTime;
-      b.status = "scheduled";
-      b.suggestedStartTime = null;
-      b.suggestedEndTime = null;
-    }
-    return b;
-  });
+  const { data: current, error: readErr } = await client().from("bookings").select("suggested_start_time, suggested_end_time").eq("id", bookingId).single();
+  if (readErr) throw new Error(readErr.message);
+  const { data, error } = await client()
+    .from("bookings")
+    .update({
+      start_time: current.suggested_start_time,
+      end_time: current.suggested_end_time,
+      status: "scheduled",
+      suggested_start_time: null,
+      suggested_end_time: null,
+    })
+    .eq("id", bookingId)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return mapBooking(data);
 }
 
 // ---------------------------------------------------------------------------
 // student · histórico / detalhe
 // ---------------------------------------------------------------------------
 
-export async function getStudentBookingHistory(studentId: string, tab: "proximas" | "anteriores" | "todas") {
-  await delay(350);
+export async function getStudentBookingHistory(
+  studentId: string,
+  tab: "proximas" | "anteriores" | "todas",
+): Promise<Booking[]> {
+  const { data, error } = await client().rpc("get_student_booking_history", { p_cursor: null, p_limit: 200 });
+  if (error) throw new Error(error.message);
   const now = Date.now();
-  return getDb()
-    .bookings.filter((b) => b.studentId === studentId)
-    .filter((b) => {
-      const isFuture = new Date(b.startTime).getTime() > now;
+  return (data ?? [])
+    .filter((r: any) => r.student_id === studentId)
+    .filter((r: any) => {
+      const isFuture = new Date(r.start_time).getTime() > now;
       if (tab === "proximas") return isFuture;
       if (tab === "anteriores") return !isFuture;
       return true;
     })
-    .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+    .map(mapBooking);
 }
 
 export async function getBookingById(bookingId: string): Promise<Booking | undefined> {
-  await delay(200);
-  return getDb().bookings.find((b) => b.id === bookingId);
+  const { data, error } = await client().from("bookings").select("*").eq("id", bookingId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? mapBooking(data) : undefined;
 }
 
 // ---------------------------------------------------------------------------
 // student · pacotes / solicitações
 // ---------------------------------------------------------------------------
 
-export async function requestPackage(studentId: string, adminId: string, templateId: string) {
-  await delay(400);
-  return mutate((db) => {
-    const req: PurchaseRequest = {
-      id: genId("pr"),
-      studentId,
-      adminId,
-      kind: "package",
-      templateId,
-      status: "pending",
-      notes: null,
-      createdAt: new Date().toISOString(),
-      decidedAt: null,
-    };
-    db.purchaseRequests.push(req);
-    return req;
-  });
+export async function requestPackage(_studentId: string, adminId: string, templateId: string) {
+  const { data, error } = await client().rpc("request_package", { p_admin_id: adminId, p_template_id: templateId });
+  if (error) throw new Error(error.message);
+  return mapRequest(data);
 }
 
-export async function requestSingleClass(studentId: string, adminId: string, templateId: string) {
-  await delay(400);
-  return mutate((db) => {
-    const req: PurchaseRequest = {
-      id: genId("pr"),
-      studentId,
-      adminId,
-      kind: "single_class",
-      templateId,
-      status: "pending",
-      notes: null,
-      createdAt: new Date().toISOString(),
-      decidedAt: null,
-    };
-    db.purchaseRequests.push(req);
-    return req;
-  });
+export async function requestSingleClass(_studentId: string, adminId: string, templateId: string) {
+  const { data, error } = await client().rpc("request_single_class", { p_admin_id: adminId, p_template_id: templateId });
+  if (error) throw new Error(error.message);
+  return mapRequest(data);
 }
 
 // ---------------------------------------------------------------------------
 // admin · dashboard
 // ---------------------------------------------------------------------------
 
-export async function reconcileBookingStatuses(adminId: string) {
-  return mutate((db) => {
-    const now = Date.now();
-    let changed = 0;
-    for (const b of db.bookings) {
-      if (b.adminId === adminId && b.status === "scheduled" && new Date(b.endTime).getTime() < now) {
-        b.status = "completed";
-        changed++;
-      }
-    }
-    return changed;
-  });
+export async function reconcileBookingStatuses(_adminId: string) {
+  const { data, error } = await client().rpc("reconcile_booking_statuses");
+  if (error) throw new Error(error.message);
+  return data as number;
 }
 
 export async function getAdminDashboard(adminId: string) {
-  await delay();
-  const db = getDb();
-  const students = db.students.filter((s) => s.adminId === adminId);
-  const now = new Date();
-  const todayBookings = db.bookings.filter(
-    (b) => b.adminId === adminId && b.status !== "cancelled" && isSameDay(new Date(b.startTime), now),
+  const nowIso = new Date().toISOString();
+  const [studentsRes, todayCountRes, pendingRes, upcomingRes] = await Promise.all([
+    client().from("students").select("id, admin_id, created_at").eq("admin_id", adminId),
+    client()
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("admin_id", adminId)
+      .neq("status", "cancelled")
+      .gte("start_time", dayBoundsUtcIso(new Date()).startIso)
+      .lt("start_time", dayBoundsUtcIso(new Date()).endIso),
+    client().from("bookings").select("*").eq("admin_id", adminId).eq("status", "pending_confirmation"),
+    client()
+      .from("bookings")
+      .select("*")
+      .eq("admin_id", adminId)
+      .in("status", ["scheduled", "pending_confirmation"])
+      .gt("start_time", nowIso)
+      .order("start_time", { ascending: true })
+      .limit(3),
+  ]);
+  if (studentsRes.error) throw new Error(studentsRes.error.message);
+  if (pendingRes.error) throw new Error(pendingRes.error.message);
+  if (upcomingRes.error) throw new Error(upcomingRes.error.message);
+
+  const studentRows = studentsRes.data ?? [];
+  const pendingRows = pendingRes.data ?? [];
+  const upcomingRows = upcomingRes.data ?? [];
+  const names = await namesFor([
+    ...studentRows.map((r) => r.id),
+    ...pendingRows.map((r: any) => r.student_id),
+    ...upcomingRows.map((r: any) => r.student_id),
+  ]);
+  const students: StudentRecord[] = studentRows.map((r) => ({
+    id: r.id,
+    adminId: r.admin_id,
+    createdAt: r.created_at,
+    name: names[r.id] ?? "Aluno",
+  }));
+
+  const atRiskEntries = await Promise.all(
+    students.map(async (s) => ({ student: s, credits: await creditsAvailableFor(s.id) })),
   );
-  const withName = (b: Booking) => ({ ...b, studentName: db.students.find((s) => s.id === b.studentId)?.name ?? "Aluno" });
-  const pending = todayOrFuturePending(db.bookings, adminId).map(withName);
-  const upcoming = db.bookings
-    .filter((b) => b.adminId === adminId && (b.status === "scheduled" || b.status === "pending_confirmation"))
-    .filter((b) => new Date(b.startTime).getTime() > Date.now())
-    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-    .slice(0, 3)
-    .map(withName);
-  const atRisk = students
-    .map((s) => ({ student: s, credits: creditsAvailableFor(s.id) }))
-    .filter((x) => x.credits <= 1);
 
   return {
-    kpiToday: todayBookings.length,
+    kpiToday: todayCountRes.count ?? 0,
     activeStudents: students.length,
-    pending,
-    upcoming,
-    atRisk,
+    pending: pendingRows.map((r: any) => ({ ...mapBooking(r), studentName: names[r.student_id] ?? "Aluno" })),
+    upcoming: upcomingRows.map((r: any) => ({ ...mapBooking(r), studentName: names[r.student_id] ?? "Aluno" })),
+    atRisk: atRiskEntries.filter((x) => x.credits <= 1),
   };
-}
-
-function isSameDay(a: Date, b: Date) {
-  const za = toZonedTime(a, TIMEZONE);
-  const zb = toZonedTime(b, TIMEZONE);
-  return za.toDateString() === zb.toDateString();
-}
-
-function todayOrFuturePending(bookings: Booking[], adminId: string) {
-  return bookings.filter((b) => b.adminId === adminId && b.status === "pending_confirmation");
 }
 
 // ---------------------------------------------------------------------------
@@ -293,85 +398,70 @@ export interface TimelineEntry {
 }
 
 export async function getAdminAgendaForDay(adminId: string, date: Date): Promise<TimelineEntry[]> {
-  await delay(350);
-  const db = getDb();
   const wd = weekdayOf(date);
-  const daySlots = db.availabilitySlots.filter((s) => s.adminId === adminId && s.weekday === wd);
+  const { data: slots, error: slotsErr } = await client().from("availability_slots").select("start_time, end_time").eq("admin_id", adminId).eq("weekday", wd);
+  if (slotsErr) throw new Error(slotsErr.message);
+
+  const { startIso, endIso } = dayBoundsUtcIso(date);
+  const { data: bookings, error: bookErr } = await client()
+    .from("bookings")
+    .select("*")
+    .eq("admin_id", adminId)
+    .neq("status", "cancelled")
+    .gte("start_time", startIso)
+    .lt("start_time", endIso);
+  if (bookErr) throw new Error(bookErr.message);
+
+  const names = await namesFor((bookings ?? []).map((b: any) => b.student_id));
+
   const hourSet = new Set<number>();
-  for (const slot of daySlots) {
-    const startH = parseInt(slot.startTime, 10);
-    const endH = parseInt(slot.endTime, 10);
+  for (const slot of slots ?? []) {
+    const startH = parseInt(slot.start_time, 10);
+    const endH = parseInt(slot.end_time, 10);
     for (let h = startH; h < endH; h++) hourSet.add(h);
   }
-
-  const dayBookings = db.bookings.filter(
-    (b) => b.adminId === adminId && b.status !== "cancelled" && isSameDay(new Date(b.startTime), date),
-  );
-  for (const b of dayBookings) hourSet.add(toZonedTime(new Date(b.startTime), TIMEZONE).getHours());
+  for (const b of bookings ?? []) hourSet.add(toZonedTime(new Date(b.start_time), TIMEZONE).getHours());
 
   const hours = Array.from(hourSet).sort((a, b) => a - b);
   return hours.map((h) => {
     const time = String(h).padStart(2, "0") + ":00";
-    const booking = dayBookings.find((b) => toZonedTime(new Date(b.startTime), TIMEZONE).getHours() === h);
+    const booking = (bookings ?? []).find((b: any) => toZonedTime(new Date(b.start_time), TIMEZONE).getHours() === h);
     if (!booking) return { hour: time, free: true };
-    const student = db.students.find((s) => s.id === booking.studentId);
-    return { hour: time, free: false, booking, studentName: student?.name ?? "Aluno" };
+    return { hour: time, free: false, booking: mapBooking(booking), studentName: names[booking.student_id] ?? "Aluno" };
   });
 }
 
 export async function approveBooking(bookingId: string) {
-  await delay(300);
-  return mutate((db) => {
-    const b = db.bookings.find((x) => x.id === bookingId);
-    if (b) b.status = "scheduled";
-    return b;
-  });
+  const { data, error } = await client().from("bookings").update({ status: "scheduled" }).eq("id", bookingId).select().single();
+  if (error) throw new Error(error.message);
+  return mapBooking(data);
 }
 
-export async function rejectBooking(
-  bookingId: string,
-  note: string,
-  suggestedStart?: string | null,
-  suggestedEnd?: string | null,
-) {
-  await delay(300);
-  return mutate((db) => {
-    const b = db.bookings.find((x) => x.id === bookingId);
-    if (b) {
-      b.status = suggestedStart && suggestedEnd ? "rejected_with_suggestion" : "rejected";
-      b.teacherNote = note || null;
-      b.suggestedStartTime = suggestedStart ?? null;
-      b.suggestedEndTime = suggestedEnd ?? null;
-    }
-    return b;
-  });
+export async function rejectBooking(bookingId: string, note: string, suggestedStart?: string | null, suggestedEnd?: string | null) {
+  const withSuggestion = !!(suggestedStart && suggestedEnd);
+  const { data, error } = await client()
+    .from("bookings")
+    .update({
+      status: withSuggestion ? "rejected_with_suggestion" : "rejected",
+      teacher_note: note || null,
+      suggested_start_time: suggestedStart ?? null,
+      suggested_end_time: suggestedEnd ?? null,
+    })
+    .eq("id", bookingId)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return mapBooking(data);
 }
 
 export async function completeBooking(bookingId: string) {
-  await delay(300);
-  return mutate((db) => {
-    const b = db.bookings.find((x) => x.id === bookingId);
-    if (!b) return b;
-    b.status = "completed";
-    const pkg = db.packages.find((p) => p.studentId === b.studentId && p.status === "active");
-    if (pkg) pkg.usedClasses += 1;
-    return b;
-  });
+  const { error } = await client().rpc("complete_booking", { p_booking_id: bookingId });
+  if (error) throw new Error(error.message);
 }
 
 export async function markNoShow(bookingId: string) {
-  await delay(300);
-  return mutate((db) => {
-    const b = db.bookings.find((x) => x.id === bookingId);
-    if (!b) return b;
-    b.status = "no_show";
-    const settings = db.adminSettings.find((s) => s.adminId === b.adminId);
-    if (settings?.noShowConsumesClass) {
-      const pkg = db.packages.find((p) => p.studentId === b.studentId && p.status === "active");
-      if (pkg) pkg.usedClasses += 1;
-    }
-    return b;
-  });
+  const { error } = await client().rpc("mark_no_show", { p_booking_id: bookingId });
+  if (error) throw new Error(error.message);
 }
 
 // ---------------------------------------------------------------------------
@@ -379,76 +469,70 @@ export async function markNoShow(bookingId: string) {
 // ---------------------------------------------------------------------------
 
 export async function getAdminStudents(adminId: string, search: string) {
-  await delay(300);
+  const { data: students, error } = await client().from("students").select("id, admin_id, created_at").eq("admin_id", adminId);
+  if (error) throw new Error(error.message);
+  const rows = students ?? [];
+  const names = await namesFor(rows.map((s) => s.id));
   const q = search.trim().toLowerCase();
-  return getDb()
-    .students.filter((s) => s.adminId === adminId)
-    .filter((s) => !q || s.name.toLowerCase().includes(q))
-    .map((s) => ({ student: s, credits: creditsAvailableFor(s.id), package: activePackageFor(s.id) }));
+
+  const entries = await Promise.all(
+    rows.map(async (s) => ({
+      student: { id: s.id, adminId: s.admin_id, createdAt: s.created_at, name: names[s.id] ?? "Aluno" } as StudentRecord,
+      credits: await creditsAvailableFor(s.id),
+      package: await activePackageFor(s.id),
+    })),
+  );
+  return entries.filter((e) => !q || e.student.name.toLowerCase().includes(q));
 }
 
 export async function getAdminStudentDetail(studentId: string) {
-  await delay(300);
-  const db = getDb();
-  const student = db.students.find((s) => s.id === studentId) as StudentRecord;
-  const pkg = activePackageFor(studentId);
-  const history = db.bookings
-    .filter((b) => b.studentId === studentId)
-    .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
-    .slice(0, 6);
-  return { student, package: pkg ?? null, credits: creditsAvailableFor(studentId), history };
+  const [studentRes, names, pkg, credits, historyRes] = await Promise.all([
+    client().from("students").select("id, admin_id, created_at").eq("id", studentId).single(),
+    namesFor([studentId]),
+    activePackageFor(studentId),
+    creditsAvailableFor(studentId),
+    client().from("booking_history_app").select("*").eq("student_id", studentId).order("start_time", { ascending: false }).limit(6),
+  ]);
+  if (studentRes.error) throw new Error(studentRes.error.message);
+  if (historyRes.error) throw new Error(historyRes.error.message);
+
+  const student: StudentRecord = {
+    id: studentRes.data.id,
+    adminId: studentRes.data.admin_id,
+    createdAt: studentRes.data.created_at,
+    name: names[studentId] ?? "Aluno",
+  };
+  return { student, package: pkg, credits, history: (historyRes.data ?? []).map(mapBooking) };
 }
 
 export async function assignPackageFromTemplate(studentId: string, templateId: string) {
-  await delay(400);
-  return mutate((db) => {
-    const template = db.packageTemplates.find((t) => t.id === templateId);
-    if (!template) return null;
-    for (const p of db.packages) {
-      if (p.studentId === studentId && p.status === "active") p.status = "finished";
-    }
-    const pkg: PackageRecord = {
-      id: genId("pkg"),
-      studentId,
-      totalClasses: template.totalClasses,
-      usedClasses: 0,
-      status: "active",
-      templateName: template.name,
-      createdAt: new Date().toISOString(),
-      expiresAt: addDays(new Date(), template.validityDays).toISOString(),
-    };
-    db.packages.push(pkg);
-    return pkg;
-  });
+  const { data, error } = await client().rpc("assign_package_from_template", { p_student_id: studentId, p_template_id: templateId });
+  if (error) throw new Error(error.message);
+  return mapPackage(data);
 }
 
 export async function removeActivePackage(studentId: string) {
-  await delay(300);
-  return mutate((db) => {
-    for (const p of db.packages) {
-      if (p.studentId === studentId && p.status === "active") p.status = "finished";
-    }
-  });
+  const { error } = await client().rpc("remove_active_package", { p_student_id: studentId });
+  if (error) throw new Error(error.message);
 }
 
 // ---------------------------------------------------------------------------
 // admin · histórico
 // ---------------------------------------------------------------------------
 
-export async function getAdminBookingHistory(adminId: string, search: string, statusFilter: string) {
-  await delay(350);
-  const db = getDb();
+export async function getAdminBookingHistory(
+  adminId: string,
+  search: string,
+  statusFilter: string,
+): Promise<{ booking: Booking; studentName: string }[]> {
+  const { data, error } = await client().rpc("get_admin_booking_history", { p_cursor: null, p_limit: 200 });
+  if (error) throw new Error(error.message);
   const q = search.trim().toLowerCase();
-  return db.bookings
-    .filter((b) => b.adminId === adminId)
-    .filter((b) => statusFilter === "todas" || b.status === statusFilter)
-    .filter((b) => {
-      if (!q) return true;
-      const s = db.students.find((x) => x.id === b.studentId);
-      return s?.name.toLowerCase().includes(q);
-    })
-    .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
-    .map((b) => ({ booking: b, studentName: db.students.find((s) => s.id === b.studentId)?.name ?? "Aluno" }));
+  return (data ?? [])
+    .filter((r: any) => r.admin_id === adminId)
+    .filter((r: any) => statusFilter === "todas" || r.status === statusFilter)
+    .filter((r: any) => !q || (r.student_name ?? "").toLowerCase().includes(q))
+    .map((r: any) => ({ booking: mapBooking(r), studentName: r.student_name ?? "Aluno" }));
 }
 
 /** Only completed/no_show bookings consumed a credit, and a booking can only be refunded once. */
@@ -457,32 +541,34 @@ export function canRefundBooking(booking: Pick<Booking, "status" | "refunded">) 
 }
 
 export async function refundBooking(bookingId: string) {
-  await delay(300);
-  return mutate((db) => {
-    const b = db.bookings.find((x) => x.id === bookingId);
-    if (!b || !canRefundBooking(b)) return;
-    const pkg = db.packages.find((p) => p.studentId === b.studentId && p.status === "active");
-    if (pkg && pkg.usedClasses > 0) pkg.usedClasses -= 1;
-    b.refunded = true;
-  });
+  const { data: booking, error: readErr } = await client().from("bookings").select("student_id, status, refunded").eq("id", bookingId).single();
+  if (readErr) throw new Error(readErr.message);
+  if (!canRefundBooking(booking)) return;
+
+  const { data: pkg } = await client().from("packages").select("id, used_classes").eq("student_id", booking.student_id).eq("status", "active").maybeSingle();
+  if (pkg && pkg.used_classes > 0) {
+    await unwrap(await client().from("packages").update({ used_classes: pkg.used_classes - 1 }).eq("id", pkg.id).select().maybeSingle());
+  }
+  const { error } = await client().from("bookings").update({ refunded: true }).eq("id", bookingId);
+  if (error) throw new Error(error.message);
 }
 
 export async function undoRefundBooking(bookingId: string) {
-  return mutate((db) => {
-    const b = db.bookings.find((x) => x.id === bookingId);
-    if (!b || !b.refunded) return;
-    const pkg = db.packages.find((p) => p.studentId === b.studentId && p.status === "active");
-    if (pkg) pkg.usedClasses += 1;
-    b.refunded = false;
-  });
+  const { data: booking, error: readErr } = await client().from("bookings").select("student_id, refunded").eq("id", bookingId).single();
+  if (readErr) throw new Error(readErr.message);
+  if (!booking.refunded) return;
+
+  const { data: pkg } = await client().from("packages").select("id, used_classes").eq("student_id", booking.student_id).eq("status", "active").maybeSingle();
+  if (pkg) {
+    await client().from("packages").update({ used_classes: pkg.used_classes + 1 }).eq("id", pkg.id);
+  }
+  const { error } = await client().from("bookings").update({ refunded: false }).eq("id", bookingId);
+  if (error) throw new Error(error.message);
 }
 
 export async function markBookingAsMakeup(bookingId: string) {
-  await delay(300);
-  return mutate((db) => {
-    const b = db.bookings.find((x) => x.id === bookingId);
-    if (b) b.isMakeup = true;
-  });
+  const { error } = await client().from("bookings").update({ is_makeup: true }).eq("id", bookingId);
+  if (error) throw new Error(error.message);
 }
 
 // ---------------------------------------------------------------------------
@@ -490,77 +576,36 @@ export async function markBookingAsMakeup(bookingId: string) {
 // ---------------------------------------------------------------------------
 
 export async function getPurchaseRequests(adminId: string) {
-  await delay(300);
-  const db = getDb();
-  return db.purchaseRequests
-    .filter((r) => r.adminId === adminId && r.status === "pending")
-    .map((r) => ({
-      request: r,
-      studentName: db.students.find((s) => s.id === r.studentId)?.name ?? "Aluno",
-      template: db.packageTemplates.find((t) => t.id === r.templateId) ?? null,
-    }));
+  const { data, error } = await client().from("purchase_requests").select("*").eq("admin_id", adminId).eq("status", "pending").order("created_at");
+  if (error) throw new Error(error.message);
+  const rows = data ?? [];
+  const [names, templatesRes] = await Promise.all([
+    namesFor(rows.map((r) => r.student_id)),
+    client().from("package_templates").select("*").in("id", Array.from(new Set(rows.map((r) => r.template_id).filter(Boolean)))),
+  ]);
+  const templates: Record<string, PackageTemplate> = {};
+  for (const t of templatesRes.data ?? []) templates[t.id] = mapTemplate(t);
+
+  return rows.map((r) => ({
+    request: mapRequest(r),
+    studentName: names[r.student_id] ?? "Aluno",
+    template: r.template_id ? (templates[r.template_id] ?? null) : null,
+  }));
 }
 
 export async function approvePurchaseRequest(requestId: string) {
-  await delay(400);
-  return mutate((db) => {
-    const req = db.purchaseRequests.find((r) => r.id === requestId);
-    if (!req) return;
-    req.status = "approved";
-    req.decidedAt = new Date().toISOString();
-    const template = db.packageTemplates.find((t) => t.id === req.templateId);
-    if (!template) return;
-    if (req.kind === "package") {
-      for (const p of db.packages) {
-        if (p.studentId === req.studentId && p.status === "active") p.status = "finished";
-      }
-      db.packages.push({
-        id: genId("pkg"),
-        studentId: req.studentId,
-        totalClasses: template.totalClasses,
-        usedClasses: 0,
-        status: "active",
-        templateName: template.name,
-        createdAt: new Date().toISOString(),
-        expiresAt: addDays(new Date(), template.validityDays).toISOString(),
-      });
-    } else {
-      const active = db.packages.find((p) => p.studentId === req.studentId && p.status === "active");
-      if (active) active.totalClasses += 1;
-      else
-        db.packages.push({
-          id: genId("pkg"),
-          studentId: req.studentId,
-          totalClasses: 1,
-          usedClasses: 0,
-          status: "active",
-          templateName: template.name,
-          createdAt: new Date().toISOString(),
-          expiresAt: addDays(new Date(), template.validityDays).toISOString(),
-        });
-    }
-  });
+  const { error } = await client().rpc("approve_purchase_request", { p_request_id: requestId });
+  if (error) throw new Error(error.message);
 }
 
 export async function rejectPurchaseRequest(requestId: string) {
-  await delay(300);
-  return mutate((db) => {
-    const req = db.purchaseRequests.find((r) => r.id === requestId);
-    if (req) {
-      req.status = "rejected";
-      req.decidedAt = new Date().toISOString();
-    }
-  });
+  const { error } = await client().rpc("reject_purchase_request", { p_request_id: requestId });
+  if (error) throw new Error(error.message);
 }
 
 export async function restorePurchaseRequest(requestId: string) {
-  return mutate((db) => {
-    const req = db.purchaseRequests.find((r) => r.id === requestId);
-    if (req) {
-      req.status = "pending";
-      req.decidedAt = null;
-    }
-  });
+  const { error } = await client().from("purchase_requests").update({ status: "pending", decided_at: null }).eq("id", requestId);
+  if (error) throw new Error(error.message);
 }
 
 // ---------------------------------------------------------------------------
@@ -568,28 +613,37 @@ export async function restorePurchaseRequest(requestId: string) {
 // ---------------------------------------------------------------------------
 
 export async function createPackageTemplate(adminId: string, data: Omit<PackageTemplate, "id" | "adminId">) {
-  await delay(350);
-  return mutate((db) => {
-    const template: PackageTemplate = { id: genId("tpl"), adminId, ...data };
-    db.packageTemplates.push(template);
-    return template;
-  });
+  const { data: row, error } = await client()
+    .from("package_templates")
+    .insert({
+      admin_id: adminId,
+      name: data.name,
+      description: data.description,
+      total_classes: data.totalClasses,
+      price_cents: data.priceCents,
+      validity_days: data.validityDays,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return mapTemplate(row);
 }
 
 export async function updatePackageTemplate(id: string, data: Partial<Omit<PackageTemplate, "id" | "adminId">>) {
-  await delay(350);
-  return mutate((db) => {
-    const t = db.packageTemplates.find((x) => x.id === id);
-    if (t) Object.assign(t, data);
-    return t;
-  });
+  const patch: Record<string, unknown> = {};
+  if (data.name !== undefined) patch.name = data.name;
+  if (data.description !== undefined) patch.description = data.description;
+  if (data.totalClasses !== undefined) patch.total_classes = data.totalClasses;
+  if (data.priceCents !== undefined) patch.price_cents = data.priceCents;
+  if (data.validityDays !== undefined) patch.validity_days = data.validityDays;
+  const { data: row, error } = await client().from("package_templates").update(patch).eq("id", id).select().single();
+  if (error) throw new Error(error.message);
+  return mapTemplate(row);
 }
 
 export async function deletePackageTemplate(id: string) {
-  await delay(300);
-  return mutate((db) => {
-    db.packageTemplates = db.packageTemplates.filter((t) => t.id !== id);
-  });
+  const { error } = await client().from("package_templates").delete().eq("id", id);
+  if (error) throw new Error(error.message);
 }
 
 // ---------------------------------------------------------------------------
@@ -598,43 +652,62 @@ export async function deletePackageTemplate(id: string) {
 
 export const WEEKDAY_NAMES = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
-export async function getAvailability(adminId: string) {
-  await delay(350);
-  const db = getDb();
-  const settings = db.adminSettings.find((s) => s.adminId === adminId);
+export interface AvailabilityDay {
+  weekday: number;
+  name: string;
+  active: boolean;
+  slots: (AvailabilitySlot & { bookedCount: number })[];
+}
+
+export async function getAvailability(adminId: string): Promise<AvailabilityDay[]> {
+  const [settingsRes, slotsRes, bookingsRes] = await Promise.all([
+    client().from("admin_settings").select("*").eq("admin_id", adminId).maybeSingle(),
+    client().from("availability_slots").select("*").eq("admin_id", adminId),
+    client()
+      .from("bookings")
+      .select("start_time")
+      .eq("admin_id", adminId)
+      .in("status", ["scheduled", "pending_confirmation"])
+      .gt("start_time", new Date().toISOString()),
+  ]);
+  if (slotsRes.error) throw new Error(slotsRes.error.message);
+  if (bookingsRes.error) throw new Error(bookingsRes.error.message);
+
+  const settings = settingsRes.data ? mapSettings(settingsRes.data) : null;
+  const slots = (slotsRes.data ?? []).map(mapSlot);
+  const bookingTimes = (bookingsRes.data ?? []).map((b) => toZonedTime(new Date(b.start_time), TIMEZONE));
+
+  function bookedCount(weekday: number, start: string, end: string) {
+    const s = parseInt(start, 10);
+    const e = parseInt(end, 10);
+    return bookingTimes.filter((d) => d.getDay() === weekday && d.getHours() >= s && d.getHours() < e).length;
+  }
+
   return WEEKDAY_NAMES.map((name, weekday) => ({
     weekday,
     name,
     active: settings?.availabilityDayActive[weekday] ?? true,
-    slots: db.availabilitySlots
-      .filter((s) => s.adminId === adminId && s.weekday === weekday)
-      .sort((a, b) => a.startTime.localeCompare(b.startTime)),
+    slots: slots
+      .filter((s) => s.weekday === weekday)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime))
+      .map((s) => ({ ...s, bookedCount: bookedCount(weekday, s.startTime, s.endTime) })),
   }));
 }
 
-export function bookingsInSlot(adminId: string, weekday: number, start: string, end: string) {
-  const db = getDb();
-  const s = parseInt(start, 10);
-  const e = parseInt(end, 10);
-  return db.bookings.filter((b) => {
-    if (b.adminId !== adminId || (b.status !== "scheduled" && b.status !== "pending_confirmation")) return false;
-    const d = toZonedTime(new Date(b.startTime), TIMEZONE);
-    if (d.getDay() !== weekday) return false;
-    const h = d.getHours();
-    return h >= s && h < e;
-  }).length;
+async function ensureSettingsRow(adminId: string) {
+  const { data } = await client().from("admin_settings").select("admin_id").eq("admin_id", adminId).maybeSingle();
+  if (!data) {
+    await client().from("admin_settings").insert({ admin_id: adminId });
+  }
 }
 
 export async function toggleAvailabilityDay(adminId: string, weekday: number, active: boolean) {
-  await delay(300);
-  return mutate((db) => {
-    let settings = db.adminSettings.find((s) => s.adminId === adminId);
-    if (!settings) {
-      settings = { adminId, noShowConsumesClass: true, availabilityDayActive: {} };
-      db.adminSettings.push(settings);
-    }
-    settings.availabilityDayActive[weekday] = active;
-  });
+  await ensureSettingsRow(adminId);
+  const { data: row, error: readErr } = await client().from("admin_settings").select("availability_day_active").eq("admin_id", adminId).single();
+  if (readErr) throw new Error(readErr.message);
+  const next = { ...(row.availability_day_active ?? {}), [String(weekday)]: active };
+  const { error } = await client().from("admin_settings").update({ availability_day_active: next }).eq("admin_id", adminId);
+  if (error) throw new Error(error.message);
 }
 
 export async function saveAvailabilitySlot(
@@ -644,71 +717,60 @@ export async function saveAvailabilitySlot(
   end: string,
   id?: string | null,
 ): Promise<{ error?: string; slot?: AvailabilitySlot }> {
-  await delay(350);
   const s = parseInt(start, 10);
   const e = parseInt(end, 10);
   if (e <= s) return { error: "O fim precisa ser depois do início." };
 
-  return mutate((db) => {
-    const daySlots = db.availabilitySlots.filter((sl) => sl.adminId === adminId && sl.weekday === weekday);
-    const clash = daySlots.some(
-      (sl) => sl.id !== id && parseInt(sl.startTime, 10) < e && s < parseInt(sl.endTime, 10),
-    );
-    if (clash) return { error: `Esse intervalo conflita com outro já cadastrado em ${WEEKDAY_NAMES[weekday]}.` };
+  const { data: daySlots, error: readErr } = await client().from("availability_slots").select("id, start_time, end_time").eq("admin_id", adminId).eq("weekday", weekday);
+  if (readErr) return { error: readErr.message };
+  const clash = (daySlots ?? []).some((sl) => sl.id !== id && parseInt(sl.start_time, 10) < e && s < parseInt(sl.end_time, 10));
+  if (clash) return { error: `Esse intervalo conflita com outro já cadastrado em ${WEEKDAY_NAMES[weekday]}.` };
 
-    if (id) {
-      const slot = db.availabilitySlots.find((sl) => sl.id === id);
-      if (slot) {
-        slot.startTime = start;
-        slot.endTime = end;
-        return { slot };
-      }
-    }
-    const slot: AvailabilitySlot = { id: genId("av"), adminId, weekday, startTime: start, endTime: end };
-    db.availabilitySlots.push(slot);
-    let settings = db.adminSettings.find((s2) => s2.adminId === adminId);
-    if (!settings) {
-      settings = { adminId, noShowConsumesClass: true, availabilityDayActive: {} };
-      db.adminSettings.push(settings);
-    }
-    settings.availabilityDayActive[weekday] = true;
-    return { slot };
-  });
+  if (id) {
+    const { data, error } = await client().from("availability_slots").update({ start_time: start, end_time: end }).eq("id", id).select().single();
+    if (error) return { error: error.message };
+    return { slot: mapSlot(data) };
+  }
+
+  const { data, error } = await client().from("availability_slots").insert({ admin_id: adminId, weekday, start_time: start, end_time: end }).select().single();
+  if (error) return { error: error.message };
+  await ensureSettingsRow(adminId);
+  const { data: row } = await client().from("admin_settings").select("availability_day_active").eq("admin_id", adminId).single();
+  const next = { ...(row?.availability_day_active ?? {}), [String(weekday)]: true };
+  await client().from("admin_settings").update({ availability_day_active: next }).eq("admin_id", adminId);
+  return { slot: mapSlot(data) };
 }
 
 export async function deleteAvailabilitySlot(id: string) {
-  await delay(300);
-  return mutate((db) => {
-    db.availabilitySlots = db.availabilitySlots.filter((s) => s.id !== id);
-  });
+  const { error } = await client().from("availability_slots").delete().eq("id", id);
+  if (error) throw new Error(error.message);
 }
 
 export async function restoreAvailabilitySlot(slot: AvailabilitySlot) {
-  return mutate((db) => {
-    db.availabilitySlots.push(slot);
+  const { error } = await client().from("availability_slots").insert({
+    id: slot.id,
+    admin_id: slot.adminId,
+    weekday: slot.weekday,
+    start_time: slot.startTime,
+    end_time: slot.endTime,
   });
+  if (error) throw new Error(error.message);
 }
 
 // ---------------------------------------------------------------------------
 // configurações
 // ---------------------------------------------------------------------------
 
-export async function getAdminSettings(adminId: string) {
-  await delay(200);
-  return getDb().adminSettings.find((s) => s.adminId === adminId) ?? null;
+export async function getAdminSettings(adminId: string): Promise<AdminSettings | null> {
+  const { data, error } = await client().from("admin_settings").select("*").eq("admin_id", adminId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? mapSettings(data) : null;
 }
 
 export async function updateNoShowConsumesClass(adminId: string, value: boolean) {
-  await delay(300);
-  return mutate((db) => {
-    let settings = db.adminSettings.find((s) => s.adminId === adminId);
-    if (!settings) {
-      settings = { adminId, noShowConsumesClass: value, availabilityDayActive: {} };
-      db.adminSettings.push(settings);
-    } else {
-      settings.noShowConsumesClass = value;
-    }
-  });
+  await ensureSettingsRow(adminId);
+  const { error } = await client().from("admin_settings").update({ no_show_consumes_class: value }).eq("admin_id", adminId);
+  if (error) throw new Error(error.message);
 }
 
 // ---------------------------------------------------------------------------
@@ -716,37 +778,47 @@ export async function updateNoShowConsumesClass(adminId: string, value: boolean)
 // ---------------------------------------------------------------------------
 
 export async function getNotifications(userId: string): Promise<AppNotification[]> {
-  await delay(250);
-  return getDb()
-    .notifications.filter((n) => n.userId === userId)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const { data, error } = await client().from("notifications").select("*").eq("user_id", userId).order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapNotification);
 }
 
 export async function markNotificationRead(id: string) {
-  return mutate((db) => {
-    const n = db.notifications.find((x) => x.id === id);
-    if (n) n.read = true;
-  });
+  const { error } = await client().from("notifications").update({ read: true }).eq("id", id);
+  if (error) throw new Error(error.message);
 }
 
 export async function markAllNotificationsRead(userId: string) {
-  return mutate((db) => {
-    for (const n of db.notifications) if (n.userId === userId) n.read = true;
-  });
+  const { error } = await client().from("notifications").update({ read: true }).eq("user_id", userId);
+  if (error) throw new Error(error.message);
 }
 
 export async function clearNotifications(userId: string): Promise<AppNotification[]> {
-  return mutate((db) => {
-    const removed = db.notifications.filter((n) => n.userId === userId);
-    db.notifications = db.notifications.filter((n) => n.userId !== userId);
-    return removed;
-  });
+  const { data, error } = await client().from("notifications").select("*").eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  const removed = (data ?? []).map(mapNotification);
+  const { error: delErr } = await client().from("notifications").delete().eq("user_id", userId);
+  if (delErr) throw new Error(delErr.message);
+  return removed;
 }
 
 export async function restoreNotifications(items: AppNotification[]) {
-  return mutate((db) => {
-    db.notifications.push(...items);
-  });
+  if (items.length === 0) return;
+  const { error } = await client()
+    .from("notifications")
+    .insert(
+      items.map((n) => ({
+        id: n.id,
+        user_id: n.userId,
+        kind: n.kind,
+        title: n.title,
+        description: n.description,
+        created_at: n.createdAt,
+        read: n.read,
+        related_booking_id: n.relatedBookingId,
+      })),
+    );
+  if (error) throw new Error(error.message);
 }
 
 // ---------------------------------------------------------------------------
@@ -754,43 +826,26 @@ export async function restoreNotifications(items: AppNotification[]) {
 // ---------------------------------------------------------------------------
 
 export async function validateInvite(token: string) {
-  await delay(300);
-  const db = getDb();
-  const invite = db.invites.find((i) => i.token === token);
-  if (!invite || invite.usedAt) return null;
-  const admin = db.profiles.find((p) => p.id === invite.adminId);
-  return { invite, adminName: admin?.name ?? "Professor" };
+  const { data, error } = await client().rpc("validate_invite", { p_token: token });
+  if (error) throw new Error(error.message);
+  const row = data?.[0];
+  if (!row) return null;
+  return { invite: { token, adminId: row.admin_id, createdAt: "", usedAt: null }, adminName: row.admin_name ?? "Professor" };
 }
 
-export async function acceptInvite(token: string, name: string) {
-  await delay(500);
-  return mutate((db) => {
-    const invite = db.invites.find((i) => i.token === token);
-    if (!invite || invite.usedAt) throw new Error("Convite inválido ou expirado.");
-    const id = genId("stu");
-    db.profiles.push({ id, name, role: "student", email: `${id}@bahiaboxe.com`, createdAt: new Date().toISOString() });
-    db.students.push({ id, profileId: id, adminId: invite.adminId, name, createdAt: new Date().toISOString() });
-    invite.usedAt = new Date().toISOString();
-    return id;
-  });
+/** Links the already-authenticated user (must have just signed up) as a student of this invite's admin. */
+export async function acceptInvite(token: string) {
+  const { error } = await client().rpc("accept_invite", { p_token: token });
+  if (error) throw new Error(error.message);
 }
 
 // ---------------------------------------------------------------------------
 // perfil
 // ---------------------------------------------------------------------------
 
-export function studentIdForProfile(profileId: string): string {
-  return profileId;
-}
-
 export async function updateProfileName(profileId: string, name: string) {
-  await delay(400);
-  return mutate((db) => {
-    const profile = db.profiles.find((p) => p.id === profileId);
-    if (profile) profile.name = name;
-    const student = db.students.find((s) => s.id === profileId);
-    if (student) student.name = name;
-  });
+  const { error } = await client().from("profiles").update({ name }).eq("id", profileId);
+  if (error) throw new Error(error.message);
 }
 
 export type { BookingStatus };

@@ -12,7 +12,6 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
-  bookingsInSlot,
   deleteAvailabilitySlot,
   getAvailability,
   restoreAvailabilitySlot,
@@ -138,7 +137,7 @@ export default function AdminDisponibilidade() {
                   aria-label="Alternar disponibilidade do dia"
                   checked={day.active}
                   onCheckedChange={(checked) => {
-                    const booked = day.slots.reduce((n, s) => n + bookingsInSlot(profile.id, day.weekday, s.startTime, s.endTime), 0);
+                    const booked = day.slots.reduce((n, s) => n + s.bookedCount, 0);
                     if (day.active && !checked && booked > 0) {
                       setConfirmDeactivate({ weekday: day.weekday, name: day.name, booked });
                     } else {
@@ -151,7 +150,7 @@ export default function AdminDisponibilidade() {
               {day.active && day.slots.length > 0 && (
                 <div className="flex flex-col gap-2 mb-2.5">
                   {day.slots.map((slot) => {
-                    const booked = bookingsInSlot(profile.id, day.weekday, slot.startTime, slot.endTime);
+                    const booked = slot.bookedCount;
                     return (
                       <div key={slot.id} className="flex items-center gap-2.5 p-2.5 rounded-[13px] bg-[#141414] border border-[#262626]">
                         <div className="flex-1">

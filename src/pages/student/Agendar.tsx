@@ -9,8 +9,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatDayNumber, formatWeekdayShort } from "@/lib/dateUtils";
-import { getAvailableSlotsForDay, getStudentHome, scheduleBooking } from "@/integrations/backend/api";
-import { DEMO_ADMIN_ID } from "@/integrations/backend/store";
+import { getAvailableSlotsForDay, getStudentAdminId, getStudentHome, scheduleBooking } from "@/integrations/backend/api";
 import { CalendarSearch } from "lucide-react";
 
 const DAY_COUNT = 7;
@@ -31,9 +30,17 @@ export default function StudentAgendar() {
     enabled: !!profile,
   });
 
+  const { data: adminId } = useQuery({
+    queryKey: ["student-admin-id", profile?.id],
+    queryFn: () => getStudentAdminId(profile!.id),
+    enabled: !!profile,
+    staleTime: Infinity,
+  });
+
   const { data: slots, isLoading } = useQuery({
-    queryKey: ["available-slots", DEMO_ADMIN_ID, selectedDate.toDateString()],
-    queryFn: () => getAvailableSlotsForDay(DEMO_ADMIN_ID, selectedDate),
+    queryKey: ["available-slots", adminId, selectedDate.toDateString()],
+    queryFn: () => getAvailableSlotsForDay(adminId!, selectedDate),
+    enabled: !!adminId,
   });
 
   const schedule = useMutation({
@@ -43,7 +50,7 @@ export default function StudentAgendar() {
       start.setHours(h, 0, 0, 0);
       const end = new Date(start);
       end.setHours(h + 1);
-      return scheduleBooking(profile!.id, DEMO_ADMIN_ID, start.toISOString(), end.toISOString());
+      return scheduleBooking(profile!.id, adminId!, start.toISOString(), end.toISOString());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["student-home"] });
@@ -90,7 +97,7 @@ export default function StudentAgendar() {
 
       <div className="font-display text-lg tracking-wide text-foreground my-2 mb-2.5">HORÁRIOS LIVRES</div>
 
-      {isLoading && (
+      {(isLoading || !adminId) && (
         <div className="grid grid-cols-2 gap-2.5">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-[66px] rounded-2xl bg-secondary animate-pulse" />
