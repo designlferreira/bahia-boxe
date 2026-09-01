@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getStatusConfig } from "@/lib/bookingStatus";
 import { formatDateTime, formatTime, formatDate } from "@/lib/dateUtils";
-import { acceptSuggestion, cancelBooking, getBookingById } from "@/integrations/backend/api";
+import { acceptSuggestion, cancelBooking, getBookingDetail } from "@/integrations/backend/api";
 
 export default function StudentAulaDetalhe() {
   const { id } = useParams<{ id: string }>();
@@ -19,11 +19,15 @@ export default function StudentAulaDetalhe() {
   const queryClient = useQueryClient();
   const [confirmCancel, setConfirmCancel] = useState(false);
 
-  const { data: booking, isLoading, isError, refetch } = useQuery({
+  const { data: detail, isLoading, isError, refetch } = useQuery({
     queryKey: ["booking", id],
-    queryFn: () => getBookingById(id!),
+    queryFn: () => getBookingDetail(id!),
     enabled: !!id,
   });
+  const booking = detail?.booking;
+  // `profiles` is not readable by a student, so the professor's name only exists when the
+  // history view could resolve it.
+  const professor = detail?.adminName ?? "Seu professor";
 
   const cancel = useMutation({
     mutationFn: () => cancelBooking(id!),
@@ -93,7 +97,7 @@ export default function StudentAulaDetalhe() {
             <>
               <div className="h-px bg-[#2E2A1A] my-3.5" />
               <div className="text-[13.5px] text-foreground/85 leading-relaxed">“{booking.teacherNote}”</div>
-              <div className="text-xs text-muted-foreground mt-2">— Prof. Diego</div>
+              <div className="text-xs text-muted-foreground mt-2">— {professor}</div>
             </>
           )}
         </div>
@@ -127,7 +131,7 @@ export default function StudentAulaDetalhe() {
           {formatTime(booking.startTime)} – {formatTime(booking.endTime)}
         </div>
         <div className="h-px bg-border my-4" />
-        <Row label="Professor" value="Diego Andrade" />
+        <Row label="Professor" value={professor} />
         <Row label="Local" value="Academia Bahia Boxe" />
         <Row label="Consome crédito" value="1 aula" last />
       </div>

@@ -10,9 +10,17 @@ export interface Profile {
   createdAt: string;
 }
 
+/**
+ * A row of `public.students` — the link between a profile and its professor.
+ *
+ * `id` is the students row's own uuid and is NOT the profile id: the database keeps the
+ * authenticated account (`auth.users` → `profiles`) and the student enrolment as separate
+ * entities. Everything that references a student (`bookings.student_id`, `packages.student_id`,
+ * `purchase_requests.student_id`) points at this `id`, never at `profileId`.
+ */
 export interface StudentRecord {
-  /** Same value as the student's own Profile.id (== auth.users.id) — see supabase/migrations/0001_init.sql. */
   id: string;
+  profileId: string;
   adminId: string;
   name: string;
   createdAt: string;
@@ -24,8 +32,10 @@ export interface PackageTemplate {
   name: string;
   description: string;
   totalClasses: number;
-  priceCents: number;
-  validityDays: number;
+  /** `package_templates.price_cents` is nullable — null means the price was never filled in. */
+  priceCents: number | null;
+  validityDays: number | null;
+  isActive: boolean;
 }
 
 export interface PackageRecord {
@@ -34,9 +44,11 @@ export interface PackageRecord {
   totalClasses: number;
   usedClasses: number;
   status: "active" | "finished";
+  /** 'package' (multi-class) or 'single' (one-off class). */
+  kind: "package" | "single";
+  /** Derived label — `packages` stores no template reference. */
   templateName: string;
   createdAt: string;
-  expiresAt: string;
 }
 
 export interface Booking {
@@ -46,27 +58,41 @@ export interface Booking {
   startTime: string;
   endTime: string;
   status: BookingStatus;
+  slotId: string | null;
+  billingKind: string;
   cancelReason?: string | null;
   teacherNote?: string | null;
   suggestedStartTime?: string | null;
   suggestedEndTime?: string | null;
-  isMakeup?: boolean;
-  refunded?: boolean;
 }
 
+/** One concrete hour of availability — `availability_slots` is a list of datetimes, not a weekly grid. */
 export interface AvailabilitySlot {
   id: string;
   adminId: string;
-  weekday: number; // 0 = domingo ... 6 = sábado
-  startTime: string; // HH:mm
-  endTime: string; // HH:mm
+  startTime: string; // ISO
+  endTime: string; // ISO
+  isActive: boolean;
+}
+
+/**
+ * A weekday time range as shown on the availability screen, backed by the concrete
+ * `availability_slots` rows it covers within the planning horizon.
+ */
+export interface AvailabilityInterval {
+  key: string;
+  weekday: number;
+  startTime: string; // "HH:mm"
+  endTime: string; // "HH:mm"
+  slotIds: string[];
+  bookedCount: number;
 }
 
 export interface PurchaseRequest {
   id: string;
   studentId: string;
   adminId: string;
-  kind: "package" | "single_class";
+  kind: "package" | "single";
   templateId: string | null;
   status: "pending" | "approved" | "rejected";
   notes: string | null;
@@ -85,15 +111,7 @@ export interface AppNotification {
   relatedBookingId?: string | null;
 }
 
-export interface Invite {
-  token: string;
-  adminId: string;
-  createdAt: string;
-  usedAt: string | null;
-}
-
 export interface AdminSettings {
   adminId: string;
   noShowConsumesClass: boolean;
-  availabilityDayActive: Record<number, boolean>;
 }

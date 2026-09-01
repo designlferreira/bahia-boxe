@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatDayNumber, formatWeekdayLong, formatWeekdayShort } from "@/lib/dateUtils";
 import { getAvailableSlotsForDay, getStudentAdminId, getStudentHome, scheduleBooking } from "@/integrations/backend/api";
+import type { DaySlot } from "@/integrations/backend/api";
 import { CalendarSearch } from "lucide-react";
 
 const DAY_COUNT = 7;
@@ -19,7 +20,7 @@ export default function StudentAgendar() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [dayOffset, setDayOffset] = useState(1);
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [selected, setSelected] = useState<DaySlot | null>(null);
 
   const days = Array.from({ length: DAY_COUNT }, (_, i) => addDays(new Date(), i + 1));
   const selectedDate = days[dayOffset] ?? days[0];
@@ -44,14 +45,8 @@ export default function StudentAgendar() {
   });
 
   const schedule = useMutation({
-    mutationFn: () => {
-      const [h] = selectedTime!.split(":").map(Number);
-      const start = new Date(selectedDate);
-      start.setHours(h, 0, 0, 0);
-      const end = new Date(start);
-      end.setHours(h + 1);
-      return scheduleBooking(profile!.id, adminId!, start.toISOString(), end.toISOString());
-    },
+    // The slot id is what the database books against — no client-side time arithmetic.
+    mutationFn: () => scheduleBooking(selected!.slotId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["student-home"] });
       queryClient.invalidateQueries({ queryKey: ["student-history"] });
@@ -77,7 +72,7 @@ export default function StudentAgendar() {
               type="button"
               onClick={() => {
                 setDayOffset(i);
-                setSelectedTime(null);
+                setSelected(null);
               }}
               aria-label={`${formatWeekdayLong(d)}, dia ${formatDayNumber(d)}`}
               aria-pressed={on}
@@ -120,13 +115,13 @@ export default function StudentAgendar() {
         <div className="grid grid-cols-2 gap-2.5">
           {slots.map((s) => {
             const full = s.status === "booked";
-            const on = selectedTime === s.time;
+            const on = selected?.slotId === s.slotId;
             return (
               <button
-                key={s.time}
+                key={s.slotId}
                 type="button"
                 disabled={full}
-                onClick={() => setSelectedTime(on ? null : s.time)}
+                onClick={() => setSelected(on ? null : s)}
                 className={cn(
                   "h-[66px] rounded-2xl border text-left px-3.5 transition-all active:scale-95",
                   full && "bg-[#141414] border-[#222] cursor-not-allowed",
@@ -154,15 +149,15 @@ export default function StudentAgendar() {
           ctaLabel="Ver próximo dia"
           onCta={() => {
             setDayOffset((d) => (d + 1) % DAY_COUNT);
-            setSelectedTime(null);
+            setSelected(null);
           }}
         />
       )}
 
-      {selectedTime && (
+      {selected && (
         <div className="fixed inset-x-0 bottom-[84px] px-5 pb-3 pt-6 bg-[linear-gradient(180deg,transparent,hsl(var(--background))_34%)] z-20 animate-bb-toast">
           <Button size="lg" className="w-full h-14" onClick={() => schedule.mutate()} disabled={schedule.isPending}>
-            {schedule.isPending ? "Confirmando…" : `Confirmar ${selectedTime}`}
+            {schedule.isPending ? "Confirmando…" : `Confirmar ${selected.time}`}
           </Button>
         </div>
       )}

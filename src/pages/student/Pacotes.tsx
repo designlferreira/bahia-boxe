@@ -35,9 +35,7 @@ export default function StudentPacotes() {
 
   const request = useMutation({
     mutationFn: (t: PackageTemplate) =>
-      t.totalClasses > 1
-        ? requestPackage(profile!.id, adminId!, t.id)
-        : requestSingleClass(profile!.id, adminId!, t.id),
+      t.totalClasses > 1 ? requestPackage(t.id) : requestSingleClass(`Pedido a partir de "${t.name}"`),
     onSuccess: (_r, t) => {
       queryClient.invalidateQueries({ queryKey: ["purchase-requests"] });
       toast.success(`Pedido de ${t.name.toLowerCase()} enviado`);
@@ -61,8 +59,8 @@ export default function StudentPacotes() {
             />
           </div>
           <div className="text-[12.5px] text-muted-foreground">
-            {home.package.usedClasses} de {home.package.totalClasses} usadas · vence em{" "}
-            {formatDateShort(home.package.expiresAt)}
+            {home.package.usedClasses} de {home.package.totalClasses} usadas · desde{" "}
+            {formatDateShort(home.package.createdAt)}
           </div>
         </div>
       )}

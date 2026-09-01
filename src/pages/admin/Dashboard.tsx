@@ -21,7 +21,7 @@ export default function AdminDashboard() {
   const [rejectTarget, setRejectTarget] = useState<{ id: string; student: string; time: string } | null>(null);
 
   useEffect(() => {
-    if (profile) reconcileBookingStatuses(profile.id).then(() => queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] }));
+    if (profile) reconcileBookingStatuses().then(() => queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id]);
 

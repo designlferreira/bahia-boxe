@@ -1,11 +1,12 @@
-import { toZonedTime } from "date-fns-tz";
+import { addDays, addWeeks, format } from "date-fns";
+import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { calcCreditsAvailable } from "@/lib/packageUtils";
 import { TIMEZONE } from "@/lib/dateUtils";
 import { supabase } from "@/integrations/supabase/client";
 import type {
   AdminSettings,
   AppNotification,
-  AvailabilitySlot,
+  AvailabilityInterval,
   Booking,
   PackageRecord,
   PackageTemplate,
@@ -14,18 +15,27 @@ import type {
 } from "./types";
 import type { BookingStatus } from "@/lib/bookingStatus";
 
+/**
+ * This module talks to the pre-existing Bahia Boxe database (see supabase/README.md). Two of its
+ * shapes drive most of the code here:
+ *
+ * 1. `students.id` is not `profiles.id`. Everything student-scoped (`bookings`, `packages`,
+ *    `purchase_requests`) references the students row, so any call that starts from the logged-in
+ *    user's profile id has to resolve it first — `studentIdForProfile()`.
+ * 2. `availability_slots` holds concrete one-hour datetimes, not a weekly recurrence. The weekly
+ *    grid the availability screen shows is derived from the slots inside a planning horizon.
+ */
+
 function client() {
   if (!supabase) throw new Error("Supabase não configurado (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY ausentes).");
   return supabase;
 }
 
-function unwrap<T>({ data, error }: { data: T | null; error: { message: string } | null }): T {
-  if (error) throw new Error(error.message);
-  return data as T;
-}
+/** Statuses that hold a place on the professor's calendar. */
+const ACTIVE_STATUSES: BookingStatus[] = ["scheduled", "pending_confirmation"];
 
 // ---------------------------------------------------------------------------
-// row → app-type mappers (snake_case DB rows → the camelCase shapes every page already uses)
+// row → app-type mappers
 // ---------------------------------------------------------------------------
 
 function mapBooking(r: any): Booking {
@@ -36,25 +46,27 @@ function mapBooking(r: any): Booking {
     startTime: r.start_time,
     endTime: r.end_time,
     status: r.status,
+    slotId: r.slot_id ?? null,
+    billingKind: r.billing_kind ?? "package",
     cancelReason: r.cancel_reason,
     teacherNote: r.teacher_note,
     suggestedStartTime: r.suggested_start_time,
     suggestedEndTime: r.suggested_end_time,
-    isMakeup: r.is_makeup,
-    refunded: r.refunded,
   };
 }
 
+/** `packages` stores no template link, so the label is derived from `kind` + `total_classes`. */
 function mapPackage(r: any): PackageRecord {
+  const kind: PackageRecord["kind"] = r.kind === "single" ? "single" : "package";
   return {
     id: r.id,
     studentId: r.student_id,
     totalClasses: r.total_classes,
     usedClasses: r.used_classes,
     status: r.status,
-    templateName: r.template_name,
+    kind,
+    templateName: kind === "single" ? "Aula avulsa" : `Pacote de ${r.total_classes} aulas`,
     createdAt: r.created_at,
-    expiresAt: r.expires_at,
   };
 }
 
@@ -63,10 +75,11 @@ function mapTemplate(r: any): PackageTemplate {
     id: r.id,
     adminId: r.admin_id,
     name: r.name,
-    description: r.description,
+    description: r.description ?? "",
     totalClasses: r.total_classes,
-    priceCents: r.price_cents,
-    validityDays: r.validity_days,
+    priceCents: r.price_cents ?? null,
+    validityDays: r.validity_days ?? null,
+    isActive: r.is_active ?? true,
   };
 }
 
@@ -84,30 +97,26 @@ function mapRequest(r: any): PurchaseRequest {
   };
 }
 
-function mapNotification(r: any): AppNotification {
-  return {
-    id: r.id,
-    userId: r.user_id,
-    kind: r.kind,
-    title: r.title,
-    description: r.description,
-    createdAt: r.created_at,
-    read: r.read,
-    relatedBookingId: r.related_booking_id,
-  };
+// ---------------------------------------------------------------------------
+// identity helpers
+// ---------------------------------------------------------------------------
+
+const studentIdByProfile = new Map<string, string>();
+
+/** Resolves `profiles.id` → `students.id`. Cached: the link never changes for a session. */
+async function studentIdForProfile(profileId: string): Promise<string> {
+  const cached = studentIdByProfile.get(profileId);
+  if (cached) return cached;
+  const { data, error } = await client().from("students").select("id").eq("profile_id", profileId).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Sua conta ainda não está vinculada a um professor.");
+  studentIdByProfile.set(profileId, data.id);
+  return data.id;
 }
 
-function mapSlot(r: any): AvailabilitySlot {
-  return { id: r.id, adminId: r.admin_id, weekday: r.weekday, startTime: r.start_time.slice(0, 5), endTime: r.end_time.slice(0, 5) };
-}
-
-function mapSettings(r: any): AdminSettings {
-  return { adminId: r.admin_id, noShowConsumesClass: r.no_show_consumes_class, availabilityDayActive: r.availability_day_active ?? {} };
-}
-
-/** Fetches {id: name} for a set of profile ids in one round trip. */
-async function namesFor(ids: string[]): Promise<Record<string, string>> {
-  const unique = Array.from(new Set(ids)).filter(Boolean);
+/** {profileId: name}. Students can only read their own profile; admins can read every profile. */
+async function profileNames(profileIds: string[]): Promise<Record<string, string>> {
+  const unique = Array.from(new Set(profileIds)).filter(Boolean);
   if (unique.length === 0) return {};
   const { data, error } = await client().from("profiles").select("id, name").in("id", unique);
   if (error) throw new Error(error.message);
@@ -116,32 +125,76 @@ async function namesFor(ids: string[]): Promise<Record<string, string>> {
   return map;
 }
 
-function weekdayOf(date: Date) {
-  return toZonedTime(date, TIMEZONE).getDay();
+/** Every student of an admin, with the name resolved from their profile. */
+async function adminStudents(adminId: string): Promise<StudentRecord[]> {
+  const { data, error } = await client()
+    .from("students")
+    .select("id, profile_id, admin_id, created_at")
+    .eq("admin_id", adminId);
+  if (error) throw new Error(error.message);
+  const rows = data ?? [];
+  const names = await profileNames(rows.map((r) => r.profile_id));
+  return rows.map((r) => ({
+    id: r.id,
+    profileId: r.profile_id,
+    adminId: r.admin_id,
+    createdAt: r.created_at,
+    name: names[r.profile_id] ?? "Aluno",
+  }));
 }
 
+// ---------------------------------------------------------------------------
+// timezone helpers — the database stores timestamptz, the UI reasons in BRT
+// ---------------------------------------------------------------------------
+
+function brt(date: string | Date) {
+  return toZonedTime(typeof date === "string" ? new Date(date) : date, TIMEZONE);
+}
+
+function brtWeekday(date: string | Date) {
+  return brt(date).getDay();
+}
+
+function brtHour(date: string | Date) {
+  return brt(date).getHours();
+}
+
+function brtDateKey(date: Date) {
+  return format(brt(date), "yyyy-MM-dd");
+}
+
+/** The UTC instants bounding a BRT calendar day. */
 function dayBoundsUtcIso(date: Date) {
-  const zoned = toZonedTime(date, TIMEZONE);
-  const start = new Date(zoned);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-  return { startIso: start.toISOString(), endIso: end.toISOString() };
+  const day = brtDateKey(date);
+  const next = format(addDays(brt(date), 1), "yyyy-MM-dd");
+  return {
+    startIso: fromZonedTime(`${day}T00:00:00`, TIMEZONE).toISOString(),
+    endIso: fromZonedTime(`${next}T00:00:00`, TIMEZONE).toISOString(),
+  };
 }
 
+const hhmm = (hour: number) => `${String(hour).padStart(2, "0")}:00`;
+
 // ---------------------------------------------------------------------------
-// student · home / package
+// student · home / pacotes
 // ---------------------------------------------------------------------------
 
-export async function activePackageFor(studentId: string): Promise<PackageRecord | null> {
+async function activePackageForStudentRow(studentId: string): Promise<PackageRecord | null> {
   const { data, error } = await client()
     .from("packages")
     .select("*")
     .eq("student_id", studentId)
     .eq("status", "active")
-    .maybeSingle();
+    .order("created_at", { ascending: false })
+    .limit(1);
   if (error) throw new Error(error.message);
-  return data ? mapPackage(data) : null;
+  const row = (data ?? [])[0];
+  return row ? mapPackage(row) : null;
+}
+
+/** `studentId` here is a `students.id` (admin screens already hold one). */
+export async function activePackageFor(studentId: string): Promise<PackageRecord | null> {
+  return activePackageForStudentRow(studentId);
 }
 
 async function futureScheduledCount(studentId: string): Promise<number> {
@@ -149,58 +202,85 @@ async function futureScheduledCount(studentId: string): Promise<number> {
     .from("bookings")
     .select("id", { count: "exact", head: true })
     .eq("student_id", studentId)
-    .in("status", ["scheduled", "pending_confirmation"])
+    .in("status", ACTIVE_STATUSES)
     .gt("start_time", new Date().toISOString());
   if (error) throw new Error(error.message);
   return count ?? 0;
 }
 
 export async function creditsAvailableFor(studentId: string): Promise<number> {
-  const pkg = await activePackageFor(studentId);
+  const pkg = await activePackageForStudentRow(studentId);
   if (!pkg) return 0;
   const future = await futureScheduledCount(studentId);
   return calcCreditsAvailable(pkg.totalClasses, pkg.usedClasses, future);
 }
 
-export async function getStudentHome(studentId: string) {
+export async function getStudentHome(profileId: string) {
+  const studentId = await studentIdForProfile(profileId);
+  const nowIso = new Date().toISOString();
   const [pkg, credits, upcomingRes, suggestionRes] = await Promise.all([
-    activePackageFor(studentId),
+    activePackageForStudentRow(studentId),
     creditsAvailableFor(studentId),
     client()
       .from("bookings")
       .select("*")
       .eq("student_id", studentId)
-      .in("status", ["scheduled", "pending_confirmation"])
-      .gt("start_time", new Date().toISOString())
+      .in("status", ACTIVE_STATUSES)
+      .gt("start_time", nowIso)
       .order("start_time", { ascending: true })
-      .limit(1)
-      .maybeSingle(),
-    client().from("bookings").select("*").eq("student_id", studentId).eq("status", "rejected_with_suggestion").maybeSingle(),
+      .limit(1),
+    client()
+      .from("bookings")
+      .select("*")
+      .eq("student_id", studentId)
+      .eq("status", "rejected_with_suggestion")
+      .order("start_time", { ascending: false })
+      .limit(1),
   ]);
+  if (upcomingRes.error) throw new Error(upcomingRes.error.message);
+  if (suggestionRes.error) throw new Error(suggestionRes.error.message);
+  const upcoming = (upcomingRes.data ?? [])[0];
+  const suggestion = (suggestionRes.data ?? [])[0];
   return {
     package: pkg,
     credits,
-    nextBooking: upcomingRes.data ? mapBooking(upcomingRes.data) : null,
-    suggestion: suggestionRes.data ? mapBooking(suggestionRes.data) : null,
+    nextBooking: upcoming ? mapBooking(upcoming) : null,
+    suggestion: suggestion ? mapBooking(suggestion) : null,
   };
 }
 
+/** Active templates only — removing a template is a soft delete (`is_active = false`). */
 export async function getPackageTemplates(adminId: string): Promise<PackageTemplate[]> {
-  const { data, error } = await client().from("package_templates").select("*").eq("admin_id", adminId).order("total_classes");
+  const { data, error } = await client()
+    .from("package_templates")
+    .select("*")
+    .eq("admin_id", adminId)
+    .eq("is_active", true)
+    .order("total_classes");
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapTemplate);
 }
 
-export async function getStudentPackages(studentId: string) {
-  const { data, error } = await client().from("packages").select("*").eq("student_id", studentId).order("created_at", { ascending: false });
+export async function getStudentPackages(profileId: string) {
+  const studentId = await studentIdForProfile(profileId);
+  const { data, error } = await client()
+    .from("packages")
+    .select("*")
+    .eq("student_id", studentId)
+    .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapPackage);
 }
 
-/** The admin_id of the (single, per spec §1) admin a student belongs to. */
-export async function getStudentAdminId(studentId: string): Promise<string> {
-  const { data, error } = await client().from("students").select("admin_id").eq("id", studentId).single();
+/** The admin a student belongs to (spec §1: one professor per student). */
+export async function getStudentAdminId(profileId: string): Promise<string> {
+  const { data, error } = await client()
+    .from("students")
+    .select("admin_id")
+    .eq("profile_id", profileId)
+    .maybeSingle();
   if (error) throw new Error(error.message);
+  if (!data) throw new Error("Sua conta ainda não está vinculada a um professor.");
   return data.admin_id;
 }
 
@@ -209,59 +289,70 @@ export async function getStudentAdminId(studentId: string): Promise<string> {
 // ---------------------------------------------------------------------------
 
 export interface DaySlot {
+  slotId: string;
   time: string; // "HH:mm"
-  status: "free" | "booked" | "own";
+  status: "free" | "booked";
 }
 
 export async function getAvailableSlotsForDay(adminId: string, date: Date): Promise<DaySlot[]> {
-  const wd = weekdayOf(date);
-  const { data: settingsRow } = await client().from("admin_settings").select("availability_day_active").eq("admin_id", adminId).maybeSingle();
-  const dayActive = settingsRow?.availability_day_active?.[String(wd)];
-  if (dayActive === false) return [];
-
-  const { data: slots, error: slotsErr } = await client()
-    .from("availability_slots")
-    .select("start_time, end_time")
-    .eq("admin_id", adminId)
-    .eq("weekday", wd);
-  if (slotsErr) throw new Error(slotsErr.message);
-
   const { startIso, endIso } = dayBoundsUtcIso(date);
-  const { data: bookings, error: bookErr } = await client()
-    .from("bookings")
-    .select("start_time")
-    .eq("admin_id", adminId)
-    .in("status", ["scheduled", "pending_confirmation"])
-    .gte("start_time", startIso)
-    .lt("start_time", endIso);
-  if (bookErr) throw new Error(bookErr.message);
+  const nowIso = new Date().toISOString();
 
-  const hours: string[] = [];
-  for (const slot of slots ?? []) {
-    const startH = parseInt(slot.start_time, 10);
-    const endH = parseInt(slot.end_time, 10);
-    for (let h = startH; h < endH; h++) hours.push(String(h).padStart(2, "0") + ":00");
-  }
-  const uniqueHours = Array.from(new Set(hours)).sort();
-  const bookedHours = new Set((bookings ?? []).map((b) => toZonedTime(new Date(b.start_time), TIMEZONE).getHours()));
+  // RLS already narrows this to active, future slots for students; the filters keep the admin
+  // (who can read all of their own slots) on the same footing.
+  const [slotsRes, freeRes] = await Promise.all([
+    client()
+      .from("availability_slots")
+      .select("id, start_time")
+      .eq("admin_id", adminId)
+      .eq("is_active", true)
+      .gt("start_time", nowIso)
+      .gte("start_time", startIso)
+      .lt("start_time", endIso)
+      .order("start_time"),
+    client()
+      .from("available_slots")
+      .select("slot_id")
+      .eq("admin_id", adminId)
+      .gte("start_time", startIso)
+      .lt("start_time", endIso),
+  ]);
+  if (slotsRes.error) throw new Error(slotsRes.error.message);
+  if (freeRes.error) throw new Error(freeRes.error.message);
 
-  return uniqueHours.map((time) => ({ time, status: bookedHours.has(parseInt(time, 10)) ? "booked" : "free" }));
+  const free = new Set((freeRes.data ?? []).map((r) => r.slot_id));
+  return (slotsRes.data ?? []).map((s) => ({
+    slotId: s.id,
+    time: hhmm(brtHour(s.start_time)),
+    status: free.has(s.id) ? "free" : "booked",
+  }));
 }
 
-export async function scheduleBooking(_studentId: string, adminId: string, startTime: string, endTime: string) {
-  const { data, error } = await client().rpc("schedule_booking", { p_admin_id: adminId, p_start: startTime, p_end: endTime });
+/** `schedule_booking` validates credits, ownership and slot availability server-side. */
+export async function scheduleBooking(slotId: string) {
+  const { error } = await client().rpc("schedule_booking", { p_slot_id: slotId });
   if (error) throw new Error(error.message);
-  return mapBooking(data);
 }
 
+/** Students may cancel their own scheduled class up to 6h before it starts (RLS enforces it). */
 export async function cancelBooking(bookingId: string) {
-  const { data, error } = await client().from("bookings").update({ status: "cancelled" }).eq("id", bookingId).select().single();
+  const { data, error } = await client()
+    .from("bookings")
+    .update({ status: "cancelled" })
+    .eq("id", bookingId)
+    .select()
+    .maybeSingle();
   if (error) throw new Error(error.message);
+  if (!data) throw new Error("Só é possível cancelar até 6 horas antes do início da aula.");
   return mapBooking(data);
 }
 
 export async function acceptSuggestion(bookingId: string) {
-  const { data: current, error: readErr } = await client().from("bookings").select("suggested_start_time, suggested_end_time").eq("id", bookingId).single();
+  const { data: current, error: readErr } = await client()
+    .from("bookings")
+    .select("suggested_start_time, suggested_end_time")
+    .eq("id", bookingId)
+    .single();
   if (readErr) throw new Error(readErr.message);
   const { data, error } = await client()
     .from("bookings")
@@ -274,8 +365,9 @@ export async function acceptSuggestion(bookingId: string) {
     })
     .eq("id", bookingId)
     .select()
-    .single();
+    .maybeSingle();
   if (error) throw new Error(error.message);
+  if (!data) throw new Error("Esse horário não está mais disponível. Escolha outro.");
   return mapBooking(data);
 }
 
@@ -284,15 +376,19 @@ export async function acceptSuggestion(bookingId: string) {
 // ---------------------------------------------------------------------------
 
 export async function getStudentBookingHistory(
-  studentId: string,
+  profileId: string,
   tab: "proximas" | "anteriores" | "todas",
 ): Promise<Booking[]> {
-  const { data, error } = await client().rpc("get_student_booking_history", { p_cursor: null, p_limit: 200 });
+  const studentId = await studentIdForProfile(profileId);
+  const { data, error } = await client()
+    .from("bookings")
+    .select("*")
+    .eq("student_id", studentId)
+    .order("start_time", { ascending: false });
   if (error) throw new Error(error.message);
   const now = Date.now();
   return (data ?? [])
-    .filter((r: any) => r.student_id === studentId)
-    .filter((r: any) => {
+    .filter((r) => {
       const isFuture = new Date(r.start_time).getTime() > now;
       if (tab === "proximas") return isFuture;
       if (tab === "anteriores") return !isFuture;
@@ -301,89 +397,109 @@ export async function getStudentBookingHistory(
     .map(mapBooking);
 }
 
-export async function getBookingById(bookingId: string): Promise<Booking | undefined> {
+/**
+ * The professor's name is not readable from `profiles` by a student (RLS), so it comes from the
+ * `booking_history_app` view, which joins it server-side. Falls back to the plain row.
+ */
+export async function getBookingDetail(bookingId: string): Promise<{ booking: Booking; adminName: string | null } | undefined> {
+  const viewRes = await client().from("booking_history_app").select("*").eq("id", bookingId).maybeSingle();
+  if (!viewRes.error && viewRes.data) {
+    return { booking: mapBooking(viewRes.data), adminName: viewRes.data.admin_name ?? null };
+  }
   const { data, error } = await client().from("bookings").select("*").eq("id", bookingId).maybeSingle();
   if (error) throw new Error(error.message);
-  return data ? mapBooking(data) : undefined;
+  return data ? { booking: mapBooking(data), adminName: null } : undefined;
 }
 
 // ---------------------------------------------------------------------------
-// student · pacotes / solicitações
+// student · solicitações
 // ---------------------------------------------------------------------------
 
-export async function requestPackage(_studentId: string, adminId: string, templateId: string) {
-  const { data, error } = await client().rpc("request_package", { p_admin_id: adminId, p_template_id: templateId });
+export async function requestPackage(templateId: string, notes?: string) {
+  const { error } = await client().rpc("request_package", { p_template_id: templateId, p_notes: notes ?? null });
   if (error) throw new Error(error.message);
-  return mapRequest(data);
 }
 
-export async function requestSingleClass(_studentId: string, adminId: string, templateId: string) {
-  const { data, error } = await client().rpc("request_single_class", { p_admin_id: adminId, p_template_id: templateId });
+/** A single class has no template: `request_single_class` only records the intent. */
+export async function requestSingleClass(notes?: string) {
+  const { error } = await client().rpc("request_single_class", { p_notes: notes ?? null });
   if (error) throw new Error(error.message);
-  return mapRequest(data);
 }
 
 // ---------------------------------------------------------------------------
 // admin · dashboard
 // ---------------------------------------------------------------------------
 
-export async function reconcileBookingStatuses(_adminId: string) {
-  const { data, error } = await client().rpc("reconcile_booking_statuses");
+export async function reconcileBookingStatuses() {
+  const { error } = await client().rpc("reconcile_booking_statuses");
   if (error) throw new Error(error.message);
-  return data as number;
 }
 
 export async function getAdminDashboard(adminId: string) {
   const nowIso = new Date().toISOString();
-  const [studentsRes, todayCountRes, pendingRes, upcomingRes] = await Promise.all([
-    client().from("students").select("id, admin_id, created_at").eq("admin_id", adminId),
+  const { startIso, endIso } = dayBoundsUtcIso(new Date());
+
+  const [students, todayRes, pendingRes, upcomingRes] = await Promise.all([
+    adminStudents(adminId),
     client()
       .from("bookings")
       .select("id", { count: "exact", head: true })
       .eq("admin_id", adminId)
       .neq("status", "cancelled")
-      .gte("start_time", dayBoundsUtcIso(new Date()).startIso)
-      .lt("start_time", dayBoundsUtcIso(new Date()).endIso),
-    client().from("bookings").select("*").eq("admin_id", adminId).eq("status", "pending_confirmation"),
+      .gte("start_time", startIso)
+      .lt("start_time", endIso),
+    client().from("bookings").select("*").eq("admin_id", adminId).eq("status", "pending_confirmation").order("start_time"),
     client()
       .from("bookings")
       .select("*")
       .eq("admin_id", adminId)
-      .in("status", ["scheduled", "pending_confirmation"])
+      .in("status", ACTIVE_STATUSES)
       .gt("start_time", nowIso)
       .order("start_time", { ascending: true })
       .limit(3),
   ]);
-  if (studentsRes.error) throw new Error(studentsRes.error.message);
   if (pendingRes.error) throw new Error(pendingRes.error.message);
   if (upcomingRes.error) throw new Error(upcomingRes.error.message);
 
-  const studentRows = studentsRes.data ?? [];
-  const pendingRows = pendingRes.data ?? [];
-  const upcomingRows = upcomingRes.data ?? [];
-  const names = await namesFor([
-    ...studentRows.map((r) => r.id),
-    ...pendingRows.map((r: any) => r.student_id),
-    ...upcomingRows.map((r: any) => r.student_id),
-  ]);
-  const students: StudentRecord[] = studentRows.map((r) => ({
-    id: r.id,
-    adminId: r.admin_id,
-    createdAt: r.created_at,
-    name: names[r.id] ?? "Aluno",
-  }));
-
-  const atRiskEntries = await Promise.all(
-    students.map(async (s) => ({ student: s, credits: await creditsAvailableFor(s.id) })),
-  );
+  const byId = new Map(students.map((s) => [s.id, s]));
+  const nameOf = (studentId: string) => byId.get(studentId)?.name ?? "Aluno";
+  const credits = await creditsByStudent(students.map((s) => s.id));
 
   return {
-    kpiToday: todayCountRes.count ?? 0,
+    kpiToday: todayRes.count ?? 0,
     activeStudents: students.length,
-    pending: pendingRows.map((r: any) => ({ ...mapBooking(r), studentName: names[r.student_id] ?? "Aluno" })),
-    upcoming: upcomingRows.map((r: any) => ({ ...mapBooking(r), studentName: names[r.student_id] ?? "Aluno" })),
-    atRisk: atRiskEntries.filter((x) => x.credits <= 1),
+    pending: (pendingRes.data ?? []).map((r) => ({ ...mapBooking(r), studentName: nameOf(r.student_id) })),
+    upcoming: (upcomingRes.data ?? []).map((r) => ({ ...mapBooking(r), studentName: nameOf(r.student_id) })),
+    atRisk: students
+      .map((student) => ({ student, credits: credits[student.id] ?? 0 }))
+      .filter((x) => x.credits <= 1),
   };
+}
+
+/** Credits for many students in two queries instead of two per student. */
+async function creditsByStudent(studentIds: string[]): Promise<Record<string, number>> {
+  if (studentIds.length === 0) return {};
+  const [pkgRes, bookingRes] = await Promise.all([
+    client().from("packages").select("student_id, total_classes, used_classes").in("student_id", studentIds).eq("status", "active"),
+    client()
+      .from("bookings")
+      .select("student_id")
+      .in("student_id", studentIds)
+      .in("status", ACTIVE_STATUSES)
+      .gt("start_time", new Date().toISOString()),
+  ]);
+  if (pkgRes.error) throw new Error(pkgRes.error.message);
+  if (bookingRes.error) throw new Error(bookingRes.error.message);
+
+  const future: Record<string, number> = {};
+  for (const b of bookingRes.data ?? []) future[b.student_id] = (future[b.student_id] ?? 0) + 1;
+
+  const out: Record<string, number> = {};
+  for (const id of studentIds) out[id] = 0;
+  for (const p of pkgRes.data ?? []) {
+    out[p.student_id] = calcCreditsAvailable(p.total_classes, p.used_classes, future[p.student_id] ?? 0);
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -398,41 +514,55 @@ export interface TimelineEntry {
 }
 
 export async function getAdminAgendaForDay(adminId: string, date: Date): Promise<TimelineEntry[]> {
-  const wd = weekdayOf(date);
-  const { data: slots, error: slotsErr } = await client().from("availability_slots").select("start_time, end_time").eq("admin_id", adminId).eq("weekday", wd);
-  if (slotsErr) throw new Error(slotsErr.message);
-
   const { startIso, endIso } = dayBoundsUtcIso(date);
-  const { data: bookings, error: bookErr } = await client()
-    .from("bookings")
-    .select("*")
-    .eq("admin_id", adminId)
-    .neq("status", "cancelled")
-    .gte("start_time", startIso)
-    .lt("start_time", endIso);
-  if (bookErr) throw new Error(bookErr.message);
+  const [slotsRes, bookingsRes, students] = await Promise.all([
+    client()
+      .from("availability_slots")
+      .select("start_time")
+      .eq("admin_id", adminId)
+      .eq("is_active", true)
+      .gte("start_time", startIso)
+      .lt("start_time", endIso),
+    client()
+      .from("bookings")
+      .select("*")
+      .eq("admin_id", adminId)
+      .neq("status", "cancelled")
+      .gte("start_time", startIso)
+      .lt("start_time", endIso),
+    adminStudents(adminId),
+  ]);
+  if (slotsRes.error) throw new Error(slotsRes.error.message);
+  if (bookingsRes.error) throw new Error(bookingsRes.error.message);
 
-  const names = await namesFor((bookings ?? []).map((b: any) => b.student_id));
+  const nameOf = new Map(students.map((s) => [s.id, s.name]));
+  const bookings = bookingsRes.data ?? [];
 
-  const hourSet = new Set<number>();
-  for (const slot of slots ?? []) {
-    const startH = parseInt(slot.start_time, 10);
-    const endH = parseInt(slot.end_time, 10);
-    for (let h = startH; h < endH; h++) hourSet.add(h);
-  }
-  for (const b of bookings ?? []) hourSet.add(toZonedTime(new Date(b.start_time), TIMEZONE).getHours());
+  const hours = new Set<number>();
+  for (const s of slotsRes.data ?? []) hours.add(brtHour(s.start_time));
+  for (const b of bookings) hours.add(brtHour(b.start_time));
 
-  const hours = Array.from(hourSet).sort((a, b) => a - b);
-  return hours.map((h) => {
-    const time = String(h).padStart(2, "0") + ":00";
-    const booking = (bookings ?? []).find((b: any) => toZonedTime(new Date(b.start_time), TIMEZONE).getHours() === h);
-    if (!booking) return { hour: time, free: true };
-    return { hour: time, free: false, booking: mapBooking(booking), studentName: names[booking.student_id] ?? "Aluno" };
-  });
+  return Array.from(hours)
+    .sort((a, b) => a - b)
+    .map((h) => {
+      const booking = bookings.find((b) => brtHour(b.start_time) === h);
+      if (!booking) return { hour: hhmm(h), free: true };
+      return {
+        hour: hhmm(h),
+        free: false,
+        booking: mapBooking(booking),
+        studentName: nameOf.get(booking.student_id) ?? "Aluno",
+      };
+    });
 }
 
 export async function approveBooking(bookingId: string) {
-  const { data, error } = await client().from("bookings").update({ status: "scheduled" }).eq("id", bookingId).select().single();
+  const { data, error } = await client()
+    .from("bookings")
+    .update({ status: "scheduled" })
+    .eq("id", bookingId)
+    .select()
+    .single();
   if (error) throw new Error(error.message);
   return mapBooking(data);
 }
@@ -454,6 +584,7 @@ export async function rejectBooking(bookingId: string, note: string, suggestedSt
   return mapBooking(data);
 }
 
+/** Both RPCs consume (or not) a package credit according to `profiles.no_show_consumes_class`. */
 export async function completeBooking(bookingId: string) {
   const { error } = await client().rpc("complete_booking", { p_booking_id: bookingId });
   if (error) throw new Error(error.message);
@@ -469,46 +600,61 @@ export async function markNoShow(bookingId: string) {
 // ---------------------------------------------------------------------------
 
 export async function getAdminStudents(adminId: string, search: string) {
-  const { data: students, error } = await client().from("students").select("id, admin_id, created_at").eq("admin_id", adminId);
-  if (error) throw new Error(error.message);
-  const rows = students ?? [];
-  const names = await namesFor(rows.map((s) => s.id));
-  const q = search.trim().toLowerCase();
+  const students = await adminStudents(adminId);
+  const ids = students.map((s) => s.id);
+  const [credits, pkgRes] = await Promise.all([
+    creditsByStudent(ids),
+    ids.length
+      ? client().from("packages").select("*").in("student_id", ids).eq("status", "active")
+      : Promise.resolve({ data: [], error: null } as const),
+  ]);
+  if (pkgRes.error) throw new Error(pkgRes.error.message);
 
-  const entries = await Promise.all(
-    rows.map(async (s) => ({
-      student: { id: s.id, adminId: s.admin_id, createdAt: s.created_at, name: names[s.id] ?? "Aluno" } as StudentRecord,
-      credits: await creditsAvailableFor(s.id),
-      package: await activePackageFor(s.id),
-    })),
-  );
-  return entries.filter((e) => !q || e.student.name.toLowerCase().includes(q));
+  const pkgByStudent = new Map<string, PackageRecord>();
+  for (const row of pkgRes.data ?? []) pkgByStudent.set(row.student_id, mapPackage(row));
+
+  const q = search.trim().toLowerCase();
+  return students
+    .map((student) => ({
+      student,
+      credits: credits[student.id] ?? 0,
+      package: pkgByStudent.get(student.id) ?? null,
+    }))
+    .filter((e) => !q || e.student.name.toLowerCase().includes(q));
 }
 
 export async function getAdminStudentDetail(studentId: string) {
-  const [studentRes, names, pkg, credits, historyRes] = await Promise.all([
-    client().from("students").select("id, admin_id, created_at").eq("id", studentId).single(),
-    namesFor([studentId]),
-    activePackageFor(studentId),
+  const { data: row, error } = await client()
+    .from("students")
+    .select("id, profile_id, admin_id, created_at")
+    .eq("id", studentId)
+    .single();
+  if (error) throw new Error(error.message);
+
+  const [names, pkg, credits, historyRes] = await Promise.all([
+    profileNames([row.profile_id]),
+    activePackageForStudentRow(studentId),
     creditsAvailableFor(studentId),
-    client().from("booking_history_app").select("*").eq("student_id", studentId).order("start_time", { ascending: false }).limit(6),
+    client().from("bookings").select("*").eq("student_id", studentId).order("start_time", { ascending: false }).limit(6),
   ]);
-  if (studentRes.error) throw new Error(studentRes.error.message);
   if (historyRes.error) throw new Error(historyRes.error.message);
 
   const student: StudentRecord = {
-    id: studentRes.data.id,
-    adminId: studentRes.data.admin_id,
-    createdAt: studentRes.data.created_at,
-    name: names[studentId] ?? "Aluno",
+    id: row.id,
+    profileId: row.profile_id,
+    adminId: row.admin_id,
+    createdAt: row.created_at,
+    name: names[row.profile_id] ?? "Aluno",
   };
   return { student, package: pkg, credits, history: (historyRes.data ?? []).map(mapBooking) };
 }
 
 export async function assignPackageFromTemplate(studentId: string, templateId: string) {
-  const { data, error } = await client().rpc("assign_package_from_template", { p_student_id: studentId, p_template_id: templateId });
+  const { error } = await client().rpc("assign_package_from_template", {
+    p_student_id: studentId,
+    p_template_id: templateId,
+  });
   if (error) throw new Error(error.message);
-  return mapPackage(data);
 }
 
 export async function removeActivePackage(studentId: string) {
@@ -525,50 +671,18 @@ export async function getAdminBookingHistory(
   search: string,
   statusFilter: string,
 ): Promise<{ booking: Booking; studentName: string }[]> {
-  const { data, error } = await client().rpc("get_admin_booking_history", { p_cursor: null, p_limit: 200 });
-  if (error) throw new Error(error.message);
+  const [bookingsRes, students] = await Promise.all([
+    client().from("bookings").select("*").eq("admin_id", adminId).order("start_time", { ascending: false }).limit(200),
+    adminStudents(adminId),
+  ]);
+  if (bookingsRes.error) throw new Error(bookingsRes.error.message);
+
+  const nameOf = new Map(students.map((s) => [s.id, s.name]));
   const q = search.trim().toLowerCase();
-  return (data ?? [])
-    .filter((r: any) => r.admin_id === adminId)
-    .filter((r: any) => statusFilter === "todas" || r.status === statusFilter)
-    .filter((r: any) => !q || (r.student_name ?? "").toLowerCase().includes(q))
-    .map((r: any) => ({ booking: mapBooking(r), studentName: r.student_name ?? "Aluno" }));
-}
-
-/** Only completed/no_show bookings consumed a credit, and a booking can only be refunded once. */
-export function canRefundBooking(booking: Pick<Booking, "status" | "refunded">) {
-  return (booking.status === "completed" || booking.status === "no_show") && !booking.refunded;
-}
-
-export async function refundBooking(bookingId: string) {
-  const { data: booking, error: readErr } = await client().from("bookings").select("student_id, status, refunded").eq("id", bookingId).single();
-  if (readErr) throw new Error(readErr.message);
-  if (!canRefundBooking(booking)) return;
-
-  const { data: pkg } = await client().from("packages").select("id, used_classes").eq("student_id", booking.student_id).eq("status", "active").maybeSingle();
-  if (pkg && pkg.used_classes > 0) {
-    await unwrap(await client().from("packages").update({ used_classes: pkg.used_classes - 1 }).eq("id", pkg.id).select().maybeSingle());
-  }
-  const { error } = await client().from("bookings").update({ refunded: true }).eq("id", bookingId);
-  if (error) throw new Error(error.message);
-}
-
-export async function undoRefundBooking(bookingId: string) {
-  const { data: booking, error: readErr } = await client().from("bookings").select("student_id, refunded").eq("id", bookingId).single();
-  if (readErr) throw new Error(readErr.message);
-  if (!booking.refunded) return;
-
-  const { data: pkg } = await client().from("packages").select("id, used_classes").eq("student_id", booking.student_id).eq("status", "active").maybeSingle();
-  if (pkg) {
-    await client().from("packages").update({ used_classes: pkg.used_classes + 1 }).eq("id", pkg.id);
-  }
-  const { error } = await client().from("bookings").update({ refunded: false }).eq("id", bookingId);
-  if (error) throw new Error(error.message);
-}
-
-export async function markBookingAsMakeup(bookingId: string) {
-  const { error } = await client().from("bookings").update({ is_makeup: true }).eq("id", bookingId);
-  if (error) throw new Error(error.message);
+  return (bookingsRes.data ?? [])
+    .filter((r) => statusFilter === "todas" || r.status === statusFilter)
+    .map((r) => ({ booking: mapBooking(r), studentName: nameOf.get(r.student_id) ?? "Aluno" }))
+    .filter((e) => !q || e.studentName.toLowerCase().includes(q));
 }
 
 // ---------------------------------------------------------------------------
@@ -576,20 +690,31 @@ export async function markBookingAsMakeup(bookingId: string) {
 // ---------------------------------------------------------------------------
 
 export async function getPurchaseRequests(adminId: string) {
-  const { data, error } = await client().from("purchase_requests").select("*").eq("admin_id", adminId).eq("status", "pending").order("created_at");
+  const { data, error } = await client()
+    .from("purchase_requests")
+    .select("*")
+    .eq("admin_id", adminId)
+    .eq("status", "pending")
+    .order("created_at");
   if (error) throw new Error(error.message);
   const rows = data ?? [];
-  const [names, templatesRes] = await Promise.all([
-    namesFor(rows.map((r) => r.student_id)),
-    client().from("package_templates").select("*").in("id", Array.from(new Set(rows.map((r) => r.template_id).filter(Boolean)))),
+
+  const templateIds = Array.from(new Set(rows.map((r) => r.template_id).filter(Boolean)));
+  const [students, templatesRes] = await Promise.all([
+    adminStudents(adminId),
+    templateIds.length
+      ? client().from("package_templates").select("*").in("id", templateIds)
+      : Promise.resolve({ data: [], error: null } as const),
   ]);
-  const templates: Record<string, PackageTemplate> = {};
-  for (const t of templatesRes.data ?? []) templates[t.id] = mapTemplate(t);
+  if (templatesRes.error) throw new Error(templatesRes.error.message);
+
+  const nameOf = new Map(students.map((s) => [s.id, s.name]));
+  const templates = new Map((templatesRes.data ?? []).map((t) => [t.id, mapTemplate(t)]));
 
   return rows.map((r) => ({
     request: mapRequest(r),
-    studentName: names[r.student_id] ?? "Aluno",
-    template: r.template_id ? (templates[r.template_id] ?? null) : null,
+    studentName: nameOf.get(r.student_id) ?? "Aluno",
+    template: r.template_id ? (templates.get(r.template_id) ?? null) : null,
   }));
 }
 
@@ -603,16 +728,28 @@ export async function rejectPurchaseRequest(requestId: string) {
   if (error) throw new Error(error.message);
 }
 
+/** Undo for a rejection — a rejection has no side effects, so putting it back is enough. */
 export async function restorePurchaseRequest(requestId: string) {
-  const { error } = await client().from("purchase_requests").update({ status: "pending", decided_at: null }).eq("id", requestId);
+  const { error } = await client()
+    .from("purchase_requests")
+    .update({ status: "pending", decided_at: null })
+    .eq("id", requestId);
   if (error) throw new Error(error.message);
 }
 
 // ---------------------------------------------------------------------------
-// admin · pacotes (templates CRUD)
+// admin · pacotes (templates)
 // ---------------------------------------------------------------------------
 
-export async function createPackageTemplate(adminId: string, data: Omit<PackageTemplate, "id" | "adminId">) {
+type TemplateInput = {
+  name: string;
+  description: string;
+  totalClasses: number;
+  priceCents: number | null;
+  validityDays: number | null;
+};
+
+export async function createPackageTemplate(adminId: string, data: TemplateInput) {
   const { data: row, error } = await client()
     .from("package_templates")
     .insert({
@@ -622,6 +759,7 @@ export async function createPackageTemplate(adminId: string, data: Omit<PackageT
       total_classes: data.totalClasses,
       price_cents: data.priceCents,
       validity_days: data.validityDays,
+      is_active: true,
     })
     .select()
     .single();
@@ -629,7 +767,7 @@ export async function createPackageTemplate(adminId: string, data: Omit<PackageT
   return mapTemplate(row);
 }
 
-export async function updatePackageTemplate(id: string, data: Partial<Omit<PackageTemplate, "id" | "adminId">>) {
+export async function updatePackageTemplate(id: string, data: Partial<TemplateInput>) {
   const patch: Record<string, unknown> = {};
   if (data.name !== undefined) patch.name = data.name;
   if (data.description !== undefined) patch.description = data.description;
@@ -641,8 +779,13 @@ export async function updatePackageTemplate(id: string, data: Partial<Omit<Packa
   return mapTemplate(row);
 }
 
+/**
+ * Soft delete: `purchase_requests.template_id` points here, and a hard delete would blank the
+ * template out of past requests. Deactivating hides it from new requests, which is what the
+ * screen promises.
+ */
 export async function deletePackageTemplate(id: string) {
-  const { error } = await client().from("package_templates").delete().eq("id", id);
+  const { error } = await client().from("package_templates").update({ is_active: false }).eq("id", id);
   if (error) throw new Error(error.message);
 }
 
@@ -652,109 +795,159 @@ export async function deletePackageTemplate(id: string) {
 
 export const WEEKDAY_NAMES = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
+/** How far ahead the weekly grid writes and reads concrete slots. */
+export const HORIZON_WEEKS = 12;
+
 export interface AvailabilityDay {
   weekday: number;
   name: string;
   active: boolean;
-  slots: (AvailabilitySlot & { bookedCount: number })[];
+  slots: AvailabilityInterval[];
+}
+
+function horizonBounds() {
+  const now = new Date();
+  return { fromIso: now.toISOString(), toIso: addWeeks(now, HORIZON_WEEKS).toISOString() };
+}
+
+/** Merges the individual hourly slots of one weekday into contiguous ranges. */
+function mergeHours(entries: { hour: number; id: string }[]): { startHour: number; endHour: number; ids: string[] }[] {
+  const byHour = new Map<number, string[]>();
+  for (const e of entries) byHour.set(e.hour, [...(byHour.get(e.hour) ?? []), e.id]);
+
+  const out: { startHour: number; endHour: number; ids: string[] }[] = [];
+  for (const hour of Array.from(byHour.keys()).sort((a, b) => a - b)) {
+    const last = out[out.length - 1];
+    if (last && last.endHour === hour) {
+      last.endHour = hour + 1;
+      last.ids.push(...byHour.get(hour)!);
+    } else {
+      out.push({ startHour: hour, endHour: hour + 1, ids: [...byHour.get(hour)!] });
+    }
+  }
+  return out;
 }
 
 export async function getAvailability(adminId: string): Promise<AvailabilityDay[]> {
-  const [settingsRes, slotsRes, bookingsRes] = await Promise.all([
-    client().from("admin_settings").select("*").eq("admin_id", adminId).maybeSingle(),
-    client().from("availability_slots").select("*").eq("admin_id", adminId),
+  const { fromIso, toIso } = horizonBounds();
+  const [slotsRes, bookingsRes] = await Promise.all([
+    client()
+      .from("availability_slots")
+      .select("id, start_time, is_active")
+      .eq("admin_id", adminId)
+      .gte("start_time", fromIso)
+      .lt("start_time", toIso),
     client()
       .from("bookings")
       .select("start_time")
       .eq("admin_id", adminId)
-      .in("status", ["scheduled", "pending_confirmation"])
-      .gt("start_time", new Date().toISOString()),
+      .in("status", ACTIVE_STATUSES)
+      .gte("start_time", fromIso)
+      .lt("start_time", toIso),
   ]);
   if (slotsRes.error) throw new Error(slotsRes.error.message);
   if (bookingsRes.error) throw new Error(bookingsRes.error.message);
 
-  const settings = settingsRes.data ? mapSettings(settingsRes.data) : null;
-  const slots = (slotsRes.data ?? []).map(mapSlot);
-  const bookingTimes = (bookingsRes.data ?? []).map((b) => toZonedTime(new Date(b.start_time), TIMEZONE));
+  const slots = slotsRes.data ?? [];
+  const bookings = (bookingsRes.data ?? []).map((b) => ({ weekday: brtWeekday(b.start_time), hour: brtHour(b.start_time) }));
 
-  function bookedCount(weekday: number, start: string, end: string) {
-    const s = parseInt(start, 10);
-    const e = parseInt(end, 10);
-    return bookingTimes.filter((d) => d.getDay() === weekday && d.getHours() >= s && d.getHours() < e).length;
-  }
+  return WEEKDAY_NAMES.map((name, weekday) => {
+    const ofDay = slots.filter((s) => brtWeekday(s.start_time) === weekday);
+    const active = ofDay.some((s) => s.is_active);
+    const ranges = mergeHours(ofDay.filter((s) => s.is_active).map((s) => ({ hour: brtHour(s.start_time), id: s.id })));
 
-  return WEEKDAY_NAMES.map((name, weekday) => ({
-    weekday,
-    name,
-    active: settings?.availabilityDayActive[weekday] ?? true,
-    slots: slots
-      .filter((s) => s.weekday === weekday)
-      .sort((a, b) => a.startTime.localeCompare(b.startTime))
-      .map((s) => ({ ...s, bookedCount: bookedCount(weekday, s.startTime, s.endTime) })),
-  }));
+    return {
+      weekday,
+      name,
+      active,
+      slots: ranges.map((r) => ({
+        key: `${weekday}-${r.startHour}-${r.endHour}`,
+        weekday,
+        startTime: hhmm(r.startHour),
+        endTime: hhmm(r.endHour),
+        slotIds: r.ids,
+        bookedCount: bookings.filter((b) => b.weekday === weekday && b.hour >= r.startHour && b.hour < r.endHour).length,
+      })),
+    };
+  });
 }
 
-async function ensureSettingsRow(adminId: string) {
-  const { data } = await client().from("admin_settings").select("admin_id").eq("admin_id", adminId).maybeSingle();
-  if (!data) {
-    await client().from("admin_settings").insert({ admin_id: adminId });
-  }
-}
-
-export async function toggleAvailabilityDay(adminId: string, weekday: number, active: boolean) {
-  await ensureSettingsRow(adminId);
-  const { data: row, error: readErr } = await client().from("admin_settings").select("availability_day_active").eq("admin_id", adminId).single();
-  if (readErr) throw new Error(readErr.message);
-  const next = { ...(row.availability_day_active ?? {}), [String(weekday)]: active };
-  const { error } = await client().from("admin_settings").update({ availability_day_active: next }).eq("admin_id", adminId);
+async function setSlotsActive(ids: string[], active: boolean) {
+  if (ids.length === 0) return;
+  const { error } = await client().from("availability_slots").update({ is_active: active }).in("id", ids);
   if (error) throw new Error(error.message);
 }
 
-export async function saveAvailabilitySlot(
+/** Turns every slot of that weekday inside the horizon on or off. */
+export async function toggleAvailabilityDay(adminId: string, weekday: number, active: boolean) {
+  const { fromIso, toIso } = horizonBounds();
+  const { data, error } = await client()
+    .from("availability_slots")
+    .select("id, start_time")
+    .eq("admin_id", adminId)
+    .gte("start_time", fromIso)
+    .lt("start_time", toIso);
+  if (error) throw new Error(error.message);
+  const ids = (data ?? []).filter((s) => brtWeekday(s.start_time) === weekday).map((s) => s.id);
+  if (ids.length === 0 && active) {
+    throw new Error("Esse dia ainda não tem horários cadastrados. Adicione um intervalo primeiro.");
+  }
+  await setSlotsActive(ids, active);
+}
+
+/** Every date inside the horizon that falls on `weekday`, as "yyyy-MM-dd" in BRT. */
+function horizonDatesFor(weekday: number): string[] {
+  const out: string[] = [];
+  const start = brt(new Date());
+  const end = addWeeks(start, HORIZON_WEEKS);
+  for (let d = start; d < end; d = addDays(d, 1)) {
+    if (d.getDay() === weekday) out.push(format(d, "yyyy-MM-dd"));
+  }
+  return out;
+}
+
+/**
+ * Writes one weekday range as concrete hourly slots across the horizon. `upsert_availability_slots`
+ * inserts what is missing and reactivates what already exists.
+ */
+export async function saveAvailabilityInterval(
   adminId: string,
   weekday: number,
   start: string,
   end: string,
-  id?: string | null,
-): Promise<{ error?: string; slot?: AvailabilitySlot }> {
-  const s = parseInt(start, 10);
-  const e = parseInt(end, 10);
-  if (e <= s) return { error: "O fim precisa ser depois do início." };
+  replacing?: AvailabilityInterval | null,
+): Promise<{ error?: string }> {
+  const startHour = parseInt(start, 10);
+  const endHour = parseInt(end, 10);
+  if (endHour <= startHour) return { error: "O fim precisa ser depois do início." };
 
-  const { data: daySlots, error: readErr } = await client().from("availability_slots").select("id, start_time, end_time").eq("admin_id", adminId).eq("weekday", weekday);
-  if (readErr) return { error: readErr.message };
-  const clash = (daySlots ?? []).some((sl) => sl.id !== id && parseInt(sl.start_time, 10) < e && s < parseInt(sl.end_time, 10));
-  if (clash) return { error: `Esse intervalo conflita com outro já cadastrado em ${WEEKDAY_NAMES[weekday]}.` };
-
-  if (id) {
-    const { data, error } = await client().from("availability_slots").update({ start_time: start, end_time: end }).eq("id", id).select().single();
-    if (error) return { error: error.message };
-    return { slot: mapSlot(data) };
+  const payload: { start_time: string; end_time: string }[] = [];
+  for (const day of horizonDatesFor(weekday)) {
+    for (let h = startHour; h < endHour; h++) {
+      const from = fromZonedTime(`${day}T${hhmm(h)}:00`, TIMEZONE);
+      if (from.getTime() <= Date.now()) continue;
+      payload.push({ start_time: from.toISOString(), end_time: new Date(from.getTime() + 3_600_000).toISOString() });
+    }
   }
+  if (payload.length === 0) return { error: "Não há datas futuras nesse intervalo dentro do horizonte de agendamento." };
 
-  const { data, error } = await client().from("availability_slots").insert({ admin_id: adminId, weekday, start_time: start, end_time: end }).select().single();
-  if (error) return { error: error.message };
-  await ensureSettingsRow(adminId);
-  const { data: row } = await client().from("admin_settings").select("availability_day_active").eq("admin_id", adminId).single();
-  const next = { ...(row?.availability_day_active ?? {}), [String(weekday)]: true };
-  await client().from("admin_settings").update({ availability_day_active: next }).eq("admin_id", adminId);
-  return { slot: mapSlot(data) };
+  if (replacing) await setSlotsActive(replacing.slotIds, false);
+
+  const { error } = await client().rpc("upsert_availability_slots", { p_admin_id: adminId, p_slots: payload });
+  if (error) {
+    if (replacing) await setSlotsActive(replacing.slotIds, true);
+    return { error: error.message };
+  }
+  return {};
 }
 
-export async function deleteAvailabilitySlot(id: string) {
-  const { error } = await client().from("availability_slots").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+/** Removing an interval deactivates its slots — the rows stay, so "desfazer" is exact. */
+export async function deleteAvailabilityInterval(interval: AvailabilityInterval) {
+  await setSlotsActive(interval.slotIds, false);
 }
 
-export async function restoreAvailabilitySlot(slot: AvailabilitySlot) {
-  const { error } = await client().from("availability_slots").insert({
-    id: slot.id,
-    admin_id: slot.adminId,
-    weekday: slot.weekday,
-    start_time: slot.startTime,
-    end_time: slot.endTime,
-  });
-  if (error) throw new Error(error.message);
+export async function restoreAvailabilityInterval(interval: AvailabilityInterval) {
+  await setSlotsActive(interval.slotIds, true);
 }
 
 // ---------------------------------------------------------------------------
@@ -762,78 +955,178 @@ export async function restoreAvailabilitySlot(slot: AvailabilitySlot) {
 // ---------------------------------------------------------------------------
 
 export async function getAdminSettings(adminId: string): Promise<AdminSettings | null> {
-  const { data, error } = await client().from("admin_settings").select("*").eq("admin_id", adminId).maybeSingle();
+  const { data, error } = await client()
+    .from("profiles")
+    .select("id, no_show_consumes_class")
+    .eq("id", adminId)
+    .maybeSingle();
   if (error) throw new Error(error.message);
-  return data ? mapSettings(data) : null;
+  return data ? { adminId: data.id, noShowConsumesClass: data.no_show_consumes_class } : null;
 }
 
 export async function updateNoShowConsumesClass(adminId: string, value: boolean) {
-  await ensureSettingsRow(adminId);
-  const { error } = await client().from("admin_settings").update({ no_show_consumes_class: value }).eq("admin_id", adminId);
+  const { error } = await client().from("profiles").update({ no_show_consumes_class: value }).eq("id", adminId);
   if (error) throw new Error(error.message);
 }
 
 // ---------------------------------------------------------------------------
 // notificações
+//
+// The database has no notifications table, so the feed is derived from the data that would have
+// produced one (pending approvals, rejections, upcoming classes). Read/dismissed state is per
+// device, in localStorage — there is nowhere on the server to record it.
 // ---------------------------------------------------------------------------
 
-export async function getNotifications(userId: string): Promise<AppNotification[]> {
-  const { data, error } = await client().from("notifications").select("*").eq("user_id", userId).order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
-  return (data ?? []).map(mapNotification);
+function notificationState(userId: string): { read: string[]; cleared: string[] } {
+  try {
+    const raw = localStorage.getItem(`bb.notifications.${userId}`);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return { read: parsed?.read ?? [], cleared: parsed?.cleared ?? [] };
+  } catch {
+    return { read: [], cleared: [] };
+  }
 }
 
+function saveNotificationState(userId: string, state: { read: string[]; cleared: string[] }) {
+  try {
+    localStorage.setItem(`bb.notifications.${userId}`, JSON.stringify(state));
+  } catch {
+    /* private mode / storage disabled — the feed just stops remembering */
+  }
+}
+
+async function deriveNotifications(userId: string): Promise<AppNotification[]> {
+  const { data: profile } = await client().from("profiles").select("role").eq("id", userId).maybeSingle();
+  const items: AppNotification[] = [];
+  const nowIso = new Date().toISOString();
+
+  if (profile?.role === "admin") {
+    const [requestsRes, pendingRes] = await Promise.all([
+      client().from("purchase_requests").select("*").eq("admin_id", userId).eq("status", "pending"),
+      client().from("bookings").select("*").eq("admin_id", userId).eq("status", "pending_confirmation"),
+    ]);
+    for (const r of requestsRes.data ?? []) {
+      items.push({
+        id: `request:${r.id}`,
+        userId,
+        kind: "system",
+        title: r.kind === "single" ? "Pedido de aula avulsa" : "Pedido de pacote",
+        description: "Um aluno está aguardando sua aprovação.",
+        createdAt: r.created_at,
+        read: false,
+      });
+    }
+    for (const b of pendingRes.data ?? []) {
+      items.push({
+        id: `booking:${b.id}:pending`,
+        userId,
+        kind: "booking",
+        title: "Agendamento aguardando confirmação",
+        description: "Um aluno pediu um horário.",
+        createdAt: b.created_at,
+        read: false,
+        relatedBookingId: b.id,
+      });
+    }
+  } else {
+    const studentId = await studentIdForProfile(userId).catch(() => null);
+    if (!studentId) return [];
+    const [bookingsRes, requestsRes] = await Promise.all([
+      client().from("bookings").select("*").eq("student_id", studentId).order("start_time", { ascending: false }).limit(40),
+      client().from("purchase_requests").select("*").eq("student_id", studentId).neq("status", "pending").order("decided_at", { ascending: false }).limit(20),
+    ]);
+    for (const b of bookingsRes.data ?? []) {
+      if (b.status === "rejected" || b.status === "rejected_with_suggestion") {
+        items.push({
+          id: `booking:${b.id}:${b.status}`,
+          userId,
+          kind: "cancel",
+          title: b.status === "rejected" ? "Agendamento recusado" : "O professor sugeriu outro horário",
+          description: b.teacher_note || "Toque para ver os detalhes.",
+          createdAt: b.created_at,
+          read: false,
+          relatedBookingId: b.id,
+        });
+      } else if (b.status === "scheduled" && b.start_time > nowIso) {
+        items.push({
+          id: `booking:${b.id}:scheduled`,
+          userId,
+          kind: "confirm",
+          title: "Aula confirmada",
+          description: "Seu horário está garantido.",
+          createdAt: b.created_at,
+          read: false,
+          relatedBookingId: b.id,
+        });
+      }
+    }
+    for (const r of requestsRes.data ?? []) {
+      items.push({
+        id: `request:${r.id}:${r.status}`,
+        userId,
+        kind: "system",
+        title: r.status === "approved" ? "Pedido aprovado" : "Pedido recusado",
+        description: r.status === "approved" ? "Seus créditos já estão disponíveis." : "Fale com seu professor para entender o motivo.",
+        createdAt: r.decided_at ?? r.created_at,
+        read: false,
+      });
+    }
+  }
+
+  return items.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
+export async function getNotifications(userId: string): Promise<AppNotification[]> {
+  const [items, state] = [await deriveNotifications(userId), notificationState(userId)];
+  const cleared = new Set(state.cleared);
+  const read = new Set(state.read);
+  return items.filter((n) => !cleared.has(n.id)).map((n) => ({ ...n, read: read.has(n.id) }));
+}
+
+/** The bell passes only the notification id, so the owning user comes from the session. */
 export async function markNotificationRead(id: string) {
-  const { error } = await client().from("notifications").update({ read: true }).eq("id", id);
-  if (error) throw new Error(error.message);
+  const { data } = await client().auth.getUser();
+  const uid = data.user?.id;
+  if (!uid) return;
+  const state = notificationState(uid);
+  if (!state.read.includes(id)) state.read.push(id);
+  saveNotificationState(uid, state);
 }
 
 export async function markAllNotificationsRead(userId: string) {
-  const { error } = await client().from("notifications").update({ read: true }).eq("user_id", userId);
-  if (error) throw new Error(error.message);
+  const items = await deriveNotifications(userId);
+  const state = notificationState(userId);
+  saveNotificationState(userId, { ...state, read: Array.from(new Set([...state.read, ...items.map((n) => n.id)])) });
 }
 
 export async function clearNotifications(userId: string): Promise<AppNotification[]> {
-  const { data, error } = await client().from("notifications").select("*").eq("user_id", userId);
-  if (error) throw new Error(error.message);
-  const removed = (data ?? []).map(mapNotification);
-  const { error: delErr } = await client().from("notifications").delete().eq("user_id", userId);
-  if (delErr) throw new Error(delErr.message);
-  return removed;
+  const visible = await getNotifications(userId);
+  const state = notificationState(userId);
+  saveNotificationState(userId, { ...state, cleared: Array.from(new Set([...state.cleared, ...visible.map((n) => n.id)])) });
+  return visible;
 }
 
 export async function restoreNotifications(items: AppNotification[]) {
   if (items.length === 0) return;
-  const { error } = await client()
-    .from("notifications")
-    .insert(
-      items.map((n) => ({
-        id: n.id,
-        user_id: n.userId,
-        kind: n.kind,
-        title: n.title,
-        description: n.description,
-        created_at: n.createdAt,
-        read: n.read,
-        related_booking_id: n.relatedBookingId,
-      })),
-    );
-  if (error) throw new Error(error.message);
+  const userId = items[0].userId;
+  const state = notificationState(userId);
+  const restore = new Set(items.map((n) => n.id));
+  saveNotificationState(userId, { ...state, cleared: state.cleared.filter((id) => !restore.has(id)) });
 }
 
 // ---------------------------------------------------------------------------
 // convites
 // ---------------------------------------------------------------------------
 
-export async function validateInvite(token: string) {
+export async function validateInvite(token: string): Promise<{ valid: boolean; reason: string } | null> {
   const { data, error } = await client().rpc("validate_invite", { p_token: token });
   if (error) throw new Error(error.message);
-  const row = data?.[0];
+  const row = (data as { is_valid: boolean; reason: string }[] | null)?.[0];
   if (!row) return null;
-  return { invite: { token, adminId: row.admin_id, createdAt: "", usedAt: null }, adminName: row.admin_name ?? "Professor" };
+  return { valid: row.is_valid, reason: row.reason };
 }
 
-/** Links the already-authenticated user (must have just signed up) as a student of this invite's admin. */
+/** Links the already-authenticated user as a student of this invite's admin. */
 export async function acceptInvite(token: string) {
   const { error } = await client().rpc("accept_invite", { p_token: token });
   if (error) throw new Error(error.message);

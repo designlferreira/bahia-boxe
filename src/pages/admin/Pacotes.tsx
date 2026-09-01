@@ -54,7 +54,7 @@ export default function AdminPacotes() {
         description: editing.description,
         totalClasses: editing.totalClasses,
         priceCents: editing.priceCents,
-        validityDays: editing.validityDays,
+        validityDays: editing.validityDays ?? 60,
       });
     } else {
       setForm(empty);

@@ -52,7 +52,7 @@ export default function Convite() {
     );
   }
 
-  if (!data) {
+  if (!data || !data.valid) {
     return (
       <main className="min-h-dvh flex flex-col items-center justify-center bg-background px-6 text-center">
         <h1 className="font-display text-2xl tracking-wide text-foreground mb-1.5">CONVITE INVÁLIDO</h1>
@@ -65,7 +65,7 @@ export default function Convite() {
     <main className="min-h-dvh flex flex-col justify-center bg-background px-6">
       <h1 className="font-display text-3xl tracking-wide text-foreground mb-1.5">VOCÊ FOI CONVIDADO</h1>
       <p className="text-[13.5px] text-muted-foreground mb-6">
-        {data.adminName} está te convidando para gerenciar suas aulas no Bahia Boxe.
+        Seu professor está te convidando para gerenciar suas aulas no Bahia Boxe.
       </p>
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-3.5">
         <div>

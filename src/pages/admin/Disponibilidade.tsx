@@ -12,13 +12,14 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
-  deleteAvailabilitySlot,
+  deleteAvailabilityInterval,
   getAvailability,
-  restoreAvailabilitySlot,
-  saveAvailabilitySlot,
+  HORIZON_WEEKS,
+  restoreAvailabilityInterval,
+  saveAvailabilityInterval,
   toggleAvailabilityDay,
 } from "@/integrations/backend/api";
-import type { AvailabilitySlot } from "@/integrations/backend/types";
+import type { AvailabilityInterval } from "@/integrations/backend/types";
 
 const START_HOURS = [6, 7, 8, 9, 10, 17, 18, 19, 20];
 const END_HOURS = [7, 8, 9, 10, 11, 18, 19, 20, 21];
@@ -27,7 +28,8 @@ const hhmm = (h: number) => String(h).padStart(2, "0") + ":00";
 interface EditorState {
   weekday: number;
   dayName: string;
-  id: string | null;
+  /** The range being replaced, or null when adding a new one. */
+  interval: AvailabilityInterval | null;
   start: string;
   end: string;
 }
@@ -38,7 +40,7 @@ export default function AdminDisponibilidade() {
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState<{ weekday: number; name: string; booked: number } | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<{ slot: AvailabilitySlot; dayName: string; booked: number } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ slot: AvailabilityInterval; dayName: string; booked: number } | null>(null);
 
   const key = ["availability", profile?.id];
   const { data, isLoading, isError, refetch } = useQuery({
@@ -59,10 +61,11 @@ export default function AdminDisponibilidade() {
         className: vars.active ? undefined : "!text-amber",
       });
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível alterar o dia."),
   });
 
   const saveSlot = useMutation({
-    mutationFn: (e: EditorState) => saveAvailabilitySlot(profile!.id, e.weekday, e.start, e.end, e.id),
+    mutationFn: (e: EditorState) => saveAvailabilityInterval(profile!.id, e.weekday, e.start, e.end, e.interval),
     onSuccess: (result, vars) => {
       if (result.error) {
         setEditorError(result.error);
@@ -71,12 +74,12 @@ export default function AdminDisponibilidade() {
       invalidate();
       setEditor(null);
       setEditorError(null);
-      toast.success(vars.id ? "Horário atualizado" : `Horário adicionado em ${vars.dayName}`);
+      toast.success(vars.interval ? "Horário atualizado" : `Horário adicionado em ${vars.dayName}`);
     },
   });
 
   const deleteSlot = useMutation({
-    mutationFn: (slot: AvailabilitySlot) => deleteAvailabilitySlot(slot.id),
+    mutationFn: (slot: AvailabilityInterval) => deleteAvailabilityInterval(slot),
     onSuccess: (_r, slot) => {
       invalidate();
       toast.warning("Horário removido", {
@@ -84,7 +87,7 @@ export default function AdminDisponibilidade() {
         action: {
           label: "Desfazer",
           onClick: async () => {
-            await restoreAvailabilitySlot(slot);
+            await restoreAvailabilityInterval(slot);
             invalidate();
           },
         },
@@ -99,7 +102,7 @@ export default function AdminDisponibilidade() {
 
   return (
     <div className="page-container">
-      <PageHeader title="MINHA DISPONIBILIDADE" subtitle="Grade semanal recorrente" back />
+      <PageHeader title="MINHA DISPONIBILIDADE" subtitle={`Grade semanal · próximas ${HORIZON_WEEKS} semanas`} back />
 
       <div className="rounded-[18px] px-4 py-3.5 mb-4 bg-[linear-gradient(150deg,#1F1B0C,#171717_62%)] border border-[#35301A] flex items-center gap-3.5">
         <div>
@@ -152,7 +155,7 @@ export default function AdminDisponibilidade() {
                   {day.slots.map((slot) => {
                     const booked = slot.bookedCount;
                     return (
-                      <div key={slot.id} className="flex items-center gap-2.5 p-2.5 rounded-[13px] bg-[#141414] border border-[#262626]">
+                      <div key={slot.key} className="flex items-center gap-2.5 p-2.5 rounded-[13px] bg-[#141414] border border-[#262626]">
                         <div className="flex-1">
                           <div className="text-[14.5px] font-semibold text-foreground">
                             {slot.startTime} – {slot.endTime}
@@ -165,7 +168,7 @@ export default function AdminDisponibilidade() {
                           type="button"
                           aria-label="Editar horário"
                           onClick={() => {
-                            setEditor({ weekday: day.weekday, dayName: day.name, id: slot.id, start: slot.startTime, end: slot.endTime });
+                            setEditor({ weekday: day.weekday, dayName: day.name, interval: slot, start: slot.startTime, end: slot.endTime });
                             setEditorError(null);
                           }}
                           className="h-11 w-11 rounded-[10px] border border-[#333] bg-secondary flex items-center justify-center active:scale-95"
@@ -202,7 +205,7 @@ export default function AdminDisponibilidade() {
                 variant="secondary"
                 className="w-full h-11 hover:border-primary hover:text-primary"
                 onClick={() => {
-                  setEditor({ weekday: day.weekday, dayName: day.name, id: null, start: "06:00", end: "09:00" });
+                  setEditor({ weekday: day.weekday, dayName: day.name, interval: null, start: "06:00", end: "09:00" });
                   setEditorError(null);
                 }}
               >
@@ -217,8 +220,10 @@ export default function AdminDisponibilidade() {
       <Sheet open={!!editor} onOpenChange={(o) => !o && setEditor(null)}>
         {editor && (
           <SheetContent>
-            <SheetTitle>{editor.id ? "EDITAR HORÁRIO" : "ADICIONAR HORÁRIO"}</SheetTitle>
-            <div className="text-[13px] text-muted-foreground mb-4">{editor.dayName} · repete toda semana</div>
+            <SheetTitle>{editor.interval ? "EDITAR HORÁRIO" : "ADICIONAR HORÁRIO"}</SheetTitle>
+            <div className="text-[13px] text-muted-foreground mb-4">
+              Toda {editor.dayName.toLowerCase()}, pelas próximas {HORIZON_WEEKS} semanas
+            </div>
 
             <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Início</div>
             <div className="flex gap-2 overflow-x-auto -mx-5 px-5 mb-3.5 pb-1 scroll-fade-x">
@@ -273,7 +278,7 @@ export default function AdminDisponibilidade() {
                 Voltar
               </Button>
               <Button size="lg" className="flex-[1.4]" onClick={() => saveSlot.mutate(editor)} disabled={saveSlot.isPending}>
-                {editor.id ? "Salvar alterações" : "Adicionar horário"}
+                {editor.interval ? "Salvar alterações" : "Adicionar horário"}
               </Button>
             </div>
           </SheetContent>
