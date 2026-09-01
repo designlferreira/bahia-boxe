@@ -9,6 +9,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SkeletonList } from "@/components/SkeletonCard";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,14 @@ import {
 } from "@/integrations/backend/api";
 import type { PackageTemplate } from "@/integrations/backend/types";
 
-const empty = { name: "", description: "", totalClasses: 10, priceCents: 0, validityDays: 60 };
+const empty = { name: "", description: "", totalClasses: 10, priceCents: null as number | null, validityDays: 60 };
+
+function priceError(priceCents: number | null): string | null {
+  if (priceCents === null) return "Informe o preço do pacote.";
+  if (priceCents < 0) return "O preço não pode ser negativo.";
+  if (priceCents === 0) return "Informe um preço maior que zero.";
+  return null;
+}
 
 export default function AdminPacotes() {
   const { profile } = useAuth();
@@ -30,6 +38,8 @@ export default function AdminPacotes() {
   const [form, setForm] = useState(empty);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PackageTemplate | null>(null);
+  const [priceTouched, setPriceTouched] = useState(false);
+  const priceValidation = priceError(form.priceCents);
 
   const key = ["package-templates", profile?.id];
   const { data, isLoading, isError, refetch } = useQuery({
@@ -57,12 +67,17 @@ export default function AdminPacotes() {
   }
 
   const save = useMutation({
-    mutationFn: () =>
-      editing ? updatePackageTemplate(editing.id, form) : createPackageTemplate(profile!.id, form),
+    mutationFn: () => {
+      const payload = { ...form, priceCents: form.priceCents ?? 0 };
+      return editing ? updatePackageTemplate(editing.id, payload) : createPackageTemplate(profile!.id, payload);
+    },
     onSuccess: () => {
       invalidate();
       setSheetOpen(false);
       toast.success(editing ? "Modelo atualizado" : "Modelo criado");
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Não foi possível salvar o modelo.");
     },
   });
 
@@ -76,11 +91,13 @@ export default function AdminPacotes() {
 
   function openCreate() {
     setEditing(null);
+    setPriceTouched(false);
     setSheetOpen(true);
   }
 
   function openEdit(t: PackageTemplate) {
     setEditing(t);
+    setPriceTouched(false);
     setSheetOpen(true);
   }
 
@@ -171,15 +188,21 @@ export default function AdminPacotes() {
               </div>
             </div>
             <div>
-              <Label htmlFor="price">Preço (R$)</Label>
-              <Input
+              <Label htmlFor="price">Preço</Label>
+              <CurrencyInput
                 id="price"
-                type="number"
-                min={0}
-                step="0.01"
-                value={(form.priceCents / 100).toFixed(2)}
-                onChange={(e) => setForm((f) => ({ ...f, priceCents: Math.round(Number(e.target.value) * 100) }))}
+                valueCents={form.priceCents}
+                onValueChange={(cents) => setForm((f) => ({ ...f, priceCents: cents }))}
+                placeholder="0,00"
+                aria-invalid={!!(priceTouched && priceValidation)}
+                aria-describedby={priceTouched && priceValidation ? "price-error" : undefined}
+                onBlur={() => setPriceTouched(true)}
               />
+              {priceTouched && priceValidation && (
+                <div id="price-error" role="alert" className="text-[12.5px] text-destructive mt-1.5">
+                  {priceValidation}
+                </div>
+              )}
             </div>
           </div>
           <div className="flex gap-2.5 mt-5">
@@ -190,9 +213,9 @@ export default function AdminPacotes() {
               size="lg"
               className="flex-[1.4]"
               onClick={() => save.mutate()}
-              disabled={!form.name.trim() || save.isPending}
+              disabled={!form.name.trim() || !!priceValidation || save.isPending}
             >
-              {editing ? "Salvar alterações" : "Criar modelo"}
+              {save.isPending ? "Salvando…" : editing ? "Salvar alterações" : "Criar modelo"}
             </Button>
           </div>
         </SheetContent>

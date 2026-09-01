@@ -147,8 +147,17 @@ export default function Login() {
         </Link>
       </div>
 
-      <div className="text-center text-[11px] text-muted-foreground/70 mt-6">
-        Demo: marina@bahiaboxe.com (aluna) ou diego@bahiaboxe.com (professor) · senha 123456
+      <div className="flex items-center gap-3 my-2">
+        <span className="h-px flex-1 bg-border" />
+        <span className="text-[11px] uppercase tracking-wide text-muted-foreground">ou</span>
+        <span className="h-px flex-1 bg-border" />
+      </div>
+
+      <div className="text-center text-[13px] text-muted-foreground">
+        Ainda não tem uma conta?{" "}
+        <Link to="/criar-conta" className="inline-flex min-h-11 items-center font-semibold text-accent hover:text-foreground">
+          Criar conta
+        </Link>
       </div>
     </main>
   );

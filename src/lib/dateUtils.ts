@@ -38,10 +38,27 @@ export function formatMonthShort(date: string | Date) {
   return formatInTimeZone(date, TIMEZONE, "MMM", { locale: ptBR }).toLowerCase();
 }
 
-/** short weekday abbreviation, e.g. "Ter" */
+// Fixed table instead of the ptBR locale's abbreviation: date-fns renders the long form here
+// ("segunda"), which overflows the day-picker squares on narrow screens.
+const WEEKDAY_SHORT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const WEEKDAY_LONG = [
+  "Domingo",
+  "Segunda-feira",
+  "Terça-feira",
+  "Quarta-feira",
+  "Quinta-feira",
+  "Sexta-feira",
+  "Sábado",
+];
+
+/** Three-letter weekday, e.g. "Ter". For the visible label. */
 export function formatWeekdayShort(date: string | Date) {
-  const s = formatInTimeZone(date, TIMEZONE, "EEE", { locale: ptBR });
-  return s.charAt(0).toUpperCase() + s.slice(1).replace(".", "");
+  return WEEKDAY_SHORT[toZonedTime(typeof date === "string" ? new Date(date) : date, TIMEZONE).getDay()];
+}
+
+/** Full weekday, e.g. "Terça-feira". For accessible names, where the short form reads poorly. */
+export function formatWeekdayLong(date: string | Date) {
+  return WEEKDAY_LONG[toZonedTime(typeof date === "string" ? new Date(date) : date, TIMEZONE).getDay()];
 }
 
 export function formatNextClass(startTime: string, endTime: string) {

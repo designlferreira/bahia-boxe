@@ -9,7 +9,7 @@ import { RejectBookingModal } from "@/components/RejectBookingModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { formatDate, formatDayNumber, formatWeekdayShort } from "@/lib/dateUtils";
+import { formatDate, formatDayNumber, formatWeekdayLong, formatWeekdayShort } from "@/lib/dateUtils";
 import { getStatusConfig } from "@/lib/bookingStatus";
 import {
   approveBooking,
@@ -116,15 +116,26 @@ export default function AdminAgenda() {
               key={d.toISOString()}
               type="button"
               onClick={() => setDayOffset(i)}
+              aria-label={`${formatWeekdayLong(d)}, dia ${formatDayNumber(d)}`}
+              aria-pressed={on}
               className={cn(
                 "shrink-0 w-14 py-2 rounded-2xl border transition-all active:scale-95",
                 on ? "bg-primary border-primary" : "bg-secondary border-border",
               )}
             >
-              <div className={cn("text-[10.5px] uppercase tracking-wide", on ? "text-primary-foreground/80" : "text-muted-foreground")}>
+              <div
+                aria-hidden
+                className={cn(
+                  "text-[10.5px] uppercase tracking-wide whitespace-nowrap",
+                  on ? "text-primary-foreground/80" : "text-muted-foreground",
+                )}
+              >
                 {formatWeekdayShort(d)}
               </div>
-              <div className={cn("font-display text-[23px] leading-tight", on ? "text-primary-foreground" : "text-foreground")}>
+              <div
+                aria-hidden
+                className={cn("font-display text-[23px] leading-tight", on ? "text-primary-foreground" : "text-foreground")}
+              >
                 {formatDayNumber(d)}
               </div>
             </button>

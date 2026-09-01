@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { formatDayNumber, formatWeekdayShort } from "@/lib/dateUtils";
+import { formatDayNumber, formatWeekdayLong, formatWeekdayShort } from "@/lib/dateUtils";
 import { getAvailableSlotsForDay, getStudentAdminId, getStudentHome, scheduleBooking } from "@/integrations/backend/api";
 import { CalendarSearch } from "lucide-react";
 
@@ -79,15 +79,26 @@ export default function StudentAgendar() {
                 setDayOffset(i);
                 setSelectedTime(null);
               }}
+              aria-label={`${formatWeekdayLong(d)}, dia ${formatDayNumber(d)}`}
+              aria-pressed={on}
               className={cn(
                 "shrink-0 w-[62px] py-2.5 rounded-2xl border transition-all active:scale-95",
                 on ? "bg-primary border-primary" : "bg-secondary border-border",
               )}
             >
-              <div className={cn("text-[11px] uppercase tracking-wide", on ? "text-primary-foreground/80" : "text-muted-foreground")}>
+              <div
+                aria-hidden
+                className={cn(
+                  "text-[11px] uppercase tracking-wide whitespace-nowrap",
+                  on ? "text-primary-foreground/80" : "text-muted-foreground",
+                )}
+              >
                 {formatWeekdayShort(d)}
               </div>
-              <div className={cn("font-display text-2xl leading-tight", on ? "text-primary-foreground" : "text-foreground")}>
+              <div
+                aria-hidden
+                className={cn("font-display text-2xl leading-tight", on ? "text-primary-foreground" : "text-foreground")}
+              >
                 {formatDayNumber(d)}
               </div>
             </button>

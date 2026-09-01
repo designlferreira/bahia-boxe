@@ -7,6 +7,8 @@ import { StudentLayout } from "@/layouts/StudentLayout";
 import { AdminLayout } from "@/layouts/AdminLayout";
 
 import Login from "@/pages/auth/Login";
+import CriarConta from "@/pages/auth/CriarConta";
+import ConfirmarEmail from "@/pages/auth/ConfirmarEmail";
 import RecuperarSenha from "@/pages/auth/RecuperarSenha";
 import ResetPassword from "@/pages/auth/ResetPassword";
 import Convite from "@/pages/auth/Convite";
@@ -47,6 +49,8 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<PostLoginRedirect />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/criar-conta" element={<CriarConta />} />
+      <Route path="/confirmar-email" element={<ConfirmarEmail />} />
       <Route path="/recuperar-senha" element={<RecuperarSenha />} />
       <Route path="/auth/reset-password" element={<ResetPassword />} />
       <Route path="/convite/:token" element={<Convite />} />
