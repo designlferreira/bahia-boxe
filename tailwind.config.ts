@@ -87,6 +87,9 @@ export default {
           from: { opacity: "0", transform: "translate(-50%, -50%) scale(.98)" },
           to: { opacity: "1", transform: "translate(-50%, -50%) scale(1)" },
         },
+        "bb-spin": {
+          to: { transform: "rotate(360deg)" },
+        },
       },
       animation: {
         "bb-in": "bb-in .35s ease both",
@@ -96,6 +99,7 @@ export default {
         "bb-bar": "bb-bar .7s cubic-bezier(.22,1,.36,1) both",
         "bb-toast": "bb-toast .3s cubic-bezier(.22,1,.36,1) both",
         "dialog-in": "dialog-in .18s ease both",
+        "bb-spin": "bb-spin 4s linear infinite",
       },
     },
   },

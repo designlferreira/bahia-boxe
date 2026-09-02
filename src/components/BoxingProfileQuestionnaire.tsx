@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { cn } from "@/lib/utils";
@@ -146,6 +146,14 @@ export function BoxingProfileQuestionnaire({
             />
           </div>
         </div>
+        <button
+          type="button"
+          onClick={() => setConfirmExit(true)}
+          aria-label="Sair do questionário"
+          className="h-11 w-11 shrink-0 rounded-xl bg-secondary border border-border flex items-center justify-center active:scale-95 transition-transform"
+        >
+          <X className="h-[18px] w-[18px] text-muted-foreground" />
+        </button>
       </div>
 
       <fieldset className="mt-6 mb-8">

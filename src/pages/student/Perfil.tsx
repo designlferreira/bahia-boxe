@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { HelpCircle, Sparkles } from "lucide-react";
+import { ChevronRight, HelpCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard } from "@/components/SkeletonCard";
@@ -92,16 +92,43 @@ export default function StudentPerfil() {
       <button
         type="button"
         onClick={() => navigate("/app/perfil-lutador")}
-        className="w-full text-left relative overflow-hidden rounded-[20px] p-5 mb-5 bg-[linear-gradient(135deg,#1F1B0C_0%,#171717_65%)] border border-amber/30 active:scale-[0.99] transition-transform animate-bb-up"
+        className="w-full text-left relative rounded-xl bg-background p-2 mb-5 shadow-card active:scale-[0.98] transition-transform animate-bb-up"
       >
-        <div className="absolute -right-6 -top-6 w-[140px] h-[140px] rounded-full bg-[radial-gradient(circle,hsl(var(--amber)/0.22),transparent_70%)] animate-bb-pulse" />
-        <div className="relative flex items-center gap-1.5 text-amber text-[11px] font-bold uppercase tracking-wide mb-1.5">
-          <Sparkles className="h-3.5 w-3.5" /> Descubra seu perfil de lutador
+        <div className="relative rounded-2xl border border-dashed border-amber/40 bg-card px-4 pt-[18px] pb-4 overflow-hidden">
+          {/* Cordas do ringue */}
+          <div className="absolute left-0 right-0 top-[6px] h-0.5 bg-amber/50" />
+          <div className="absolute left-0 right-0 top-[13px] h-0.5 bg-amber/35" />
+          <div className="absolute left-0 right-0 top-[20px] h-0.5 bg-amber/[.22]" />
+          {/* Postes de canto */}
+          <div className="absolute top-[3px] left-3 w-[9px] h-[22px] rounded-sm bg-secondary" />
+          <div className="absolute top-[3px] right-3 w-[9px] h-[22px] rounded-sm bg-secondary" />
+
+          <div className="absolute -top-[9px] left-[34px] bg-amber text-amber-foreground text-[9px] font-extrabold uppercase tracking-[.08em] px-[9px] py-[3px] rounded-full">
+            Novo desafio
+          </div>
+
+          <div className="relative mt-3.5 flex items-center gap-2.5">
+            <div className="relative flex-none w-10 h-10">
+              <div className="absolute inset-0 rounded-full bg-[conic-gradient(hsl(var(--amber))_0deg,hsl(var(--secondary))_360deg)] motion-safe:animate-bb-spin" />
+              <div className="absolute inset-1 rounded-full bg-card flex items-center justify-center">
+                <div className="w-[9px] h-[9px] bg-foreground/90 rotate-45" />
+              </div>
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="text-[9.5px] font-bold uppercase tracking-[.1em] text-amber/90 mb-1">PERFIL DE LUTADOR</div>
+              <div className="font-display text-[15.5px] leading-[1.2] text-foreground">
+                Qual é seu estilo
+                <br />
+                no ringue?
+              </div>
+            </div>
+
+            <div className="flex-none flex items-center gap-1 bg-amber/10 text-accent border border-amber/50 rounded-[10px] px-2.5 py-2 text-xs font-bold whitespace-nowrap">
+              Descobrir <ChevronRight className="h-3.5 w-3.5" />
+            </div>
+          </div>
         </div>
-        <div className="relative text-[15px] font-semibold text-foreground mb-1">
-          Pressure Fighter, Out-Boxer, Boxer-Puncher ou Counter Puncher?
-        </div>
-        <div className="relative text-[12.5px] text-muted-foreground">Fazer teste</div>
       </button>
 
       <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Informações pessoais</div>
