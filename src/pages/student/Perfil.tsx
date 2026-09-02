@@ -94,14 +94,19 @@ export default function StudentPerfil() {
         onClick={() => navigate("/app/perfil-lutador")}
         className="w-full text-left relative rounded-xl bg-background p-2 mb-5 shadow-card active:scale-[0.98] transition-transform animate-bb-up"
       >
-        <div className="relative rounded-2xl border border-dashed border-amber/40 bg-card px-4 pt-[18px] pb-4 overflow-hidden">
-          {/* Cordas do ringue */}
-          <div className="absolute left-0 right-0 top-[6px] h-0.5 bg-amber/50" />
-          <div className="absolute left-0 right-0 top-[13px] h-0.5 bg-amber/35" />
-          <div className="absolute left-0 right-0 top-[20px] h-0.5 bg-amber/[.22]" />
-          {/* Postes de canto */}
-          <div className="absolute top-[3px] left-3 w-[9px] h-[22px] rounded-sm bg-secondary" />
-          <div className="absolute top-[3px] right-3 w-[9px] h-[22px] rounded-sm bg-secondary" />
+        <div className="relative rounded-2xl border border-dashed border-amber/40 bg-card px-4 pt-[18px] pb-4">
+          {/* Camada clipada — só as cordas/postes precisam ser cortados nos cantos arredondados;
+              a badge abaixo fica FORA dela de propósito, senão o overflow-hidden corta a badge
+              (que propositalmente ultrapassa a borda de cima do card). */}
+          <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
+            {/* Cordas do ringue */}
+            <div className="absolute left-0 right-0 top-[6px] h-0.5 bg-amber/50" />
+            <div className="absolute left-0 right-0 top-[13px] h-0.5 bg-amber/35" />
+            <div className="absolute left-0 right-0 top-[20px] h-0.5 bg-amber/[.22]" />
+            {/* Postes de canto */}
+            <div className="absolute top-[3px] left-3 w-[9px] h-[22px] rounded-sm bg-secondary" />
+            <div className="absolute top-[3px] right-3 w-[9px] h-[22px] rounded-sm bg-secondary" />
+          </div>
 
           <div className="absolute -top-[9px] left-[34px] bg-amber text-amber-foreground text-[9px] font-extrabold uppercase tracking-[.08em] px-[9px] py-[3px] rounded-full">
             Novo desafio
