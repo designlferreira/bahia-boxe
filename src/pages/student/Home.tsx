@@ -34,7 +34,7 @@ export default function StudentHome() {
             {profile.name}
           </h1>
         </div>
-        <NotificationBell userId={profile.id} bookingRoute="/app/historico" cancelRoute={data?.suggestion ? `/app/aula/${data.suggestion.id}` : "/app/historico"} />
+        <NotificationBell userId={profile.id} />
       </div>
 
       <PWAInstallBanner />

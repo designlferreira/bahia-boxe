@@ -61,7 +61,7 @@ export default function AdminDashboard() {
             Prof. {profile.name.split(" ")[0]}
           </h1>
         </div>
-        <NotificationBell userId={profile.id} bookingRoute="/admin/agenda" />
+        <NotificationBell userId={profile.id} />
       </div>
 
       {isError && <ErrorState title="Não foi possível carregar o painel" onRetry={() => refetch()} />}
@@ -150,7 +150,12 @@ export default function AdminDashboard() {
             {data.upcoming.map((b) => {
               const cfg = getStatusConfig(b.status);
               return (
-                <div key={b.id} className="card-dark p-3.5 flex items-center gap-3">
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => navigate(`/admin/aula/${b.id}`)}
+                  className="w-full text-left card-dark p-3.5 flex items-center gap-3 active:scale-[0.99] transition-transform"
+                >
                   <div className="font-display text-xl text-accent w-[52px]">{formatTime(b.startTime)}</div>
                   <div className="flex-1">
                     <div className="text-[14.5px] font-semibold text-foreground">{b.studentName}</div>
@@ -159,7 +164,7 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   <Badge className={cfg.badgeClass}>{cfg.label}</Badge>
-                </div>
+                </button>
               );
             })}
           </div>

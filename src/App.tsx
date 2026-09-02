@@ -23,12 +23,14 @@ import StudentMinhaConta from "@/pages/student/MinhaConta";
 
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminAgenda from "@/pages/admin/Agenda";
+import AdminAulaDetalhe from "@/pages/admin/AulaDetalhe";
 import AdminAlunos from "@/pages/admin/Alunos";
 import AdminAlunoDetalhe from "@/pages/admin/AlunoDetalhe";
 import AdminHistorico from "@/pages/admin/Historico";
 import AdminPedidos from "@/pages/admin/Pedidos";
 import AdminPacotes from "@/pages/admin/Pacotes";
 import AdminDisponibilidade from "@/pages/admin/Disponibilidade";
+import AdminOrientacoesAula from "@/pages/admin/OrientacoesAula";
 import AdminConfiguracoes from "@/pages/admin/Configuracoes";
 import AdminMinhaConta from "@/pages/admin/MinhaConta";
 
@@ -72,12 +74,14 @@ function AppRoutes() {
         <Route element={<AdminLayout />}>
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/agenda" element={<AdminAgenda />} />
+          <Route path="/admin/aula/:id" element={<AdminAulaDetalhe />} />
           <Route path="/admin/alunos" element={<AdminAlunos />} />
           <Route path="/admin/alunos/:studentId" element={<AdminAlunoDetalhe />} />
           <Route path="/admin/historico" element={<AdminHistorico />} />
           <Route path="/admin/pacotes" element={<AdminPacotes />} />
           <Route path="/admin/solicitacoes" element={<AdminPedidos />} />
           <Route path="/admin/disponibilidade" element={<AdminDisponibilidade />} />
+          <Route path="/admin/orientacoes" element={<AdminOrientacoesAula />} />
           <Route path="/admin/configuracoes" element={<AdminConfiguracoes />} />
           <Route path="/admin/minha-conta" element={<AdminMinhaConta />} />
           <Route path="/admin/minha-conta/alterar-senha" element={<AlterarSenha backTo="/admin/minha-conta" />} />

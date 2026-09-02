@@ -9,6 +9,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { cn } from "@/lib/utils";
 import { relativeTime } from "@/lib/dateUtils";
+import { notificationHref } from "@/lib/notifications";
+import { useAuth } from "@/context/AuthContext";
 import {
   clearNotifications,
   getNotifications,
@@ -22,17 +24,16 @@ const KIND_ICON = { booking: CalendarClock, cancel: XCircle, confirm: CheckCircl
 
 interface NotificationBellProps {
   userId: string;
-  /** where "booking"-kind notifications should navigate to on open */
-  bookingRoute: string;
-  /** where "cancel"-kind (suggestion) notifications should navigate to, if different */
-  cancelRoute?: string;
 }
 
-export function NotificationBell({ userId, bookingRoute, cancelRoute }: NotificationBellProps) {
+/** Destino de cada notificação vem do próprio dado (`entity`), resolvido por `notificationHref` —
+ * nunca uma rota fixa passada de fora. */
+export function NotificationBell({ userId }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { profile } = useAuth();
   const key = ["notifications", userId];
 
   const { data: notifs = [] } = useQuery({ queryKey: key, queryFn: () => getNotifications(userId) });
@@ -43,8 +44,8 @@ export function NotificationBell({ userId, bookingRoute, cancelRoute }: Notifica
     onSuccess: (_r, n) => {
       queryClient.invalidateQueries({ queryKey: key });
       setOpen(false);
-      if (n.kind === "booking") navigate(bookingRoute);
-      if (n.kind === "cancel" && cancelRoute) navigate(cancelRoute);
+      const href = profile ? notificationHref(n, profile.role) : null;
+      if (href) navigate(href);
     },
   });
 

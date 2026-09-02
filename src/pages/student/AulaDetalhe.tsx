@@ -2,16 +2,18 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, Clock3, MapPin, Repeat } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { ErrorState } from "@/components/ErrorState";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getStatusConfig } from "@/lib/bookingStatus";
 import { formatDateTime, formatTime, formatDate } from "@/lib/dateUtils";
-import { acceptSuggestion, cancelBooking, getBookingDetail } from "@/integrations/backend/api";
+import { arrivalMessage, equipmentItems, formatAddress, hasAddress, mapsUrl } from "@/lib/classGuidelines";
+import { acceptSuggestion, cancelBooking, getBookingDetail, getClassGuidelinesForBooking } from "@/integrations/backend/api";
 
 export default function StudentAulaDetalhe() {
   const { id } = useParams<{ id: string }>();
@@ -29,6 +31,12 @@ export default function StudentAulaDetalhe() {
   // history view could resolve it.
   const professor = detail?.adminName ?? "Seu professor";
 
+  const { data: guidelines } = useQuery({
+    queryKey: ["class-guidelines", booking?.adminId],
+    queryFn: () => getClassGuidelinesForBooking(booking!),
+    enabled: !!booking,
+  });
+
   const cancel = useMutation({
     mutationFn: () => cancelBooking(id!),
     onSuccess: () => {
@@ -37,6 +45,7 @@ export default function StudentAulaDetalhe() {
       navigate("/app/home");
       toast.warning("Aula cancelada · crédito devolvido");
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível cancelar a aula."),
   });
 
   const accept = useMutation({
@@ -47,6 +56,7 @@ export default function StudentAulaDetalhe() {
       navigate("/app/home");
       toast.success(`Horário confirmado para ${formatDateTime(booking!.suggestedStartTime!)}`);
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível aceitar o novo horário."),
   });
 
   if (isLoading) {
@@ -117,13 +127,23 @@ export default function StudentAulaDetalhe() {
   const cfg = getStatusConfig(booking.status);
   const cancelable = (booking.status === "scheduled" || booking.status === "pending_confirmation") &&
     new Date(booking.startTime).getTime() > Date.now();
+  const arrival = guidelines ? arrivalMessage(guidelines.arrivalMinutes) : null;
+  const equipment = guidelines ? equipmentItems(guidelines.equipment) : [];
+  const address = guidelines && hasAddress(guidelines) ? formatAddress(guidelines) : null;
 
   return (
     <div className="page-container">
       <PageHeader title="DETALHE DA AULA" back />
 
       <div className="card-dark p-5 mb-3.5">
-        <Badge className={`${cfg.badgeClass} mb-3`}>{cfg.label}</Badge>
+        <div className="flex items-center gap-2 mb-3">
+          <Badge className={cfg.badgeClass}>{cfg.label}</Badge>
+          {booking.isReplacement && (
+            <Badge className="bg-secondary text-muted-foreground flex items-center gap-1">
+              <Repeat className="h-3 w-3" /> Reposição
+            </Badge>
+          )}
+        </div>
         <div className="font-display text-[38px] tracking-wide text-foreground leading-none">
           {formatDate(booking.startTime)}
         </div>
@@ -131,10 +151,62 @@ export default function StudentAulaDetalhe() {
           {formatTime(booking.startTime)} – {formatTime(booking.endTime)}
         </div>
         <div className="h-px bg-border my-4" />
-        <Row label="Professor" value={professor} />
-        <Row label="Local" value="Academia Bahia Boxe" />
-        <Row label="Consome crédito" value="1 aula" last />
+        <div className="flex items-center gap-2.5">
+          <Avatar initials={professor.split(" ").map((n) => n[0]).slice(0, 2).join("")} size="sm" />
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Professor</div>
+            <div className="text-[14.5px] font-semibold text-foreground">{professor}</div>
+          </div>
+        </div>
       </div>
+
+      {address && (
+        <div className="card-dark p-4 mb-3.5">
+          <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">
+            <MapPin className="h-3.5 w-3.5" /> Onde será
+          </div>
+          <div className="text-[14.5px] text-foreground/90 leading-snug">{address}</div>
+          {guidelines?.referencePoint && (
+            <div className="text-[12.5px] text-muted-foreground mt-1">Referência: {guidelines.referencePoint}</div>
+          )}
+          <a
+            href={mapsUrl(guidelines!)}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-11 items-center mt-2 text-[13px] font-semibold text-accent"
+          >
+            Ver no mapa
+          </a>
+        </div>
+      )}
+
+      {arrival && (
+        <div className="flex items-start gap-2.5 rounded-2xl p-4 bg-secondary/60 mb-3.5">
+          <Clock3 className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+          <div className="text-[13.5px] text-foreground/85 leading-relaxed">{arrival}</div>
+        </div>
+      )}
+
+      {equipment.length > 0 && (
+        <div className="mb-3.5">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-2">Leve para esta aula</div>
+          <div className="flex flex-wrap gap-2">
+            {equipment.map((item) => (
+              <div key={item.label} className="rounded-xl border border-border bg-secondary px-3 py-2">
+                <div className="text-[13px] font-semibold text-foreground">{item.label}</div>
+                {item.sub && <div className="text-[11px] text-muted-foreground">{item.sub}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {guidelines?.notes && (
+        <div className="rounded-2xl p-4 bg-secondary/60 mb-3.5">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">Orientações</div>
+          <div className="text-[13.5px] text-foreground/85 leading-relaxed">{guidelines.notes}</div>
+        </div>
+      )}
 
       {booking.teacherNote && booking.status !== "rejected" && (
         <div className="rounded-2xl p-4 bg-amber/[0.08] border border-amber/25 mb-3.5">
@@ -159,15 +231,6 @@ export default function StudentAulaDetalhe() {
         confirmLabel="Cancelar aula"
         onConfirm={() => cancel.mutate()}
       />
-    </div>
-  );
-}
-
-function Row({ label, value, last }: { label: string; value: string; last?: boolean }) {
-  return (
-    <div className={`flex justify-between text-[13.5px] ${last ? "" : "mb-2.5"}`}>
-      <span className="text-muted-foreground">{label}</span>
-      <span className="text-foreground">{value}</span>
     </div>
   );
 }

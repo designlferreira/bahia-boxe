@@ -126,6 +126,12 @@ export interface PurchaseRequest {
   decidedAt: string | null;
 }
 
+/** O que tocar na notificação deve abrir — nunca uma rota hardcoded no componente. */
+export type NotificationEntity =
+  | { type: "booking"; id: string }
+  | { type: "purchase_requests" }
+  | null;
+
 export interface AppNotification {
   id: string;
   userId: string;
@@ -134,7 +140,7 @@ export interface AppNotification {
   description: string;
   createdAt: string;
   read: boolean;
-  relatedBookingId?: string | null;
+  entity: NotificationEntity;
 }
 
 export interface AdminSettings {

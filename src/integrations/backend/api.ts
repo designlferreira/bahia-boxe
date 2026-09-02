@@ -13,6 +13,7 @@ import type {
   StudentRecord,
 } from "./types";
 import type { BookingStatus } from "@/lib/bookingStatus";
+import type { ClassGuidelines } from "@/lib/classGuidelines";
 
 /**
  * This module talks to the pre-existing Bahia Boxe database (see supabase/README.md). Two of its
@@ -406,6 +407,17 @@ export async function getBookingDetail(bookingId: string): Promise<{ booking: Bo
   const { data, error } = await client().from("bookings").select("*").eq("id", bookingId).maybeSingle();
   if (error) throw new Error(error.message);
   return data ? { booking: mapBooking(data), adminName: null } : undefined;
+}
+
+/** Mesma view, do lado do professor: já traz o nome do aluno resolvido. */
+export async function getAdminBookingDetail(bookingId: string): Promise<{ booking: Booking; studentName: string } | undefined> {
+  const viewRes = await client().from("booking_history_app").select("*").eq("id", bookingId).maybeSingle();
+  if (!viewRes.error && viewRes.data) {
+    return { booking: mapBooking(viewRes.data), studentName: viewRes.data.student_name ?? "Aluno" };
+  }
+  const { data, error } = await client().from("bookings").select("*").eq("id", bookingId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? { booking: mapBooking(data), studentName: "Aluno" } : undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -1032,6 +1044,65 @@ export async function updateNoShowConsumesClass(adminId: string, value: boolean)
 }
 
 // ---------------------------------------------------------------------------
+// orientações da aula
+// ---------------------------------------------------------------------------
+
+function mapGuidelines(r: any): ClassGuidelines {
+  return {
+    adminId: r.admin_id,
+    cep: r.cep,
+    street: r.street,
+    number: r.number,
+    complement: r.complement,
+    neighborhood: r.neighborhood,
+    city: r.city,
+    state: r.state,
+    referencePoint: r.reference_point,
+    arrivalMinutes: r.arrival_minutes,
+    equipment: r.equipment ?? {},
+    notes: r.notes,
+  };
+}
+
+/**
+ * Padrão do professor — hoje é a única fonte. Chamar por aqui (não por acesso direto à tabela)
+ * é o que deixa espaço pra um override por aula no futuro sem mudar quem lê.
+ */
+export async function getClassGuidelines(adminId: string): Promise<ClassGuidelines | null> {
+  const { data, error } = await client().from("class_guidelines").select("*").eq("admin_id", adminId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? mapGuidelines(data) : null;
+}
+
+export async function getClassGuidelinesForBooking(booking: Pick<Booking, "adminId">): Promise<ClassGuidelines | null> {
+  return getClassGuidelines(booking.adminId);
+}
+
+export async function saveClassGuidelines(adminId: string, g: Omit<ClassGuidelines, "adminId">) {
+  const { error } = await client()
+    .from("class_guidelines")
+    .upsert(
+      {
+        admin_id: adminId,
+        cep: g.cep,
+        street: g.street,
+        number: g.number,
+        complement: g.complement,
+        neighborhood: g.neighborhood,
+        city: g.city,
+        state: g.state,
+        reference_point: g.referencePoint,
+        arrival_minutes: g.arrivalMinutes,
+        equipment: g.equipment,
+        notes: g.notes,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "admin_id" },
+    );
+  if (error) throw new Error(error.message);
+}
+
+// ---------------------------------------------------------------------------
 // notificações
 //
 // The database has no notifications table, so the feed is derived from the data that would have
@@ -1076,6 +1147,7 @@ async function deriveNotifications(userId: string): Promise<AppNotification[]> {
         description: "Um aluno está aguardando sua aprovação.",
         createdAt: r.created_at,
         read: false,
+        entity: { type: "purchase_requests" },
       });
     }
     for (const b of pendingRes.data ?? []) {
@@ -1087,7 +1159,7 @@ async function deriveNotifications(userId: string): Promise<AppNotification[]> {
         description: "Um aluno pediu um horário.",
         createdAt: b.created_at,
         read: false,
-        relatedBookingId: b.id,
+        entity: { type: "booking", id: b.id },
       });
     }
   } else {
@@ -1107,7 +1179,7 @@ async function deriveNotifications(userId: string): Promise<AppNotification[]> {
           description: b.teacher_note || "Toque para ver os detalhes.",
           createdAt: b.created_at,
           read: false,
-          relatedBookingId: b.id,
+          entity: { type: "booking", id: b.id },
         });
       } else if (b.status === "scheduled" && b.start_time > nowIso) {
         items.push({
@@ -1118,7 +1190,7 @@ async function deriveNotifications(userId: string): Promise<AppNotification[]> {
           description: "Seu horário está garantido.",
           createdAt: b.created_at,
           read: false,
-          relatedBookingId: b.id,
+          entity: { type: "booking", id: b.id },
         });
       }
     }
@@ -1131,6 +1203,7 @@ async function deriveNotifications(userId: string): Promise<AppNotification[]> {
         description: r.status === "approved" ? "Seus créditos já estão disponíveis." : "Fale com seu professor para entender o motivo.",
         createdAt: r.decided_at ?? r.created_at,
         read: false,
+        entity: { type: "purchase_requests" },
       });
     }
   }

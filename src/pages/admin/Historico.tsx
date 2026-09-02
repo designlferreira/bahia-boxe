@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { BookingFilters } from "@/components/BookingFilters";
@@ -21,6 +22,7 @@ const FILTERS = [
 
 export default function AdminHistorico() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("todas");
 
@@ -51,7 +53,12 @@ export default function AdminHistorico() {
           {data.map(({ booking, studentName }) => {
             const cfg = getStatusConfig(booking.status);
             return (
-              <div key={booking.id} className="card-dark p-3.5">
+              <button
+                key={booking.id}
+                type="button"
+                onClick={() => navigate(`/admin/aula/${booking.id}`)}
+                className="w-full text-left card-dark p-3.5 active:scale-[0.99] transition-transform"
+              >
                 <div className="flex items-center gap-2.5">
                   <div className="flex-1">
                     <div className="text-[14.5px] font-semibold text-foreground">{studentName}</div>
@@ -60,7 +67,7 @@ export default function AdminHistorico() {
                   {booking.isReplacement && <Badge className="bg-secondary text-muted-foreground">Reposição</Badge>}
                   <Badge className={cfg.badgeClass}>{cfg.label}</Badge>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
