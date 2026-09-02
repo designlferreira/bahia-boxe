@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
@@ -43,15 +43,23 @@ export default function AdminOrientacoesAula() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<Form>(empty);
+  const [cepLoading, setCepLoading] = useState(false);
+  // Sem isso, o React Query padrão refaz a busca sempre que a aba/teclado reganha foco — o que é
+  // comum ao alternar entre campos no celular — e o useEffect abaixo sobrescrevia o que o
+  // professor tinha acabado de digitar com o dado antigo do servidor. Uma vez carregado, o
+  // formulário local é a fonte da verdade até "Salvar".
+  const loadedRef = useRef(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["class-guidelines", profile?.id],
     queryFn: () => getClassGuidelines(profile!.id),
     enabled: !!profile,
+    refetchOnWindowFocus: false,
   });
 
   useEffect(() => {
-    if (data) {
+    if (data && !loadedRef.current) {
+      loadedRef.current = true;
       setForm({
         cep: data.cep ?? "",
         street: data.street ?? "",
@@ -67,6 +75,28 @@ export default function AdminOrientacoesAula() {
       });
     }
   }, [data]);
+
+  async function lookupCep() {
+    const digits = (form.cep ?? "").replace(/\D/g, "");
+    if (digits.length !== 8) return;
+    setCepLoading(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+      const found = await res.json();
+      if (found.erro) return;
+      setForm((f) => ({
+        ...f,
+        street: found.logradouro || f.street,
+        neighborhood: found.bairro || f.neighborhood,
+        city: found.localidade || f.city,
+        state: found.uf || f.state,
+      }));
+    } catch {
+      /* sem internet ou CEP inválido — o professor preenche à mão, sem bloquear o resto do formulário */
+    } finally {
+      setCepLoading(false);
+    }
+  }
 
   const save = useMutation({
     mutationFn: () => saveClassGuidelines(profile!.id, form),
@@ -98,17 +128,37 @@ export default function AdminOrientacoesAula() {
 
       <Section title="Local da aula">
         <div className="grid grid-cols-2 gap-3 mb-3">
-          <Field label="CEP" value={form.cep} onChange={(v) => setForm((f) => ({ ...f, cep: v }))} placeholder="41000-000" />
-          <Field label="Número" value={form.number} onChange={(v) => setForm((f) => ({ ...f, number: v }))} placeholder="123" />
+          <div className="relative">
+            <Field
+              label="CEP"
+              value={form.cep}
+              onChange={(v) => setForm((f) => ({ ...f, cep: v }))}
+              onBlur={lookupCep}
+              placeholder="41000-000"
+              autoComplete="postal-code"
+              inputMode="numeric"
+            />
+            {cepLoading && (
+              <div className="absolute right-3 bottom-3.5 text-[11px] text-muted-foreground">buscando…</div>
+            )}
+          </div>
+          <Field label="Número" value={form.number} onChange={(v) => setForm((f) => ({ ...f, number: v }))} placeholder="123" inputMode="numeric" />
         </div>
-        <Field label="Rua" value={form.street} onChange={(v) => setForm((f) => ({ ...f, street: v }))} placeholder="Rua das Palmeiras" className="mb-3" />
+        <Field
+          label="Rua"
+          value={form.street}
+          onChange={(v) => setForm((f) => ({ ...f, street: v }))}
+          placeholder="Rua das Palmeiras"
+          autoComplete="address-line1"
+          className="mb-3"
+        />
         <div className="grid grid-cols-2 gap-3 mb-3">
-          <Field label="Complemento" value={form.complement} onChange={(v) => setForm((f) => ({ ...f, complement: v }))} placeholder="Sala 2" />
+          <Field label="Complemento" value={form.complement} onChange={(v) => setForm((f) => ({ ...f, complement: v }))} placeholder="Sala 2" autoComplete="address-line2" />
           <Field label="Bairro" value={form.neighborhood} onChange={(v) => setForm((f) => ({ ...f, neighborhood: v }))} placeholder="Centro" />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Cidade" value={form.city} onChange={(v) => setForm((f) => ({ ...f, city: v }))} placeholder="Salvador" />
-          <Field label="Estado" value={form.state} onChange={(v) => setForm((f) => ({ ...f, state: v }))} placeholder="BA" />
+          <Field label="Cidade" value={form.city} onChange={(v) => setForm((f) => ({ ...f, city: v }))} placeholder="Salvador" autoComplete="address-level2" />
+          <Field label="Estado" value={form.state} onChange={(v) => setForm((f) => ({ ...f, state: v }))} placeholder="BA" autoComplete="address-level1" />
         </div>
       </Section>
 
@@ -216,17 +266,30 @@ function Field({
   onChange,
   placeholder,
   className,
+  autoComplete,
+  inputMode,
+  onBlur,
 }: {
   label: string;
   value: string | null;
   onChange: (v: string) => void;
   placeholder?: string;
   className?: string;
+  autoComplete?: string;
+  inputMode?: "text" | "numeric";
+  onBlur?: () => void;
 }) {
   return (
     <div className={className}>
       <Label>{label}</Label>
-      <Input value={value ?? ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+      <Input
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+        inputMode={inputMode}
+      />
     </div>
   );
 }
