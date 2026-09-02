@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Sparkles, TrendingUp } from "lucide-react";
+import { Sparkles, TrendingUp, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
@@ -38,7 +38,10 @@ export default function StudentPerfilLutador() {
     enabled: !!studentId,
   });
 
-  const latest = history?.[0];
+  // `history` traz 'self' e 'coach' juntos (RLS por posse, não por tipo) — esta tela é sobre a
+  // AUTOAVALIAÇÃO do aluno, então filtra por tipo em vez de assumir a linha mais recente.
+  const latest = history?.find((a) => a.assessmentType === "self");
+  const latestCoach = history?.find((a) => a.assessmentType === "coach");
   const isRecent = latest
     ? Date.now() - new Date(latest.completedAt).getTime() < RECENT_ASSESSMENT_HOURS * 60 * 60 * 1000
     : false;
@@ -75,6 +78,11 @@ export default function StudentPerfilLutador() {
             É uma autoavaliação: reflete como você percebe o seu próprio jogo no momento, não uma medição técnica feita pelo seu
             treinador.
           </p>
+          {latestCoach && (
+            <Button variant="secondary" className="w-full mt-4" onClick={() => navigate("/app/perfil-lutador/comparacao")}>
+              <Users className="h-4 w-4 mr-1.5" /> Ver avaliação do seu professor
+            </Button>
+          )}
         </>
       )}
 
@@ -83,6 +91,11 @@ export default function StudentPerfilLutador() {
           <BoxingProfileResultView assessment={latest} />
 
           <div className="flex flex-col gap-2.5 mt-2">
+            {latestCoach && (
+              <Button variant="secondary" className="w-full" onClick={() => navigate("/app/perfil-lutador/comparacao")}>
+                <Users className="h-4 w-4 mr-1.5" /> Você × seu professor
+              </Button>
+            )}
             <Button variant="secondary" className="w-full" onClick={() => navigate("/app/perfil-lutador/historico")}>
               <TrendingUp className="h-4 w-4 mr-1.5" /> Minha evolução
             </Button>

@@ -21,16 +21,18 @@ export default function StudentPerfilLutadorHistorico() {
     staleTime: Infinity,
   });
 
-  const {
-    data: history,
-    isLoading,
-    isError,
-    refetch,
-  } = useQuery({
+  const { data: rawHistory, isLoading, isError, refetch } = useQuery({
     queryKey: ["boxing-profile-history", studentId],
     queryFn: () => getBoxingProfileHistory(studentId!),
     enabled: !!studentId,
   });
+
+  // "Minha evolução" é sobre a AUTOPERCEPÇÃO do aluno ao longo do tempo — `getBoxingProfileHistory`
+  // também traz avaliações 'coach' (o professor pode ler as do próprio aluno, migration 0007), que
+  // não pertencem a essa linha do tempo. Comparar a nota do aluno hoje com a leitura de outra
+  // pessoa no passado não seria "evolução", seria misturar dois avaliadores diferentes — essa
+  // comparação tem tela própria (`/app/perfil-lutador/comparacao`).
+  const history = rawHistory?.filter((a) => a.assessmentType === "self");
 
   // Do mais antigo pro mais recente — é a ordem que a visão de evolução por dimensão precisa.
   const chronological = history ? [...history].reverse() : [];

@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { X } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard, SkeletonList } from "@/components/SkeletonCard";
@@ -24,6 +24,7 @@ import {
 export default function AdminAlunoDetalhe() {
   const { studentId } = useParams<{ studentId: string }>();
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [assignOpen, setAssignOpen] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -136,6 +137,20 @@ export default function AdminAlunoDetalhe() {
           Remover pacote
         </Button>
       </div>
+
+      <button
+        type="button"
+        onClick={() => navigate(`/admin/alunos/${studentId}/perfil-lutador`)}
+        className="w-full card-dark p-3.5 mb-5 flex items-center gap-3 text-left active:scale-[0.99] transition-transform"
+      >
+        <div className="h-9 w-9 shrink-0 rounded-full bg-amber/15 flex items-center justify-center">
+          <Sparkles className="h-4 w-4 text-amber" />
+        </div>
+        <div className="flex-1">
+          <div className="text-[14px] font-semibold text-foreground">Perfil de Boxe</div>
+          <div className="text-[12px] text-muted-foreground">Sua avaliação técnica e a comparação com a autoavaliação do aluno</div>
+        </div>
+      </button>
 
       <div className="font-display text-lg tracking-wide text-foreground mb-2.5">ÚLTIMAS AULAS</div>
       <div className="flex flex-col gap-2.5">

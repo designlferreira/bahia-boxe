@@ -1,3 +1,4 @@
+export * from "./assessmentType";
 export * from "./dimensions";
 export * from "./questions";
 export * from "./fighterProfiles";

@@ -1419,6 +1419,8 @@ export async function getStudentProfileStats(adminId: string): Promise<StudentPr
 function mapAssessmentSummary(r: any): BoxingProfileAssessmentSummary {
   return {
     id: r.id,
+    assessmentType: r.assessment_type,
+    assessedBy: r.assessed_by,
     completedAt: r.completed_at,
     primaryProfile: r.primary_profile,
     secondaryProfile: r.secondary_profile,
@@ -1431,11 +1433,15 @@ function mapAssessmentSummary(r: any): BoxingProfileAssessmentSummary {
  * Lista pra tela de histórico — nunca busca `answers` (pode ter até 32 chaves por linha; a lista
  * só precisa do resumo). Detalhe completo é uma chamada separada, só quando o aluno abre uma
  * avaliação específica.
+ *
+ * Traz 'self' e 'coach' juntos (RLS decide o que cada sessão pode ver: o aluno lê as próprias
+ * linhas independente do tipo desde a Fase 1; o professor lê as dos seus alunos desde a
+ * migration 0007). Quem chama filtra por `assessmentType` conforme a tela precisar.
  */
 export async function getBoxingProfileHistory(studentId: string): Promise<BoxingProfileAssessmentSummary[]> {
   const { data, error } = await client()
     .from("boxing_profile_assessments")
-    .select("id, completed_at, primary_profile, secondary_profile, dimension_scores, profile_scores")
+    .select("id, assessment_type, assessed_by, completed_at, primary_profile, secondary_profile, dimension_scores, profile_scores")
     .eq("student_id", studentId)
     .order("completed_at", { ascending: false });
   if (error) throw new Error(error.message);
@@ -1471,6 +1477,48 @@ export async function submitBoxingProfileAssessment(studentId: string, answers: 
     .insert({
       student_id: studentId,
       assessment_type: "self",
+      questionnaire_version: BOXING_QUESTIONNAIRE_VERSION,
+      scoring_version: BOXING_SCORING_VERSION,
+      answers,
+      dimension_scores: result.dimensionScores,
+      profile_scores: result.profileScores,
+      primary_profile: result.primaryProfile,
+      secondary_profile: result.secondaryProfile,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return {
+    ...mapAssessmentSummary(data),
+    answers: data.answers,
+    questionnaireVersion: data.questionnaire_version,
+    scoringVersion: data.scoring_version,
+    createdAt: data.created_at,
+  };
+}
+
+/**
+ * Avaliação 'coach': o professor responde as mesmas 32 perguntas (voz reformulada, mesmos ids),
+ * sobre um aluno seu. Mesmo motor de pontuação de `submitBoxingProfileAssessment` — ele não lê
+ * texto de pergunta, só id/dimensão/opção, que são idênticos entre as duas vozes. RLS
+ * (`boxing_profile_assessments_admin_insert`, migration 0007) garante no banco que só o professor
+ * dono do aluno grava, e sempre com `assessed_by = auth.uid()`; não confiamos nisso só no cliente.
+ */
+export async function submitCoachBoxingProfileAssessment(
+  studentId: string,
+  assessedBy: string,
+  answers: BoxingAnswers,
+): Promise<BoxingProfileAssessment> {
+  if (!isBoxingProfileComplete(answers)) {
+    throw new Error("Responda todas as questões antes de concluir.");
+  }
+  const result = scoreBoxingProfile(answers);
+  const { data, error } = await client()
+    .from("boxing_profile_assessments")
+    .insert({
+      student_id: studentId,
+      assessment_type: "coach",
+      assessed_by: assessedBy,
       questionnaire_version: BOXING_QUESTIONNAIRE_VERSION,
       scoring_version: BOXING_SCORING_VERSION,
       answers,

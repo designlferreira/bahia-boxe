@@ -1,5 +1,10 @@
 import type { BookingStatus } from "@/lib/bookingStatus";
-import type { Answers as BoxingAnswers, Dimension as BoxingDimension, FighterProfileKey } from "@/lib/boxingProfile";
+import type {
+  Answers as BoxingAnswers,
+  AssessmentType as BoxingAssessmentType,
+  Dimension as BoxingDimension,
+  FighterProfileKey,
+} from "@/lib/boxingProfile";
 
 export type Role = "student" | "admin";
 
@@ -176,6 +181,9 @@ export interface StudentProfile {
 
 export interface BoxingProfileAssessmentSummary {
   id: string;
+  assessmentType: BoxingAssessmentType;
+  /** Profile id de quem preencheu quando `assessmentType === "coach"`; `null` em 'self'. */
+  assessedBy: string | null;
   completedAt: string;
   primaryProfile: FighterProfileKey;
   secondaryProfile: FighterProfileKey;

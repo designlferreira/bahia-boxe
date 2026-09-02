@@ -25,12 +25,15 @@ import StudentPerfilLutador from "@/pages/student/PerfilLutador";
 import StudentPerfilLutadorQuestionario from "@/pages/student/PerfilLutadorQuestionario";
 import StudentPerfilLutadorResultado from "@/pages/student/PerfilLutadorResultado";
 import StudentPerfilLutadorHistorico from "@/pages/student/PerfilLutadorHistorico";
+import StudentPerfilLutadorComparacao from "@/pages/student/PerfilLutadorComparacao";
 
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminAgenda from "@/pages/admin/Agenda";
 import AdminAulaDetalhe from "@/pages/admin/AulaDetalhe";
 import AdminAlunos from "@/pages/admin/Alunos";
 import AdminAlunoDetalhe from "@/pages/admin/AlunoDetalhe";
+import AdminAlunoPerfilBoxe from "@/pages/admin/AlunoPerfilBoxe";
+import AdminAlunoPerfilBoxeQuestionario from "@/pages/admin/AlunoPerfilBoxeQuestionario";
 import AdminHistorico from "@/pages/admin/Historico";
 import AdminPedidos from "@/pages/admin/Pedidos";
 import AdminPacotes from "@/pages/admin/Pacotes";
@@ -76,6 +79,7 @@ function AppRoutes() {
           <Route path="/app/perfil-lutador/questionario" element={<StudentPerfilLutadorQuestionario />} />
           <Route path="/app/perfil-lutador/resultado/:id" element={<StudentPerfilLutadorResultado />} />
           <Route path="/app/perfil-lutador/historico" element={<StudentPerfilLutadorHistorico />} />
+          <Route path="/app/perfil-lutador/comparacao" element={<StudentPerfilLutadorComparacao />} />
           <Route path="/app/minha-conta/alterar-senha" element={<AlterarSenha backTo="/app/minha-conta" />} />
           <Route path="/app/minhas-aulas" element={<Navigate to="/app/historico" replace />} />
         </Route>
@@ -88,6 +92,8 @@ function AppRoutes() {
           <Route path="/admin/aula/:id" element={<AdminAulaDetalhe />} />
           <Route path="/admin/alunos" element={<AdminAlunos />} />
           <Route path="/admin/alunos/:studentId" element={<AdminAlunoDetalhe />} />
+          <Route path="/admin/alunos/:studentId/perfil-lutador" element={<AdminAlunoPerfilBoxe />} />
+          <Route path="/admin/alunos/:studentId/perfil-lutador/questionario" element={<AdminAlunoPerfilBoxeQuestionario />} />
           <Route path="/admin/historico" element={<AdminHistorico />} />
           <Route path="/admin/pacotes" element={<AdminPacotes />} />
           <Route path="/admin/solicitacoes" element={<AdminPedidos />} />
