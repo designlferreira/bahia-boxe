@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, KeyRound, Package, Settings, CalendarClock } from "lucide-react";
+import { ChevronRight, KeyRound, Package, Settings, CalendarClock, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,7 @@ export default function AdminMinhaConta() {
       <div className="flex flex-col rounded-2xl bg-card border border-border overflow-hidden mb-3.5">
         <AccountRow label="Minha disponibilidade" icon={CalendarClock} onClick={() => navigate("/admin/disponibilidade")} />
         <AccountRow label="Modelos de pacote" icon={Package} onClick={() => navigate("/admin/pacotes")} />
+        <AccountRow label="Perfil dos alunos" icon={Users} onClick={() => navigate("/admin/perfil-alunos")} />
         <AccountRow label="Configurações" icon={Settings} onClick={() => navigate("/admin/configuracoes")} />
         <AccountRow label="Editar perfil" onClick={() => setEditOpen(true)} />
         <AccountRow label="Alterar senha" icon={KeyRound} onClick={() => navigate("/admin/minha-conta/alterar-senha")} last />

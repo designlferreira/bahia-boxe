@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, KeyRound } from "lucide-react";
+import { ChevronRight, KeyRound, User } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ export default function StudentMinhaConta() {
 
       <div className="flex flex-col rounded-2xl bg-card border border-border overflow-hidden mb-3.5">
         <AccountRow label="Editar perfil" onClick={() => setEditOpen(true)} />
+        <AccountRow label="Perfil físico e de boxe" icon={User} onClick={() => navigate("/app/minha-conta/perfil")} />
         <AccountRow
           label="Alterar senha"
           icon={KeyRound}

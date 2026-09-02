@@ -7,9 +7,13 @@ import type {
   AppNotification,
   AvailabilityInterval,
   Booking,
+  Guard,
+  Laterality,
   PackageRecord,
   PackageTemplate,
   PurchaseRequest,
+  Sex,
+  StudentProfile,
   StudentRecord,
 } from "./types";
 import type { BookingStatus } from "@/lib/bookingStatus";
@@ -108,7 +112,7 @@ function mapRequest(r: any): PurchaseRequest {
 const studentIdByProfile = new Map<string, string>();
 
 /** Resolves `profiles.id` → `students.id`. Cached: the link never changes for a session. */
-async function studentIdForProfile(profileId: string): Promise<string> {
+export async function studentIdForProfile(profileId: string): Promise<string> {
   const cached = studentIdByProfile.get(profileId);
   if (cached) return cached;
   const { data, error } = await client().from("students").select("id").eq("profile_id", profileId).maybeSingle();
@@ -1274,6 +1278,121 @@ export async function acceptInvite(token: string) {
 export async function updateProfileName(profileId: string, name: string) {
   const { error } = await client().from("profiles").update({ name }).eq("id", profileId);
   if (error) throw new Error(error.message);
+}
+
+// ---------------------------------------------------------------------------
+// perfil complementar do aluno (Etapa 8)
+// ---------------------------------------------------------------------------
+
+function mapStudentProfile(studentId: string, r: any | null): StudentProfile {
+  return {
+    studentId,
+    sex: r?.sex ?? null,
+    heightCm: r?.height_cm ?? null,
+    weightKg: r?.weight_kg ?? null,
+    guard: r?.guard ?? null,
+    laterality: r?.laterality ?? null,
+    fighterProfileResult: r?.fighter_profile_result ?? null,
+    updatedAt: r?.updated_at ?? "",
+  };
+}
+
+export async function getStudentProfile(studentId: string): Promise<StudentProfile> {
+  const { data, error } = await client().from("student_profiles").select("*").eq("student_id", studentId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return mapStudentProfile(studentId, data);
+}
+
+export async function saveStudentProfile(
+  studentId: string,
+  patch: Pick<StudentProfile, "sex" | "heightCm" | "weightKg" | "guard" | "laterality">,
+) {
+  const { error } = await client()
+    .from("student_profiles")
+    .upsert(
+      {
+        student_id: studentId,
+        sex: patch.sex,
+        height_cm: patch.heightCm,
+        weight_kg: patch.weightKg,
+        guard: patch.guard,
+        laterality: patch.laterality,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "student_id" },
+    );
+  if (error) throw new Error(error.message);
+}
+
+// ---------------------------------------------------------------------------
+// perfil dos alunos — agregado pro professor (Etapa 10)
+// ---------------------------------------------------------------------------
+
+export interface CategoryStats<T extends string> {
+  filled: number;
+  breakdown: Record<T, number>;
+}
+
+export interface NumericStats {
+  filled: number;
+  avg: number | null;
+  min: number | null;
+  max: number | null;
+}
+
+export interface StudentProfileStats {
+  totalStudents: number;
+  sex: CategoryStats<Sex>;
+  guard: CategoryStats<Guard>;
+  laterality: CategoryStats<Laterality>;
+  heightCm: NumericStats;
+  weightKg: NumericStats;
+}
+
+function categoryStats<T extends string>(values: (T | null)[], keys: T[]): CategoryStats<T> {
+  const breakdown = Object.fromEntries(keys.map((k) => [k, 0])) as Record<T, number>;
+  let filled = 0;
+  for (const v of values) {
+    if (v && v in breakdown) {
+      breakdown[v]++;
+      filled++;
+    }
+  }
+  return { filled, breakdown };
+}
+
+function numericStats(values: (number | null)[]): NumericStats {
+  const present = values.filter((v): v is number => v !== null);
+  if (present.length === 0) return { filled: 0, avg: null, min: null, max: null };
+  return {
+    filled: present.length,
+    avg: present.reduce((a, b) => a + b, 0) / present.length,
+    min: Math.min(...present),
+    max: Math.max(...present),
+  };
+}
+
+export async function getStudentProfileStats(adminId: string): Promise<StudentProfileStats> {
+  const { data: studentRows, error: studentsErr } = await client().from("students").select("id").eq("admin_id", adminId);
+  if (studentsErr) throw new Error(studentsErr.message);
+  const ids = (studentRows ?? []).map((s) => s.id);
+
+  const profiles = ids.length
+    ? await (async () => {
+        const { data, error } = await client().from("student_profiles").select("*").in("student_id", ids);
+        if (error) throw new Error(error.message);
+        return (data ?? []).map((r) => mapStudentProfile(r.student_id, r));
+      })()
+    : [];
+
+  return {
+    totalStudents: ids.length,
+    sex: categoryStats(profiles.map((p) => p.sex), ["female", "male", "other"]),
+    guard: categoryStats(profiles.map((p) => p.guard), ["orthodox", "southpaw", "switch"]),
+    laterality: categoryStats(profiles.map((p) => p.laterality), ["right", "left", "ambidextrous"]),
+    heightCm: numericStats(profiles.map((p) => p.heightCm)),
+    weightKg: numericStats(profiles.map((p) => p.weightKg)),
+  };
 }
 
 export type { BookingStatus };

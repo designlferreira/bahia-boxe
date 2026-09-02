@@ -20,6 +20,8 @@ import StudentHistorico from "@/pages/student/Historico";
 import StudentAulaDetalhe from "@/pages/student/AulaDetalhe";
 import StudentPacotes from "@/pages/student/Pacotes";
 import StudentMinhaConta from "@/pages/student/MinhaConta";
+import StudentPerfil from "@/pages/student/Perfil";
+import StudentPerfilLutador from "@/pages/student/PerfilLutador";
 
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminAgenda from "@/pages/admin/Agenda";
@@ -31,6 +33,7 @@ import AdminPedidos from "@/pages/admin/Pedidos";
 import AdminPacotes from "@/pages/admin/Pacotes";
 import AdminDisponibilidade from "@/pages/admin/Disponibilidade";
 import AdminOrientacoesAula from "@/pages/admin/OrientacoesAula";
+import AdminPerfilAlunos from "@/pages/admin/PerfilAlunos";
 import AdminConfiguracoes from "@/pages/admin/Configuracoes";
 import AdminMinhaConta from "@/pages/admin/MinhaConta";
 
@@ -65,6 +68,8 @@ function AppRoutes() {
           <Route path="/app/aula/:id" element={<StudentAulaDetalhe />} />
           <Route path="/app/pacotes" element={<StudentPacotes />} />
           <Route path="/app/minha-conta" element={<StudentMinhaConta />} />
+          <Route path="/app/minha-conta/perfil" element={<StudentPerfil />} />
+          <Route path="/app/perfil-lutador" element={<StudentPerfilLutador />} />
           <Route path="/app/minha-conta/alterar-senha" element={<AlterarSenha backTo="/app/minha-conta" />} />
           <Route path="/app/minhas-aulas" element={<Navigate to="/app/historico" replace />} />
         </Route>
@@ -82,6 +87,7 @@ function AppRoutes() {
           <Route path="/admin/solicitacoes" element={<AdminPedidos />} />
           <Route path="/admin/disponibilidade" element={<AdminDisponibilidade />} />
           <Route path="/admin/orientacoes" element={<AdminOrientacoesAula />} />
+          <Route path="/admin/perfil-alunos" element={<AdminPerfilAlunos />} />
           <Route path="/admin/configuracoes" element={<AdminConfiguracoes />} />
           <Route path="/admin/minha-conta" element={<AdminMinhaConta />} />
           <Route path="/admin/minha-conta/alterar-senha" element={<AlterarSenha backTo="/admin/minha-conta" />} />

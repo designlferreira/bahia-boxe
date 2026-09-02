@@ -147,3 +147,23 @@ export interface AdminSettings {
   adminId: string;
   noShowConsumesClass: boolean;
 }
+
+export type Sex = "female" | "male" | "other";
+export type Guard = "orthodox" | "southpaw" | "switch";
+export type Laterality = "right" | "left" | "ambidextrous";
+
+/**
+ * Enriquecimento progressivo, opcional — nunca obrigatório no onboarding. Todo campo é `null` =
+ * "não informado", não um valor sentinela armazenado.
+ */
+export interface StudentProfile {
+  studentId: string;
+  sex: Sex | null;
+  heightCm: number | null;
+  weightKg: number | null;
+  guard: Guard | null;
+  laterality: Laterality | null;
+  /** Reservado para a Etapa 9 (teste de perfil de lutador) — não escrito nesta rodada. */
+  fighterProfileResult: unknown | null;
+  updatedAt: string;
+}
