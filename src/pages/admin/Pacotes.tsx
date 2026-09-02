@@ -30,6 +30,8 @@ function priceError(priceCents: number | null): string | null {
   return null;
 }
 
+type PriceMode = "defined" | "tbd";
+
 export default function AdminPacotes() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
@@ -38,7 +40,8 @@ export default function AdminPacotes() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PackageTemplate | null>(null);
   const [priceTouched, setPriceTouched] = useState(false);
-  const priceValidation = priceError(form.priceCents);
+  const [priceMode, setPriceMode] = useState<PriceMode>("defined");
+  const priceValidation = priceMode === "tbd" ? null : priceError(form.priceCents);
 
   const key = ["package-templates", profile?.id];
   const { data, isLoading, isError, refetch } = useQuery({
@@ -56,8 +59,10 @@ export default function AdminPacotes() {
         priceCents: editing.priceCents,
         validityDays: editing.validityDays ?? 60,
       });
+      setPriceMode(editing.priceCents === null ? "tbd" : "defined");
     } else {
       setForm(empty);
+      setPriceMode("defined");
     }
   }, [editing]);
 
@@ -67,7 +72,7 @@ export default function AdminPacotes() {
 
   const save = useMutation({
     mutationFn: () => {
-      const payload = { ...form, priceCents: form.priceCents ?? 0 };
+      const payload = { ...form, priceCents: priceMode === "tbd" ? null : (form.priceCents ?? 0) };
       return editing ? updatePackageTemplate(editing.id, payload) : createPackageTemplate(profile!.id, payload);
     },
     onSuccess: () => {
@@ -187,22 +192,48 @@ export default function AdminPacotes() {
               </div>
             </div>
             <div>
-              <Label htmlFor="price">Preço</Label>
-              <CurrencyInput
-                id="price"
-                valueCents={form.priceCents}
-                onValueChange={(cents) => setForm((f) => ({ ...f, priceCents: cents }))}
-                placeholder="0,00"
-                aria-invalid={!!(priceTouched && priceValidation)}
-                aria-describedby={priceTouched && priceValidation ? "price-error" : undefined}
-                onBlur={() => setPriceTouched(true)}
-              />
-              {priceTouched && priceValidation ? (
-                <div id="price-error" role="alert" className="text-[12.5px] text-destructive mt-1.5">
-                  {priceValidation}
+              <div className="flex items-center justify-between mb-1.5">
+                <Label htmlFor="price" className="mb-0">
+                  Preço
+                </Label>
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground min-h-11">
+                  <input
+                    type="checkbox"
+                    checked={priceMode === "tbd"}
+                    onChange={(e) => {
+                      const tbd = e.target.checked;
+                      setPriceMode(tbd ? "tbd" : "defined");
+                      setForm((f) => ({ ...f, priceCents: tbd ? null : (f.priceCents ?? 0) }));
+                      setPriceTouched(false);
+                    }}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  Preço a combinar
+                </label>
+              </div>
+              {priceMode === "tbd" ? (
+                <div className="text-[12.5px] text-muted-foreground rounded-[13px] border border-dashed border-[#333] px-3.5 py-3">
+                  Sem valor fixo — o preço será combinado diretamente com o aluno.
                 </div>
               ) : (
-                <div className="text-[12.5px] text-muted-foreground mt-1.5">Use 0 para um pacote gratuito.</div>
+                <>
+                  <CurrencyInput
+                    id="price"
+                    valueCents={form.priceCents}
+                    onValueChange={(cents) => setForm((f) => ({ ...f, priceCents: cents }))}
+                    placeholder="0,00"
+                    aria-invalid={!!(priceTouched && priceValidation)}
+                    aria-describedby={priceTouched && priceValidation ? "price-error" : undefined}
+                    onBlur={() => setPriceTouched(true)}
+                  />
+                  {priceTouched && priceValidation ? (
+                    <div id="price-error" role="alert" className="text-[12.5px] text-destructive mt-1.5">
+                      {priceValidation}
+                    </div>
+                  ) : (
+                    <div className="text-[12.5px] text-muted-foreground mt-1.5">Use 0 para um pacote gratuito.</div>
+                  )}
+                </>
               )}
             </div>
           </div>

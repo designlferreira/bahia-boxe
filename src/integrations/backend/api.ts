@@ -854,7 +854,11 @@ export async function getAvailability(adminId: string): Promise<AvailabilityDay[
   return WEEKDAY_NAMES.map((name, weekday) => {
     const ofDay = slots.filter((s) => brtWeekday(s.start_time) === weekday);
     const active = ofDay.some((s) => s.is_active);
-    const ranges = mergeHours(ofDay.filter((s) => s.is_active).map((s) => ({ hour: brtHour(s.start_time), id: s.id })));
+    // When the whole day is switched off, every one of its slots is inactive together — show them
+    // anyway (paused, not gone) instead of rendering an empty day. While the day is on, keep
+    // filtering to active slots so an individually removed interval stays hidden.
+    const relevant = active ? ofDay.filter((s) => s.is_active) : ofDay;
+    const ranges = mergeHours(relevant.map((s) => ({ hour: brtHour(s.start_time), id: s.id })));
 
     return {
       weekday,

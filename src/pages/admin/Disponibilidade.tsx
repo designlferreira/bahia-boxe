@@ -21,8 +21,8 @@ import {
 } from "@/integrations/backend/api";
 import type { AvailabilityInterval } from "@/integrations/backend/types";
 
-const START_HOURS = [6, 7, 8, 9, 10, 17, 18, 19, 20];
-const END_HOURS = [7, 8, 9, 10, 11, 18, 19, 20, 21];
+const START_HOURS = Array.from({ length: 24 }, (_, h) => h);
+const END_HOURS = Array.from({ length: 24 }, (_, h) => h + 1);
 const hhmm = (h: number) => String(h).padStart(2, "0") + ":00";
 
 interface EditorState {
@@ -129,11 +129,13 @@ export default function AdminDisponibilidade() {
                     {day.name}
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5">
-                    {!day.active
-                      ? "Indisponível"
-                      : day.slots.length === 0
+                    {day.slots.length === 0
+                      ? day.active
                         ? "Sem horários"
-                        : `${day.slots.length} intervalo(s)`}
+                        : "Indisponível"
+                      : day.active
+                        ? `${day.slots.length} intervalo(s)`
+                        : `Indisponível · ${day.slots.length} intervalo(s) pausado(s)`}
                   </div>
                 </div>
                 <Switch
@@ -150,8 +152,8 @@ export default function AdminDisponibilidade() {
                 />
               </div>
 
-              {day.active && day.slots.length > 0 && (
-                <div className="flex flex-col gap-2 mb-2.5">
+              {day.slots.length > 0 && (
+                <div className={cn("flex flex-col gap-2 mb-2.5", !day.active && "opacity-50")}>
                   {day.slots.map((slot) => {
                     const booked = slot.bookedCount;
                     return (
@@ -161,7 +163,11 @@ export default function AdminDisponibilidade() {
                             {slot.startTime} – {slot.endTime}
                           </div>
                           <div className={cn("text-[11.5px] mt-0.5", booked > 0 ? "text-amber" : "text-muted-foreground")}>
-                            {booked > 0 ? `${booked} aula(s) marcada(s) neste intervalo` : "Aberto para agendamento"}
+                            {!day.active
+                              ? "Pausado enquanto o dia está desativado"
+                              : booked > 0
+                                ? `${booked} aula(s) marcada(s) neste intervalo`
+                                : "Aberto para agendamento"}
                           </div>
                         </div>
                         <button
@@ -193,7 +199,7 @@ export default function AdminDisponibilidade() {
                 </div>
               )}
 
-              {day.active && day.slots.length === 0 && (
+              {day.slots.length === 0 && (
                 <div className="border border-dashed border-[#2E2E2E] rounded-[13px] p-4 text-center mb-2.5">
                   <div className="text-[12.5px] text-muted-foreground">
                     Nenhum intervalo — alunos não conseguem agendar neste dia.

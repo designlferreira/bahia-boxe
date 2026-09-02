@@ -104,6 +104,9 @@ export default function CriarConta() {
               setName(e.target.value);
               if (fieldErrors.name) setFieldErrors((f) => ({ ...f, name: undefined }));
             }}
+            onBlur={(e) => {
+              setFieldErrors((f) => ({ ...f, name: e.target.value.trim() ? undefined : "Informe seu nome completo." }));
+            }}
             placeholder="Seu nome"
             aria-invalid={!!fieldErrors.name}
             aria-describedby={fieldErrors.name ? "name-error" : undefined}
@@ -127,6 +130,11 @@ export default function CriarConta() {
             onChange={(e) => {
               setEmail(e.target.value);
               if (fieldErrors.email) setFieldErrors((f) => ({ ...f, email: undefined }));
+            }}
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              const err = !v ? undefined : !EMAIL_RE.test(v) ? "Digite um e-mail válido." : undefined;
+              setFieldErrors((f) => ({ ...f, email: err }));
             }}
             placeholder="voce@email.com"
             aria-invalid={!!fieldErrors.email}
@@ -190,6 +198,10 @@ export default function CriarConta() {
             onChange={(e) => {
               setConfirm(e.target.value);
               if (fieldErrors.confirm) setFieldErrors((f) => ({ ...f, confirm: undefined }));
+            }}
+            onBlur={(e) => {
+              const v = e.target.value;
+              setFieldErrors((f) => ({ ...f, confirm: v && v !== password ? "As senhas não coincidem." : undefined }));
             }}
             placeholder="Repita a senha"
             aria-invalid={!!fieldErrors.confirm}

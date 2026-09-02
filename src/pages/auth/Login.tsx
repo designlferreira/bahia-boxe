@@ -50,27 +50,29 @@ export default function Login() {
   }
 
   return (
-    <main className="min-h-dvh flex flex-col justify-end bg-gradient-to-b from-primary/20 to-background px-6 pb-10">
-      <div className="flex items-center gap-3 mb-10">
-        <div className="h-11 w-11 rounded-2xl bg-gradient-hero shadow-glow flex items-center justify-center">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
-            <path d="M7 5h8a4 4 0 0 1 4 4v3a4 4 0 0 1-4 4H9" />
-            <path d="M7 5v11a3 3 0 0 0 3 3h5" />
-          </svg>
+    <main className="min-h-dvh flex flex-col bg-gradient-to-b from-primary/20 to-background px-6 pt-10 pb-10">
+      <div>
+        <div className="flex items-center gap-3 mb-10">
+          <div className="h-11 w-11 rounded-2xl bg-gradient-hero shadow-glow flex items-center justify-center">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
+              <path d="M7 5h8a4 4 0 0 1 4 4v3a4 4 0 0 1-4 4H9" />
+              <path d="M7 5v11a3 3 0 0 0 3 3h5" />
+            </svg>
+          </div>
+          <div>
+            <div className="font-display text-3xl leading-none tracking-wide text-foreground">BAHIA BOXE</div>
+            <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground mt-0.5">Gestão de aulas</div>
+          </div>
         </div>
-        <div>
-          <div className="font-display text-3xl leading-none tracking-wide text-foreground">BAHIA BOXE</div>
-          <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground mt-0.5">Gestão de aulas</div>
-        </div>
+
+        <h1 className="font-display text-[44px] leading-[0.95] tracking-wide text-foreground mb-5">
+          SEU RINGUE,
+          <br />
+          SUA AGENDA.
+        </h1>
       </div>
 
-      <h1 className="font-display text-[44px] leading-[0.95] tracking-wide text-foreground mb-5">
-        SEU RING,
-        <br />
-        SUA AGENDA.
-      </h1>
-
-      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-3.5">
+      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-3.5 mt-auto">
         <div>
           <Label htmlFor="email">E-mail</Label>
           <Input
