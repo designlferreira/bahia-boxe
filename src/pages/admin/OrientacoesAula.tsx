@@ -123,7 +123,7 @@ export default function AdminOrientacoesAula() {
   const eq = form.equipment;
 
   return (
-    <div className="page-container pb-8">
+    <div className="page-container">
       <PageHeader title="ORIENTAÇÕES DA AULA" subtitle="Padrão mostrado aos alunos nos detalhes de cada aula" back />
 
       <Section title="Local da aula">
