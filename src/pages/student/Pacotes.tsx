@@ -40,6 +40,7 @@ export default function StudentPacotes() {
       queryClient.invalidateQueries({ queryKey: ["purchase-requests"] });
       toast.success(`Pedido de ${t.name.toLowerCase()} enviado`);
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível enviar o pedido."),
   });
 
   return (

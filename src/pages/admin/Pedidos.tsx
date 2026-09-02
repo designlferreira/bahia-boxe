@@ -35,6 +35,7 @@ export default function AdminPedidos() {
       queryClient.invalidateQueries({ queryKey: key });
       toast.success("Pedido aprovado · pacote criado");
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível aprovar o pedido."),
   });
 
   const reject = useMutation({
@@ -52,6 +53,7 @@ export default function AdminPedidos() {
         },
       });
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível recusar o pedido."),
   });
 
   return (
