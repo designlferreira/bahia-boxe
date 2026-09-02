@@ -1,4 +1,5 @@
 import type { BookingStatus } from "@/lib/bookingStatus";
+import type { Answers as BoxingAnswers, Dimension as BoxingDimension, FighterProfileKey } from "@/lib/boxingProfile";
 
 export type Role = "student" | "admin";
 
@@ -168,7 +169,23 @@ export interface StudentProfile {
   weightKg: number | null;
   guard: Guard | null;
   laterality: Laterality | null;
-  /** Reservado para a Etapa 9 (teste de perfil de lutador) — não escrito nesta rodada. */
+  /** Não usado mais — o resultado real do Perfil de Boxe vive em `boxing_profile_assessments`. */
   fighterProfileResult: unknown | null;
   updatedAt: string;
+}
+
+export interface BoxingProfileAssessmentSummary {
+  id: string;
+  completedAt: string;
+  primaryProfile: FighterProfileKey;
+  secondaryProfile: FighterProfileKey;
+  dimensionScores: Record<BoxingDimension, number>;
+  profileScores: Record<FighterProfileKey, number>;
+}
+
+export interface BoxingProfileAssessment extends BoxingProfileAssessmentSummary {
+  answers: BoxingAnswers;
+  questionnaireVersion: string;
+  scoringVersion: string;
+  createdAt: string;
 }

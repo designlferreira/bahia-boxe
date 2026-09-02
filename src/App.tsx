@@ -22,6 +22,9 @@ import StudentPacotes from "@/pages/student/Pacotes";
 import StudentMinhaConta from "@/pages/student/MinhaConta";
 import StudentPerfil from "@/pages/student/Perfil";
 import StudentPerfilLutador from "@/pages/student/PerfilLutador";
+import StudentPerfilLutadorQuestionario from "@/pages/student/PerfilLutadorQuestionario";
+import StudentPerfilLutadorResultado from "@/pages/student/PerfilLutadorResultado";
+import StudentPerfilLutadorHistorico from "@/pages/student/PerfilLutadorHistorico";
 
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminAgenda from "@/pages/admin/Agenda";
@@ -70,6 +73,9 @@ function AppRoutes() {
           <Route path="/app/minha-conta" element={<StudentMinhaConta />} />
           <Route path="/app/minha-conta/perfil" element={<StudentPerfil />} />
           <Route path="/app/perfil-lutador" element={<StudentPerfilLutador />} />
+          <Route path="/app/perfil-lutador/questionario" element={<StudentPerfilLutadorQuestionario />} />
+          <Route path="/app/perfil-lutador/resultado/:id" element={<StudentPerfilLutadorResultado />} />
+          <Route path="/app/perfil-lutador/historico" element={<StudentPerfilLutadorHistorico />} />
           <Route path="/app/minha-conta/alterar-senha" element={<AlterarSenha backTo="/app/minha-conta" />} />
           <Route path="/app/minhas-aulas" element={<Navigate to="/app/historico" replace />} />
         </Route>

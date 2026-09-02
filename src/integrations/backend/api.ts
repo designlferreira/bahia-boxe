@@ -7,6 +7,8 @@ import type {
   AppNotification,
   AvailabilityInterval,
   Booking,
+  BoxingProfileAssessment,
+  BoxingProfileAssessmentSummary,
   Guard,
   Laterality,
   PackageRecord,
@@ -18,6 +20,13 @@ import type {
 } from "./types";
 import type { BookingStatus } from "@/lib/bookingStatus";
 import type { ClassGuidelines } from "@/lib/classGuidelines";
+import {
+  isComplete as isBoxingProfileComplete,
+  QUESTIONNAIRE_VERSION as BOXING_QUESTIONNAIRE_VERSION,
+  scoreAssessment as scoreBoxingProfile,
+  SCORING_VERSION as BOXING_SCORING_VERSION,
+  type Answers as BoxingAnswers,
+} from "@/lib/boxingProfile";
 
 /**
  * This module talks to the pre-existing Bahia Boxe database (see supabase/README.md). Two of its
@@ -1400,6 +1409,85 @@ export async function getStudentProfileStats(adminId: string): Promise<StudentPr
     laterality: categoryStats(profiles.map((p) => p.laterality), ["right", "left", "ambidextrous"]),
     heightCm: numericStats(profiles.map((p) => p.heightCm)),
     weightKg: numericStats(profiles.map((p) => p.weightKg)),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Perfil de Boxe — autoavaliação (Etapa 9 completa)
+// ---------------------------------------------------------------------------
+
+function mapAssessmentSummary(r: any): BoxingProfileAssessmentSummary {
+  return {
+    id: r.id,
+    completedAt: r.completed_at,
+    primaryProfile: r.primary_profile,
+    secondaryProfile: r.secondary_profile,
+    dimensionScores: r.dimension_scores,
+    profileScores: r.profile_scores,
+  };
+}
+
+/**
+ * Lista pra tela de histórico — nunca busca `answers` (pode ter até 32 chaves por linha; a lista
+ * só precisa do resumo). Detalhe completo é uma chamada separada, só quando o aluno abre uma
+ * avaliação específica.
+ */
+export async function getBoxingProfileHistory(studentId: string): Promise<BoxingProfileAssessmentSummary[]> {
+  const { data, error } = await client()
+    .from("boxing_profile_assessments")
+    .select("id, completed_at, primary_profile, secondary_profile, dimension_scores, profile_scores")
+    .eq("student_id", studentId)
+    .order("completed_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapAssessmentSummary);
+}
+
+export async function getBoxingProfileAssessment(id: string): Promise<BoxingProfileAssessment | undefined> {
+  const { data, error } = await client().from("boxing_profile_assessments").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return undefined;
+  return {
+    ...mapAssessmentSummary(data),
+    answers: data.answers,
+    questionnaireVersion: data.questionnaire_version,
+    scoringVersion: data.scoring_version,
+    createdAt: data.created_at,
+  };
+}
+
+/**
+ * Único ponto de escrita: calcula o resultado (scoreAssessment, determinístico, sem IA em
+ * runtime) e persiste tudo — respostas, scores das 8 dimensões, scores dos 6 perfis, versão do
+ * questionário e do algoritmo — numa única inserção atômica. Uma avaliação concluída nunca é
+ * atualizada depois; refazer o teste sempre cria uma linha nova.
+ */
+export async function submitBoxingProfileAssessment(studentId: string, answers: BoxingAnswers): Promise<BoxingProfileAssessment> {
+  if (!isBoxingProfileComplete(answers)) {
+    throw new Error("Responda todas as questões antes de concluir.");
+  }
+  const result = scoreBoxingProfile(answers);
+  const { data, error } = await client()
+    .from("boxing_profile_assessments")
+    .insert({
+      student_id: studentId,
+      assessment_type: "self",
+      questionnaire_version: BOXING_QUESTIONNAIRE_VERSION,
+      scoring_version: BOXING_SCORING_VERSION,
+      answers,
+      dimension_scores: result.dimensionScores,
+      profile_scores: result.profileScores,
+      primary_profile: result.primaryProfile,
+      secondary_profile: result.secondaryProfile,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return {
+    ...mapAssessmentSummary(data),
+    answers: data.answers,
+    questionnaireVersion: data.questionnaire_version,
+    scoringVersion: data.scoring_version,
+    createdAt: data.created_at,
   };
 }
 
