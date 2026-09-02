@@ -51,7 +51,7 @@ export default function StudentAgendar() {
       queryClient.invalidateQueries({ queryKey: ["student-home"] });
       queryClient.invalidateQueries({ queryKey: ["student-history"] });
       navigate("/app/home");
-      toast.success("Enviado! Aguarde a aprovação do professor");
+      toast.success("Aula agendada!");
     },
   });
 

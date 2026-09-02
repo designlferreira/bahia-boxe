@@ -26,6 +26,9 @@ export interface StudentRecord {
   createdAt: string;
 }
 
+/** De onde veio o pacote — dimensão separada de `kind` (que distingue pacote x aula avulsa). */
+export type PackageOrigin = "trial" | "purchase" | "admin_grant";
+
 export interface PackageTemplate {
   id: string;
   adminId: string;
@@ -46,6 +49,7 @@ export interface PackageRecord {
   status: "active" | "finished";
   /** 'package' (multi-class) or 'single' (one-off class). */
   kind: "package" | "single";
+  origin: PackageOrigin;
   /** Derived label — `packages` stores no template reference. */
   templateName: string;
   createdAt: string;
@@ -64,6 +68,28 @@ export interface Booking {
   teacherNote?: string | null;
   suggestedStartTime?: string | null;
   suggestedEndTime?: string | null;
+  isReplacement: boolean;
+  replacementForBookingId: string | null;
+}
+
+/** Uma movimentação imutável em `credit_transactions` — o histórico, não o saldo. */
+export interface CreditTransaction {
+  id: string;
+  studentId: string;
+  packageId: string | null;
+  bookingId: string | null;
+  delta: number;
+  reason:
+    | "trial_grant"
+    | "purchase_grant"
+    | "admin_grant"
+    | "lesson_completed"
+    | "absence_charge"
+    | "undo"
+    | "replacement_refund"
+    | "legacy_unverified_consumption";
+  reversesTransactionId: string | null;
+  createdAt: string;
 }
 
 /** One concrete hour of availability — `availability_slots` is a list of datetimes, not a weekly grid. */

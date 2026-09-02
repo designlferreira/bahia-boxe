@@ -51,3 +51,12 @@ export function getStatusConfig(status: string | null | undefined): StatusConfig
 export function isFutureStatus(status: BookingStatus) {
   return status === "scheduled" || status === "pending_confirmation";
 }
+
+/**
+ * Derived, not a status of its own: a `scheduled` lesson whose time has already passed is not
+ * silently completed anymore (that was the reconciliation bug) — it just waits for the professor
+ * to declare what actually happened.
+ */
+export function isAwaitingConfirmation(status: BookingStatus, endTime: string) {
+  return status === "scheduled" && new Date(endTime).getTime() < Date.now();
+}

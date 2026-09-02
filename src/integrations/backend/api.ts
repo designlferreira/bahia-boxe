@@ -1,6 +1,5 @@
 import { addDays, addWeeks, format } from "date-fns";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
-import { calcCreditsAvailable } from "@/lib/packageUtils";
 import { TIMEZONE } from "@/lib/dateUtils";
 import { supabase } from "@/integrations/supabase/client";
 import type {
@@ -52,12 +51,15 @@ function mapBooking(r: any): Booking {
     teacherNote: r.teacher_note,
     suggestedStartTime: r.suggested_start_time,
     suggestedEndTime: r.suggested_end_time,
+    isReplacement: r.is_replacement ?? false,
+    replacementForBookingId: r.replacement_for_booking_id ?? null,
   };
 }
 
-/** `packages` stores no template link, so the label is derived from `kind` + `total_classes`. */
+/** `packages` stores no template link, so the label is derived from `kind` + `origin` + `total_classes`. */
 function mapPackage(r: any): PackageRecord {
   const kind: PackageRecord["kind"] = r.kind === "single" ? "single" : "package";
+  const origin: PackageRecord["origin"] = r.origin === "trial" || r.origin === "admin_grant" ? r.origin : "purchase";
   return {
     id: r.id,
     studentId: r.student_id,
@@ -65,7 +67,8 @@ function mapPackage(r: any): PackageRecord {
     usedClasses: r.used_classes,
     status: r.status,
     kind,
-    templateName: kind === "single" ? "Aula avulsa" : `Pacote de ${r.total_classes} aulas`,
+    origin,
+    templateName: origin === "trial" ? "Aula experimental" : kind === "single" ? "Aula avulsa" : `Pacote de ${r.total_classes} aulas`,
     createdAt: r.created_at,
   };
 }
@@ -197,22 +200,16 @@ export async function activePackageFor(studentId: string): Promise<PackageRecord
   return activePackageForStudentRow(studentId);
 }
 
-async function futureScheduledCount(studentId: string): Promise<number> {
-  const { count, error } = await client()
-    .from("bookings")
-    .select("id", { count: "exact", head: true })
-    .eq("student_id", studentId)
-    .in("status", ACTIVE_STATUSES)
-    .gt("start_time", new Date().toISOString());
-  if (error) throw new Error(error.message);
-  return count ?? 0;
-}
-
+/**
+ * Única regra canônica de saldo disponível — vive em `available_credits_for_student` no banco
+ * (soma de crédito restante de TODOS os pacotes ativos do aluno, trial incluído, menos reservas
+ * futuras) para que o frontend nunca reimplemente essa fórmula em paralelo à que as RPCs de
+ * agendamento/conclusão já usam.
+ */
 export async function creditsAvailableFor(studentId: string): Promise<number> {
-  const pkg = await activePackageForStudentRow(studentId);
-  if (!pkg) return 0;
-  const future = await futureScheduledCount(studentId);
-  return calcCreditsAvailable(pkg.totalClasses, pkg.usedClasses, future);
+  const { data, error } = await client().rpc("available_credits_for_student", { p_student_id: studentId });
+  if (error) throw new Error(error.message);
+  return data ?? 0;
 }
 
 export async function getStudentHome(profileId: string) {
@@ -430,6 +427,12 @@ export async function requestSingleClass(notes?: string) {
 // admin · dashboard
 // ---------------------------------------------------------------------------
 
+/**
+ * Não é mais chamada automaticamente (era ela quem auto-completava aulas passadas, sem
+ * declaração do professor, e podia travar inteira por causa de uma exceção — ver
+ * supabase/README.md). Mantida por enquanto: nada no banco depende dela e ela pode voltar a ser
+ * útil como uma ação manual/administrativa no futuro.
+ */
 export async function reconcileBookingStatuses() {
   const { error } = await client().rpc("reconcile_booking_statuses");
   if (error) throw new Error(error.message);
@@ -439,7 +442,7 @@ export async function getAdminDashboard(adminId: string) {
   const nowIso = new Date().toISOString();
   const { startIso, endIso } = dayBoundsUtcIso(new Date());
 
-  const [students, todayRes, pendingRes, upcomingRes] = await Promise.all([
+  const [students, todayRes, pendingRes, upcomingRes, awaitingRes] = await Promise.all([
     adminStudents(adminId),
     client()
       .from("bookings")
@@ -457,9 +460,19 @@ export async function getAdminDashboard(adminId: string) {
       .gt("start_time", nowIso)
       .order("start_time", { ascending: true })
       .limit(3),
+    // scheduled + horário já passou: não vira "completed" sozinha (ver reconcileBookingStatuses
+    // acima) — fica visível aqui até o professor confirmar o que aconteceu.
+    client()
+      .from("bookings")
+      .select("*")
+      .eq("admin_id", adminId)
+      .eq("status", "scheduled")
+      .lt("end_time", nowIso)
+      .order("start_time", { ascending: true }),
   ]);
   if (pendingRes.error) throw new Error(pendingRes.error.message);
   if (upcomingRes.error) throw new Error(upcomingRes.error.message);
+  if (awaitingRes.error) throw new Error(awaitingRes.error.message);
 
   const byId = new Map(students.map((s) => [s.id, s]));
   const nameOf = (studentId: string) => byId.get(studentId)?.name ?? "Aluno";
@@ -470,13 +483,18 @@ export async function getAdminDashboard(adminId: string) {
     activeStudents: students.length,
     pending: (pendingRes.data ?? []).map((r) => ({ ...mapBooking(r), studentName: nameOf(r.student_id) })),
     upcoming: (upcomingRes.data ?? []).map((r) => ({ ...mapBooking(r), studentName: nameOf(r.student_id) })),
+    awaitingConfirmation: (awaitingRes.data ?? []).map((r) => ({ ...mapBooking(r), studentName: nameOf(r.student_id) })),
     atRisk: students
       .map((student) => ({ student, credits: credits[student.id] ?? 0 }))
       .filter((x) => x.credits <= 1),
   };
 }
 
-/** Credits for many students in two queries instead of two per student. */
+/**
+ * Versão em lote da mesma fórmula canônica, para listas de alunos (evita N chamadas de RPC). Um
+ * aluno pode ter mais de um pacote `active` simultâneo agora (trial + pago) — soma o restante de
+ * todos antes de descontar as reservas futuras, em vez de pegar "o" pacote.
+ */
 async function creditsByStudent(studentIds: string[]): Promise<Record<string, number>> {
   if (studentIds.length === 0) return {};
   const [pkgRes, bookingRes] = await Promise.all([
@@ -494,11 +512,14 @@ async function creditsByStudent(studentIds: string[]): Promise<Record<string, nu
   const future: Record<string, number> = {};
   for (const b of bookingRes.data ?? []) future[b.student_id] = (future[b.student_id] ?? 0) + 1;
 
-  const out: Record<string, number> = {};
-  for (const id of studentIds) out[id] = 0;
+  const remaining: Record<string, number> = {};
+  for (const id of studentIds) remaining[id] = 0;
   for (const p of pkgRes.data ?? []) {
-    out[p.student_id] = calcCreditsAvailable(p.total_classes, p.used_classes, future[p.student_id] ?? 0);
+    remaining[p.student_id] = (remaining[p.student_id] ?? 0) + (p.total_classes - p.used_classes);
   }
+
+  const out: Record<string, number> = {};
+  for (const id of studentIds) out[id] = Math.max(0, (remaining[id] ?? 0) - (future[id] ?? 0));
   return out;
 }
 
@@ -593,6 +614,43 @@ export async function completeBooking(bookingId: string) {
 export async function markNoShow(bookingId: string) {
   const { error } = await client().rpc("mark_no_show", { p_booking_id: bookingId });
   if (error) throw new Error(error.message);
+}
+
+/**
+ * Reverte a conclusão/falta mais recente ainda não revertida desta aula: status volta a
+ * `scheduled` e, se havia consumido crédito, o ledger recebe um `undo` referenciado à transação
+ * original (nunca apaga o histórico). Sem janela de tempo — continua válido enquanto a aula
+ * seguir `completed`/`no_show`.
+ */
+export async function undoLessonAction(bookingId: string) {
+  const { error } = await client().rpc("undo_lesson_action", { p_booking_id: bookingId });
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Marca `bookingId` como reposição de `replacesBookingId`: nunca cobra crédito novo dessa aula, e
+ * estorna a cobrança da aula original (se ainda não tiver sido estornada). Aulas do próprio aluno,
+ * ainda não marcadas.
+ */
+export async function markAsReplacement(bookingId: string, replacesBookingId: string) {
+  const { error } = await client().rpc("mark_as_replacement", {
+    p_booking_id: bookingId,
+    p_replaces_booking_id: replacesBookingId,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** Aulas do aluno que podem ser "a aula original" de uma reposição — canceladas ou faltas, mais recentes primeiro. */
+export async function getReplaceableBookingsForStudent(studentId: string): Promise<Booking[]> {
+  const { data, error } = await client()
+    .from("bookings")
+    .select("*")
+    .eq("student_id", studentId)
+    .in("status", ["no_show", "cancelled"])
+    .order("start_time", { ascending: false })
+    .limit(20);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapBooking);
 }
 
 // ---------------------------------------------------------------------------

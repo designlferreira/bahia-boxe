@@ -57,6 +57,7 @@ export default function AdminHistorico() {
                     <div className="text-[14.5px] font-semibold text-foreground">{studentName}</div>
                     <div className="text-[12.5px] text-muted-foreground mt-0.5">{formatDateTime(booking.startTime)}</div>
                   </div>
+                  {booking.isReplacement && <Badge className="bg-secondary text-muted-foreground">Reposição</Badge>}
                   <Badge className={cfg.badgeClass}>{cfg.label}</Badge>
                 </div>
               </div>

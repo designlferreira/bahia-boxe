@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -9,21 +9,20 @@ import { SkeletonList } from "@/components/SkeletonCard";
 import { RejectBookingModal } from "@/components/RejectBookingModal";
 import { Button } from "@/components/ui/button";
 import { formatDate, formatDateTime, formatTime } from "@/lib/dateUtils";
-import { approveBooking, getAdminDashboard, reconcileBookingStatuses, rejectBooking } from "@/integrations/backend/api";
+import { approveBooking, getAdminDashboard, rejectBooking } from "@/integrations/backend/api";
 import { getStatusConfig } from "@/lib/bookingStatus";
 import { Badge } from "@/components/ui/badge";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Clock3 } from "lucide-react";
+
+function errorMessage(err: unknown, fallback: string) {
+  return err instanceof Error ? err.message : fallback;
+}
 
 export default function AdminDashboard() {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [rejectTarget, setRejectTarget] = useState<{ id: string; student: string; time: string } | null>(null);
-
-  useEffect(() => {
-    if (profile) reconcileBookingStatuses().then(() => queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.id]);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["admin-dashboard", profile?.id],
@@ -37,6 +36,7 @@ export default function AdminDashboard() {
       queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
       toast.success("Aula aprovada");
     },
+    onError: (err) => toast.error(errorMessage(err, "Não foi possível aprovar o agendamento.")),
   });
 
   const reject = useMutation({
@@ -47,6 +47,7 @@ export default function AdminDashboard() {
       setRejectTarget(null);
       toast.warning(vars.start ? "Recusado com sugestão de horário" : "Agendamento recusado");
     },
+    onError: (err) => toast.error(errorMessage(err, "Não foi possível recusar o agendamento.")),
   });
 
   if (!profile) return null;
@@ -68,6 +69,27 @@ export default function AdminDashboard() {
 
       {data && (
         <>
+          {data.awaitingConfirmation.length > 0 && (
+            <button
+              type="button"
+              onClick={() => navigate("/admin/agenda")}
+              className="w-full text-left rounded-[20px] p-4 mb-4 bg-[linear-gradient(150deg,#1A1F27,#171717_62%)] border border-primary/30 flex items-center gap-3 active:scale-[0.99] transition-transform animate-bb-up"
+            >
+              <div className="h-10 w-10 shrink-0 rounded-full bg-primary/15 flex items-center justify-center">
+                <Clock3 className="h-[18px] w-[18px] text-primary" />
+              </div>
+              <div className="flex-1">
+                <div className="text-[13.5px] font-semibold text-foreground">
+                  {data.awaitingConfirmation.length} aula(s) aguardando confirmação
+                </div>
+                <div className="text-[12px] text-muted-foreground mt-0.5">
+                  O horário passou — declare se aconteceu ou se o aluno faltou.
+                </div>
+              </div>
+              <ChevronRight className="h-[18px] w-[18px] text-muted-foreground shrink-0" />
+            </button>
+          )}
+
           {data.pending.length > 0 && (
             <div className="rounded-[20px] p-4 mb-4 bg-[linear-gradient(150deg,#211A0B,#171717_62%)] border border-amber/30 animate-bb-up">
               <div className="flex items-center gap-2 mb-3">

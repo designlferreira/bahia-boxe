@@ -6,23 +6,35 @@ import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { ErrorState } from "@/components/ErrorState";
 import { RejectBookingModal } from "@/components/RejectBookingModal";
+import { ReplacementPickerSheet } from "@/components/ReplacementPickerSheet";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatDate, formatDayNumber, formatWeekdayLong, formatWeekdayShort } from "@/lib/dateUtils";
-import { getStatusConfig } from "@/lib/bookingStatus";
+import { getStatusConfig, isAwaitingConfirmation } from "@/lib/bookingStatus";
 import {
   approveBooking,
   completeBooking,
   getAdminAgendaForDay,
+  getAdminSettings,
+  markAsReplacement,
   markNoShow,
   rejectBooking,
+  undoLessonAction,
   type TimelineEntry,
 } from "@/integrations/backend/api";
 
 const DAY_COUNT = 7;
+const UNDO_TOAST_MS = 9000;
 
-function dotClassFor(status: string) {
+function errorMessage(err: unknown, fallback: string) {
+  return err instanceof Error ? err.message : fallback;
+}
+
+function dotClassFor(entry: TimelineEntry) {
+  const status = entry.booking!.status;
+  if (status === "scheduled" && isAwaitingConfirmation(status, entry.booking!.endTime)) return "bg-amber";
   switch (status) {
     case "scheduled":
       return "bg-primary";
@@ -45,6 +57,9 @@ export default function AdminAgenda() {
   const queryClient = useQueryClient();
   const [dayOffset, setDayOffset] = useState(0);
   const [rejectTarget, setRejectTarget] = useState<{ id: string; student: string; time: string } | null>(null);
+  const [confirmComplete, setConfirmComplete] = useState<TimelineEntry | null>(null);
+  const [confirmNoShow, setConfirmNoShow] = useState<TimelineEntry | null>(null);
+  const [replacementTarget, setReplacementTarget] = useState<TimelineEntry | null>(null);
 
   const days = Array.from({ length: DAY_COUNT }, (_, i) => addDays(new Date(), i));
   const selectedDate = days[dayOffset];
@@ -54,6 +69,13 @@ export default function AdminAgenda() {
     queryFn: () => getAdminAgendaForDay(profile!.id, selectedDate),
     enabled: !!profile,
   });
+
+  const { data: settings } = useQuery({
+    queryKey: ["admin-settings", profile?.id],
+    queryFn: () => getAdminSettings(profile!.id),
+    enabled: !!profile,
+  });
+  const noShowConsumesClass = settings?.noShowConsumesClass ?? true;
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["admin-agenda"] });
@@ -66,6 +88,7 @@ export default function AdminAgenda() {
       invalidate();
       toast.success(`Aula de ${entry.studentName?.split(" ")[0]} aprovada`);
     },
+    onError: (err) => toast.error(errorMessage(err, "Não foi possível aprovar o agendamento.")),
   });
 
   const reject = useMutation({
@@ -76,22 +99,51 @@ export default function AdminAgenda() {
       setRejectTarget(null);
       toast.warning(vars.start ? "Recusado com sugestão de horário" : "Agendamento recusado");
     },
+    onError: (err) => toast.error(errorMessage(err, "Não foi possível recusar o agendamento.")),
+  });
+
+  const undo = useMutation({
+    mutationFn: (bookingId: string) => undoLessonAction(bookingId),
+    onSuccess: () => {
+      invalidate();
+      toast("Desfeito");
+    },
+    onError: (err) => toast.error(errorMessage(err, "Não foi possível desfazer.")),
   });
 
   const complete = useMutation({
     mutationFn: (id: string) => completeBooking(id),
-    onSuccess: () => {
+    onSuccess: (_r, id) => {
       invalidate();
-      toast.success("Aula concluída");
+      toast.success("Aula concluída com sucesso.", {
+        duration: UNDO_TOAST_MS,
+        action: { label: "Desfazer", onClick: () => undo.mutate(id) },
+      });
     },
+    onError: (err) => toast.error(errorMessage(err, "Não foi possível concluir a aula.")),
   });
 
   const noShow = useMutation({
     mutationFn: (id: string) => markNoShow(id),
+    onSuccess: (_r, id) => {
+      invalidate();
+      toast.warning("Falta registrada.", {
+        duration: UNDO_TOAST_MS,
+        action: { label: "Desfazer", onClick: () => undo.mutate(id) },
+      });
+    },
+    onError: (err) => toast.error(errorMessage(err, "Não foi possível registrar a falta.")),
+  });
+
+  const replacement = useMutation({
+    mutationFn: ({ bookingId, replacesBookingId }: { bookingId: string; replacesBookingId: string }) =>
+      markAsReplacement(bookingId, replacesBookingId),
     onSuccess: () => {
       invalidate();
-      toast.warning("Falta registrada");
+      setReplacementTarget(null);
+      toast.success("Marcada como reposição — sem cobrar crédito novo");
     },
+    onError: (err) => toast.error(errorMessage(err, "Não foi possível marcar como reposição.")),
   });
 
   if (!profile) return null;
@@ -154,82 +206,121 @@ export default function AdminAgenda() {
 
       {!isLoading && !isError && data && (
         <div className="flex flex-col">
-          {data.map((entry) => (
-            <div key={entry.hour} className="flex gap-3 min-h-[74px]">
-              <div className="w-11 shrink-0 text-right pt-0.5">
-                <div className="text-xs text-muted-foreground tabular-nums">{entry.hour}</div>
-              </div>
-              <div className="w-0.5 bg-[#262626] shrink-0 relative">
-                <span
-                  className={cn(
-                    "absolute -left-[3px] top-1.5 h-2 w-2 rounded-full",
-                    entry.free ? "bg-[#2E2E2E]" : dotClassFor(entry.booking!.status),
-                  )}
-                />
-              </div>
-              <div className="flex-1 pb-3">
-                {entry.free ? (
-                  <div className="border border-dashed border-[#2E2E2E] rounded-2xl p-3.5 text-[12.5px] text-muted-foreground">
-                    Horário livre
-                  </div>
-                ) : (
-                  <div
+          {data.map((entry) => {
+            const booking = entry.booking;
+            const awaiting = !entry.free && booking!.status === "scheduled" && isAwaitingConfirmation(booking!.status, booking!.endTime);
+            const cfg = booking ? getStatusConfig(booking.status) : null;
+            const actionBusy =
+              (complete.isPending && complete.variables === booking?.id) ||
+              (noShow.isPending && noShow.variables === booking?.id) ||
+              (undo.isPending && undo.variables === booking?.id);
+
+            return (
+              <div key={entry.hour} className="flex gap-3 min-h-[74px]">
+                <div className="w-11 shrink-0 text-right pt-0.5">
+                  <div className="text-xs text-muted-foreground tabular-nums">{entry.hour}</div>
+                </div>
+                <div className="w-0.5 bg-[#262626] shrink-0 relative">
+                  <span
                     className={cn(
-                      "bg-card border rounded-2xl p-3.5",
-                      entry.booking?.status === "pending_confirmation" ? "border-amber/35" : "border-border",
+                      "absolute -left-[3px] top-1.5 h-2 w-2 rounded-full transition-colors",
+                      entry.free ? "bg-[#2E2E2E]" : dotClassFor(entry),
                     )}
-                  >
-                    <div className="flex justify-between items-start gap-2 mb-2">
-                      <div>
-                        <div className="text-[14.5px] font-semibold text-foreground">{entry.studentName}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5">
-                          {entry.hour} – {String((parseInt(entry.hour, 10) + 1) % 24).padStart(2, "0")}:00
-                        </div>
-                      </div>
-                      <Badge className={cn(getStatusConfig(entry.booking!.status).badgeClass, "whitespace-nowrap")}>
-                        {getStatusConfig(entry.booking!.status).label}
-                      </Badge>
+                  />
+                </div>
+                <div className="flex-1 pb-3">
+                  {entry.free ? (
+                    <div className="border border-dashed border-[#2E2E2E] rounded-2xl p-3.5 text-[12.5px] text-muted-foreground">
+                      Horário livre
                     </div>
-                    {entry.booking?.status === "pending_confirmation" && (
-                      <div className="flex gap-2">
-                        <Button size="sm" className="flex-1 h-10" onClick={() => approve.mutate(entry)}>
-                          Aprovar
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="flex-1 h-10"
-                          onClick={() =>
-                            setRejectTarget({
-                              id: entry.booking!.id,
-                              student: entry.studentName!,
-                              time: `${entry.hour} – ${String((parseInt(entry.hour, 10) + 1) % 24).padStart(2, "0")}:00`,
-                            })
-                          }
-                        >
-                          Recusar
-                        </Button>
+                  ) : (
+                    <div
+                      className={cn(
+                        "bg-card border rounded-2xl p-3.5 transition-colors",
+                        booking?.status === "pending_confirmation" || awaiting ? "border-amber/35" : "border-border",
+                      )}
+                    >
+                      <div className="flex justify-between items-start gap-2 mb-2">
+                        <div>
+                          <div className="text-[14.5px] font-semibold text-foreground flex items-center gap-1.5">
+                            {entry.studentName}
+                            {booking?.isReplacement && (
+                              <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                                Reposição
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {entry.hour} – {String((parseInt(entry.hour, 10) + 1) % 24).padStart(2, "0")}:00
+                          </div>
+                        </div>
+                        <Badge className={cn(awaiting ? "bg-amber/20 text-amber" : cfg!.badgeClass, "whitespace-nowrap")}>
+                          {awaiting ? "Aguardando confirmação" : cfg!.label}
+                        </Badge>
                       </div>
-                    )}
-                    {entry.booking?.status === "scheduled" && (
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          className="flex-1 h-10 !bg-accent/10 !text-accent !border !border-accent/40 !shadow-none"
-                          onClick={() => complete.mutate(entry.booking!.id)}
-                        >
-                          Concluir
-                        </Button>
-                        <Button variant="secondary" size="sm" className="flex-1 h-10" onClick={() => noShow.mutate(entry.booking!.id)}>
-                          Falta
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
+
+                      {booking?.status === "pending_confirmation" && (
+                        <div className="flex gap-2">
+                          <Button size="sm" className="flex-1 h-10" onClick={() => approve.mutate(entry)} disabled={approve.isPending}>
+                            Aprovar
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="flex-1 h-10"
+                            onClick={() =>
+                              setRejectTarget({
+                                id: booking.id,
+                                student: entry.studentName!,
+                                time: `${entry.hour} – ${String((parseInt(entry.hour, 10) + 1) % 24).padStart(2, "0")}:00`,
+                              })
+                            }
+                          >
+                            Recusar
+                          </Button>
+                        </div>
+                      )}
+
+                      {booking?.status === "scheduled" && (
+                        <div className="flex flex-col gap-2">
+                          {awaiting && (
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                className="flex-1 h-10 !bg-accent/10 !text-accent !border !border-accent/40 !shadow-none"
+                                disabled={actionBusy}
+                                onClick={() => setConfirmComplete(entry)}
+                              >
+                                Concluir
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="flex-1 h-10"
+                                disabled={actionBusy}
+                                onClick={() => setConfirmNoShow(entry)}
+                              >
+                                Falta
+                              </Button>
+                            </div>
+                          )}
+                          {!booking.isReplacement && (
+                            <button
+                              type="button"
+                              onClick={() => setReplacementTarget(entry)}
+                              className="self-start text-[12px] text-muted-foreground underline underline-offset-2 min-h-11 flex items-center"
+                            >
+                              Marcar como reposição
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -241,6 +332,44 @@ export default function AdminAgenda() {
           studentName={rejectTarget.student}
           timeLabel={rejectTarget.time}
           onConfirm={(note, start, end) => reject.mutate({ id: rejectTarget.id, note, start, end })}
+        />
+      )}
+
+      <ConfirmDialog
+        open={!!confirmComplete}
+        onOpenChange={(o) => !o && setConfirmComplete(null)}
+        title="CONCLUIR AULA?"
+        description="Ao confirmar, você estará declarando que esta aula aconteceu normalmente. O crédito referente a esta aula será consumido do aluno."
+        confirmLabel="Confirmar conclusão"
+        cancelLabel="Cancelar"
+        tone="default"
+        onConfirm={() => confirmComplete && complete.mutate(confirmComplete.booking!.id)}
+      />
+
+      <ConfirmDialog
+        open={!!confirmNoShow}
+        onOpenChange={(o) => !o && setConfirmNoShow(null)}
+        title="REGISTRAR FALTA?"
+        description={`Confirme que o aluno não compareceu a esta aula.\n\n${
+          noShowConsumesClass
+            ? "De acordo com as configurações atuais, o crédito desta aula será consumido."
+            : "De acordo com as configurações atuais, o crédito desta aula será mantido."
+        }`}
+        confirmLabel="Registrar falta"
+        cancelLabel="Cancelar"
+        tone="default"
+        onConfirm={() => confirmNoShow && noShow.mutate(confirmNoShow.booking!.id)}
+      />
+
+      {replacementTarget && (
+        <ReplacementPickerSheet
+          open={!!replacementTarget}
+          onOpenChange={(o) => !o && setReplacementTarget(null)}
+          studentId={replacementTarget.booking!.studentId}
+          studentName={replacementTarget.studentName ?? "Aluno"}
+          onPick={(replacesId) =>
+            replacement.mutate({ bookingId: replacementTarget.booking!.id, replacesBookingId: replacesId })
+          }
         />
       )}
     </div>
