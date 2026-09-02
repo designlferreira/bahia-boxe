@@ -2,17 +2,18 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Sparkles } from "lucide-react";
+import { HelpCircle, Sparkles } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard } from "@/components/SkeletonCard";
+import { GuardInfoDialog } from "@/components/GuardInfoDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getStudentProfile, saveStudentProfile, studentIdForProfile } from "@/integrations/backend/api";
 import type { Guard, Laterality, Sex } from "@/integrations/backend/types";
-import { GUARD_LABELS, LATERALITY_LABELS, SEX_LABELS } from "@/lib/studentProfile";
+import { GUARD_INFO, LATERALITY_LABELS, SEX_LABELS } from "@/lib/studentProfile";
 
 interface Form {
   sex: Sex | null;
@@ -29,6 +30,7 @@ export default function StudentPerfil() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<Form>(empty);
+  const [guardInfoOpen, setGuardInfoOpen] = useState<Guard | null>(null);
   const loadedRef = useRef(false);
 
   const { data: studentId } = useQuery({
@@ -135,12 +137,43 @@ export default function StudentPerfil() {
       </div>
 
       <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Boxe</div>
-      <div className="mb-2.5">
-        <Label>Guarda/base</Label>
-        <div className="flex flex-wrap gap-2">
-          {(Object.keys(GUARD_LABELS) as Guard[]).map((g) => (
-            <Pill key={g} label={GUARD_LABELS[g]} on={form.guard === g} onClick={() => setForm((f) => ({ ...f, guard: f.guard === g ? null : g }))} />
-          ))}
+      <div className="mb-5">
+        <Label>Guarda</Label>
+        <div className="text-[12px] text-muted-foreground mb-2.5 -mt-1">Qual você considera a sua guarda principal?</div>
+        <div className="grid grid-cols-2 gap-2.5">
+          {(Object.keys(GUARD_INFO) as Guard[]).map((g) => {
+            const on = form.guard === g;
+            return (
+              <div
+                key={g}
+                className={cn(
+                  "rounded-2xl border p-3.5 transition-all",
+                  on ? "bg-primary/15 border-primary" : "bg-secondary border-border",
+                )}
+              >
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, guard: f.guard === g ? null : g }))}
+                  className="w-full text-left active:scale-[0.98] transition-transform"
+                >
+                  <div className={cn("text-[13.5px] font-semibold mb-1", on ? "text-primary" : "text-foreground")}>
+                    {GUARD_INFO[g].label}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground leading-snug">{GUARD_INFO[g].summary}</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setGuardInfoOpen(g);
+                  }}
+                  className="mt-2.5 flex items-center gap-1 min-h-8 text-[11px] font-semibold text-accent"
+                >
+                  <HelpCircle className="h-3 w-3" /> O que é essa guarda?
+                </button>
+              </div>
+            );
+          })}
         </div>
       </div>
       <div className="mb-6">
@@ -160,6 +193,8 @@ export default function StudentPerfil() {
       <Button size="lg" className="w-full" onClick={() => save.mutate()} disabled={save.isPending || !studentId}>
         {save.isPending ? "Salvando…" : "Salvar"}
       </Button>
+
+      <GuardInfoDialog guard={guardInfoOpen} onOpenChange={(o) => !o && setGuardInfoOpen(null)} />
     </div>
   );
 }

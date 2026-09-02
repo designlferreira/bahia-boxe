@@ -149,7 +149,12 @@ export interface AdminSettings {
 }
 
 export type Sex = "female" | "male" | "other";
-export type Guard = "orthodox" | "southpaw" | "switch";
+/**
+ * Cobre os dois sentidos do termo "guarda" no boxe: orientação de base (orthodox/southpaw/switch)
+ * e estilo de posicionamento de braço (peekaboo/cross_arm/philly_shell/long_guard) — um aluno tem
+ * só um valor aqui, o que ele considera sua guarda principal.
+ */
+export type Guard = "orthodox" | "southpaw" | "switch" | "peekaboo" | "cross_arm" | "philly_shell" | "long_guard";
 export type Laterality = "right" | "left" | "ambidextrous";
 
 /**

@@ -1388,7 +1388,15 @@ export async function getStudentProfileStats(adminId: string): Promise<StudentPr
   return {
     totalStudents: ids.length,
     sex: categoryStats(profiles.map((p) => p.sex), ["female", "male", "other"]),
-    guard: categoryStats(profiles.map((p) => p.guard), ["orthodox", "southpaw", "switch"]),
+    guard: categoryStats(profiles.map((p) => p.guard), [
+      "orthodox",
+      "southpaw",
+      "switch",
+      "peekaboo",
+      "cross_arm",
+      "philly_shell",
+      "long_guard",
+    ]),
     laterality: categoryStats(profiles.map((p) => p.laterality), ["right", "left", "ambidextrous"]),
     heightCm: numericStats(profiles.map((p) => p.heightCm)),
     weightKg: numericStats(profiles.map((p) => p.weightKg)),

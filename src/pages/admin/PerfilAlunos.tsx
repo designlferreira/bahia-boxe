@@ -31,7 +31,13 @@ export default function AdminPerfilAlunos() {
       {!isLoading && !isError && data && data.totalStudents > 0 && (
         <div className="flex flex-col gap-3.5">
           <CategoryCard title="Lateralidade" stats={data.laterality} labels={LATERALITY_LABELS} total={data.totalStudents} order={["right", "left", "ambidextrous"] as Laterality[]} />
-          <CategoryCard title="Guarda" stats={data.guard} labels={GUARD_LABELS} total={data.totalStudents} order={["orthodox", "southpaw", "switch"] as Guard[]} />
+          <CategoryCard
+            title="Guarda"
+            stats={data.guard}
+            labels={GUARD_LABELS}
+            total={data.totalStudents}
+            order={["orthodox", "southpaw", "switch", "peekaboo", "cross_arm", "philly_shell", "long_guard"] as Guard[]}
+          />
           <CategoryCard title="Sexo" stats={data.sex} labels={SEX_LABELS} total={data.totalStudents} order={["female", "male", "other"] as Sex[]} />
           <NumericCard title="Altura" unit="cm" stats={data.heightCm} total={data.totalStudents} />
           <NumericCard title="Peso" unit="kg" stats={data.weightKg} total={data.totalStudents} />
