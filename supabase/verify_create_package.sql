@@ -29,11 +29,10 @@ begin;
 -- ===========================================================================
 do $$
 declare
-  v_professor_id uuid := '00000000-0000-0000-0000-000000000000'; -- profiles.id do professor (role='admin')
-  v_outro_professor_id uuid := '00000000-0000-0000-0000-000000000000'; -- profiles.id de OUTRO professor, sem vínculo com o aluno abaixo
-  v_aluno_id uuid := '00000000-0000-0000-0000-000000000000'; -- students.id, aluno do v_professor_id
-  v_aluno_profile_id uuid := '00000000-0000-0000-0000-000000000000'; -- profiles.id do MESMO aluno (pra testar "aluno não é admin")
-  v_template_id uuid := '00000000-0000-0000-0000-000000000000'; -- package_templates.id, do v_professor_id, is_active=true
+  v_professor_id uuid := '7da8bf09-a200-4831-9d4c-233ef76fad39'; -- Italo Souza, único professor deste banco
+  v_aluno_id uuid := '4cd0e555-728b-47ba-ba3c-073b54d28af3'; -- aluno do v_professor_id
+  v_aluno_profile_id uuid := '89e09167-3d8e-411f-a5b8-841e1860c5f8'; -- profiles.id do MESMO aluno (pra testar "aluno não é admin")
+  v_template_id uuid := '81aaf8d0-2659-4889-8c48-0ed68e18534f'; -- "6 Aulas", do v_professor_id, is_active=true
   v_pkg1 uuid;
   v_pkg2 uuid;
 begin
@@ -84,14 +83,10 @@ begin
     raise notice 'TESTE 5 (aluno tentando): exceção esperada = %', sqlerrm;
   end;
 
-  -- 7) admin, mas não é o professor deste aluno — deve dar not_allowed.
-  perform set_config('request.jwt.claims', json_build_object('sub', v_outro_professor_id, 'role', 'authenticated')::text, true);
-  begin
-    perform public.assign_package_to_student(v_aluno_id, 8);
-    raise notice 'TESTE 6 (professor errado): FALHOU — deveria ter dado exceção e não deu';
-  exception when others then
-    raise notice 'TESTE 6 (professor errado): exceção esperada = %', sqlerrm;
-  end;
+  -- 7) admin, mas não é o professor deste aluno — deve dar not_allowed. PULADO: só existe um
+  --    professor (role='admin') neste banco, sem outro pra impersonar. A condição testada
+  --    (`students.admin_id = auth.uid()`) é texto idêntico entre o original e o extraído —
+  --    conferido por leitura, não por execução. Lacuna aceita, registrada aqui de propósito.
 end;
 $$;
 
@@ -102,7 +97,7 @@ rollback;
 -- "função não existe" se rodado antes. Confirma que a função ficou inalcançável do cliente.
 -- ===========================================================================
 -- begin;
--- select set_config('request.jwt.claims', json_build_object('sub', '<professor_profile_id>', 'role', 'authenticated')::text, true);
+-- select set_config('request.jwt.claims', json_build_object('sub', '7da8bf09-a200-4831-9d4c-233ef76fad39', 'role', 'authenticated')::text, true);
 -- set local role authenticated;
--- select public._create_package('<aluno_student_id>'::uuid, 5, 'purchase', 'package'); -- espera: permission denied for function _create_package
+-- select public._create_package('4cd0e555-728b-47ba-ba3c-073b54d28af3'::uuid, 5, 'purchase', 'package'); -- espera: permission denied for function _create_package
 -- rollback;
