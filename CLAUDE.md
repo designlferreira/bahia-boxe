@@ -162,6 +162,35 @@ and origin<>'trial'` que já existe, sem precisar de ajuste: não filtra por
 origin do pacote sendo fechado, então já vale simetricamente entre comprado,
 admin_grant e recorrência).
 
+**Essa regra também é um índice único no banco — descoberto por acidente em
+2026-09-03, ao testar** (`verify_calcular_saldo_pacote.sql` deu `duplicate
+key value violates unique constraint
+"ux_packages_one_active_purchase_per_student"` ao inserir um segundo pacote
+`active` pro mesmo aluno). Confirmado via `pg_indexes`:
+
+```sql
+CREATE UNIQUE INDEX ux_packages_one_active_purchase_per_student
+ON public.packages USING btree (student_id)
+WHERE ((status = 'active'::package_status) AND (origin <> 'trial'::text));
+```
+
+**O nome do índice engana** — diz "purchase" mas o predicado é `origin <>
+'trial'`, então já valia pra `admin_grant` antes desta feature e agora
+também vale pra `recurrence`. Isso é o comportamento que queremos (é
+literalmente a regra "1 pacote ativo não-trial por vez" que a Etapa 4 já
+precisa), mas **foi efeito colateral de estender o `CHECK` de `origin`, não
+uma decisão deliberada sobre este índice especificamente** — registrado aqui
+pra não parecer coincidência da próxima vez que alguém ler o nome
+"purchase" e concluir que recorrência não deveria estar sujeita a ele.
+
+**Consequência prática para a Etapa 4:** `gerar_pacote_recorrencia` NÃO pode
+fazer `insert` direto em `packages` sob nenhuma circunstância (nem por
+performance, nem por simplicidade) — tem que passar por `_create_package`,
+cujo `update` (fecha o pacote ativo anterior) sempre roda antes do `insert`
+na mesma função, satisfazendo o índice por construção. Um `insert` direto
+que pule esse `update` colide com este índice exatamente como aconteceu no
+script de teste.
+
 **6. Criação de pacote: caminho único de escrita, extraído em commit isolado
 antes da geração por recorrência.** `assign_package_from_template` e
 `assign_package_to_student` (`0001:222-291`) hoje fazem cada uma seu próprio
