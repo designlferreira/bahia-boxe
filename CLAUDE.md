@@ -114,6 +114,93 @@ Vira função SQL: `calcular_saldo_pacote(p_pacote_id uuid) returns table
 (total int, consumidas int, restantes int, a_repor int)`, mais uma view para
 a UI ler saldo sem chamar a função por linha.
 
+`calcular_saldo_pacote()` é a ÚNICA autoridade — `packages.used_classes` vira
+cópia materializada, nunca fonte. Conflito que isso resolve: `used_classes` é
+um contador; a spec define consumo como derivado da CADEIA (agrupar por
+`cadeia_id`, achar a linha terminal, aplicar a regra) — duas fontes de
+verdade pro mesmo número que divergem sempre que há remarcação (uma cadeia
+com 3 remarcações tem 3 linhas; um contador ingênuo descontaria 3 créditos de
+uma aula só).
+- Pacotes com `recorrencia_id IS NOT NULL`: os RPCs que já mudam status de
+  booking (`mark_no_show`, `complete_booking`, e os novos de reagendar e
+  cancelar da Etapa 6) chamam `calcular_saldo_pacote()` e SOBRESCREVEM
+  `used_classes` com o resultado. Sem trigger nova — a escrita fica no mesmo
+  ponto onde hoje já se escreve em `used_classes`.
+- Pacotes sem `recorrencia_id` (comprado/admin_grant/trial): comportamento
+  atual intacto, nada muda — continuam incrementando `used_classes` como
+  sempre incrementaram.
+- Nenhum código novo pode INCREMENTAR `used_classes`. Só sobrescrever com o
+  valor calculado.
+
+**5. `pacote` reaproveita `packages` — não é tabela nova.** `packages` já tem
+`student_id`/`total_classes`/`used_classes`/`status`, exatamente a forma que
+a spec pedia. Duas colunas novas, nullable: `recorrencia_id uuid references
+aluno_recorrencia(id)`, `falta_consome_credito boolean`. `bookings.pacote_id`
+referencia `packages.id` diretamente — sem FK polimórfico, sem duas fontes de
+saldo pro mesmo aluno. `professor_id` não ganha coluna própria: continua
+derivado via `student_id → students.admin_id`, como o resto do código já faz.
+
+`origin` (`text` + `CHECK`, não enum nativo — `0001_credit_ledger.sql:85-86`)
+é o campo canônico de "de onde veio o pacote". Ganha um quarto valor:
+`'recurrence'`. Por ser `CHECK` (não `pg_enum`), estender é `drop
+constraint`/`add constraint` numa única migration, sem a limitação de
+transação que o `ADD VALUE` do `booking_status` tem (decisão 1) —
+reversibilidade de verdade. `recorrencia_id` continua existindo como FK, mas
+quem responde "de onde veio" é `origin`; `recorrencia_id IS NOT NULL` fica só
+como o vínculo com o template, não como sinalizador de origem.
+Pacote de recorrência: `origin = 'recurrence'`, `kind = 'package'` (default
+real da coluna, confirmado em 2026-09-03 via `information_schema.columns`:
+`column_default = 'package'::text`, `not null` — é o mesmo valor que
+`assign_package_from_template`/`assign_package_to_student` já produzem hoje
+sem setar `kind` explicitamente, então setar explicitamente daqui pra frente
+não muda nada do que essas duas já gravam).
+
+**Consequência do "1 pacote ativo não-trial por vez" (já valia, mantido):** o
+professor não pode pré-gerar o próximo pacote de recorrência antes do atual
+terminar — isso finalizaria o atual (mesmo `update ... where status='active'
+and origin<>'trial'` que já existe, sem precisar de ajuste: não filtra por
+origin do pacote sendo fechado, então já vale simetricamente entre comprado,
+admin_grant e recorrência).
+
+**6. Criação de pacote: caminho único de escrita, extraído em commit isolado
+antes da geração por recorrência.** `assign_package_from_template` e
+`assign_package_to_student` (`0001:222-291`) hoje fazem cada uma seu próprio
+`insert into packages` — mesmos 5 campos, mesma regra ao redor, mas duplicado.
+Antes de a Etapa 4 introduzir um terceiro caminho, extrai-se o trecho comum
+para uma função interna:
+
+```sql
+_create_package(p_student_id uuid, p_total_classes int, p_origin text, p_kind text default 'package')
+  returns uuid
+```
+
+com os invariantes confirmados em 2026-09-03 (comparando as duas funções
+linha a linha):
+- autorização dupla (`profiles.role='admin'` E `students.admin_id=auth.uid()`)
+  — permanece na função pública que chama `_create_package`, não duplicada
+  dentro dela outra vez
+- `p_total_classes is null or p_total_classes <= 0` → exceção (hoje só existe
+  em `assign_package_to_student`; `assign_package_from_template` confia sem
+  checar que `package_templates.total_classes` já é válido — sem CHECK no
+  banco garantindo isso)
+- fecha outros pacotes `active` não-trial do aluno antes de inserir
+- `used_classes = 0`, `status = 'active'` na criação
+- `kind` sempre setado explicitamente (nunca mais confiar no default)
+- retorna o `id` do pacote novo
+
+Requisitos da extração (é refatoração pura — "não refatorar o AUTOSSERVICO"
+existe pra impedir remoção/mudança de comportamento, não pra proibir extração
+sem mudança de comportamento):
+- comportamento idêntico ao atual nas duas funções existentes, provado por
+  teste rodando antes e depois da extração
+- assinatura pública e nome de `assign_package_from_template` e
+  `assign_package_to_student` inalterados
+- commit isolado, sem nada da criação de pacote por recorrência junto
+
+A Etapa 4 chama `_create_package(p_student_id, p_total_aulas, 'recurrence',
+'package')` e materializa as N linhas de `bookings` depois — sem insert
+paralelo em `packages`.
+
 ### Entidades
 
 **aluno_recorrencia** — template persistente, NÃO gera aulas sozinho
@@ -121,13 +208,12 @@ a UI ler saldo sem chamar a função por linha.
   dia_semana (0-6), horario, duracao
   ativo
 
-**pacote** — lote concreto de aulas. **Em aberto**: tabela nova ou reaproveitar
-`packages` (já existe, já tem `student_id`/`total_classes`/`used_classes`/
-`status`) com 2 colunas novas (`recorrencia_id`, `falta_consome_credito`)? Ver
-"Pontos ainda em aberto" — decidir antes de fechar a Etapa 1.
-  aluno_id, professor_id, recorrencia_id (nullable)
-  total_aulas
-  falta_consome_credito   ← SNAPSHOT, copiado da config do professor na criação
+**pacote** — é a `packages` existente (decisão 5), não uma tabela nova.
+  student_id (existente) — professor_id derivado via students.admin_id, sem coluna própria
+  recorrencia_id uuid references aluno_recorrencia(id) (nullable, novo)
+  falta_consome_credito boolean (nullable, novo)  ← SNAPSHOT, copiado da config do professor na criação
+  origin ganha o valor 'recurrence' (CHECK estendido, decisão 5)
+  total_classes/used_classes/status/kind (existentes, sem mudança de forma)
 
 **agendamento** — aula real (tabela `bookings` existente, apenas colunas novas)
   ...campos atuais...
@@ -196,8 +282,6 @@ reagendamento quanto em reposição (decisão 2).
 
 Decidir antes de chegar na etapa correspondente:
 
-- **`pacote`: tabela nova ou reaproveitar `packages`?** Ver seção Entidades
-  acima — bloqueia fechar a lista de arquivos da Etapa 1.
 - **Feriados** — ao gerar o pacote, aula que cai em feriado: gerar e sinalizar
   para o professor resolver, ou pular? (recomendação: gerar e sinalizar; pular
   automaticamente esconde a decisão do usuário)
