@@ -201,6 +201,46 @@ A Etapa 4 chama `_create_package(p_student_id, p_total_aulas, 'recurrence',
 'package')` e materializa as N linhas de `bookings` depois — sem insert
 paralelo em `packages`.
 
+**7. `bookings.pacote_id` é uma ligação NOVA — não existia nada eager antes
+dela.** Verificado em código (2026-09-03): a única ligação booking↔pacote
+hoje é `credit_transactions.package_id`/`.booking_id` na mesma linha, escrita
+tardiamente por `complete_booking`/`mark_no_show` no momento da conclusão —
+nunca uma atribuição antecipada. A escolha de qual pacote debitar é feita
+nesse momento por uma busca ("mais antigo `active` com vaga, trial primeiro":
+`order by (origin = 'trial') desc, created_at asc limit 1`,
+`0001:481-487`/`:555-561`), não por nenhum vínculo gravado no booking. Existe
+também `booking_package_consumptions` (`primary key(booking_id)` +
+`package_id`) — mas é vestígio morto: era escrita pela trigger
+`apply_booking_package_consumption`, **removida na própria 0001**
+(`0001:781-782`) por causar dupla contagem; hoje tem RLS ligada e zero
+policies (inacessível pelo cliente). **Não reativar, não escrever, não
+remover** — é só evidência histórica que a 0001 já consultou pro backfill do
+ledger.
+
+Como RECORRENCIA precisa do oposto (as N linhas nascem já pertencendo a um
+pacote específico, não "qualquer um com vaga"), `pacote_id` passa a ser a
+fonte direta pra `mark_no_show`/`complete_booking` quando presente — a busca
+preguiçosa antiga só roda quando `pacote_id is null` (bookings do
+AUTOSSERVICO, comportamento idêntico ao de hoje).
+
+**Consequência conhecida, aceita conscientemente — não é bug:** a busca
+preguiçosa ordena `(origin = 'trial') desc`, e trial convive à parte da regra
+de "1 pacote ativo não-trial por vez" — um aluno pode ter trial ativo E
+pacote de recorrência ativo ao mesmo tempo. Antes desta decisão, uma aula de
+recorrência concluída debitaria o TRIAL (a busca preguiçosa o prefere
+primeiro); com `pacote_id` como fonte direta, isso para de acontecer — que é
+o comportamento correto — mas como consequência, **o crédito de trial de um
+aluno em recorrência para de ser consumido e fica parado, `active`,
+indefinidamente**. `packages` não tem coluna de expiração (`supabase/
+README.md:45-46` é explícito: "não há data de expiração"), não achamos
+nenhum cron/job agendado em nenhuma migration deste repo, e
+`packages_one_trial_per_student` garante que nunca haverá um segundo trial
+pra "substituir" o parado. Ele continua contando em `available_credits_for_student`
+(soma todos os `active`) pra sempre. Justificativa aceita: trial é cortesia
+de entrada; aluno que já está em recorrência não está mais nesse estágio.
+**Se alguém achar esse crédito de trial parado no perfil de um aluno depois,
+isso é o comportamento decidido aqui, não um bug pra "consertar".**
+
 ### Entidades
 
 **aluno_recorrencia** — template persistente, NÃO gera aulas sozinho
@@ -222,7 +262,9 @@ paralelo em `packages`.
   pacote_id           (nullable, novo)
   recorrencia_id      (nullable, novo)
   cadeia_id           (nullable até o backfill, novo) → id da PRIMEIRA linha da cadeia
-  cancelado_por       (nullable, novo)  → PROFESSOR | ALUNO, só quando `cancelled`
+  cancelado_por       (nullable, novo)  → check in ('professor','aluno'), minúsculo por
+    consistência com o resto do banco (`booking_status`/`origin`/`kind` são
+    todos lowercase) — só preenchido quando `cancelled`
   aviso_ausencia_em, aviso_ausencia_motivo (nullable, novo — Etapa 8)
   ~~origem~~ (descartada, decisão 2 — derivável)
   ~~reagendado_de_id~~ (descartada, decisão 2 — reaproveita `replacement_for_booking_id`)
@@ -264,8 +306,8 @@ reagendamento quanto em reposição (decisão 2).
 ```
     completed (REALIZADA)                     → sempre consome
     no_show (FALTA)                           → consome se pacote.falta_consome_credito (com fallback, decisão 3)
-    cancelled + cancelado_por=ALUNO           → consome se pacote.falta_consome_credito
-    cancelled + cancelado_por=PROFESSOR       → NUNCA consome
+    cancelled + cancelado_por='aluno'         → consome se pacote.falta_consome_credito
+    cancelled + cancelado_por='professor'     → NUNCA consome
     rescheduled (REAGENDADA)                  → nunca consome (não é terminal)
 ```
 - Falta perdoada NÃO gera registro de saldo separado. O crédito simplesmente
@@ -277,6 +319,21 @@ reagendamento quanto em reposição (decisão 2).
   (decisão 4). Nenhuma tela, query ou componente TypeScript pode somar status
   diretamente na tabela de agendamentos — uma cadeia com 3 remarcações tem 3
   linhas e contar linhas dobraria o desconto.
+
+### Roteiro de migrations (2026-09-03, plano da Etapa 1)
+
+| # | Arquivo | Conteúdo | Etapa |
+|---|---|---|---|
+| 1 | `0008_booking_status_rescheduled.sql` | `ALTER TYPE booking_status ADD VALUE 'rescheduled';` — sozinha na migration (decisão 1: valor de enum não pode ser usado na mesma transação em que é criado) | 2 |
+| 2 | `0009_aluno_recorrencia.sql` | Tabela `aluno_recorrencia` + RLS professor-only (aluno não lê o template — já enxerga a recorrência pelas aulas materializadas na agenda) | 2 |
+| 3 | `0010_packages_recurrence_columns.sql` | `packages.recorrencia_id` (nullable, FK), `.falta_consome_credito` (nullable); `origin` CHECK ganha `'recurrence'` (decisão 5) | 2 |
+| 4 | `0011_bookings_recurrence_columns.sql` | `bookings.pacote_id` (nullable, FK `packages.id`, decisão 7), `.recorrencia_id`, `.cadeia_id`, `.cancelado_por` (`check in ('professor','aluno')`) — todas nullable; **backfill topológico** de `cadeia_id` via recursive CTE sobre `replacement_for_booking_id` (raiz = próprio id quando `replacement_for_booking_id is null`; sucessor herda o `cadeia_id` da raiz, resolvido seguindo a cadeia até o fim — nunca `cadeia_id = id` para todas as linhas) | 2 |
+| 5 | `0012_extract_create_package.sql` | Extrai `_create_package(...)` de `assign_package_from_template`/`assign_package_to_student` (decisão 6) — refatoração pura, testada antes/depois, sozinha | **2.5** |
+| 6 | `0013_calcular_saldo_pacote.sql` | `calcular_saldo_pacote(p_pacote_id)` + view de leitura (decisão 4), com testes — fecha a Etapa 3 sozinha | 3 |
+| 7 | `0014_gerar_pacote_recorrencia.sql` | RPC pública: valida a recorrência, chama `_create_package(..., 'recurrence', 'package')`, materializa N linhas em `bookings` (`cadeia_id` = próprio id, `pacote_id` = pacote recém-criado) | 4 |
+| 8 | `0015_mark_no_show_complete_booking_recorrencia.sql` | `create or replace` de `mark_no_show`/`complete_booking` (decisão 7): coalesce de `falta_consome_credito`; quando `pacote_id is not null`, usa esse pacote diretamente (não a busca "mais antigo ativo") e sobrescreve `used_classes` via `calcular_saldo_pacote()`; `pacote_id is null` → comportamento idêntico ao atual. Testada junto com a 0014, com pacote de recorrência gerado de verdade — por isso vem DEPOIS dela, não antes (rodar antes seria inofensivo mas ficaria sem cobertura real por uma etapa inteira) | 4 |
+| 9 | `0016_reagendar_cancelar_aula.sql` | RPCs `reagendar_aula`/`cancelar_aula`, professor-only | 6 |
+| 10 | `0017_aviso_ausencia.sql` | `bookings.aviso_ausencia_em`/`.aviso_ausencia_motivo` (adiado pra cá — não adicionar coluna que nenhuma função usa ainda) + função pro aluno registrar | 8 |
 
 ### Pontos ainda em aberto
 
