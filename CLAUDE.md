@@ -233,6 +233,16 @@ A Etapa 4 chama `_create_package(p_student_id, p_total_aulas, 'recurrence',
 'package')` e materializa as N linhas de `bookings` depois — sem insert
 paralelo em `packages`.
 
+**Status real da verificação (2026-09-03): só por leitura, não empírica.**
+A paridade de comportamento entre `0001` e `0012` foi conferida linha a
+linha (auth idêntica, mesmo `update`/`insert`, `kind` explícito comprovado
+igual ao default real da coluna) — não foi rodada contra o banco.
+`supabase/verify_create_package.sql` existe no repo pronto pra isso, mas a
+execução ficou pra depois. **Se aparecer bug na criação de pacote
+(`assign_package_from_template`/`assign_package_to_student`/`_create_package`),
+este é o primeiro lugar a olhar** — a garantia que existe hoje é mais fraca
+que "provado por teste", é "conferido por leitura cuidadosa".
+
 **7. `bookings.pacote_id` é uma ligação NOVA — não existia nada eager antes
 dela.** Verificado em código (2026-09-03): a única ligação booking↔pacote
 hoje é `credit_transactions.package_id`/`.booking_id` na mesma linha, escrita
@@ -272,6 +282,43 @@ pra "substituir" o parado. Ele continua contando em `available_credits_for_stude
 de entrada; aluno que já está em recorrência não está mais nesse estágio.
 **Se alguém achar esse crédito de trial parado no perfil de um aluno depois,
 isso é o comportamento decidido aqui, não um bug pra "consertar".**
+
+**8. `calcular_saldo_pacote()` — algoritmo (2026-09-03, Etapa 3).** Implementada
+em `0013_calcular_saldo_pacote.sql`. Só aceita pacote com `recorrencia_id is
+not null` — chamar num pacote AUTOSSERVICO daria `consumidas=0` sempre
+(nenhum booking antigo tem `pacote_id`), um saldo que parece certo mas não
+é; a função prefere dar exceção (`not_a_recurrencia_package`) a devolver
+isso silenciosamente.
+
+Algoritmo: acha todas as cadeias com pelo menos uma linha `pacote_id =
+p_pacote_id`, pega a cadeia INTEIRA por `cadeia_id` (não só as linhas com
+`pacote_id` preenchido — um sucessor de reagendamento pode não ter herdado
+isso ainda), acha a linha TERMINAL de cada cadeia (a que nenhuma outra
+aponta via `replacement_for_booking_id`) e aplica a regra de crédito só
+sobre o terminal. `distinct on (cadeia_id) order by created_at desc` no
+passo do terminal é defesa contra um dado anômalo que o AUTOSSERVICO não
+impede hoje (duas linhas diferentes apontando pro mesmo antecessor via
+`mark_as_replacement`) — sem isso, uma cadeia ramificada contaria mais de
+uma vez.
+
+`a_repor` não é uma subtração explícita de "faltas_perdoadas −
+reposicoes_ja_agendadas" — é contagem de cadeias cujo terminal ATUAL é uma
+falta/cancelamento-por-aluno perdoado (`falta_consome_credito = false`
+efetivo). Assim que uma reposição é registrada, ela estende a MESMA cadeia
+(decisão 2 — `cadeia_id` herdado) e vira o novo terminal, então a cadeia sai
+da contagem automaticamente, por construção — a subtração da spec original
+e essa contagem são equivalentes matematicamente, dado que toda reposição
+sempre estende a cadeia em vez de existir como linha solta.
+
+View `saldo_pacotes` repete a checagem de posse (aluno dono ou professor
+dono) por dentro, em vez de confiar só no RLS que `packages` já tenha (ou
+não) configurado fora deste repositório — nunca verificado neste projeto.
+
+**Verificação: os 8 casos do CLAUDE.md, por script rodável — não por
+leitura**, diferente da decisão 6. `supabase/verify_calcular_saldo_pacote.sql`
+existe no repo; a lógica de cadeia é nova (não é extração de código
+existente), então "conferir por leitura" não bastaria aqui. Ainda não
+executado contra o banco — mesma ressalva.
 
 ### Entidades
 
