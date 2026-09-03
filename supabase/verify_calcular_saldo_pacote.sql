@@ -1,41 +1,61 @@
--- Testes de calcular_saldo_pacote() — os 8 casos do CLAUDE.md, rodáveis direto (mesmos IDs reais
--- já usados em verify_create_package.sql: professor Italo Souza, aluno 4cd0e555-...).
+-- Testes de calcular_saldo_pacote() — os 8 casos do CLAUDE.md.
 --
--- SEGURO DE RODAR CONTRA PRODUÇÃO: BEGIN/ROLLBACK — nenhum pacote/aula/recorrência de teste
--- sobrevive à transação, mesmo que sejam inseridos de verdade durante ela.
+-- Aluno de teste dedicado (a4ad5883-4ed2-44a2-9cd3-b239b70f9658, criado pela aplicação, não é
+-- aluno real) — professor real (Italo Souza, único professor deste banco, só usado como admin_id
+-- de referência, nunca escrito).
 --
--- COMO USAR: rode o arquivo inteiro. Cada caso termina em um RAISE NOTICE comparando
--- total/consumidas/restantes/a_repor obtidos contra o esperado. Procure por "DIVERGIU" no
--- resultado — se não aparecer nenhum, os 8 casos bateram.
+-- ISOLAMENTO ENTRE CASOS: cada caso roda entre SAVEPOINT/ROLLBACK TO SAVEPOINT. O índice
+-- ux_packages_one_active_purchase_per_student (descoberto rodando a versão anterior deste script)
+-- só permite UM pacote 'active' não-trial por aluno — sem isolar por caso, o caso 2 colidiria com
+-- o pacote ainda ativo do caso 1. ROLLBACK TO SAVEPOINT desfaz o que o caso criou (sucesso ou
+-- falha) antes do próximo começar, então todos os 8 partem do mesmo estado limpo e a falha de um
+-- não contamina os seguintes.
+--
+-- SAVEPOINT/ROLLBACK TO SAVEPOINT são comandos soltos, fora de qualquer DO — PL/pgSQL não expõe
+-- isso como statement interno. Por isso setup + chamada de calcular_saldo_pacote + RAISE NOTICE
+-- de cada caso vivem num único DO (não dá pra passar o id do pacote entre blocos DO separados).
+--
+-- SE UM CASO NÃO APARECER NO OUTPUT: o setup dele lançou um erro inesperado antes de chegar no
+-- RAISE NOTICE — o ROLLBACK TO SAVEPOINT ainda roda e recupera a transação pro caso seguinte, mas
+-- esse caso específico fica sem veredito aqui (o erro do Postgres aparece acima, no resultado do
+-- próprio DO que falhou).
+--
+-- COMO USAR: rode o arquivo inteiro. Procure por "DIVERGIU" ou "ERRO" no resultado — se não
+-- aparecer nenhum e os 8 "OK" aparecerem, os casos bateram.
 
 begin;
 
 do $$
 declare
   v_professor_id uuid := '7da8bf09-a200-4831-9d4c-233ef76fad39';
-  v_aluno_id uuid := '4cd0e555-728b-47ba-ba3c-073b54d28af3';
+  v_aluno_id uuid := 'a4ad5883-4ed2-44a2-9cd3-b239b70f9658'; -- aluno de teste dedicado
   v_recorrencia_id uuid;
-
-  v_pkg uuid;
-  v_id1 uuid;
-  v_id2 uuid;
-  v_saldo record;
 begin
-  -- Só o GUC, sem `set local role authenticated`: calcular_saldo_pacote é security definer, roda
-  -- com o dono da função pra suas próprias queries internas independente do role de quem chama —
-  -- só precisa que auth.uid() resolva certo (lê só o GUC, não o role atual). Trocar de role
-  -- também arriscaria as inserções de dado de teste abaixo esbarrarem em RLS de packages/bookings
-  -- que nunca foi pensada pra permitir insert direto do cliente (só via RPC) — o que não é o que
-  -- este script quer testar.
   perform set_config('request.jwt.claims', json_build_object('sub', v_professor_id, 'role', 'authenticated')::text, true);
 
+  -- Uma recorrência de teste só, reusada pelos 8 casos (inerte pro que está sendo testado —
+  -- calcular_saldo_pacote só checa recorrencia_id is not null, nunca lê o conteúdo da linha).
+  -- Fica fora de qualquer SAVEPOINT de caso, então sobrevive aos ROLLBACK TO SAVEPOINT entre eles.
   insert into public.aluno_recorrencia (aluno_id, dia_semana, horario, duracao, ativo)
   values (v_aluno_id, 1, '18:00', interval '1 hour', true)
   returning id into v_recorrencia_id;
 
-  -- ===========================================================================================
-  -- CASO 1 — pacote de 8 aulas, todas AGENDADA (scheduled) → saldo 8
-  -- ===========================================================================================
+  perform set_config('bahia_boxe.test_recorrencia_id', v_recorrencia_id::text, true);
+end;
+$$;
+
+-- =================================================================================================
+-- CASO 1 — pacote de 8 aulas, todas AGENDADA (scheduled) → saldo 8
+-- =================================================================================================
+savepoint caso_1;
+do $$
+declare
+  v_professor_id uuid := '7da8bf09-a200-4831-9d4c-233ef76fad39';
+  v_aluno_id uuid := 'a4ad5883-4ed2-44a2-9cd3-b239b70f9658';
+  v_recorrencia_id uuid := current_setting('bahia_boxe.test_recorrencia_id')::uuid;
+  v_pkg uuid;
+  v_saldo record;
+begin
   insert into public.packages (student_id, total_classes, used_classes, status, origin, kind, recorrencia_id, falta_consome_credito)
   values (v_aluno_id, 8, 0, 'active', 'recurrence', 'package', v_recorrencia_id, true)
   returning id into v_pkg;
@@ -45,9 +65,6 @@ begin
          now() + (n || ' days')::interval, now() + (n || ' days')::interval + interval '1 hour',
          'scheduled', 'package', v_pkg, gen_random_uuid()
   from generate_series(1, 8) n;
-  -- cada linha inserida acima é raiz (não tem sucessora) — cadeia_id precisa ser o PRÓPRIO id,
-  -- não o segundo gen_random_uuid() gerado por linha (não dava pra saber o id antes do insert
-  -- terminar). Corrige em lote.
   update public.bookings set cadeia_id = id where pacote_id = v_pkg;
 
   select * into v_saldo from public.calcular_saldo_pacote(v_pkg);
@@ -56,13 +73,34 @@ begin
   else
     raise notice 'CASO 1 (8 scheduled): DIVERGIU — obtido total=%, consumidas=%, restantes=%, a_repor=% | esperado 8,0,8,0', v_saldo.total, v_saldo.consumidas, v_saldo.restantes, v_saldo.a_repor;
   end if;
+exception when others then
+  raise notice 'CASO 1: ERRO INESPERADO — %', sqlerrm;
+end;
+$$;
+rollback to savepoint caso_1;
 
-  -- ===========================================================================================
-  -- CASO 2 — mesmo pacote do caso 1, 2 dessas 8 viram REALIZADA (completed) → saldo 6
-  -- ===========================================================================================
-  update public.bookings
-  set status = 'completed'
-  where id in (select id from public.bookings where pacote_id = v_pkg order by start_time limit 2);
+-- =================================================================================================
+-- CASO 2 — pacote de 8 aulas, 2 viram REALIZADA (completed) → saldo 6
+-- =================================================================================================
+savepoint caso_2;
+do $$
+declare
+  v_professor_id uuid := '7da8bf09-a200-4831-9d4c-233ef76fad39';
+  v_aluno_id uuid := 'a4ad5883-4ed2-44a2-9cd3-b239b70f9658';
+  v_recorrencia_id uuid := current_setting('bahia_boxe.test_recorrencia_id')::uuid;
+  v_pkg uuid;
+  v_saldo record;
+begin
+  insert into public.packages (student_id, total_classes, used_classes, status, origin, kind, recorrencia_id, falta_consome_credito)
+  values (v_aluno_id, 8, 0, 'active', 'recurrence', 'package', v_recorrencia_id, true)
+  returning id into v_pkg;
+
+  insert into public.bookings (id, student_id, admin_id, start_time, end_time, status, billing_kind, pacote_id, cadeia_id)
+  select gen_random_uuid(), v_aluno_id, v_professor_id,
+         now() + (n || ' days')::interval, now() + (n || ' days')::interval + interval '1 hour',
+         case when n <= 2 then 'completed' else 'scheduled' end, 'package', v_pkg, gen_random_uuid()
+  from generate_series(1, 8) n;
+  update public.bookings set cadeia_id = id where pacote_id = v_pkg;
 
   select * into v_saldo from public.calcular_saldo_pacote(v_pkg);
   if (v_saldo.total, v_saldo.consumidas, v_saldo.restantes, v_saldo.a_repor) = (8, 2, 6, 0) then
@@ -70,10 +108,26 @@ begin
   else
     raise notice 'CASO 2 (2 completed): DIVERGIU — obtido total=%, consumidas=%, restantes=%, a_repor=% | esperado 8,2,6,0', v_saldo.total, v_saldo.consumidas, v_saldo.restantes, v_saldo.a_repor;
   end if;
+exception when others then
+  raise notice 'CASO 2: ERRO INESPERADO — %', sqlerrm;
+end;
+$$;
+rollback to savepoint caso_2;
 
-  -- ===========================================================================================
-  -- CASO 3 — aula remarcada 2x e depois REALIZADA → consome EXATAMENTE 1 crédito (não 3)
-  -- ===========================================================================================
+-- =================================================================================================
+-- CASO 3 — aula remarcada 2x e depois REALIZADA → consome EXATAMENTE 1 crédito (não 3)
+-- =================================================================================================
+savepoint caso_3;
+do $$
+declare
+  v_professor_id uuid := '7da8bf09-a200-4831-9d4c-233ef76fad39';
+  v_aluno_id uuid := 'a4ad5883-4ed2-44a2-9cd3-b239b70f9658';
+  v_recorrencia_id uuid := current_setting('bahia_boxe.test_recorrencia_id')::uuid;
+  v_pkg uuid;
+  v_id1 uuid;
+  v_id2 uuid;
+  v_saldo record;
+begin
   insert into public.packages (student_id, total_classes, used_classes, status, origin, kind, recorrencia_id, falta_consome_credito)
   values (v_aluno_id, 1, 0, 'active', 'recurrence', 'package', v_recorrencia_id, true)
   returning id into v_pkg;
@@ -95,10 +149,25 @@ begin
   else
     raise notice 'CASO 3 (remarcada 2x + completed): DIVERGIU — obtido total=%, consumidas=%, restantes=%, a_repor=% | esperado 1,1,0,0', v_saldo.total, v_saldo.consumidas, v_saldo.restantes, v_saldo.a_repor;
   end if;
+exception when others then
+  raise notice 'CASO 3: ERRO INESPERADO — %', sqlerrm;
+end;
+$$;
+rollback to savepoint caso_3;
 
-  -- ===========================================================================================
-  -- CASO 4 — FALTA com falta_consome_credito = true → consome
-  -- ===========================================================================================
+-- =================================================================================================
+-- CASO 4 — FALTA com falta_consome_credito = true → consome
+-- =================================================================================================
+savepoint caso_4;
+do $$
+declare
+  v_professor_id uuid := '7da8bf09-a200-4831-9d4c-233ef76fad39';
+  v_aluno_id uuid := 'a4ad5883-4ed2-44a2-9cd3-b239b70f9658';
+  v_recorrencia_id uuid := current_setting('bahia_boxe.test_recorrencia_id')::uuid;
+  v_pkg uuid;
+  v_id1 uuid;
+  v_saldo record;
+begin
   insert into public.packages (student_id, total_classes, used_classes, status, origin, kind, recorrencia_id, falta_consome_credito)
   values (v_aluno_id, 1, 0, 'active', 'recurrence', 'package', v_recorrencia_id, true)
   returning id into v_pkg;
@@ -113,10 +182,25 @@ begin
   else
     raise notice 'CASO 4 (no_show, falta_consome=true): DIVERGIU — obtido total=%, consumidas=%, restantes=%, a_repor=% | esperado 1,1,0,0', v_saldo.total, v_saldo.consumidas, v_saldo.restantes, v_saldo.a_repor;
   end if;
+exception when others then
+  raise notice 'CASO 4: ERRO INESPERADO — %', sqlerrm;
+end;
+$$;
+rollback to savepoint caso_4;
 
-  -- ===========================================================================================
-  -- CASO 5 — FALTA com falta_consome_credito = false → não consome, saldo intacto, aguardando reposição
-  -- ===========================================================================================
+-- =================================================================================================
+-- CASO 5 — FALTA com falta_consome_credito = false → não consome, saldo intacto, aguardando reposição
+-- =================================================================================================
+savepoint caso_5;
+do $$
+declare
+  v_professor_id uuid := '7da8bf09-a200-4831-9d4c-233ef76fad39';
+  v_aluno_id uuid := 'a4ad5883-4ed2-44a2-9cd3-b239b70f9658';
+  v_recorrencia_id uuid := current_setting('bahia_boxe.test_recorrencia_id')::uuid;
+  v_pkg uuid;
+  v_id1 uuid;
+  v_saldo record;
+begin
   insert into public.packages (student_id, total_classes, used_classes, status, origin, kind, recorrencia_id, falta_consome_credito)
   values (v_aluno_id, 1, 0, 'active', 'recurrence', 'package', v_recorrencia_id, false)
   returning id into v_pkg;
@@ -131,10 +215,25 @@ begin
   else
     raise notice 'CASO 5 (no_show, falta_consome=false): DIVERGIU — obtido total=%, consumidas=%, restantes=%, a_repor=% | esperado 1,0,1,1', v_saldo.total, v_saldo.consumidas, v_saldo.restantes, v_saldo.a_repor;
   end if;
+exception when others then
+  raise notice 'CASO 5: ERRO INESPERADO — %', sqlerrm;
+end;
+$$;
+rollback to savepoint caso_5;
 
-  -- ===========================================================================================
-  -- CASO 6 — CANCELADA por PROFESSOR com falta_consome_credito = true → NÃO consome
-  -- ===========================================================================================
+-- =================================================================================================
+-- CASO 6 — CANCELADA por PROFESSOR com falta_consome_credito = true → NÃO consome
+-- =================================================================================================
+savepoint caso_6;
+do $$
+declare
+  v_professor_id uuid := '7da8bf09-a200-4831-9d4c-233ef76fad39';
+  v_aluno_id uuid := 'a4ad5883-4ed2-44a2-9cd3-b239b70f9658';
+  v_recorrencia_id uuid := current_setting('bahia_boxe.test_recorrencia_id')::uuid;
+  v_pkg uuid;
+  v_id1 uuid;
+  v_saldo record;
+begin
   insert into public.packages (student_id, total_classes, used_classes, status, origin, kind, recorrencia_id, falta_consome_credito)
   values (v_aluno_id, 1, 0, 'active', 'recurrence', 'package', v_recorrencia_id, true)
   returning id into v_pkg;
@@ -149,10 +248,25 @@ begin
   else
     raise notice 'CASO 6 (cancelled por professor, falta_consome=true): DIVERGIU — obtido total=%, consumidas=%, restantes=%, a_repor=% | esperado 1,0,1,0', v_saldo.total, v_saldo.consumidas, v_saldo.restantes, v_saldo.a_repor;
   end if;
+exception when others then
+  raise notice 'CASO 6: ERRO INESPERADO — %', sqlerrm;
+end;
+$$;
+rollback to savepoint caso_6;
 
-  -- ===========================================================================================
-  -- CASO 7 — CANCELADA por ALUNO com falta_consome_credito = true → consome
-  -- ===========================================================================================
+-- =================================================================================================
+-- CASO 7 — CANCELADA por ALUNO com falta_consome_credito = true → consome
+-- =================================================================================================
+savepoint caso_7;
+do $$
+declare
+  v_professor_id uuid := '7da8bf09-a200-4831-9d4c-233ef76fad39';
+  v_aluno_id uuid := 'a4ad5883-4ed2-44a2-9cd3-b239b70f9658';
+  v_recorrencia_id uuid := current_setting('bahia_boxe.test_recorrencia_id')::uuid;
+  v_pkg uuid;
+  v_id1 uuid;
+  v_saldo record;
+begin
   insert into public.packages (student_id, total_classes, used_classes, status, origin, kind, recorrencia_id, falta_consome_credito)
   values (v_aluno_id, 1, 0, 'active', 'recurrence', 'package', v_recorrencia_id, true)
   returning id into v_pkg;
@@ -167,10 +281,25 @@ begin
   else
     raise notice 'CASO 7 (cancelled por aluno, falta_consome=true): DIVERGIU — obtido total=%, consumidas=%, restantes=%, a_repor=% | esperado 1,1,0,0', v_saldo.total, v_saldo.consumidas, v_saldo.restantes, v_saldo.a_repor;
   end if;
+exception when others then
+  raise notice 'CASO 7: ERRO INESPERADO — %', sqlerrm;
+end;
+$$;
+rollback to savepoint caso_7;
 
-  -- ===========================================================================================
-  -- CASO 8 — no_show perdoado + reposição REALIZADA → consome 1 no total, a_repor = 0
-  -- ===========================================================================================
+-- =================================================================================================
+-- CASO 8 — no_show perdoado + reposição REALIZADA → consome 1 no total, a_repor = 0
+-- =================================================================================================
+savepoint caso_8;
+do $$
+declare
+  v_professor_id uuid := '7da8bf09-a200-4831-9d4c-233ef76fad39';
+  v_aluno_id uuid := 'a4ad5883-4ed2-44a2-9cd3-b239b70f9658';
+  v_recorrencia_id uuid := current_setting('bahia_boxe.test_recorrencia_id')::uuid;
+  v_pkg uuid;
+  v_id1 uuid;
+  v_saldo record;
+begin
   insert into public.packages (student_id, total_classes, used_classes, status, origin, kind, recorrencia_id, falta_consome_credito)
   values (v_aluno_id, 1, 0, 'active', 'recurrence', 'package', v_recorrencia_id, false)
   returning id into v_pkg;
@@ -188,8 +317,10 @@ begin
   else
     raise notice 'CASO 8 (no_show perdoado + reposicao completed): DIVERGIU — obtido total=%, consumidas=%, restantes=%, a_repor=% | esperado 1,1,0,0', v_saldo.total, v_saldo.consumidas, v_saldo.restantes, v_saldo.a_repor;
   end if;
-
+exception when others then
+  raise notice 'CASO 8: ERRO INESPERADO — %', sqlerrm;
 end;
 $$;
+rollback to savepoint caso_8;
 
 rollback;
