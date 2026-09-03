@@ -176,23 +176,55 @@ _create_package(p_student_id uuid, p_total_classes int, p_origin text, p_kind te
 
 com os invariantes confirmados em 2026-09-03 (comparando as duas funções
 linha a linha):
-- autorização dupla (`profiles.role='admin'` E `students.admin_id=auth.uid()`)
-  — permanece na função pública que chama `_create_package`, não duplicada
-  dentro dela outra vez
-- `p_total_classes is null or p_total_classes <= 0` → exceção (hoje só existe
-  em `assign_package_to_student`; `assign_package_from_template` confia sem
-  checar que `package_templates.total_classes` já é válido — sem CHECK no
-  banco garantindo isso)
 - fecha outros pacotes `active` não-trial do aluno antes de inserir
 - `used_classes = 0`, `status = 'active'` na criação
 - `kind` sempre setado explicitamente (nunca mais confiar no default)
 - retorna o `id` do pacote novo
 
+`p_total_classes is null or p_total_classes <= 0` → exceção **não** entra em
+`_create_package` — hoje só existe em `assign_package_to_student`
+(`assign_package_from_template` confia sem checar que
+`package_templates.total_classes` já é válido). Mover pra dentro da função
+compartilhada mudaria o comportamento observável de `assign_package_from_
+template`, o que contradiz "comportamento idêntico ao atual" abaixo — cada
+chamadora mantém sua própria validação de `total_classes`, exatamente como
+hoje. A Etapa 4 adiciona a mesma checagem na sua própria função pública,
+antes de chamar `_create_package`.
+
+**Autorização — CORREÇÃO (2026-09-03, revisando a primeira versão desta
+decisão):** a versão original dizia que a autorização "permanece na função
+pública que chama, não duplicada dentro dela". Isso estava errado. Este
+repositório não usa `GRANT`/`REVOKE` em nenhuma migration — todas as 10
+funções `security definer` de `0001_credit_ledger.sql` se protegem
+inteiramente por checagem interna (`if not exists (...) then raise
+exception`); toda função nova é `EXECUTE`-ável por `PUBLIC` a menos que
+alguém revogue explicitamente. Se `_create_package` não tivesse nem `REVOKE`
+nem checagem própria, ficaria chamável direto via `supabase.rpc
+('_create_package', ...)` por qualquer aluno autenticado — cria pacote pra
+qualquer aluno, sem autorização nenhuma.
+
+Correção: **as duas camadas, não uma.**
+- `revoke execute on function public._create_package(uuid, int, text, text)
+  from public, authenticated, anon;` logo após criá-la — fecha a
+  alcançabilidade a partir do cliente. Chamada interna a partir de outra
+  função `security definer` continua funcionando (roda como o dono da
+  função, o `REVOKE` não afeta isso). **Primeiro uso deste mecanismo no
+  repositório** — comentar no SQL por quê esta função tem tratamento
+  diferente das outras 10.
+- `_create_package` TAMBÉM valida autorização internamente (mesmo formato
+  de `raise exception` que o resto do repo já usa) — garante que a função
+  continue correta mesmo se uma chamadora futura esquecer de autorizar antes
+  de chamar, o que é bem mais provável que alguém contornar o `REVOKE`.
+
+A duplicação entre essa checagem e a das funções públicas chamadoras é
+**intencional — defesa em profundidade, não descuido. Não remover nenhuma
+das duas camadas em nome de DRY.**
+
 Requisitos da extração (é refatoração pura — "não refatorar o AUTOSSERVICO"
 existe pra impedir remoção/mudança de comportamento, não pra proibir extração
 sem mudança de comportamento):
 - comportamento idêntico ao atual nas duas funções existentes, provado por
-  teste rodando antes e depois da extração
+  teste rodando antes e depois da extração — não só por raciocínio
 - assinatura pública e nome de `assign_package_from_template` e
   `assign_package_to_student` inalterados
 - commit isolado, sem nada da criação de pacote por recorrência junto
