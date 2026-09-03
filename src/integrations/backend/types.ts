@@ -33,7 +33,7 @@ export interface StudentRecord {
 }
 
 /** De onde veio o pacote — dimensão separada de `kind` (que distingue pacote x aula avulsa). */
-export type PackageOrigin = "trial" | "purchase" | "admin_grant";
+export type PackageOrigin = "trial" | "purchase" | "admin_grant" | "recurrence";
 
 export interface PackageTemplate {
   id: string;
@@ -59,6 +59,13 @@ export interface PackageRecord {
   /** Derived label — `packages` stores no template reference. */
   templateName: string;
   createdAt: string;
+  /**
+   * RECORRENCIA (CLAUDE.md, decisão 5) — presente só quando `origin === "recurrence"`. Ainda não
+   * populado por `mapPackage` (api.ts não muda até a RPC de geração de pacote existir, Etapa 4).
+   */
+  recorrenciaId?: string | null;
+  /** Snapshot de `falta_consome_credito` copiado da config do professor na criação do pacote. */
+  faltaConsomeCredito?: boolean | null;
 }
 
 export interface Booking {
@@ -76,6 +83,38 @@ export interface Booking {
   suggestedEndTime?: string | null;
   isReplacement: boolean;
   replacementForBookingId: string | null;
+  /**
+   * RECORRENCIA (CLAUDE.md, decisão 7) — pacote específico ao qual esta aula pertence. Quando
+   * presente, é a fonte direta de qual pacote debitar (não a busca "pacote ativo mais antigo com
+   * vaga" que o AUTOSSERVICO usa). Ainda não populado por `mapBooking` (api.ts não muda até a
+   * Etapa 4, que materializa aulas de recorrência).
+   */
+  pacoteId?: string | null;
+  recorrenciaId?: string | null;
+  /**
+   * Id da primeira linha da cadeia de reagendamento/reposição. Toda linha já tem um valor após o
+   * backfill (migration 0011), mas a coluna continua nullable no banco.
+   */
+  cadeiaId?: string | null;
+  /** Só preenchido quando `status === "cancelled"` (CLAUDE.md, decisão registrada em 2026-09-03). */
+  canceladoPor?: "professor" | "aluno" | null;
+}
+
+/**
+ * Template persistente de dias/horário fixos que o professor define pra um aluno (fluxo
+ * RECORRENCIA) — NÃO gera aulas sozinho, é só a "receita" que a RPC de geração de pacote (Etapa 4)
+ * lê pra materializar linhas concretas em `bookings`. Ver CLAUDE.md, "Domínio: agendamento".
+ */
+export interface AlunoRecorrencia {
+  id: string;
+  studentId: string;
+  /** 0 (domingo) .. 6 (sábado), mesma convenção de `AvailabilityInterval.weekday`. */
+  diaSemana: number;
+  /** "HH:mm". */
+  horario: string;
+  duracaoMinutos: number;
+  ativo: boolean;
+  createdAt: string;
 }
 
 /** Uma movimentação imutável em `credit_transactions` — o histórico, não o saldo. */
