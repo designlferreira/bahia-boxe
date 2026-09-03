@@ -1,6 +1,6 @@
 -- Testes de calcular_saldo_pacote() — os 8 casos do CLAUDE.md.
 --
--- Aluno de teste dedicado (a4ad5883-4ed2-44a2-9cd3-b239b70f9658, criado pela aplicação, não é
+-- Aluno de teste dedicado (b12decb8-2f64-4bd8-b3a9-6c5b8b29d8a8, criado pela aplicação, não é
 -- aluno real) — professor real (Italo Souza, único professor deste banco, só usado como admin_id
 -- de referência, nunca escrito).
 --
@@ -28,7 +28,7 @@ begin;
 do $$
 declare
   v_professor_id uuid := '7da8bf09-a200-4831-9d4c-233ef76fad39';
-  v_aluno_id uuid := 'a4ad5883-4ed2-44a2-9cd3-b239b70f9658'; -- aluno de teste dedicado
+  v_aluno_id uuid := 'b12decb8-2f64-4bd8-b3a9-6c5b8b29d8a8'; -- aluno de teste dedicado
   v_recorrencia_id uuid;
 begin
   perform set_config('request.jwt.claims', json_build_object('sub', v_professor_id, 'role', 'authenticated')::text, true);
@@ -51,7 +51,7 @@ savepoint caso_1;
 do $$
 declare
   v_professor_id uuid := '7da8bf09-a200-4831-9d4c-233ef76fad39';
-  v_aluno_id uuid := 'a4ad5883-4ed2-44a2-9cd3-b239b70f9658';
+  v_aluno_id uuid := 'b12decb8-2f64-4bd8-b3a9-6c5b8b29d8a8';
   v_recorrencia_id uuid := current_setting('bahia_boxe.test_recorrencia_id')::uuid;
   v_pkg uuid;
   v_saldo record;
@@ -86,7 +86,7 @@ savepoint caso_2;
 do $$
 declare
   v_professor_id uuid := '7da8bf09-a200-4831-9d4c-233ef76fad39';
-  v_aluno_id uuid := 'a4ad5883-4ed2-44a2-9cd3-b239b70f9658';
+  v_aluno_id uuid := 'b12decb8-2f64-4bd8-b3a9-6c5b8b29d8a8';
   v_recorrencia_id uuid := current_setting('bahia_boxe.test_recorrencia_id')::uuid;
   v_pkg uuid;
   v_saldo record;
@@ -121,7 +121,7 @@ savepoint caso_3;
 do $$
 declare
   v_professor_id uuid := '7da8bf09-a200-4831-9d4c-233ef76fad39';
-  v_aluno_id uuid := 'a4ad5883-4ed2-44a2-9cd3-b239b70f9658';
+  v_aluno_id uuid := 'b12decb8-2f64-4bd8-b3a9-6c5b8b29d8a8';
   v_recorrencia_id uuid := current_setting('bahia_boxe.test_recorrencia_id')::uuid;
   v_pkg uuid;
   v_id1 uuid;
@@ -162,7 +162,7 @@ savepoint caso_4;
 do $$
 declare
   v_professor_id uuid := '7da8bf09-a200-4831-9d4c-233ef76fad39';
-  v_aluno_id uuid := 'a4ad5883-4ed2-44a2-9cd3-b239b70f9658';
+  v_aluno_id uuid := 'b12decb8-2f64-4bd8-b3a9-6c5b8b29d8a8';
   v_recorrencia_id uuid := current_setting('bahia_boxe.test_recorrencia_id')::uuid;
   v_pkg uuid;
   v_id1 uuid;
@@ -195,7 +195,7 @@ savepoint caso_5;
 do $$
 declare
   v_professor_id uuid := '7da8bf09-a200-4831-9d4c-233ef76fad39';
-  v_aluno_id uuid := 'a4ad5883-4ed2-44a2-9cd3-b239b70f9658';
+  v_aluno_id uuid := 'b12decb8-2f64-4bd8-b3a9-6c5b8b29d8a8';
   v_recorrencia_id uuid := current_setting('bahia_boxe.test_recorrencia_id')::uuid;
   v_pkg uuid;
   v_id1 uuid;
@@ -228,7 +228,7 @@ savepoint caso_6;
 do $$
 declare
   v_professor_id uuid := '7da8bf09-a200-4831-9d4c-233ef76fad39';
-  v_aluno_id uuid := 'a4ad5883-4ed2-44a2-9cd3-b239b70f9658';
+  v_aluno_id uuid := 'b12decb8-2f64-4bd8-b3a9-6c5b8b29d8a8';
   v_recorrencia_id uuid := current_setting('bahia_boxe.test_recorrencia_id')::uuid;
   v_pkg uuid;
   v_id1 uuid;
@@ -261,7 +261,7 @@ savepoint caso_7;
 do $$
 declare
   v_professor_id uuid := '7da8bf09-a200-4831-9d4c-233ef76fad39';
-  v_aluno_id uuid := 'a4ad5883-4ed2-44a2-9cd3-b239b70f9658';
+  v_aluno_id uuid := 'b12decb8-2f64-4bd8-b3a9-6c5b8b29d8a8';
   v_recorrencia_id uuid := current_setting('bahia_boxe.test_recorrencia_id')::uuid;
   v_pkg uuid;
   v_id1 uuid;
@@ -294,7 +294,7 @@ savepoint caso_8;
 do $$
 declare
   v_professor_id uuid := '7da8bf09-a200-4831-9d4c-233ef76fad39';
-  v_aluno_id uuid := 'a4ad5883-4ed2-44a2-9cd3-b239b70f9658';
+  v_aluno_id uuid := 'b12decb8-2f64-4bd8-b3a9-6c5b8b29d8a8';
   v_recorrencia_id uuid := current_setting('bahia_boxe.test_recorrencia_id')::uuid;
   v_pkg uuid;
   v_id1 uuid;
