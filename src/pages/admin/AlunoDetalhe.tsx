@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Sparkles, X } from "lucide-react";
+import { CalendarClock, Sparkles, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard, SkeletonList } from "@/components/SkeletonCard";
@@ -141,7 +141,7 @@ export default function AdminAlunoDetalhe() {
       <button
         type="button"
         onClick={() => navigate(`/admin/alunos/${studentId}/perfil-lutador`)}
-        className="w-full card-dark p-3.5 mb-5 flex items-center gap-3 text-left active:scale-[0.99] transition-transform"
+        className="w-full card-dark p-3.5 mb-2.5 flex items-center gap-3 text-left active:scale-[0.99] transition-transform"
       >
         <div className="h-9 w-9 shrink-0 rounded-full bg-amber/15 flex items-center justify-center">
           <Sparkles className="h-4 w-4 text-amber" />
@@ -149,6 +149,20 @@ export default function AdminAlunoDetalhe() {
         <div className="flex-1">
           <div className="text-[14px] font-semibold text-foreground">Perfil de Boxe</div>
           <div className="text-[12px] text-muted-foreground">Sua avaliação técnica e a comparação com a autoavaliação do aluno</div>
+        </div>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => navigate(`/admin/alunos/${studentId}/recorrencia`)}
+        className="w-full card-dark p-3.5 mb-5 flex items-center gap-3 text-left active:scale-[0.99] transition-transform"
+      >
+        <div className="h-9 w-9 shrink-0 rounded-full bg-primary/15 flex items-center justify-center">
+          <CalendarClock className="h-4 w-4 text-primary" />
+        </div>
+        <div className="flex-1">
+          <div className="text-[14px] font-semibold text-foreground">Recorrência</div>
+          <div className="text-[12px] text-muted-foreground">Dias fixos e geração de pacotes de aulas recorrentes</div>
         </div>
       </button>
 

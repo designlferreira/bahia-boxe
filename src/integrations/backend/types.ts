@@ -59,13 +59,26 @@ export interface PackageRecord {
   /** Derived label — `packages` stores no template reference. */
   templateName: string;
   createdAt: string;
-  /**
-   * RECORRENCIA (CLAUDE.md, decisão 5) — presente só quando `origin === "recurrence"`. Ainda não
-   * populado por `mapPackage` (api.ts não muda até a RPC de geração de pacote existir, Etapa 4).
-   */
+  /** RECORRENCIA (CLAUDE.md, decisão 5) — presente só quando `origin === "recurrence"`. */
   recorrenciaId?: string | null;
   /** Snapshot de `falta_consome_credito` copiado da config do professor na criação do pacote. */
   faltaConsomeCredito?: boolean | null;
+}
+
+/**
+ * Uma linha da view `saldo_pacotes` (CLAUDE.md, decisão 4/8) — o saldo derivado da CADEIA, não do
+ * contador `used_classes`. Só existe pra pacotes com `recorrenciaId` presente; chamar
+ * `calcular_saldo_pacote()` num pacote AUTOSSERVICO dá exceção de propósito (0013).
+ */
+export interface SaldoPacote {
+  pacoteId: string;
+  studentId: string;
+  recorrenciaId: string;
+  total: number;
+  consumidas: number;
+  restantes: number;
+  /** Cadeias cujo terminal atual é uma falta/cancelamento perdoado, aguardando reposição. */
+  aRepor: number;
 }
 
 export interface Booking {
@@ -86,8 +99,7 @@ export interface Booking {
   /**
    * RECORRENCIA (CLAUDE.md, decisão 7) — pacote específico ao qual esta aula pertence. Quando
    * presente, é a fonte direta de qual pacote debitar (não a busca "pacote ativo mais antigo com
-   * vaga" que o AUTOSSERVICO usa). Ainda não populado por `mapBooking` (api.ts não muda até a
-   * Etapa 4, que materializa aulas de recorrência).
+   * vaga" que o AUTOSSERVICO usa).
    */
   pacoteId?: string | null;
   recorrenciaId?: string | null;

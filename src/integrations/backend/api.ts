@@ -4,6 +4,7 @@ import { TIMEZONE } from "@/lib/dateUtils";
 import { supabase } from "@/integrations/supabase/client";
 import type {
   AdminSettings,
+  AlunoRecorrencia,
   AppNotification,
   AvailabilityInterval,
   Booking,
@@ -14,6 +15,7 @@ import type {
   PackageRecord,
   PackageTemplate,
   PurchaseRequest,
+  SaldoPacote,
   Sex,
   StudentProfile,
   StudentRecord,
@@ -67,13 +69,18 @@ function mapBooking(r: any): Booking {
     suggestedEndTime: r.suggested_end_time,
     isReplacement: r.is_replacement ?? false,
     replacementForBookingId: r.replacement_for_booking_id ?? null,
+    pacoteId: r.pacote_id ?? null,
+    recorrenciaId: r.recorrencia_id ?? null,
+    cadeiaId: r.cadeia_id ?? null,
+    canceladoPor: r.cancelado_por ?? null,
   };
 }
 
 /** `packages` stores no template link, so the label is derived from `kind` + `origin` + `total_classes`. */
 function mapPackage(r: any): PackageRecord {
   const kind: PackageRecord["kind"] = r.kind === "single" ? "single" : "package";
-  const origin: PackageRecord["origin"] = r.origin === "trial" || r.origin === "admin_grant" ? r.origin : "purchase";
+  const origin: PackageRecord["origin"] =
+    r.origin === "trial" || r.origin === "admin_grant" || r.origin === "recurrence" ? r.origin : "purchase";
   return {
     id: r.id,
     studentId: r.student_id,
@@ -82,8 +89,48 @@ function mapPackage(r: any): PackageRecord {
     status: r.status,
     kind,
     origin,
-    templateName: origin === "trial" ? "Aula experimental" : kind === "single" ? "Aula avulsa" : `Pacote de ${r.total_classes} aulas`,
+    templateName:
+      origin === "trial"
+        ? "Aula experimental"
+        : origin === "recurrence"
+          ? `Pacote de recorrência · ${r.total_classes} aulas`
+          : kind === "single"
+            ? "Aula avulsa"
+            : `Pacote de ${r.total_classes} aulas`,
     createdAt: r.created_at,
+    recorrenciaId: r.recorrencia_id ?? null,
+    faltaConsomeCredito: r.falta_consome_credito ?? null,
+  };
+}
+
+function mapAlunoRecorrencia(r: any): AlunoRecorrencia {
+  return {
+    id: r.id,
+    studentId: r.aluno_id,
+    diaSemana: r.dia_semana,
+    horario: typeof r.horario === "string" ? r.horario.slice(0, 5) : r.horario,
+    duracaoMinutos: parseIntervalMinutes(r.duracao),
+    ativo: r.ativo,
+    createdAt: r.created_at,
+  };
+}
+
+/** Postgres imprime `interval` (sem dias) como texto "HH:MM:SS" — só o formato que este app grava. */
+function parseIntervalMinutes(raw: string): number {
+  const match = /^(-?\d+):(\d{2}):(\d{2})/.exec(String(raw ?? ""));
+  if (!match) return 60;
+  return parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+}
+
+function mapSaldoPacote(r: any): SaldoPacote {
+  return {
+    pacoteId: r.pacote_id,
+    studentId: r.student_id,
+    recorrenciaId: r.recorrencia_id,
+    total: r.total,
+    consumidas: r.consumidas,
+    restantes: r.restantes,
+    aRepor: r.a_repor,
   };
 }
 
@@ -743,6 +790,104 @@ export async function assignPackageFromTemplate(studentId: string, templateId: s
 export async function removeActivePackage(studentId: string) {
   const { error } = await client().rpc("remove_active_package", { p_student_id: studentId });
   if (error) throw new Error(error.message);
+}
+
+// ---------------------------------------------------------------------------
+// admin · recorrência (RECORRENCIA, Etapa 5 — CLAUDE.md)
+// ---------------------------------------------------------------------------
+
+export async function getAlunoRecorrencias(studentId: string): Promise<AlunoRecorrencia[]> {
+  const { data, error } = await client()
+    .from("aluno_recorrencia")
+    .select("*")
+    .eq("aluno_id", studentId)
+    .order("dia_semana", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapAlunoRecorrencia);
+}
+
+export async function createAlunoRecorrencia(
+  studentId: string,
+  diaSemana: number,
+  horario: string,
+  duracaoMinutos: number,
+) {
+  const { error } = await client()
+    .from("aluno_recorrencia")
+    .insert({ aluno_id: studentId, dia_semana: diaSemana, horario, duracao: `${duracaoMinutos} minutes` });
+  if (error) throw new Error(error.message);
+}
+
+export async function setAlunoRecorrenciaAtivo(id: string, ativo: boolean) {
+  const { error } = await client().from("aluno_recorrencia").update({ ativo }).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Todas as ocorrências futuras de `weekday` dentro de `weeks` semanas, como "yyyy-MM-dd" em BRT —
+ * mesma lógica de `horizonDatesFor` (linha ~1030), sem tocar nela: aquela é do AUTOSSERVICO
+ * (disponibilidade), esta é da RECORRENCIA, propositalmente duas funções pequenas e separadas em
+ * vez de uma só generalizada por cima de código que "não deve ser refatorado" (CLAUDE.md).
+ */
+function futureWeekdayDates(weekday: number, weeks: number): string[] {
+  const out: string[] = [];
+  const start = brt(new Date());
+  const end = addWeeks(start, weeks);
+  for (let d = start; d < end; d = addDays(d, 1)) {
+    if (d.getDay() === weekday) out.push(format(d, "yyyy-MM-dd"));
+  }
+  return out;
+}
+
+/**
+ * Resolve o array de slots que `gerar_pacote_recorrencia` (0014) espera: todas as linhas ATIVAS de
+ * `aluno_recorrencia` entrelaçadas cronologicamente (decisão 9, CLAUDE.md — mais de um dia da
+ * semana é a MESMA rotina, gera UM pacote só), convertidas de BRT pra UTC com `fromZonedTime`
+ * (mesmo padrão de `saveAvailabilityInterval`), cortadas nas primeiras `totalAulas`.
+ */
+function computeRecorrenciaSlots(
+  recorrencias: Pick<AlunoRecorrencia, "id" | "diaSemana" | "horario" | "duracaoMinutos">[],
+  totalAulas: number,
+): { start_time: string; end_time: string; recorrencia_id: string }[] {
+  const weeks = Math.min(52, Math.max(HORIZON_WEEKS, Math.ceil(totalAulas / Math.max(recorrencias.length, 1)) + 2));
+  const candidates: { start: Date; end: Date; recorrenciaId: string }[] = [];
+  for (const rec of recorrencias) {
+    for (const day of futureWeekdayDates(rec.diaSemana, weeks)) {
+      const from = fromZonedTime(`${day}T${rec.horario}:00`, TIMEZONE);
+      if (from.getTime() <= Date.now()) continue;
+      candidates.push({ start: from, end: new Date(from.getTime() + rec.duracaoMinutos * 60_000), recorrenciaId: rec.id });
+    }
+  }
+  candidates.sort((a, b) => a.start.getTime() - b.start.getTime());
+  return candidates
+    .slice(0, totalAulas)
+    .map((c) => ({ start_time: c.start.toISOString(), end_time: c.end.toISOString(), recorrencia_id: c.recorrenciaId }));
+}
+
+/**
+ * Gera um pacote de recorrência: lê as linhas ATIVAS de `aluno_recorrencia` do aluno, calcula as
+ * próximas `totalAulas` ocorrências (entre todas elas, entrelaçadas por data) e chama
+ * `gerar_pacote_recorrencia`. Lança erro amigável se não houver nenhuma linha ativa — a RPC também
+ * rejeitaria (`invalid_slots`), mas a mensagem aqui é melhor pra UI.
+ */
+export async function gerarPacoteRecorrencia(studentId: string, totalAulas: number): Promise<string> {
+  const recorrencias = (await getAlunoRecorrencias(studentId)).filter((r) => r.ativo);
+  if (recorrencias.length === 0) {
+    throw new Error("Cadastre pelo menos um dia/horário de recorrência ativo antes de gerar um pacote.");
+  }
+  const slots = computeRecorrenciaSlots(recorrencias, totalAulas);
+  if (slots.length < totalAulas) {
+    throw new Error("Não foi possível calcular datas futuras suficientes para esse número de aulas.");
+  }
+  const { data, error } = await client().rpc("gerar_pacote_recorrencia", { p_aluno_id: studentId, p_slots: slots });
+  if (error) throw new Error(error.message);
+  return data as string;
+}
+
+export async function getSaldoPacote(pacoteId: string): Promise<SaldoPacote | null> {
+  const { data, error } = await client().from("saldo_pacotes").select("*").eq("pacote_id", pacoteId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? mapSaldoPacote(data) : null;
 }
 
 // ---------------------------------------------------------------------------

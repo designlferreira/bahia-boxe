@@ -34,6 +34,7 @@ import AdminAlunos from "@/pages/admin/Alunos";
 import AdminAlunoDetalhe from "@/pages/admin/AlunoDetalhe";
 import AdminAlunoPerfilBoxe from "@/pages/admin/AlunoPerfilBoxe";
 import AdminAlunoPerfilBoxeQuestionario from "@/pages/admin/AlunoPerfilBoxeQuestionario";
+import AdminAlunoRecorrencia from "@/pages/admin/AlunoRecorrencia";
 import AdminHistorico from "@/pages/admin/Historico";
 import AdminPedidos from "@/pages/admin/Pedidos";
 import AdminPacotes from "@/pages/admin/Pacotes";
@@ -94,6 +95,7 @@ function AppRoutes() {
           <Route path="/admin/alunos/:studentId" element={<AdminAlunoDetalhe />} />
           <Route path="/admin/alunos/:studentId/perfil-lutador" element={<AdminAlunoPerfilBoxe />} />
           <Route path="/admin/alunos/:studentId/perfil-lutador/questionario" element={<AdminAlunoPerfilBoxeQuestionario />} />
+          <Route path="/admin/alunos/:studentId/recorrencia" element={<AdminAlunoRecorrencia />} />
           <Route path="/admin/historico" element={<AdminHistorico />} />
           <Route path="/admin/pacotes" element={<AdminPacotes />} />
           <Route path="/admin/solicitacoes" element={<AdminPedidos />} />

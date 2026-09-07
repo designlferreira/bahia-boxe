@@ -503,6 +503,30 @@ reagendamento quanto em reposição (decisão 2).
 | 9 | `0016_reagendar_cancelar_aula.sql` | RPCs `reagendar_aula`/`cancelar_aula`, professor-only | 6 |
 | 10 | `0017_aviso_ausencia.sql` | `bookings.aviso_ausencia_em`/`.aviso_ausencia_motivo` (adiado pra cá — não adicionar coluna que nenhuma função usa ainda) + função pro aluno registrar | 8 |
 
+### Etapa 5 — tela (2026-09-07, sem migration nova)
+
+Nova página `src/pages/admin/AlunoRecorrencia.tsx`
+(`/admin/alunos/:studentId/recorrencia`), linkada por um card novo em
+`AlunoDetalhe.tsx` (mesmo padrão do card "Perfil de Boxe" — aditivo, não
+mexe no resto da página). Gerencia `aluno_recorrencia` (listar, criar,
+ativar/desativar — sem editar linha existente, ver "Mudança de recorrência"
+abaixo) e chama `gerarPacoteRecorrencia()`, que lê as linhas ativas, calcula
+os slots (client-side, `fromZonedTime`, decisão 9) e chama a RPC
+`gerar_pacote_recorrencia`. Mostra o saldo (`saldo_pacotes`) quando o pacote
+ativo do aluno é `origin === 'recurrence'`.
+
+Novas funções em `api.ts`: `getAlunoRecorrencias`, `createAlunoRecorrencia`,
+`setAlunoRecorrenciaAtivo`, `gerarPacoteRecorrencia`, `getSaldoPacote`.
+`mapBooking`/`mapPackage` passam a popular os campos de recorrência que já
+existiam no tipo mas ainda não eram lidos das linhas do banco.
+
+**Este é o primeiro teste real ponta a ponta do fluxo inteiro** (Etapa 1→5)
+— gerar um pacote pela tela e marcar uma falta é o que efetivamente
+exercita `_create_package`, `gerar_pacote_recorrencia`,
+`calcular_saldo_pacote()` e o `mark_no_show`/`complete_booking` reescritos
+juntos, pela primeira vez. Migrations 0008–0015 precisam estar aplicadas no
+banco antes de testar.
+
 ### Pontos ainda em aberto
 
 Decidir antes de chegar na etapa correspondente:
