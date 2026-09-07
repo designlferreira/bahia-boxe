@@ -349,6 +349,66 @@ existe no repo; a lógica de cadeia é nova (não é extração de código
 existente), então "conferir por leitura" não bastaria aqui. Ainda não
 executado contra o banco — mesma ressalva.
 
+**Status real (2026-09-07): APLICADA, NÃO VERIFICADA empiricamente.**
+`0013_calcular_saldo_pacote.sql` já está na migration por causa da ordem de
+dependência da Etapa 4 (`gerar_pacote_recorrencia`/`complete_booking`/
+`mark_no_show` chamam `calcular_saldo_pacote()`), mas
+`verify_calcular_saldo_pacote.sql` nunca foi rodado contra o banco — decisão
+explícita de priorizar ver o fluxo funcionando pela tela (Etapa 5) antes de
+fechar essa verificação por SQL. **Se aparecer saldo errado na tela
+(restantes/a_repor errados, pacote não fechando em `finished`, etc.), este é
+o PRIMEIRO lugar a olhar** — rode `verify_calcular_saldo_pacote.sql` para
+isolar se o bug está no algoritmo da função ou em outro lugar (RPC de
+geração, mapeamento TypeScript, tela).
+
+**9. Um aluno pode ter mais de uma linha ativa em `aluno_recorrencia`
+(2026-09-07, antes da Etapa 4).** Ex.: segunda 18h E quarta 19h — é a MESMA
+rotina semanal do aluno, não duas rotinas independentes. Não dava pra tratar
+cada linha como uma "trilha" independente com pacote próprio: o índice
+`ux_packages_one_active_purchase_per_student` (decisão 5) já impede
+fisicamente dois pacotes `active` não-trial simultâneos pro mesmo aluno —
+gerar um segundo pacote pra um segundo dia fecharia o primeiro
+automaticamente. `gerar_pacote_recorrencia` (0014) recebe um único
+`p_slots jsonb` cobrindo TODOS os dias/horários ativos do aluno já
+entrelaçados cronologicamente pelo cliente, e cria UM pacote só.
+`packages.recorrencia_id` fica com o `recorrencia_id` do primeiro slot do
+array — sem significado funcional além de "não nulo" (`calcular_saldo_pacote`
+só checa `is not null`, nunca lê o conteúdo, ver comentário em 0013); o
+vínculo que importa por aula é `bookings.recorrencia_id`, correto por linha.
+Geração dos slots (quais datas, conversão BRT→UTC) é feita client-side com
+`fromZonedTime`, reaproveitando o padrão já usado por
+`saveAvailabilityInterval`/`upsert_availability_slots` — resolve o ponto em
+aberto de fuso horário por reuso, sem reimplementar a conversão em PL/pgSQL.
+
+**10. `mark_no_show`/`complete_booking` reescritas (0015) — status simétrico,
+não incremental.** Quando `pacote_id is not null`, `used_classes`/`status` do
+pacote são SOBRESCRITOS a partir de `calcular_saldo_pacote()` a cada chamada
+— `status = 'finished' quando consumidas >= total, senão 'active'`. Isso é
+diferente do caminho AUTOSSERVICO (que só avança pra `finished`, nunca volta,
+porque ali `used_classes` é um contador incremental) — aqui faz mais sentido
+ser simétrico porque `calcular_saldo_pacote()` já é "a única autoridade"
+(decisão 4): cada chamada recalcula do zero a partir do estado real das
+cadeias, então o `status` documentar fielmente esse recálculo é mais
+consistente do que reproduzir a assimetria antiga por hábito. Ainda não há
+como `consumidas` cair depois de bater `total` dentro do escopo da Etapa 4
+(isso só existiria via reagendar/cancelar, Etapa 6) — decidido agora pra essa
+migration não precisar ser tocada de novo naquela etapa.
+
+**GAP CONHECIDO, aceito conscientemente:** `undo_lesson_action` (0001) NÃO
+foi reescrita nesta etapa — não estava no roteiro. Ela só resincroniza
+`used_classes` quando acha uma linha em `credit_transactions` pra reverter; o
+ramo de recorrência de `complete_booking`/`mark_no_show` nunca escreve em
+`credit_transactions` (não é a fonte de autoridade), então desfazer uma
+conclusão/falta de aula de recorrência volta o `status` do booking pra
+`scheduled` (isso já acontece, incondicional, antes dessa checagem) mas NÃO
+resincroniza `packages.used_classes` — fica desatualizado até a próxima
+`complete_booking`/`mark_no_show` em qualquer aula do mesmo pacote.
+`calcular_saldo_pacote()`/`saldo_pacotes` continuam corretos a qualquer
+momento (são a autoridade); só a cópia materializada em `used_classes` é que
+fica momentaneamente stale. Mesmo padrão do "crédito de trial parado"
+(decisão 7): registrado aqui, não é bug pra "consertar" sem decisão — decidir
+se `undo_lesson_action` precisa ser estendida antes da Etapa 6.
+
 ### Entidades
 
 **aluno_recorrencia** — template persistente, NÃO gera aulas sozinho
@@ -437,9 +497,9 @@ reagendamento quanto em reposição (decisão 2).
 | 3 | `0010_packages_recurrence_columns.sql` | `packages.recorrencia_id` (nullable, FK), `.falta_consome_credito` (nullable); `origin` CHECK ganha `'recurrence'` (decisão 5) | 2 |
 | 4 | `0011_bookings_recurrence_columns.sql` | `bookings.pacote_id` (nullable, FK `packages.id`, decisão 7), `.recorrencia_id`, `.cadeia_id`, `.cancelado_por` (`check in ('professor','aluno')`) — todas nullable; **backfill topológico** de `cadeia_id` via recursive CTE sobre `replacement_for_booking_id` (raiz = próprio id quando `replacement_for_booking_id is null`; sucessor herda o `cadeia_id` da raiz, resolvido seguindo a cadeia até o fim — nunca `cadeia_id = id` para todas as linhas) | 2 |
 | 5 | `0012_extract_create_package.sql` | Extrai `_create_package(...)` de `assign_package_from_template`/`assign_package_to_student` (decisão 6) — refatoração pura, testada antes/depois, sozinha | **2.5** |
-| 6 | `0013_calcular_saldo_pacote.sql` | `calcular_saldo_pacote(p_pacote_id)` + view de leitura (decisão 4), com testes — fecha a Etapa 3 sozinha | 3 |
-| 7 | `0014_gerar_pacote_recorrencia.sql` | RPC pública: valida a recorrência, chama `_create_package(..., 'recurrence', 'package')`, materializa N linhas em `bookings` (`cadeia_id` = próprio id, `pacote_id` = pacote recém-criado) | 4 |
-| 8 | `0015_mark_no_show_complete_booking_recorrencia.sql` | `create or replace` de `mark_no_show`/`complete_booking` (decisão 7): coalesce de `falta_consome_credito`; quando `pacote_id is not null`, usa esse pacote diretamente (não a busca "mais antigo ativo") e sobrescreve `used_classes` via `calcular_saldo_pacote()`; `pacote_id is null` → comportamento idêntico ao atual. Testada junto com a 0014, com pacote de recorrência gerado de verdade — por isso vem DEPOIS dela, não antes (rodar antes seria inofensivo mas ficaria sem cobertura real por uma etapa inteira) | 4 |
+| 6 | `0013_calcular_saldo_pacote.sql` | `calcular_saldo_pacote(p_pacote_id)` + view de leitura (decisão 4), com testes — fecha a Etapa 3 sozinha | 3 — **APLICADA, NÃO VERIFICADA empiricamente** (verificação adiada pra depois de ver o fluxo pela tela, ver decisão 8) |
+| 7 | `0014_gerar_pacote_recorrencia.sql` | RPC pública: valida a recorrência, chama `_create_package(..., 'recurrence', 'package')`, materializa N linhas em `bookings` (`cadeia_id` = próprio id, `pacote_id` = pacote recém-criado) | 4 — **APLICADA (2026-09-07)** |
+| 8 | `0015_mark_no_show_complete_booking_recorrencia.sql` | `create or replace` de `mark_no_show`/`complete_booking` (decisão 7): coalesce de `falta_consome_credito`; quando `pacote_id is not null`, usa esse pacote diretamente (não a busca "mais antigo ativo") e sobrescreve `used_classes` via `calcular_saldo_pacote()`; `pacote_id is null` → comportamento idêntico ao atual. Testada junto com a 0014, com pacote de recorrência gerado de verdade — por isso vem DEPOIS dela, não antes (rodar antes seria inofensivo mas ficaria sem cobertura real por uma etapa inteira) | 4 — **APLICADA (2026-09-07)**, verificação empírica pendente pela tela (Etapa 5), não por SQL |
 | 9 | `0016_reagendar_cancelar_aula.sql` | RPCs `reagendar_aula`/`cancelar_aula`, professor-only | 6 |
 | 10 | `0017_aviso_ausencia.sql` | `bookings.aviso_ausencia_em`/`.aviso_ausencia_motivo` (adiado pra cá — não adicionar coluna que nenhuma função usa ainda) + função pro aluno registrar | 8 |
 
@@ -449,10 +509,18 @@ Decidir antes de chegar na etapa correspondente:
 
 - **Feriados** — ao gerar o pacote, aula que cai em feriado: gerar e sinalizar
   para o professor resolver, ou pular? (recomendação: gerar e sinalizar; pular
-  automaticamente esconde a decisão do usuário)
-- **Fuso horário** — como as datas são persistidas hoje (`timestamptz`, UI
-  raciocina em BRT via `date-fns-tz`, ver `api.ts`). Confirmar que a geração
-  em lote da Etapa 4 usa o mesmo padrão (`fromZonedTime`/`TIMEZONE`) em vez de
-  reimplementar a conversão.
+  automaticamente esconde a decisão do usuário) **AINDA SEM DECISÃO.** A
+  implementação da Etapa 4/5 (2026-09-07) não trata feriados de forma
+  nenhuma — gera todas as ocorrências futuras do(s) dia(s) da semana sem
+  pular nem sinalizar nada. Não há tabela de feriados neste app hoje.
+- ~~**Fuso horário**~~ — RESOLVIDO (2026-09-07, decisão 9): a geração de
+  slots da Etapa 4/5 é feita client-side, reaproveitando exatamente o padrão
+  de `saveAvailabilityInterval`/`upsert_availability_slots`
+  (`fromZonedTime`/`TIMEZONE` de `api.ts`), sem reimplementar a conversão em
+  PL/pgSQL.
 - **Mudança de recorrência** — ao editar o template, aplica ao pacote em
-  andamento ou só ao próximo?
+  andamento ou só ao próximo? Ainda sem decisão — a Etapa 5 implementada em
+  2026-09-07 permite ativar/desativar linhas de `aluno_recorrencia` e criar
+  novas, mas não tem UI de "editar" uma linha existente; o próximo pacote
+  gerado sempre lê o conjunto ATUAL de linhas `ativo = true` no momento da
+  geração (nunca retroage sobre pacotes/aulas já materializados).
