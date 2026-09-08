@@ -1051,6 +1051,10 @@ export async function countAulasCancelaveisRecorrencia(studentId: string): Promi
     .eq("student_id", studentId)
     .not("pacote_id", "is", null)
     .eq("status", "scheduled")
+    // Espelha o WHERE da RPC (0019/0021): reposição/remarcação NÃO é cancelada pela regeneração,
+    // então não pode entrar na contagem — senão o diálogo avisa um número maior do que o que vai
+    // acontecer de verdade, que é pior do que não avisar.
+    .is("replacement_for_booking_id", null)
     .gt("start_time", nowIso);
   if (error) throw new Error(error.message);
   return count ?? 0;

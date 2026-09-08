@@ -576,7 +576,8 @@ reagendamento quanto em reposição (decisão 2).
 | 11 | `0018_gerar_pacote_recorrencia_cancela_anteriores.sql` | `create or replace` de `gerar_pacote_recorrencia`: cancela (`cancelado_por='professor'`) as aulas futuras `scheduled` do PRÓPRIO aluno ligadas a um pacote de recorrência anterior, antes de gerar as novas — evita duplicação ao regenerar (ver seção própria abaixo) | 4 — **APLICADA (2026-09-08)** |
 | 12 | `0019_cancelado_por_regeneracao.sql` | `cancelado_por` ganha o terceiro valor `'regeneracao'` (CHECK estendido); `gerar_pacote_recorrencia` passa a gravá-lo e a NÃO cancelar reposições (`replacement_for_booking_id is not null`); **backfill** das linhas já canceladas pela 0018 (`'professor'` → `'regeneracao'`) — único UPDATE de dados do arquivo (ver seção própria abaixo) | 4 |
 | 13 | `0020_reagendar_cancelar_aula.sql` | RPCs `reagendar_aula`/`cancelar_aula`, professor-only + **reordenação** de `complete_booking`/`mark_no_show` (ramo `pacote_id` antes do early-return de `is_replacement`) — ver seção própria abaixo | 6 |
-| 14 | `0021_aviso_ausencia.sql` | `bookings.aviso_ausencia_em`/`.aviso_ausencia_motivo` (adiado pra cá — não adicionar coluna que nenhuma função usa ainda) + função pro aluno registrar | 8 |
+| 14 | `0021_undo_recorrencia_e_overlap_do_proprio_aluno.sql` | `undo_lesson_action` ganha o ramo de recorrência com **reabertura condicionada** (assimetria deliberada com a 0017 — ver seção própria); `gerar_pacote_recorrencia` cancela a grade ANTES de checar sobreposição e passa a checar também contra o próprio aluno, com mensagens distintas | 6 |
+| 15 | `0022_aviso_ausencia.sql` | `bookings.aviso_ausencia_em`/`.aviso_ausencia_motivo` (adiado pra cá — não adicionar coluna que nenhuma função usa ainda) + função pro aluno registrar | 8 |
 
 ### Etapa 5 — tela (2026-09-07, sem migration nova)
 
@@ -1020,6 +1021,76 @@ AUTOSSERVICO) nada muda — o early-return continua exatamente onde estava.
 da view `booking_history_app`: a view é anterior às colunas da 0011 e não as
 expõe, então ler dali devolveria `cadeiaId` nulo. Da view aproveitamos só o
 `student_name`, que ela resolve server-side (RLS impede o join no cliente).
+
+### `undo_lesson_action` e a assimetria com a 0017 — NÃO UNIFORMIZAR (0021)
+
+`undo_lesson_action` era a última das quatro RPCs de ciclo de vida da aula
+ainda mexendo em `used_classes` só à moda antiga. Para uma aula de
+recorrência ela não achava nada no ledger (o ramo de recorrência de
+`complete_booking`/`mark_no_show` nunca escreve em `credit_transactions`) e
+retornava ali: o status do booking voltava, a cópia materializada não. A
+0021 dá a ela o mesmo ramo das outras três.
+
+**A regra de `status` é DIFERENTE da 0017/0020, de propósito. Quem ler as
+duas lado a lado vai achar que é inconsistência e vai querer uniformizar —
+não é, e não deve.**
+
+| | `complete_booking` / `mark_no_show` (0017/0020) | `undo_lesson_action` (0021) |
+|---|---|---|
+| Regra | `status` só é escrito quando já é `active` | reabre `finished` → `active` sob duas condições |
+| Por quê | a ação pode ser **incidental** sobre uma aula órfã de um pacote já substituído — concluir uma aula solta não pode ressuscitar o pacote antigo | a ação é **explícita** do professor sobre AQUELE pacote — desfazer a conclusão que fechou o pacote deve reabri-lo |
+
+A reabertura não é cega. Duas condições a barram:
+
+- `consumidas >= total` → não reabre: o pacote continua cheio.
+- existe OUTRO pacote `active` não-trial do mesmo aluno → não reabre: esse
+  pacote foi **substituído**, não esgotado. O predicado é literalmente o do
+  índice `ux_packages_one_active_purchase_per_student`; sem ele, um
+  `status = 'active'` cego daria erro de chave duplicada na cara do
+  professor, sem explicação nenhuma — erro, não corrupção, mas ainda assim
+  o caminho errado.
+
+Só quando as duas falham (fechou por exaustão e ninguém o substituiu) o
+pacote volta a `active`. O resync de `used_classes` acontece SEMPRE,
+independente do que o `status` faça — decisão 4 vale aqui como nas outras
+três.
+
+O caminho AUTOSSERVICO (`pacote_id is null`) segue byte-idêntico ao de 0001,
+com `status = 'active'` incondicional: ali o ledger é a autoridade e o
+estorno só existe se houve cobrança naquele pacote.
+
+### Camada 2 revisada: cancelar antes de checar (0021)
+
+A exclusão `b.student_id <> p_aluno_id` da Camada 2 (0016) existia por um
+motivo específico: `computeRecorrenciaSlots` não consulta bookings
+existentes, então a grade anterior do próprio aluno sempre colidiria consigo
+mesma e toda regeneração seria recusada. **Cancelar a grade PRIMEIRO torna a
+exclusão desnecessária** — depois do cancelamento, as únicas linhas futuras
+`scheduled` do próprio aluno que sobram são as que a regeneração
+deliberadamente não toca:
+
+- reposições/remarcações (`replacement_for_booking_id is not null`, 0019);
+- aulas do AUTOSSERVICO que o próprio aluno agendou (`pacote_id is null`).
+
+Ambas são conflito real se colidirem com a grade nova — e antes da 0021
+passavam batido, deixando o aluno com duas aulas no mesmo horário. Esse furo
+só se tornou alcançável quando a Etapa 6 passou a criar sucessores que
+herdam `pacote_id` e sobrevivem à regeneração.
+
+Ordem final dentro da RPC: valida → **cancela a grade** → checa contra outro
+aluno → checa contra o próprio aluno → cria pacote → insere. Tudo na mesma
+transação: se uma das checagens levantar, o cancelamento é desfeito junto —
+nunca fica "cancelado sem pacote novo".
+
+**Duas mensagens distintas, não uma genérica:** conflito com OUTRO aluno pede
+ajustar os dias fixos ou resolver na agenda; conflito com o PRÓPRIO aluno
+pede cancelar ou remarcar aquela aula. Dizer só "deu conflito" deixaria o
+professor sem saber qual caminho tomar.
+
+`countAulasCancelaveisRecorrencia` (`api.ts`) espelha o WHERE da RPC,
+incluindo a exclusão de reposição — o número do diálogo de confirmação tem
+que ser exatamente o que vai acontecer; avisar um número maior é pior do que
+não avisar.
 
 ### Pontos ainda em aberto
 
