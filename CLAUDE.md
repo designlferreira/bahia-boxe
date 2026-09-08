@@ -394,6 +394,29 @@ como `consumidas` cair depois de bater `total` dentro do escopo da Etapa 4
 (isso só existiria via reagendar/cancelar, Etapa 6) — decidido agora pra essa
 migration não precisar ser tocada de novo naquela etapa.
 
+**CORREÇÃO (2026-09-08, bug real encontrado em teste — 0017):** a
+simetria acima (`status` recalculado do zero a cada chamada) tinha uma
+consequência não prevista: se um pacote já `finished` (fechado por
+`_create_package` ao gerar um pacote novo pro mesmo aluno, decisão 5) ainda
+tiver algum booking com `pacote_id` apontando pra ele — uma aula órfã,
+ainda `scheduled` —, concluir ou marcar falta nessa aula recalculava
+`status` do zero e podia devolvê-lo a `active`. Não depende de nenhum outro
+bug (duplicação de bookings, etc.) — basta a aula órfã existir. É
+corrupção de estado disparando sozinha, não uma dívida aceitável.
+
+0017 corrige: `used_classes` continua sempre sobrescrito (decisão 4 não
+muda — "única autoridade", nunca deixar o número congelar mesmo num pacote
+fechado), mas `status` só é escrito quando o valor ATUAL da linha é
+`active`; se já não for, a linha mantém o que já tinha. `finished` com
+`used_classes < total_classes` não é um estado novo (`_create_package` já
+produzia isso pra `admin_grant`/`purchase` antes da RECORRENCIA existir) —
+o que era novo e errado era esse `finished` conseguir voltar sozinho.
+Reativar continua possível, só que exclusivamente via `undo_lesson_action`
+(ação explícita do professor), nunca como efeito colateral. Rejeitar a
+operação inteira (recusar concluir/marcar falta num pacote não-`active`)
+foi descartado: a aula aconteceu de verdade e precisa ficar registrável
+independente do ciclo de vida interno do pacote.
+
 **GAP CONHECIDO, aceito conscientemente:** `undo_lesson_action` (0001) NÃO
 foi reescrita nesta etapa — não estava no roteiro. Ela só resincroniza
 `used_classes` quando acha uma linha em `credit_transactions` pra reverter; o
@@ -501,8 +524,9 @@ reagendamento quanto em reposição (decisão 2).
 | 7 | `0014_gerar_pacote_recorrencia.sql` | RPC pública: valida a recorrência, chama `_create_package(..., 'recurrence', 'package')`, materializa N linhas em `bookings` (`cadeia_id` = próprio id, `pacote_id` = pacote recém-criado) | 4 — **APLICADA (2026-09-07)** |
 | 8 | `0015_mark_no_show_complete_booking_recorrencia.sql` | `create or replace` de `mark_no_show`/`complete_booking` (decisão 7): coalesce de `falta_consome_credito`; quando `pacote_id is not null`, usa esse pacote diretamente (não a busca "mais antigo ativo") e sobrescreve `used_classes` via `calcular_saldo_pacote()`; `pacote_id is null` → comportamento idêntico ao atual. Testada junto com a 0014, com pacote de recorrência gerado de verdade — por isso vem DEPOIS dela, não antes (rodar antes seria inofensivo mas ficaria sem cobertura real por uma etapa inteira) | 4 — **APLICADA (2026-09-07)**, verificação empírica pendente pela tela (Etapa 5), não por SQL |
 | 9 | `0016_gerar_pacote_recorrencia_overlap_check.sql` | `create or replace` de `gerar_pacote_recorrencia`: rejeita a geração inteira se algum slot se sobrepõe (intervalo real) a um booking `scheduled` do mesmo professor de OUTRO aluno — CAMADA 2 contra overbooking (ver seção própria abaixo) | 4 — **APLICADA (2026-09-08)** |
-| 10 | `0017_reagendar_cancelar_aula.sql` | RPCs `reagendar_aula`/`cancelar_aula`, professor-only | 6 |
-| 11 | `0018_aviso_ausencia.sql` | `bookings.aviso_ausencia_em`/`.aviso_ausencia_motivo` (adiado pra cá — não adicionar coluna que nenhuma função usa ainda) + função pro aluno registrar | 8 |
+| 10 | `0017_fix_finished_package_resurrection.sql` | `create or replace` de `mark_no_show`/`complete_booking`: `status` só é escrito quando o valor atual é `active` — corrige um pacote `finished` conseguir voltar a `active` como efeito colateral de concluir/marcar falta numa aula órfã ligada a ele por `pacote_id` (ver seção própria abaixo) | 4 — **APLICADA (2026-09-08)** |
+| 11 | `0018_reagendar_cancelar_aula.sql` | RPCs `reagendar_aula`/`cancelar_aula`, professor-only | 6 |
+| 12 | `0019_aviso_ausencia.sql` | `bookings.aviso_ausencia_em`/`.aviso_ausencia_motivo` (adiado pra cá — não adicionar coluna que nenhuma função usa ainda) + função pro aluno registrar | 8 |
 
 ### Etapa 5 — tela (2026-09-07, sem migration nova)
 
