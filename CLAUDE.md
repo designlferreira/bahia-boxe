@@ -575,7 +575,7 @@ reagendamento quanto em reposição (decisão 2).
 | 10 | `0017_fix_finished_package_resurrection.sql` | `create or replace` de `mark_no_show`/`complete_booking`: `status` só é escrito quando o valor atual é `active` — corrige um pacote `finished` conseguir voltar a `active` como efeito colateral de concluir/marcar falta numa aula órfã ligada a ele por `pacote_id` (ver seção própria abaixo) | 4 — **APLICADA (2026-09-08)** |
 | 11 | `0018_gerar_pacote_recorrencia_cancela_anteriores.sql` | `create or replace` de `gerar_pacote_recorrencia`: cancela (`cancelado_por='professor'`) as aulas futuras `scheduled` do PRÓPRIO aluno ligadas a um pacote de recorrência anterior, antes de gerar as novas — evita duplicação ao regenerar (ver seção própria abaixo) | 4 — **APLICADA (2026-09-08)** |
 | 12 | `0019_cancelado_por_regeneracao.sql` | `cancelado_por` ganha o terceiro valor `'regeneracao'` (CHECK estendido); `gerar_pacote_recorrencia` passa a gravá-lo e a NÃO cancelar reposições (`replacement_for_booking_id is not null`); **backfill** das linhas já canceladas pela 0018 (`'professor'` → `'regeneracao'`) — único UPDATE de dados do arquivo (ver seção própria abaixo) | 4 |
-| 13 | `0020_reagendar_cancelar_aula.sql` | RPCs `reagendar_aula`/`cancelar_aula`, professor-only | 6 |
+| 13 | `0020_reagendar_cancelar_aula.sql` | RPCs `reagendar_aula`/`cancelar_aula`, professor-only + **reordenação** de `complete_booking`/`mark_no_show` (ramo `pacote_id` antes do early-return de `is_replacement`) — ver seção própria abaixo | 6 |
 | 14 | `0021_aviso_ausencia.sql` | `bookings.aviso_ausencia_em`/`.aviso_ausencia_motivo` (adiado pra cá — não adicionar coluna que nenhuma função usa ainda) + função pro aluno registrar | 8 |
 
 ### Etapa 5 — tela (2026-09-07, sem migration nova)
@@ -972,6 +972,54 @@ Observação registrada, não corrigida (fora do escopo pedido): a lista
 "ÚLTIMAS AULAS" continua sendo as 6 linhas mais recentes por `start_time`
 desc, o que com recorrência significa aulas FUTURAS, não "últimas". O número
 agora está certo; o rótulo da lista é que segue impreciso.
+
+### Etapa 6 — reagendar e cancelar (2026-09-08, 0020)
+
+**`reagendar_aula(p_booking_id, p_novo_inicio, p_novo_fim) returns uuid`** —
+marca a original como `rescheduled` e cria uma linha NOVA com
+`replacement_for_booking_id` = original e `cadeia_id` HERDADO. Nunca edita a
+original. Valida no serviço: admin, dono da aula, aula `scheduled`, fim
+depois do início, início no futuro, e sobreposição real de intervalo com a
+agenda do professor (excluindo a própria linha — senão mover 18:00-19:00 pra
+18:30-19:30 colidiria consigo mesma). Aqui NÃO há exclusão por aluno: dois
+alunos no mesmo horário e o mesmo aluno duas vezes são igualmente conflito.
+A duração é preservada da aula original (a tela só escolhe dia e hora de
+início) — remarcar move a aula, não a encurta.
+
+`cadeia_id` nulo é tratado: `schedule_booking` (AUTOSSERVICO) não preenche a
+coluna, então aulas criadas DEPOIS do backfill da 0011 têm `cadeia_id` nulo.
+Nesse caso a própria original vira raiz (`coalesce(cadeia_id, id)`), senão a
+contagem de remarcações agruparia por NULL.
+
+**`cancelar_aula(p_booking_id, p_cancelado_por)`** — exige o motivo porque o
+motivo muda o crédito. A RPC aceita só `'professor'`/`'aluno'` e **rejeita
+`'regeneracao'`**: aquele é valor interno, escrito só por
+`gerar_pacote_recorrencia`. Na tela a escolha É a ação (um Sheet com as duas
+opções e a consequência de crédito de cada uma escrita), não um
+`ConfirmDialog` de um botão só.
+
+Ambas ressincronizam `used_classes`/`status` via `calcular_saldo_pacote()`
+quando `pacote_id is not null`, com a mesma regra da 0017 (status só é
+escrito quando o valor atual é `active`) — decisão 4: todo RPC que muda
+status de booking ressincroniza a cópia materializada.
+
+**Reordenação em `complete_booking`/`mark_no_show` (necessária, não
+cosmética).** Até a 0017, `if v_is_replacement then return; end if;` vinha
+ANTES do ramo `pacote_id is not null`. Consequência: uma aula de recorrência
+marcada como reposição saía pela porta do AUTOSSERVICO e **nunca**
+ressincronizava `used_classes`. Isso já era alcançável antes da Etapa 6 (o
+professor pode marcar uma aula de recorrência como reposição pelo
+`ReplacementPickerSheet`), e a Etapa 6 tornaria sistemático — todo sucessor
+de reagendamento nasce com `is_replacement = true` (decisão 2). Agora o ramo
+de recorrência vem primeiro: pra quem tem `pacote_id`, quem decide crédito é
+a cadeia e `is_replacement` é irrelevante. Pra `pacote_id is null` (todo o
+AUTOSSERVICO) nada muda — o early-return continua exatamente onde estava.
+
+**Contagem de remarcações na tela.** `getAdminBookingDetail` devolve
+`remarcacoes` = linhas da cadeia − 1. O booking passou a vir da TABELA e não
+da view `booking_history_app`: a view é anterior às colunas da 0011 e não as
+expõe, então ler dali devolveria `cadeiaId` nulo. Da view aproveitamos só o
+`student_name`, que ela resolve server-side (RLS impede o join no cliente).
 
 ### Pontos ainda em aberto
 

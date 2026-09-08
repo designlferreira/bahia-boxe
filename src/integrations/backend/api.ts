@@ -500,14 +500,60 @@ export async function getBookingDetail(bookingId: string): Promise<{ booking: Bo
 }
 
 /** Mesma view, do lado do professor: já traz o nome do aluno resolvido. */
-export async function getAdminBookingDetail(bookingId: string): Promise<{ booking: Booking; studentName: string } | undefined> {
-  const viewRes = await client().from("booking_history_app").select("*").eq("id", bookingId).maybeSingle();
-  if (!viewRes.error && viewRes.data) {
-    return { booking: mapBooking(viewRes.data), studentName: viewRes.data.student_name ?? "Aluno" };
+/**
+ * O booking vem sempre da TABELA, não da view: `booking_history_app` é anterior às colunas de
+ * RECORRENCIA (0011) e não as expõe, então ler dali devolveria `cadeiaId`/`pacoteId` nulos. Da view
+ * aproveitamos só o `student_name`, que ela resolve server-side (RLS impede o join no cliente).
+ *
+ * `remarcacoes` = "quantas vezes esta aula já foi remarcada" = linhas da cadeia menos 1
+ * (CLAUDE.md). Uma aula nunca remarcada tem 1 linha na cadeia e devolve 0.
+ */
+export async function getAdminBookingDetail(
+  bookingId: string,
+): Promise<{ booking: Booking; studentName: string; remarcacoes: number } | undefined> {
+  const [viewRes, rowRes] = await Promise.all([
+    client().from("booking_history_app").select("*").eq("id", bookingId).maybeSingle(),
+    client().from("bookings").select("*").eq("id", bookingId).maybeSingle(),
+  ]);
+  if (rowRes.error) throw new Error(rowRes.error.message);
+  if (!rowRes.data) return undefined;
+
+  const studentName = (!viewRes.error && viewRes.data?.student_name) || "Aluno";
+  const cadeiaId = rowRes.data.cadeia_id as string | null;
+  let remarcacoes = 0;
+  if (cadeiaId) {
+    const { count, error } = await client()
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("cadeia_id", cadeiaId);
+    if (error) throw new Error(error.message);
+    remarcacoes = Math.max((count ?? 1) - 1, 0);
   }
-  const { data, error } = await client().from("bookings").select("*").eq("id", bookingId).maybeSingle();
+  return { booking: mapBooking(rowRes.data), studentName, remarcacoes };
+}
+
+/** Etapa 6 — remarcar não edita a aula: marca a original como `rescheduled` e cria a sucessora. */
+export async function reagendarAula(bookingId: string, novoInicio: string, novoFim: string): Promise<string> {
+  const { data, error } = await client().rpc("reagendar_aula", {
+    p_booking_id: bookingId,
+    p_novo_inicio: novoInicio,
+    p_novo_fim: novoFim,
+  });
   if (error) throw new Error(error.message);
-  return data ? { booking: mapBooking(data), studentName: "Aluno" } : undefined;
+  return data as string;
+}
+
+/**
+ * Etapa 6 — cancelar exige o motivo, porque ele muda o crédito: por aluno consome (se o pacote
+ * cobra falta), por professor nunca consome. `'regeneracao'` não é opção — é valor interno da
+ * regeneração de pacote, e a própria RPC rejeita.
+ */
+export async function cancelarAula(bookingId: string, canceladoPor: "professor" | "aluno") {
+  const { error } = await client().rpc("cancelar_aula", {
+    p_booking_id: bookingId,
+    p_cancelado_por: canceladoPor,
+  });
+  if (error) throw new Error(error.message);
 }
 
 // ---------------------------------------------------------------------------

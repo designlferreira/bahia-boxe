@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Repeat } from "lucide-react";
+import { History, Repeat } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { ErrorState } from "@/components/ErrorState";
@@ -24,6 +24,7 @@ export default function AdminAulaDetalhe() {
   });
   const booking = detail?.booking;
   const studentName = detail?.studentName ?? "Aluno";
+  const remarcacoes = detail?.remarcacoes ?? 0;
 
   const actions = useLessonActions(() => {
     queryClient.invalidateQueries({ queryKey: ["admin-booking", id] });
@@ -65,6 +66,11 @@ export default function AdminAulaDetalhe() {
           {booking.isReplacement && (
             <Badge className="bg-secondary text-muted-foreground flex items-center gap-1">
               <Repeat className="h-3 w-3" /> Reposição
+            </Badge>
+          )}
+          {remarcacoes > 0 && (
+            <Badge className="bg-secondary text-muted-foreground flex items-center gap-1">
+              <History className="h-3 w-3" /> Remarcada {remarcacoes}x
             </Badge>
           )}
         </div>
@@ -118,6 +124,26 @@ export default function AdminAulaDetalhe() {
               </Button>
             </div>
           )}
+          <div className="flex gap-2.5">
+            <Button
+              variant="secondary"
+              size="lg"
+              className="flex-1"
+              disabled={actions.isBusy(booking.id)}
+              onClick={() => actions.openReagendar(booking, studentName)}
+            >
+              Remarcar
+            </Button>
+            <Button
+              variant="secondary"
+              size="lg"
+              className="flex-1 !border-destructive/35 !text-destructive"
+              disabled={actions.isBusy(booking.id)}
+              onClick={() => actions.openCancelar(booking, studentName)}
+            >
+              Cancelar aula
+            </Button>
+          </div>
           {!booking.isReplacement && (
             <Button variant="secondary" size="lg" onClick={() => actions.openReplacement(booking, studentName)}>
               Marcar como reposição

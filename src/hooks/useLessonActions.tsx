@@ -4,11 +4,15 @@ import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ReplacementPickerSheet } from "@/components/ReplacementPickerSheet";
+import { RescheduleSheet } from "@/components/RescheduleSheet";
+import { CancelLessonSheet } from "@/components/CancelLessonSheet";
 import {
+  cancelarAula,
   completeBooking,
   getAdminSettings,
   markAsReplacement,
   markNoShow,
+  reagendarAula,
   undoLessonAction,
 } from "@/integrations/backend/api";
 import type { Booking } from "@/integrations/backend/types";
@@ -35,6 +39,8 @@ export function useLessonActions(onChanged: () => void) {
   const [confirmComplete, setConfirmComplete] = useState<Target | null>(null);
   const [confirmNoShow, setConfirmNoShow] = useState<Target | null>(null);
   const [replacementTarget, setReplacementTarget] = useState<Target | null>(null);
+  const [reagendarTarget, setReagendarTarget] = useState<Target | null>(null);
+  const [cancelarTarget, setCancelarTarget] = useState<Target | null>(null);
 
   const { data: settings } = useQuery({
     queryKey: ["admin-settings", profile?.id],
@@ -92,6 +98,32 @@ export function useLessonActions(onChanged: () => void) {
     onError: (err) => toast.error(errorMessage(err, "Não foi possível marcar como reposição.")),
   });
 
+  const reagendar = useMutation({
+    mutationFn: ({ bookingId, inicio, fim }: { bookingId: string; inicio: string; fim: string }) =>
+      reagendarAula(bookingId, inicio, fim),
+    onSuccess: () => {
+      after();
+      setReagendarTarget(null);
+      toast.success("Aula remarcada — a original fica registrada como remarcada.");
+    },
+    onError: (err) => toast.error(errorMessage(err, "Não foi possível remarcar a aula.")),
+  });
+
+  const cancelar = useMutation({
+    mutationFn: ({ bookingId, canceladoPor }: { bookingId: string; canceladoPor: "professor" | "aluno" }) =>
+      cancelarAula(bookingId, canceladoPor),
+    onSuccess: (_r, vars) => {
+      after();
+      setCancelarTarget(null);
+      toast.warning(
+        vars.canceladoPor === "professor"
+          ? "Aula cancelada — crédito do aluno preservado."
+          : "Aula cancelada pelo aluno.",
+      );
+    },
+    onError: (err) => toast.error(errorMessage(err, "Não foi possível cancelar a aula.")),
+  });
+
   function isBusy(bookingId: string) {
     return (
       (complete.isPending && complete.variables === bookingId) ||
@@ -139,6 +171,29 @@ export function useLessonActions(onChanged: () => void) {
           }
         />
       )}
+
+      {reagendarTarget && (
+        <RescheduleSheet
+          open={!!reagendarTarget}
+          onOpenChange={(o) => !o && setReagendarTarget(null)}
+          booking={reagendarTarget.booking}
+          studentName={reagendarTarget.studentName}
+          pending={reagendar.isPending}
+          onConfirm={(inicio, fim) => reagendar.mutate({ bookingId: reagendarTarget.booking.id, inicio, fim })}
+        />
+      )}
+
+      {cancelarTarget && (
+        <CancelLessonSheet
+          open={!!cancelarTarget}
+          onOpenChange={(o) => !o && setCancelarTarget(null)}
+          booking={cancelarTarget.booking}
+          studentName={cancelarTarget.studentName}
+          noShowConsumesClass={noShowConsumesClass}
+          pending={cancelar.isPending}
+          onConfirm={(canceladoPor) => cancelar.mutate({ bookingId: cancelarTarget.booking.id, canceladoPor })}
+        />
+      )}
     </>
   );
 
@@ -147,6 +202,8 @@ export function useLessonActions(onChanged: () => void) {
     openComplete: (booking: Booking, studentName: string) => setConfirmComplete({ booking, studentName }),
     openNoShow: (booking: Booking, studentName: string) => setConfirmNoShow({ booking, studentName }),
     openReplacement: (booking: Booking, studentName: string) => setReplacementTarget({ booking, studentName }),
+    openReagendar: (booking: Booking, studentName: string) => setReagendarTarget({ booking, studentName }),
+    openCancelar: (booking: Booking, studentName: string) => setCancelarTarget({ booking, studentName }),
     undo: (bookingId: string) => undo.mutate(bookingId),
     undoPending: undo.isPending,
     dialogs,
