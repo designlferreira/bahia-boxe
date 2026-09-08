@@ -604,6 +604,27 @@ view em si, então o ponto 2 acima continua em aberto:**
 `pending_confirmation`) e o caso de alguém escrever em `aluno_recorrencia`
 fora da tela (contornando a CAMADA 1 via chamada direta à API).
 
+### Unificação do card de pacote (2026-09-08)
+
+Confirmado: não existem "dois tipos de pacote" no modelo — um pacote de
+recorrência é uma linha comum de `packages`, `origin = 'recurrence'`, sujeita
+ao mesmo índice de "um ativo não-trial por vez" que `purchase`/`admin_grant`
+(decisão 5). `activePackageForStudentRow` (`api.ts`) já buscava o pacote
+ativo sem filtrar por `origin` — o único lugar que tratava recorrência como
+entidade paralela era a TELA: `AlunoRecorrencia.tsx` desenhava um segundo
+card de saldo ao lado do card "Pacote ativo" que já existe em
+`AlunoDetalhe.tsx`, dando a impressão de dois pacotes onde só existe um.
+
+Corrigido extraindo `src/components/ActivePackageCard.tsx` — um componente
+só, recebendo `pkg`/`credits`/`saldo?` como props, sem buscar dado sozinho.
+`AlunoDetalhe.tsx` e `AlunoRecorrencia.tsx` renderizam a MESMA instância
+(nenhuma versão própria em nenhuma das duas). O badge de origem
+("Experimental"/"Compra"/"Concedido"/"Recorrência") e a linha "N aguardando
+reposição" ficam dentro do componente, condicionais a `saldo` existir — não
+a qual tela está renderizando. `saldo` (`saldo_pacotes`) só é buscado por
+quem chama, quando `pkg.origin === 'recurrence' && pkg.status === 'active'`
+— o card em si não decide isso.
+
 ### Pontos ainda em aberto
 
 Decidir antes de chegar na etapa correspondente:

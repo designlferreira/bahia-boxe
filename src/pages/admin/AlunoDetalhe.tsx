@@ -8,16 +8,18 @@ import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard, SkeletonList } from "@/components/SkeletonCard";
 import { ErrorState } from "@/components/ErrorState";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { Sheet, SheetClose, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getStatusConfig } from "@/lib/bookingStatus";
 import { formatDateTime } from "@/lib/dateUtils";
-import { formatPriceLabel, packageProgressPct } from "@/lib/packageUtils";
+import { formatPriceLabel } from "@/lib/packageUtils";
 import {
   assignPackageFromTemplate,
   getAdminStudentDetail,
   getPackageTemplates,
+  getSaldoPacote,
   removeActivePackage,
 } from "@/integrations/backend/api";
 
@@ -39,6 +41,14 @@ export default function AdminAlunoDetalhe() {
     queryKey: ["package-templates-admin", profile?.id],
     queryFn: () => getPackageTemplates(profile!.id),
     enabled: assignOpen && !!profile,
+  });
+
+  const pkg = data?.package ?? null;
+  const isRecorrenciaPkg = !!pkg && pkg.origin === "recurrence" && pkg.status === "active";
+  const { data: saldo } = useQuery({
+    queryKey: ["saldo-pacote", pkg?.id],
+    queryFn: () => getSaldoPacote(pkg!.id),
+    enabled: isRecorrenciaPkg,
   });
 
   function invalidate() {
@@ -86,7 +96,7 @@ export default function AdminAlunoDetalhe() {
     );
   }
 
-  const { student, package: pkg, credits, history } = data;
+  const { student, credits, history } = data;
   const faltas = history.filter((h) => h.status === "no_show").length;
   const completed = history.filter((h) => h.status === "completed").length;
   const freq = history.length > 0 ? Math.round((completed / history.length) * 100) : 0;
@@ -95,27 +105,8 @@ export default function AdminAlunoDetalhe() {
     <div className="page-container">
       <PageHeader title={student.name.toUpperCase()} subtitle="Aluno" back />
 
-      <div className="rounded-[20px] p-[18px] bg-[linear-gradient(150deg,#1F1B0C,#171717_60%)] border border-[#35301A] mb-3.5">
-        <div className="text-[11.5px] uppercase tracking-wide text-accent/70 font-semibold">Pacote ativo</div>
-        <div className="flex items-end gap-2 my-1 mb-3">
-          <span className="font-display text-[56px] leading-[0.85] text-accent">{credits}</span>
-          <span className="text-[13px] text-muted-foreground pb-2">créditos disponíveis</span>
-        </div>
-        {pkg ? (
-          <>
-            <div className="h-2 rounded-full bg-secondary overflow-hidden mb-2">
-              <div
-                className="h-full rounded-full bg-gradient-gold origin-left animate-bb-bar"
-                style={{ width: `${packageProgressPct(pkg.totalClasses, pkg.usedClasses)}%` }}
-              />
-            </div>
-            <div className="text-[12.5px] text-muted-foreground">
-              {pkg.usedClasses} de {pkg.totalClasses} usadas
-            </div>
-          </>
-        ) : (
-          <div className="text-[12.5px] text-muted-foreground">Sem pacote ativo</div>
-        )}
+      <div className="mb-3.5">
+        <ActivePackageCard pkg={pkg} credits={credits} saldo={saldo} />
       </div>
 
       <div className="flex gap-2.5 mb-4">

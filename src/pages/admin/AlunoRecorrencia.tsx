@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard, SkeletonList } from "@/components/SkeletonCard";
 import { ErrorState } from "@/components/ErrorState";
+import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -120,7 +121,7 @@ export default function AdminAlunoRecorrencia() {
     );
   }
 
-  const { student } = detailQuery.data;
+  const { student, credits } = detailQuery.data;
   const recorrencias = recorrenciasQuery.data ?? [];
   const activasCount = recorrencias.filter((r) => r.ativo).length;
   const saldo = saldoQuery.data ?? null;
@@ -129,27 +130,9 @@ export default function AdminAlunoRecorrencia() {
     <div className="page-container">
       <PageHeader title="RECORRÊNCIA" subtitle={student.name} back />
 
-      {isRecorrenciaPkg && saldo && (
-        <div className="rounded-[20px] p-[18px] bg-[linear-gradient(150deg,#1F1B0C,#171717_60%)] border border-[#35301A] mb-4">
-          <div className="text-[11.5px] uppercase tracking-wide text-accent/70 font-semibold mb-2">
-            Pacote de recorrência ativo
-          </div>
-          <div className="flex items-end gap-2 mb-3">
-            <span className="font-display text-[56px] leading-[0.85] text-accent">{saldo.restantes}</span>
-            <span className="text-[13px] text-muted-foreground pb-2">de {saldo.total} restantes</span>
-          </div>
-          <div className="h-2 rounded-full bg-secondary overflow-hidden mb-2">
-            <div
-              className="h-full rounded-full bg-gradient-gold origin-left animate-bb-bar"
-              style={{ width: `${saldo.total > 0 ? (saldo.consumidas / saldo.total) * 100 : 0}%` }}
-            />
-          </div>
-          <div className="text-[12.5px] text-muted-foreground">
-            {saldo.consumidas} usadas
-            {saldo.aRepor > 0 && <span className="text-amber"> · {saldo.aRepor} aguardando reposição</span>}
-          </div>
-        </div>
-      )}
+      <div className="mb-4">
+        <ActivePackageCard pkg={pkg} credits={credits} saldo={saldo} />
+      </div>
 
       <div className="flex items-center justify-between mb-2.5">
         <div className="font-display text-lg tracking-wide text-foreground">DIAS FIXOS</div>
