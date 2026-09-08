@@ -108,8 +108,12 @@ export interface Booking {
    * backfill (migration 0011), mas a coluna continua nullable no banco.
    */
   cadeiaId?: string | null;
-  /** Só preenchido quando `status === "cancelled"` (CLAUDE.md, decisão registrada em 2026-09-03). */
-  canceladoPor?: "professor" | "aluno" | null;
+  /**
+   * Só preenchido quando `status === "cancelled"` (CLAUDE.md, decisão registrada em 2026-09-03).
+   * `"regeneracao"` (0019) é a aula descartada por uma regeneração de pacote — diferente de
+   * `"professor"` (cancelamento real, reponível) porque nunca chegou a ser um compromisso.
+   */
+  canceladoPor?: "professor" | "aluno" | "regeneracao" | null;
 }
 
 /**

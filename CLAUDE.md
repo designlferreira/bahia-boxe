@@ -1,3 +1,37 @@
+## ⚠️ ANTES DE QUALQUER COISA: confirme em que repositório você está
+
+**Este repositório é `/home/claude/bahia-boxe`** (`origin =
+github.com/designlferreira/bahia-boxe`, branch `main`).
+
+Existe um SEGUNDO checkout no mesmo container, **`/home/claude/repo`**, que
+NÃO tem relação nenhuma com este trabalho: é um scaffold de handoff do Claude
+Design (commit único `a6a9651`, sem remote, backend mock em `localStorage`,
+seed com "Marina Souza", migrations `0001_init.sql`/`0002_views_and_rpcs.sql`).
+Ele se parece o suficiente com este projeto para enganar — mesmo nome de
+domínio, mesmos nomes de arquivo (`src/integrations/backend/api.ts`,
+`src/pages/admin/Agenda.tsx`), mesmas telas — mas o schema é outro, não tem
+`cancelado_por`, não tem recorrência e não tem banco real.
+
+**O shell reseta o cwd para `/home/claude/repo` a cada comando.** Isso já
+causou uma sessão inteira de análise sobre o repositório errado (2026-09-08).
+Portanto:
+
+1. **PRIMEIRO PASSO de toda sessão nova, antes de afirmar qualquer coisa
+   sobre o código:** rodar
+   `cd /home/claude/bahia-boxe && git remote -v && git log --oneline -3 && ls supabase/migrations/`
+   e confirmar que o remote é `designlferreira/bahia-boxe` e que as migrations
+   vão até pelo menos `0018_*`. Se o remote vier vazio e só houver
+   `0001_init.sql`, você está no checkout errado.
+2. **Todo comando usa caminho absoluto** começando em `/home/claude/bahia-boxe`
+   — nunca caminho relativo, nunca confiar no cwd herdado. Um `cd` dentro de
+   um comando não persiste para o próximo.
+3. O banco é um **Supabase real** com as migrations aplicadas, não um mock.
+   Ler o corpo de função aplicado via `pg_get_functiondef` quando a pergunta
+   for sobre o que está no banco — o arquivo da migration é a intenção, o
+   banco é o fato.
+
+---
+
 ## Domínio: agendamento
 
 Existem DOIS fluxos de agendamento coexistindo, selecionados pela flag
@@ -343,6 +377,20 @@ View `saldo_pacotes` repete a checagem de posse (aluno dono ou professor
 dono) por dentro, em vez de confiar só no RLS que `packages` já tenha (ou
 não) configurado fora deste repositório — nunca verificado neste projeto.
 
+**A regra de crédito é uma WHITELIST, e portanto FAIL-OPEN (nota de
+2026-09-08).** O único caso de `cancelled` que cobra crédito é
+`cancelado_por = 'aluno'`; todo o resto cai no `else 0`. Consequência: um
+valor errado em `cancelado_por` — `'Aluno'`, `'regeneração'` com acento,
+qualquer typo — significa silenciosamente "não consome". Erra a favor do
+aluno, então não é urgente, mas também não é detectável por leitura de
+saldo (o número parece plausível). **A rede que pega isso é o CHECK
+constraint da coluna**, estendido na 0019 para exatamente
+`in ('professor', 'aluno', 'regeneracao')` e mais nada (NULL continua
+passando, porque nullable = "não cancelada"): uma escrita com typo é
+REJEITADA na hora, nunca chega a virar um "não consome" silencioso. Se
+algum dia a lista de valores crescer, o CHECK é o lugar que precisa crescer
+junto — não a whitelist da 0013.
+
 **Verificação: os 8 casos do CLAUDE.md, por script rodável — não por
 leitura**, diferente da decisão 6. `supabase/verify_calcular_saldo_pacote.sql`
 existe no repo; a lógica de cadeia é nova (não é extração de código
@@ -526,8 +574,9 @@ reagendamento quanto em reposição (decisão 2).
 | 9 | `0016_gerar_pacote_recorrencia_overlap_check.sql` | `create or replace` de `gerar_pacote_recorrencia`: rejeita a geração inteira se algum slot se sobrepõe (intervalo real) a um booking `scheduled` do mesmo professor de OUTRO aluno — CAMADA 2 contra overbooking (ver seção própria abaixo) | 4 — **APLICADA (2026-09-08)** |
 | 10 | `0017_fix_finished_package_resurrection.sql` | `create or replace` de `mark_no_show`/`complete_booking`: `status` só é escrito quando o valor atual é `active` — corrige um pacote `finished` conseguir voltar a `active` como efeito colateral de concluir/marcar falta numa aula órfã ligada a ele por `pacote_id` (ver seção própria abaixo) | 4 — **APLICADA (2026-09-08)** |
 | 11 | `0018_gerar_pacote_recorrencia_cancela_anteriores.sql` | `create or replace` de `gerar_pacote_recorrencia`: cancela (`cancelado_por='professor'`) as aulas futuras `scheduled` do PRÓPRIO aluno ligadas a um pacote de recorrência anterior, antes de gerar as novas — evita duplicação ao regenerar (ver seção própria abaixo) | 4 — **APLICADA (2026-09-08)** |
-| 12 | `0019_reagendar_cancelar_aula.sql` | RPCs `reagendar_aula`/`cancelar_aula`, professor-only | 6 |
-| 13 | `0020_aviso_ausencia.sql` | `bookings.aviso_ausencia_em`/`.aviso_ausencia_motivo` (adiado pra cá — não adicionar coluna que nenhuma função usa ainda) + função pro aluno registrar | 8 |
+| 12 | `0019_cancelado_por_regeneracao.sql` | `cancelado_por` ganha o terceiro valor `'regeneracao'` (CHECK estendido); `gerar_pacote_recorrencia` passa a gravá-lo e a NÃO cancelar reposições (`replacement_for_booking_id is not null`); **backfill** das linhas já canceladas pela 0018 (`'professor'` → `'regeneracao'`) — único UPDATE de dados do arquivo (ver seção própria abaixo) | 4 |
+| 13 | `0020_reagendar_cancelar_aula.sql` | RPCs `reagendar_aula`/`cancelar_aula`, professor-only | 6 |
+| 14 | `0021_aviso_ausencia.sql` | `bookings.aviso_ausencia_em`/`.aviso_ausencia_motivo` (adiado pra cá — não adicionar coluna que nenhuma função usa ainda) + função pro aluno registrar | 8 |
 
 ### Etapa 5 — tela (2026-09-07, sem migration nova)
 
@@ -833,6 +882,49 @@ dívida já registrada pro `undo_lesson_action` (decisão 10):
 `calcular_saldo_pacote()`/`saldo_pacotes` continuam corretos a qualquer
 momento; só a cópia materializada de um pacote já fechado (que não é mais
 "o pacote ativo" de ninguém) pode ficar momentaneamente desatualizada.
+
+### `cancelado_por = 'regeneracao'`, o terceiro valor (2026-09-08, 0019)
+
+A 0018 marcava as aulas descartadas como `cancelado_por = 'professor'`,
+colapsando dois fatos que são diferentes e cuja diferença é observável:
+
+- **cancelamento real pelo professor** — o aluno perdeu uma aula que ia
+  acontecer. É reponível legitimamente.
+- **descarte por regeneração** — a aula foi substituída por outra na grade
+  nova. Nunca chegou a ser um compromisso; não há o que repor.
+
+Sintoma concreto: `getReplaceableBookingsForStudent` filtra por status
+(`no_show`/`cancelled`), então as aulas descartadas apareciam como
+candidatas a reposição. **O filtro certo é por MOTIVO, não por status** —
+filtrar `cancelled` inteiro tiraria junto o cancelamento real do professor,
+que deve continuar reponível. Daí o terceiro valor.
+
+Crédito não muda: a regra da 0013 só cobra em
+`cancelled + cancelado_por = 'aluno'`, então `'regeneracao'` já entra como
+"nunca consome" por construção, sem tocar em `calcular_saldo_pacote`.
+
+**Reposição órfã — decisão tomada ANTES de ser alcançável.** A mesma 0019
+faz a regeneração pular linhas com `replacement_for_booking_id is not null`.
+Hoje isso é inócuo (nenhuma reposição tem `pacote_id`, então nenhuma entra
+no `update` de qualquer jeito), mas a Etapa 6 vai criar sucessores DENTRO do
+pacote e aí uma reposição já combinada com o aluno passaria a ser varrida
+por uma regeneração. **Decidido agora, uma linha, antes do buraco abrir:**
+reposição é compromisso individualizado, não parte da grade que está sendo
+substituída — se precisa sair, o professor cancela explicitamente. Registrado
+aqui para que a Etapa 6 não precise redescobrir isso.
+
+**Backfill (o único UPDATE de dados da 0019).** As linhas que a 0018 já
+tinha cancelado ficaram marcadas `'professor'`; sem reclassificá-las, elas
+continuariam aparecendo como candidatas a reposição (o filtro novo mira
+`'regeneracao'`). A reclassificação é precisa, não um chute: verificado por
+grep no repositório inteiro que **nenhum outro caminho jamais escreveu
+`cancelado_por`** — `cancelBooking` (aluno), `rejectBooking`,
+`mark_as_replacement`, `complete_booking`/`mark_no_show` e a UI admin não
+tocam a coluna. Toda linha com `'professor'` hoje veio da regeneração, então
+o backfill não pode "roubar" um cancelamento manual do professor: esse
+caminho ainda não existe. **Quando a Etapa 6 criar cancelamento manual
+gravando `'professor'`, este backfill deixa de ser seguro e não pode ser
+rodado de novo.**
 
 ### Pontos ainda em aberto
 

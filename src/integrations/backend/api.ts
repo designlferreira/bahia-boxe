@@ -49,6 +49,17 @@ function client() {
 /** Statuses that hold a place on the professor's calendar. */
 const ACTIVE_STATUSES: BookingStatus[] = ["scheduled", "pending_confirmation"];
 
+/**
+ * Filtro `.or(...)` para esconder as aulas descartadas por uma regeneração de pacote
+ * (`cancelado_por = 'regeneracao'`, migration 0019) — elas nunca chegaram a ser um compromisso com
+ * o aluno, então não devem aparecer em lista, contador nem candidata a reposição.
+ *
+ * É `.or(is.null, neq)` e não `.neq(...)` sozinho de propósito: em SQL, `cancelado_por <>
+ * 'regeneracao'` é NULL (não `true`) para as linhas com `cancelado_por` nulo — que é a esmagadora
+ * maioria (todo o AUTOSSERVICO). Um `.neq` puro descartaria justamente essas.
+ */
+const SEM_DESCARTE_DE_REGENERACAO = "cancelado_por.is.null,cancelado_por.neq.regeneracao";
+
 // ---------------------------------------------------------------------------
 // row → app-type mappers
 // ---------------------------------------------------------------------------
@@ -727,13 +738,22 @@ export async function markAsReplacement(bookingId: string, replacesBookingId: st
   if (error) throw new Error(error.message);
 }
 
-/** Aulas do aluno que podem ser "a aula original" de uma reposição — canceladas ou faltas, mais recentes primeiro. */
+/**
+ * Aulas do aluno que podem ser "a aula original" de uma reposição — canceladas ou faltas, mais
+ * recentes primeiro.
+ *
+ * O filtro é por MOTIVO, não por status: cancelamento real pelo professor É reponível
+ * legitimamente (o aluno perdeu uma aula que ia acontecer). O que não pode entrar é a aula
+ * descartada por uma regeneração de pacote — ela foi substituída por outra na grade nova, nunca
+ * houve o que repor.
+ */
 export async function getReplaceableBookingsForStudent(studentId: string): Promise<Booking[]> {
   const { data, error } = await client()
     .from("bookings")
     .select("*")
     .eq("student_id", studentId)
     .in("status", ["no_show", "cancelled"])
+    .or(SEM_DESCARTE_DE_REGENERACAO)
     .order("start_time", { ascending: false })
     .limit(20);
   if (error) throw new Error(error.message);
