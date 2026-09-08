@@ -1,17 +1,17 @@
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Calendar, ChevronRight, Clock3 } from "lucide-react";
+import { Calendar, ChevronRight, Clock3 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonCard } from "@/components/SkeletonCard";
+import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getStudentHome } from "@/integrations/backend/api";
 import { getStatusConfig } from "@/lib/bookingStatus";
 import { formatDayNumber, formatMonthShort, formatDateTime } from "@/lib/dateUtils";
-import { packageProgressPct } from "@/lib/packageUtils";
 
 export default function StudentHome() {
   const { profile } = useAuth();
@@ -26,12 +26,9 @@ export default function StudentHome() {
   if (!profile) return null;
 
   // RECORRENCIA (CLAUDE.md, 2026-09-08): "crédito disponível" não existe pra quem não se
-  // auto-agenda — as aulas já nascem marcadas, o número certo é "quanto sobra no pacote"
-  // (saldo_pacotes), não available_credits_for_student (que aqui sempre bateria zero por
-  // construção — reservas futuras e aulas restantes são o mesmo conjunto de bookings).
+  // auto-agenda — ActivePackageCard já resolve isso sozinho (mostra saldo.restantes em vez de
+  // credits quando saldo existe); aqui só precisamos do valor pra decidir o botão principal.
   const saldo = data?.recorrenciaSaldo ?? null;
-  const headline = saldo ? saldo.restantes : data?.credits;
-  const lowCredits = saldo ? saldo.restantes <= 2 : (data?.credits ?? 0) <= 2;
 
   return (
     <div className="page-container">
@@ -52,42 +49,8 @@ export default function StudentHome() {
 
       {data && (
         <>
-          <div className="relative rounded-[22px] p-[22px] mb-3.5 bg-[linear-gradient(150deg,#1F1B0C_0%,#171717_58%)] border border-[#35301A] overflow-hidden animate-bb-up">
-            <div className="absolute -right-8 -top-8 w-[150px] h-[150px] rounded-full bg-[radial-gradient(circle,hsl(var(--accent)/0.18),transparent_70%)]" />
-            <div className="text-xs tracking-[0.16em] uppercase text-accent/70 font-semibold">
-              {saldo ? "Aulas restantes" : "Créditos disponíveis"}
-            </div>
-            <div className="flex items-end gap-2.5 my-0.5 mb-3.5">
-              <span className="font-display text-[92px] leading-[0.82] text-accent">{headline}</span>
-              <span className="text-sm text-muted-foreground pb-3">
-                {saldo ? "aula(s) no pacote" : "aula(s) para agendar"}
-              </span>
-            </div>
-            {data.package && (
-              <>
-                <div className="h-2 rounded-full bg-secondary overflow-hidden mb-2">
-                  <div
-                    className="h-full rounded-full bg-gradient-gold origin-left animate-bb-bar"
-                    style={{ width: `${packageProgressPct(data.package.totalClasses, data.package.usedClasses)}%` }}
-                  />
-                </div>
-                <div className="flex justify-between text-[12.5px] text-muted-foreground">
-                  <span>
-                    {data.package.usedClasses} de {data.package.totalClasses} usadas ·{" "}
-                    {saldo ? `${saldo.restantes} restantes` : `${data.credits} disponíveis`}
-                  </span>
-                  <span>{data.package.templateName}</span>
-                </div>
-              </>
-            )}
-            {lowCredits && (
-              <div className="mt-3.5 flex gap-2 items-center px-3 py-2.5 rounded-xl bg-amber/10 border border-amber/30">
-                <AlertTriangle className="h-4 w-4 text-amber shrink-0" />
-                <span className="text-[12.5px] text-amber">
-                  {saldo ? "Restam poucas aulas no pacote atual." : "Restam poucas aulas — peça a renovação do pacote."}
-                </span>
-              </div>
-            )}
+          <div className="mb-3.5 animate-bb-up">
+            <ActivePackageCard pkg={data.package} credits={data.credits} saldo={saldo} />
           </div>
 
           {data.suggestion && (

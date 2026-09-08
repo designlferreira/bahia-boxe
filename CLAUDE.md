@@ -701,6 +701,37 @@ inclusive futuros — aba "Próximas" já existente), com o texto de apoio
 "Suas aulas já estão marcadas pelo professor" em vez de "Escolha dia e
 horário em 2 toques".
 
+**CORREÇÃO (2026-09-08, achado em teste): a implementação acima recriou o
+mesmo problema que `ActivePackageCard` existia pra resolver.** Em vez de
+usar o componente compartilhado, editei um bloco PRÓPRIO já existente em
+`Home.tsx` (headline + barra + linha "usadas/disponíveis") — uma terceira
+implementação do mesmo conceito, nunca migrada pra `ActivePackageCard`
+quando ele foi criado (`AlunoDetalhe.tsx`/`AlunoRecorrencia.tsx` já
+usavam). Na tela isso apareceu como o card de pacote "duplicado" — não
+literalmente dois cards, mas a mesma informação (usadas/restantes/origem)
+calculada e escrita duas vezes por dois caminhos de código diferentes, uma
+receita garantida pra divergir de novo no futuro.
+
+Corrigido de vez: TODA a lógica condicional a `saldo` (headline
+`saldo.restantes` vs `credits`, rótulo, unidade, badge de origem, nome do
+template, alerta de poucas aulas) mudou de `Home.tsx` pra dentro do próprio
+`ActivePackageCard` — o componente agora é auto-suficiente, só recebe
+`pkg`/`credits`/`saldo?` e decide tudo sozinho. `Home.tsx`, `AlunoDetalhe.tsx`
+e `AlunoRecorrencia.tsx` renderizam a MESMA instância, sem nenhuma versão
+paralela em nenhum dos três. Efeito colateral bom: o alerta de "poucas
+aulas" (que só existia em `Home.tsx`) agora aparece também pro professor
+nas duas telas admin — satisfaz de graça o invariante já registrado
+"Alertar o professor quando restarem 2 ou menos aulas no pacote" (texto do
+alerta neutralizado pra fazer sentido pras duas audiências: "considere
+renovar o pacote" em vez de "peça a renovação", que só fazia sentido
+vindo do aluno).
+
+**Lição pra não repetir:** quando um componente compartilhado é criado pra
+unificar duas telas, qualquer ajuste de comportamento SUBSEQUENTE (como o
+"crédito disponível" desta seção) precisa entrar DENTRO do componente, não
+num dos lugares que o chamam — mesmo que só um lugar precise do ajuste no
+momento.
+
 ### Bug de ordenação em "Minhas Aulas" (2026-09-08)
 
 Achado ao investigar o item acima (não relacionado à RECORRENCIA — afeta
@@ -824,3 +855,11 @@ Decidir antes de chegar na etapa correspondente:
   novas, mas não tem UI de "editar" uma linha existente; o próximo pacote
   gerado sempre lê o conjunto ATUAL de linhas `ativo = true` no momento da
   geração (nunca retroage sobre pacotes/aulas já materializados).
+- **UX da lista de dias fixos** (achado pelo usuário em teste, 2026-09-08,
+  não bloqueia nada) — `AlunoRecorrencia.tsx` permite desativar um dia fixo
+  mas não excluí-lo, então a lista só cresce (linhas desativadas continuam
+  aparecendo, só com opacidade reduzida). Sem agrupamento (ativos primeiro,
+  por exemplo) nem qualquer ordenação além de `dia_semana` cru. A longo
+  prazo, um aluno com vários ciclos de recorrência ao longo do tempo acumula
+  uma lista poluída. Não implementado agora — não urgente, registrado pra
+  não sumir.
