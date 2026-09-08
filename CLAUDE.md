@@ -726,6 +726,36 @@ explícito):
   que motivou a correção acima. Deixado como está; sinalizar se algum dia
   precisar de uma aba "Próximas" análoga.
 
+### Seletor de data de início da recorrência (2026-09-08)
+
+Motivação: `computeRecorrenciaSlots` sempre partia de "agora" — sem
+confirmar bug nenhum aí (a geração testada estava correta, ver seção
+"D RESOLVIDO" da conversa), mas o professor não tinha como expressar
+"combinei com o aluno que começamos dia 15".
+
+**Escolha de UI: chips de datas válidas, não um calendário em grade.** O
+pedido original falava em "calendário", mas este app não tem nenhum
+componente de calendário-mês em lugar nenhum — todo seletor de dia/hora
+existente (`Disponibilidade.tsx`, o próprio seletor de hora da Etapa 5) usa
+fileira horizontal de chips roláveis. Uma fileira com as próximas ~8 semanas
+de datas válidas (só as que caem em algum dia fixo ATIVO) cobre o caso de
+uso descrito ("dia 15" está entre as primeiras opções) sem introduzir um
+padrão de UI novo só pra isso. Se no futuro for preciso escolher uma data
+muito mais distante que não caiba na fileira, aí sim vale um calendário de
+verdade — registrado aqui, não implementado agora por falta de necessidade
+concreta.
+
+Implementação: `getRecorrenciaStartDateOptions(recorrencias, weeksAhead=8)`
+(`api.ts`, nova, exportada) — mesmo filtro de "horário ainda não passado"
+que `computeRecorrenciaSlots` já usava, aplicado a TODAS as linhas ativas
+(união dos dias da semana). `computeRecorrenciaSlots`/`futureWeekdayDates`
+ganham um parâmetro `fromInstant` (default: `new Date()`) — só desloca o
+limite inferior da busca; nenhuma outra regra muda. `gerarPacoteRecorrencia`
+ganha `startDate?: string` opcional, repassado como `fromInstant` via
+`fromZonedTime` — omitido, comportamento idêntico ao de antes (a partir de
+agora). A tela sempre pré-seleciona a primeira opção (a mais próxima), sem
+exigir que o professor escolha manualmente se não quiser.
+
 ### Pontos ainda em aberto
 
 Decidir antes de chegar na etapa correspondente:

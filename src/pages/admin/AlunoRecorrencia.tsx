@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { fromZonedTime } from "date-fns-tz";
 import { Plus } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard, SkeletonList } from "@/components/SkeletonCard";
@@ -12,14 +13,23 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { formatDateShort, formatWeekdayShort, TIMEZONE } from "@/lib/dateUtils";
 import {
   createAlunoRecorrencia,
   gerarPacoteRecorrencia,
   getAdminStudentDetail,
   getAlunoRecorrencias,
+  getRecorrenciaStartDateOptions,
   getSaldoPacote,
   setAlunoRecorrenciaAtivo,
 } from "@/integrations/backend/api";
+
+/** "2026-09-14" -> "Seg, 14 set" — as opções de início são datas soltas ("yyyy-MM-dd"), sem hora;
+ *  meio-dia é só um instante seguro pra formatar sem risco de virar o dia anterior por fuso. */
+function labelForDateOnly(dateOnly: string): string {
+  const iso = fromZonedTime(`${dateOnly}T12:00:00`, TIMEZONE).toISOString();
+  return `${formatWeekdayShort(iso)}, ${formatDateShort(iso)}`;
+}
 
 const WEEKDAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 /**
@@ -42,6 +52,7 @@ export default function AdminAlunoRecorrencia() {
   const [diaSemana, setDiaSemana] = useState(1);
   const [horario, setHorario] = useState("18:00");
   const [totalAulas, setTotalAulas] = useState(8);
+  const [startDate, setStartDate] = useState<string | null>(null);
 
   const detailQuery = useQuery({
     queryKey: ["admin-student-detail", studentId],
@@ -94,10 +105,11 @@ export default function AdminAlunoRecorrencia() {
   });
 
   const gerarPacote = useMutation({
-    mutationFn: () => gerarPacoteRecorrencia(studentId!, totalAulas),
-    onSuccess: () => {
+    mutationFn: (data: { totalAulas: number; startDate: string | null }) =>
+      gerarPacoteRecorrencia(studentId!, data.totalAulas, data.startDate ?? undefined),
+    onSuccess: (_r, vars) => {
       invalidate();
-      toast.success(`Pacote de ${totalAulas} aulas gerado`);
+      toast.success(`Pacote de ${vars.totalAulas} aulas gerado`);
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível gerar o pacote."),
   });
@@ -123,8 +135,15 @@ export default function AdminAlunoRecorrencia() {
 
   const { student, credits } = detailQuery.data;
   const recorrencias = recorrenciasQuery.data ?? [];
-  const activasCount = recorrencias.filter((r) => r.ativo).length;
+  const ativas = recorrencias.filter((r) => r.ativo);
+  const activasCount = ativas.length;
   const saldo = saldoQuery.data ?? null;
+
+  // Seletor de data de início (CLAUDE.md, 2026-09-08): só oferece datas que caem em algum dia
+  // fixo ATIVO — nunca uma data solta. Se a seleção atual saiu do conjunto válido (aluno mudou os
+  // dias fixos depois de escolher), cai pra primeira opção em vez de travar num valor obsoleto.
+  const startDateOptions = getRecorrenciaStartDateOptions(ativas);
+  const effectiveStartDate = startDate && startDateOptions.includes(startDate) ? startDate : (startDateOptions[0] ?? null);
 
   return (
     <div className="page-container">
@@ -173,6 +192,38 @@ export default function AdminAlunoRecorrencia() {
           Materializa aulas concretas na agenda a partir dos dias fixos ativos
           {activasCount > 0 ? ` (${activasCount} ativo${activasCount > 1 ? "s" : ""})` : ""}.
         </div>
+
+        {activasCount > 0 && (
+          <>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">
+              Começa em
+            </div>
+            {startDateOptions.length > 0 ? (
+              <div className="flex gap-2 overflow-x-auto -mx-4 px-4 mb-3.5 pb-1 scroll-fade-x">
+                {startDateOptions.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setStartDate(d)}
+                    className={cn(
+                      "shrink-0 h-11 px-4 rounded-xl border text-sm font-semibold transition-all active:scale-95",
+                      effectiveStartDate === d
+                        ? "bg-primary/15 border-primary text-primary"
+                        : "bg-secondary border-[#333] text-foreground/85",
+                    )}
+                  >
+                    {labelForDateOnly(d)}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-[12px] text-amber mb-3.5">
+                Nenhuma data futura encontrada nos próximos dias fixos — confira se estão ativos.
+              </div>
+            )}
+          </>
+        )}
+
         <div className="flex gap-2.5">
           <Input
             type="number"
@@ -184,8 +235,8 @@ export default function AdminAlunoRecorrencia() {
           />
           <Button
             className="flex-1"
-            disabled={activasCount === 0 || gerarPacote.isPending}
-            onClick={() => gerarPacote.mutate()}
+            disabled={activasCount === 0 || !effectiveStartDate || gerarPacote.isPending}
+            onClick={() => gerarPacote.mutate({ totalAulas, startDate: effectiveStartDate })}
           >
             Gerar {totalAulas} aula{totalAulas > 1 ? "s" : ""}
           </Button>

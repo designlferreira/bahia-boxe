@@ -839,14 +839,17 @@ export async function setAlunoRecorrenciaAtivo(id: string, ativo: boolean) {
 }
 
 /**
- * Todas as ocorrências futuras de `weekday` dentro de `weeks` semanas, como "yyyy-MM-dd" em BRT —
- * mesma lógica de `horizonDatesFor` (linha ~1030), sem tocar nela: aquela é do AUTOSSERVICO
- * (disponibilidade), esta é da RECORRENCIA, propositalmente duas funções pequenas e separadas em
- * vez de uma só generalizada por cima de código que "não deve ser refatorado" (CLAUDE.md).
+ * Todas as ocorrências de `weekday` dentro de `weeks` semanas a partir de `fromInstant`, como
+ * "yyyy-MM-dd" em BRT — mesma lógica de `horizonDatesFor` (linha ~1030), sem tocar nela: aquela é
+ * do AUTOSSERVICO (disponibilidade), esta é da RECORRENCIA, propositalmente duas funções pequenas
+ * e separadas em vez de uma só generalizada por cima de código que "não deve ser refatorado"
+ * (CLAUDE.md). `fromInstant` é um instante real (não uma data "yyyy-MM-dd" solta) — sempre passado
+ * por `brt()` aqui dentro antes de qualquer leitor local (`getDay`/`format`), nunca lido cru, pelo
+ * mesmo motivo que todo o resto deste arquivo faz isso.
  */
-function futureWeekdayDates(weekday: number, weeks: number): string[] {
+function futureWeekdayDates(weekday: number, weeks: number, fromInstant: Date): string[] {
   const out: string[] = [];
-  const start = brt(new Date());
+  const start = brt(fromInstant);
   const end = addWeeks(start, weeks);
   for (let d = start; d < end; d = addDays(d, 1)) {
     if (d.getDay() === weekday) out.push(format(d, "yyyy-MM-dd"));
@@ -858,16 +861,19 @@ function futureWeekdayDates(weekday: number, weeks: number): string[] {
  * Resolve o array de slots que `gerar_pacote_recorrencia` (0014) espera: todas as linhas ATIVAS de
  * `aluno_recorrencia` entrelaçadas cronologicamente (decisão 9, CLAUDE.md — mais de um dia da
  * semana é a MESMA rotina, gera UM pacote só), convertidas de BRT pra UTC com `fromZonedTime`
- * (mesmo padrão de `saveAvailabilityInterval`), cortadas nas primeiras `totalAulas`.
+ * (mesmo padrão de `saveAvailabilityInterval`), cortadas nas primeiras `totalAulas`. `fromInstant`
+ * (default: agora) é o limite inferior da busca — passar uma data futura escolhida pelo professor
+ * (Etapa 5, seletor de início) desloca esse limite pra frente, sem mudar mais nada do cálculo.
  */
 function computeRecorrenciaSlots(
   recorrencias: Pick<AlunoRecorrencia, "id" | "diaSemana" | "horario" | "duracaoMinutos">[],
   totalAulas: number,
+  fromInstant: Date = new Date(),
 ): { start_time: string; end_time: string; recorrencia_id: string }[] {
   const weeks = Math.min(52, Math.max(HORIZON_WEEKS, Math.ceil(totalAulas / Math.max(recorrencias.length, 1)) + 2));
   const candidates: { start: Date; end: Date; recorrenciaId: string }[] = [];
   for (const rec of recorrencias) {
-    for (const day of futureWeekdayDates(rec.diaSemana, weeks)) {
+    for (const day of futureWeekdayDates(rec.diaSemana, weeks, fromInstant)) {
       const from = fromZonedTime(`${day}T${rec.horario}:00`, TIMEZONE);
       if (from.getTime() <= Date.now()) continue;
       candidates.push({ start: from, end: new Date(from.getTime() + rec.duracaoMinutos * 60_000), recorrenciaId: rec.id });
@@ -880,17 +886,43 @@ function computeRecorrenciaSlots(
 }
 
 /**
- * Gera um pacote de recorrência: lê as linhas ATIVAS de `aluno_recorrencia` do aluno, calcula as
- * próximas `totalAulas` ocorrências (entre todas elas, entrelaçadas por data) e chama
- * `gerar_pacote_recorrencia`. Lança erro amigável se não houver nenhuma linha ativa — a RPC também
- * rejeitaria (`invalid_slots`), mas a mensagem aqui é melhor pra UI.
+ * Datas "yyyy-MM-dd" válidas pra iniciar um pacote — só dias que caem em algum `diaSemana` ativo,
+ * dentro de `weeksAhead` semanas, com horário ainda não passado (mesmo filtro de
+ * `computeRecorrenciaSlots`). Usada pela tela pra restringir o seletor de data de início às
+ * ocorrências reais da recorrência — nunca uma data solta que não bate com nenhum dia configurado.
  */
-export async function gerarPacoteRecorrencia(studentId: string, totalAulas: number): Promise<string> {
+export function getRecorrenciaStartDateOptions(
+  recorrencias: Pick<AlunoRecorrencia, "diaSemana" | "horario">[],
+  weeksAhead = 8,
+): string[] {
+  const now = new Date();
+  const seen = new Set<string>();
+  for (const rec of recorrencias) {
+    for (const day of futureWeekdayDates(rec.diaSemana, weeksAhead, now)) {
+      const from = fromZonedTime(`${day}T${rec.horario}:00`, TIMEZONE);
+      if (from.getTime() <= Date.now()) continue;
+      seen.add(day);
+    }
+  }
+  return Array.from(seen).sort();
+}
+
+/**
+ * Gera um pacote de recorrência: lê as linhas ATIVAS de `aluno_recorrencia` do aluno, calcula as
+ * próximas `totalAulas` ocorrências a partir de `startDate` (ou de agora, se omitido) — entre
+ * todas as linhas, entrelaçadas por data — e chama `gerar_pacote_recorrencia`. `startDate`, quando
+ * informado, precisa ser um dos valores de `getRecorrenciaStartDateOptions` (a tela já restringe
+ * isso; a função aqui só confia porque quem chama é a mesma tela que gerou as opções). Lança erro
+ * amigável se não houver nenhuma linha ativa — a RPC também rejeitaria (`invalid_slots`), mas a
+ * mensagem aqui é melhor pra UI.
+ */
+export async function gerarPacoteRecorrencia(studentId: string, totalAulas: number, startDate?: string): Promise<string> {
   const recorrencias = (await getAlunoRecorrencias(studentId)).filter((r) => r.ativo);
   if (recorrencias.length === 0) {
     throw new Error("Cadastre pelo menos um dia/horário de recorrência ativo antes de gerar um pacote.");
   }
-  const slots = computeRecorrenciaSlots(recorrencias, totalAulas);
+  const fromInstant = startDate ? fromZonedTime(`${startDate}T00:00:00`, TIMEZONE) : new Date();
+  const slots = computeRecorrenciaSlots(recorrencias, totalAulas, fromInstant);
   if (slots.length < totalAulas) {
     throw new Error("Não foi possível calcular datas futuras suficientes para esse número de aulas.");
   }
