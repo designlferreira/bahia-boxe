@@ -21,7 +21,18 @@ import {
 } from "@/integrations/backend/api";
 
 const WEEKDAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
-const DURACAO_OPTIONS = [30, 45, 60, 90];
+/**
+ * Grade travada na mesma granularidade do AUTOSSERVICO (hora cheia, 60 min fixos) — CAMADA 1
+ * contra overbooking (CLAUDE.md). A view `available_slots` que a tela "Agendar" usa pra decidir o
+ * que oferecer exclui por IGUALDADE exata de `start_time`/`end_time`, não por sobreposição de
+ * intervalo; um horário fora da hora cheia ou com duração diferente de 60 min escaparia dessa
+ * checagem mesmo sobrepondo fisicamente um horário publicado. Deliberado: reduz a flexibilidade
+ * que a recorrência prometia (nada de 30/45/90 min por enquanto) em troca de nunca depender de um
+ * aviso pós-fato. Se precisar de outra duração no futuro, resolve a view antes, não aqui.
+ */
+const HOURS = Array.from({ length: 24 }, (_, h) => h);
+const hhmm = (h: number) => String(h).padStart(2, "0") + ":00";
+const DURACAO_MINUTOS = 60;
 
 export default function AdminAlunoRecorrencia() {
   const { studentId } = useParams<{ studentId: string }>();
@@ -29,7 +40,6 @@ export default function AdminAlunoRecorrencia() {
   const [addOpen, setAddOpen] = useState(false);
   const [diaSemana, setDiaSemana] = useState(1);
   const [horario, setHorario] = useState("18:00");
-  const [duracaoMinutos, setDuracaoMinutos] = useState(60);
   const [totalAulas, setTotalAulas] = useState(8);
 
   const detailQuery = useQuery({
@@ -62,7 +72,7 @@ export default function AdminAlunoRecorrencia() {
   }
 
   const addRecorrencia = useMutation({
-    mutationFn: () => createAlunoRecorrencia(studentId!, diaSemana, horario, duracaoMinutos),
+    mutationFn: () => createAlunoRecorrencia(studentId!, diaSemana, horario, DURACAO_MINUTOS),
     onSuccess: () => {
       invalidate();
       setAddOpen(false);
@@ -225,23 +235,26 @@ export default function AdminAlunoRecorrencia() {
           </div>
 
           <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Horário</div>
-          <Input type="time" value={horario} onChange={(e) => setHorario(e.target.value)} className="mb-3.5" />
-
-          <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Duração</div>
-          <div className="flex gap-2 mb-4">
-            {DURACAO_OPTIONS.map((min) => (
-              <button
-                key={min}
-                type="button"
-                onClick={() => setDuracaoMinutos(min)}
-                className={cn(
-                  "flex-1 h-11 rounded-xl border text-sm font-semibold transition-all active:scale-95",
-                  duracaoMinutos === min ? "bg-primary/15 border-primary text-primary" : "bg-secondary border-[#333] text-foreground/85",
-                )}
-              >
-                {min} min
-              </button>
-            ))}
+          <div className="flex gap-2 overflow-x-auto -mx-5 px-5 mb-1 pb-1 scroll-fade-x">
+            {HOURS.map((h) => {
+              const v = hhmm(h);
+              return (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setHorario(v)}
+                  className={cn(
+                    "shrink-0 h-11 px-4 rounded-xl border text-sm font-semibold transition-all active:scale-95",
+                    horario === v ? "bg-primary/15 border-primary text-primary" : "bg-secondary border-[#333] text-foreground/85",
+                  )}
+                >
+                  {v}
+                </button>
+              );
+            })}
+          </div>
+          <div className="text-[12px] text-muted-foreground mb-4">
+            Hora cheia, {DURACAO_MINUTOS} min — mesma grade da disponibilidade do autosserviço.
           </div>
 
           <div className="flex gap-2.5">

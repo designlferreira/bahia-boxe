@@ -500,8 +500,9 @@ reagendamento quanto em reposição (decisão 2).
 | 6 | `0013_calcular_saldo_pacote.sql` | `calcular_saldo_pacote(p_pacote_id)` + view de leitura (decisão 4), com testes — fecha a Etapa 3 sozinha | 3 — **APLICADA, NÃO VERIFICADA empiricamente** (verificação adiada pra depois de ver o fluxo pela tela, ver decisão 8) |
 | 7 | `0014_gerar_pacote_recorrencia.sql` | RPC pública: valida a recorrência, chama `_create_package(..., 'recurrence', 'package')`, materializa N linhas em `bookings` (`cadeia_id` = próprio id, `pacote_id` = pacote recém-criado) | 4 — **APLICADA (2026-09-07)** |
 | 8 | `0015_mark_no_show_complete_booking_recorrencia.sql` | `create or replace` de `mark_no_show`/`complete_booking` (decisão 7): coalesce de `falta_consome_credito`; quando `pacote_id is not null`, usa esse pacote diretamente (não a busca "mais antigo ativo") e sobrescreve `used_classes` via `calcular_saldo_pacote()`; `pacote_id is null` → comportamento idêntico ao atual. Testada junto com a 0014, com pacote de recorrência gerado de verdade — por isso vem DEPOIS dela, não antes (rodar antes seria inofensivo mas ficaria sem cobertura real por uma etapa inteira) | 4 — **APLICADA (2026-09-07)**, verificação empírica pendente pela tela (Etapa 5), não por SQL |
-| 9 | `0016_reagendar_cancelar_aula.sql` | RPCs `reagendar_aula`/`cancelar_aula`, professor-only | 6 |
-| 10 | `0017_aviso_ausencia.sql` | `bookings.aviso_ausencia_em`/`.aviso_ausencia_motivo` (adiado pra cá — não adicionar coluna que nenhuma função usa ainda) + função pro aluno registrar | 8 |
+| 9 | `0016_gerar_pacote_recorrencia_overlap_check.sql` | `create or replace` de `gerar_pacote_recorrencia`: rejeita a geração inteira se algum slot se sobrepõe (intervalo real) a um booking `scheduled` do mesmo professor de OUTRO aluno — CAMADA 2 contra overbooking (ver seção própria abaixo) | 4 — **APLICADA (2026-09-08)** |
+| 10 | `0017_reagendar_cancelar_aula.sql` | RPCs `reagendar_aula`/`cancelar_aula`, professor-only | 6 |
+| 11 | `0018_aviso_ausencia.sql` | `bookings.aviso_ausencia_em`/`.aviso_ausencia_motivo` (adiado pra cá — não adicionar coluna que nenhuma função usa ainda) + função pro aluno registrar | 8 |
 
 ### Etapa 5 — tela (2026-09-07, sem migration nova)
 
@@ -526,6 +527,82 @@ exercita `_create_package`, `gerar_pacote_recorrencia`,
 `calcular_saldo_pacote()` e o `mark_no_show`/`complete_booking` reescritos
 juntos, pela primeira vez. Migrations 0008–0015 precisam estar aplicadas no
 banco antes de testar.
+
+**Confirmado pelo teste real (2026-09-07): as aulas foram geradas e
+aparecem na lista do aluno e na agenda do professor.** Etapas 1-5
+funcionam ponta a ponta.
+
+### Overbooking entre RECORRENCIA e AUTOSSERVICO (2026-09-08)
+
+**Dívida conhecida, registrada, não corrigida por completo — só mitigada.**
+Descoberta ao revisar por que a tela "Agendar" poderia oferecer um horário
+já ocupado por uma aula de recorrência. `pg_get_viewdef('public.available_slots')`
+(view preexistente, fora deste repo) revelou:
+
+```sql
+SELECT s.id AS slot_id, s.admin_id, s.start_time, s.end_time
+FROM availability_slots s
+LEFT JOIN bookings b
+  ON b.start_time = s.start_time AND b.end_time = s.end_time
+ AND b.admin_id = s.admin_id AND b.status = 'scheduled'::booking_status
+WHERE b.id IS NULL
+```
+
+Dois problemas reais nessa view, nenhum causado por este trabalho mas
+ambos relevantes pra RECORRENCIA:
+
+1. **Exclui por IGUALDADE exata de horário, não por sobreposição de
+   intervalo.** Um slot publicado 18:00–19:00 e um booking 18:30–19:30 não
+   se excluem mutuamente — os dois aparecem como independentes pra essa
+   view, mesmo se sobrepondo fisicamente 30 minutos. Antes da RECORRENCIA
+   isso não importava muito na prática (a própria grade de disponibilidade
+   só publica blocos de 1h em hora cheia, então nunca colide parcialmente
+   consigo mesma) — mas dá margem pra overbooking assim que existe uma
+   segunda fonte de bookings (a RECORRENCIA) com horário livre.
+2. **Só considera `status = 'scheduled'`.** Um booking `pending_confirmation`
+   não esconde o slot — dois alunos podem pedir o mesmo horário antes do
+   professor aprovar um dos dois. Pré-existente, sem relação com
+   RECORRENCIA, registrado aqui só porque apareceu na mesma leitura.
+
+**Mitigação implementada (2026-09-08), em duas camadas — nenhuma resolve a
+view em si, então o ponto 2 acima continua em aberto:**
+
+- **CAMADA 1 — restringir a entrada do lado da RECORRENCIA.**
+  `AlunoRecorrencia.tsx` trava `horario` em hora cheia e `duracaoMinutos`
+  em 60 (removidas as opções 30/45/90 que existiam desde a Etapa 5).
+  Deliberado — reduz a flexibilidade que a recorrência prometia em troca
+  de nunca depender de sobreposição parcial escapar da igualdade exata da
+  view: uma recorrência agora só pode coincidir EXATAMENTE com um slot
+  publicado (o caso que a view já cobre) ou não coincidir nada. **Só
+  resolve o UI** — é um limite de tela (`createAlunoRecorrencia` continua
+  aceitando qualquer `horario`/`duracaoMinutos` via `insert` direto,
+  protegido só por RLS de posse, sem `CHECK` no banco). Se alguém
+  flexibilizar a grade da recorrência no futuro (ex.: reintroduzir
+  30/45/90), a view precisa ser corrigida pra sobreposição real ANTES —
+  não é opcional nem contornável de outro jeito.
+- **CAMADA 2 — validar sobreposição no momento da geração.**
+  `gerar_pacote_recorrencia` (0016, `create or replace` sobre 0014) REJEITA
+  a geração inteira (nada é escrito) se algum slot de `p_slots` se
+  sobrepõe, por intervalo real (`novo.start < existente.end and novo.end >
+  existente.start`), a um booking `scheduled` do MESMO professor de OUTRO
+  aluno. Não conta contra bookings do PRÓPRIO aluno (renovar um pacote
+  enquanto aulas antigas da recorrência anterior ainda estão `scheduled`
+  não é overbooking). Rejeitar em vez de avisar depois foi escolha
+  deliberada (não uma opção descartada por acaso): como a checagem roda
+  ANTES de qualquer `insert`/`update`, "nada foi gerado ainda" é garantido
+  pela ordem das operações dentro da mesma função, sem precisar desfazer
+  estado parcial. A mensagem de erro é texto em português direto (não um
+  código curto tipo `only_admin`) porque o front (`gerarPacoteRecorrencia`
+  em `api.ts`) só repassa `error.message` cru pro `toast.error` — não existe
+  camada de tradução de erro neste app.
+- Cobre exatamente o cenário descrito: duas recorrências de ALUNOS
+  DIFERENTES do mesmo professor na mesma célula da grade. A CAMADA 1
+  sozinha não cobre isso — ela só garante alinhamento à grade, não unicidade
+  dentro da grade.
+
+**O que continua sem solução:** o ponto 2 (view não considera
+`pending_confirmation`) e o caso de alguém escrever em `aluno_recorrencia`
+fora da tela (contornando a CAMADA 1 via chamada direta à API).
 
 ### Pontos ainda em aberto
 
