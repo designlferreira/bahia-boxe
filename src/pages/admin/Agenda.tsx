@@ -178,9 +178,9 @@ export default function AdminAgenda() {
                         <div>
                           <div className="text-[14.5px] font-semibold text-foreground flex items-center gap-1.5">
                             {entry.studentName}
-                            {booking?.isReplacement && (
+                            {entry.vinculo && (
                               <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
-                                Reposição
+                                {entry.vinculo === "remarcacao" ? "Remarcada" : "Reposição"}
                               </span>
                             )}
                           </div>
@@ -238,6 +238,26 @@ export default function AdminAgenda() {
                               </Button>
                             </div>
                           )}
+                          <div className="flex gap-2">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="flex-1 h-10"
+                              disabled={actions.isBusy(booking.id)}
+                              onClick={() => actions.openReagendar(booking, entry.studentName ?? "Aluno")}
+                            >
+                              Remarcar
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="flex-1 h-10 !border-destructive/35 !text-destructive"
+                              disabled={actions.isBusy(booking.id)}
+                              onClick={() => actions.openCancelar(booking, entry.studentName ?? "Aluno")}
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
                           {!booking.isReplacement && (
                             <button
                               type="button"

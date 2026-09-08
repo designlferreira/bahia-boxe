@@ -25,6 +25,7 @@ export default function AdminAulaDetalhe() {
   const booking = detail?.booking;
   const studentName = detail?.studentName ?? "Aluno";
   const remarcacoes = detail?.remarcacoes ?? 0;
+  const vinculo = detail?.vinculo ?? null;
 
   const actions = useLessonActions(() => {
     queryClient.invalidateQueries({ queryKey: ["admin-booking", id] });
@@ -63,9 +64,9 @@ export default function AdminAulaDetalhe() {
           <Badge className={awaiting ? "bg-amber/20 text-amber" : cfg.badgeClass}>
             {awaiting ? "Aguardando confirmação" : cfg.label}
           </Badge>
-          {booking.isReplacement && (
+          {vinculo && (
             <Badge className="bg-secondary text-muted-foreground flex items-center gap-1">
-              <Repeat className="h-3 w-3" /> Reposição
+              <Repeat className="h-3 w-3" /> {vinculo === "remarcacao" ? "Remarcada" : "Reposição"}
             </Badge>
           )}
           {remarcacoes > 0 && (

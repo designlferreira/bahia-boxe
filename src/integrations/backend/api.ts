@@ -510,7 +510,7 @@ export async function getBookingDetail(bookingId: string): Promise<{ booking: Bo
  */
 export async function getAdminBookingDetail(
   bookingId: string,
-): Promise<{ booking: Booking; studentName: string; remarcacoes: number } | undefined> {
+): Promise<{ booking: Booking; studentName: string; remarcacoes: number; vinculo: VinculoAula | null } | undefined> {
   const [viewRes, rowRes] = await Promise.all([
     client().from("booking_history_app").select("*").eq("id", bookingId).maybeSingle(),
     client().from("bookings").select("*").eq("id", bookingId).maybeSingle(),
@@ -529,7 +529,11 @@ export async function getAdminBookingDetail(
     if (error) throw new Error(error.message);
     remarcacoes = Math.max((count ?? 1) - 1, 0);
   }
-  return { booking: mapBooking(rowRes.data), studentName, remarcacoes };
+
+  const antecessorId = rowRes.data.replacement_for_booking_id as string | null;
+  const vinculo = antecessorId ? ((await vinculoPorAntecessor([antecessorId])).get(antecessorId) ?? "reposicao") : null;
+
+  return { booking: mapBooking(rowRes.data), studentName, remarcacoes, vinculo };
 }
 
 /** Etapa 6 — remarcar não edita a aula: marca a original como `rescheduled` e cria a sucessora. */
@@ -680,6 +684,31 @@ export interface TimelineEntry {
   free: boolean;
   booking?: Booking;
   studentName?: string;
+  /** Só quando a aula tem antecessor — ver `vinculoPorAntecessor`. */
+  vinculo?: VinculoAula | null;
+}
+
+/**
+ * Remarcação e reposição são o MESMO mecanismo no banco (decisão 2): as duas são "esta linha
+ * substitui aquela". O que as distingue é como o ANTECESSOR terminou — `rescheduled` (o professor
+ * moveu a aula) ou `no_show`/`cancelled` (o aluno perdeu a aula e esta é a reposição). Antes disso
+ * a tela chamava as duas de "Reposição", porque só olhava `is_replacement`.
+ */
+export type VinculoAula = "remarcacao" | "reposicao";
+
+/**
+ * Resolve o vínculo de várias aulas de uma vez, indexado pelo id do ANTECESSOR. Uma consulta só
+ * para a tela inteira — nunca uma por linha. O antecessor quase nunca está no conjunto já
+ * carregado (remarcar é justamente mover a aula para outro dia), então ele precisa ser buscado.
+ */
+async function vinculoPorAntecessor(antecessorIds: (string | null | undefined)[]): Promise<Map<string, VinculoAula>> {
+  const ids = Array.from(new Set(antecessorIds.filter((id): id is string => !!id)));
+  const out = new Map<string, VinculoAula>();
+  if (ids.length === 0) return out;
+  const { data, error } = await client().from("bookings").select("id, status").in("id", ids);
+  if (error) throw new Error(error.message);
+  for (const r of data ?? []) out.set(r.id, r.status === "rescheduled" ? "remarcacao" : "reposicao");
+  return out;
 }
 
 export async function getAdminAgendaForDay(adminId: string, date: Date): Promise<TimelineEntry[]> {
@@ -696,7 +725,10 @@ export async function getAdminAgendaForDay(adminId: string, date: Date): Promise
       .from("bookings")
       .select("*")
       .eq("admin_id", adminId)
-      .neq("status", "cancelled")
+      // `rescheduled` sai junto com `cancelled`: a aula foi MOVIDA, não vai acontecer nesse
+      // horário — deixá-la aqui mantinha o horário antigo ocupado na agenda do professor depois
+      // de remarcar. A linha continua existindo como registro, só não bloqueia mais a hora.
+      .not("status", "in", "(cancelled,rescheduled)")
       .gte("start_time", startIso)
       .lt("start_time", endIso),
     adminStudents(adminId),
@@ -706,6 +738,7 @@ export async function getAdminAgendaForDay(adminId: string, date: Date): Promise
 
   const nameOf = new Map(students.map((s) => [s.id, s.name]));
   const bookings = bookingsRes.data ?? [];
+  const vinculos = await vinculoPorAntecessor(bookings.map((b) => b.replacement_for_booking_id));
 
   const hours = new Set<number>();
   for (const s of slotsRes.data ?? []) hours.add(brtHour(s.start_time));
@@ -721,6 +754,9 @@ export async function getAdminAgendaForDay(adminId: string, date: Date): Promise
         free: false,
         booking: mapBooking(booking),
         studentName: nameOf.get(booking.student_id) ?? "Aluno",
+        vinculo: booking.replacement_for_booking_id
+          ? (vinculos.get(booking.replacement_for_booking_id) ?? "reposicao")
+          : null,
       };
     });
 }

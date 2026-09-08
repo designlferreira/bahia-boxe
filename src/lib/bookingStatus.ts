@@ -3,6 +3,7 @@ import {
   Calendar,
   CheckCircle,
   Clock,
+  History,
   XCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -14,7 +15,9 @@ export type BookingStatus =
   | "no_show"
   | "pending_confirmation"
   | "rejected"
-  | "rejected_with_suggestion";
+  | "rejected_with_suggestion"
+  /** RECORRENCIA, Etapa 6: a aula foi movida — esta linha fica como registro, a sucessora é a que vale. */
+  | "rescheduled";
 
 export interface StatusConfig {
   label: string;
@@ -34,6 +37,7 @@ const STATUS_MAP: Record<BookingStatus, StatusConfig> = {
     badgeClass: "bg-amber/20 text-amber",
     icon: AlertTriangle,
   },
+  rescheduled: { label: "Remarcada", badgeClass: "bg-muted text-muted-foreground", icon: History },
 };
 
 const FALLBACK: StatusConfig = {

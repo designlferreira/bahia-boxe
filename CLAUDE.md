@@ -1092,6 +1092,52 @@ incluindo a exclusão de reposição — o número do diálogo de confirmação 
 que ser exatamente o que vai acontecer; avisar um número maior é pior do que
 não avisar.
 
+### O que a Etapa 6 quebrou na tela, e a lição do `useLessonActions` (2026-09-08)
+
+Quatro defeitos achados no primeiro teste de remarcação, todos da mesma
+origem: a Etapa 6 mexeu no modelo e parou na tela de detalhe.
+
+1. **`'rescheduled'` não existia na camada TS.** O valor está no enum do
+   banco desde a 0008, mas `BookingStatus`/`STATUS_MAP` (`lib/bookingStatus.ts`)
+   nunca aprenderam — `getStatusConfig('rescheduled')` caía no FALLBACK e a
+   aula original renderizava badge **"—"**. Corrigido com label "Remarcada".
+2. **A original remarcada continuava ocupando o horário na Agenda.**
+   `getAdminAgendaForDay` filtrava só `.neq("status","cancelled")`, então uma
+   linha `rescheduled` seguia bloqueando a hora antiga com badge "—". Agora
+   sai junto com `cancelled` (`not in (cancelled, rescheduled)`): a linha
+   continua existindo como registro, só não bloqueia mais a hora. **Era o
+   pior dos quatro** — remarcar deixava o horário antigo inutilizável.
+   A view `available_slots` do AUTOSSERVICO **não** sofre disso: o join dela
+   exige `b.status = 'scheduled'`, então uma linha `rescheduled` não casa e o
+   slot volta a aparecer como livre. Ressalva pré-existente, sem relação com
+   a Etapa 6: se a aula original tinha vindo do AUTOSSERVICO (`slot_id`
+   preenchido), `schedule_booking` marcou aquele slot como `is_active = false`
+   e **nada volta a marcar como true** — nem cancelar, nem remarcar. Ali o
+   horário não reabre, pelo mesmo motivo que já não reabria ao cancelar.
+3. **Remarcar/Cancelar tinham sido ligados só na tela de detalhe.** Na Agenda
+   a única ação de aula futura é "Marcar como reposição", que fica escondida
+   quando `is_replacement` é true — e o sucessor de uma remarcação nasce com
+   `is_replacement = true` (decisão 2). Resultado: a aula nova aparecia com
+   **zero ações**, enquanto uma aula normal mostrava uma.
+
+   **`useLessonActions` existe exatamente para isso não acontecer** — o
+   docstring dele diz "usada tanto na lista da Agenda quanto na tela de
+   Detalhes da aula, pra não duplicar as mutations e os diálogos". O hook foi
+   estendido corretamente (ganhou `openReagendar`/`openCancelar`), mas só uma
+   das duas superfícies passou a chamá-los. **Ao acrescentar uma ação ao
+   hook, ligue as DUAS telas na mesma leva** — o hook centraliza a lógica,
+   não a renderização.
+4. **Remarcação e reposição apareciam com o mesmo rótulo.** As duas são o
+   mesmo mecanismo no banco (decisão 2) e a tela só olhava `is_replacement`,
+   chamando tudo de "Reposição". O discriminador correto já estava escrito na
+   própria decisão 2: **é como o ANTECESSOR terminou** — `rescheduled` →
+   remarcação; `no_show`/`cancelled` → reposição. Resolvido em
+   `vinculoPorAntecessor` (`api.ts`), que busca o status dos antecessores de
+   toda a tela **numa consulta só**, indexada por id do antecessor — nunca
+   uma consulta por linha. O antecessor quase nunca está no conjunto já
+   carregado (remarcar é mover para outro dia), então ele precisa mesmo ser
+   buscado; o que não pode é buscar N vezes.
+
 ### Pontos ainda em aberto
 
 Decidir antes de chegar na etapa correspondente:
@@ -1113,6 +1159,16 @@ Decidir antes de chegar na etapa correspondente:
   novas, mas não tem UI de "editar" uma linha existente; o próximo pacote
   gerado sempre lê o conjunto ATUAL de linhas `ativo = true` no momento da
   geração (nunca retroage sobre pacotes/aulas já materializados).
+- **Desfazer só existe por 9 segundos** (achado em teste, 2026-09-08, não
+  implementado — pré-existente, não é da Etapa 6). O ÚNICO ponto de entrada
+  de `undo_lesson_action` na aplicação é a ação "Desfazer" do toast de
+  sucesso de concluir/falta, com `UNDO_TOAST_MS = 9000`
+  (`useLessonActions.tsx`). Professor que fecha o toast, troca de tela ou
+  simplesmente demora perde o desfazer **para sempre** — mesmo com a RPC
+  continuando a aceitar (ela não tem janela de tempo: "continua válido
+  enquanto a transição em si for válida", comentário da 0001). Frágil para
+  uma ação que corrige erro de registro. Falta um caminho permanente (ex.:
+  botão "Desfazer" na tela de detalhe quando o status é `completed`/`no_show`).
 - **UX da lista de dias fixos** (achado pelo usuário em teste, 2026-09-08,
   não bloqueia nada) — `AlunoRecorrencia.tsx` permite desativar um dia fixo
   mas não excluí-lo, então a lista só cresce (linhas desativadas continuam
