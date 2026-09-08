@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard, SkeletonList } from "@/components/SkeletonCard";
 import { ErrorState } from "@/components/ErrorState";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatDateShort, formatWeekdayShort, TIMEZONE } from "@/lib/dateUtils";
 import {
+  countAulasCancelaveisRecorrencia,
   createAlunoRecorrencia,
   gerarPacoteRecorrencia,
   getAdminStudentDetail,
@@ -53,6 +55,7 @@ export default function AdminAlunoRecorrencia() {
   const [horario, setHorario] = useState("18:00");
   const [totalAulas, setTotalAulas] = useState(8);
   const [startDate, setStartDate] = useState<string | null>(null);
+  const [confirmGerar, setConfirmGerar] = useState(false);
 
   const detailQuery = useQuery({
     queryKey: ["admin-student-detail", studentId],
@@ -75,10 +78,21 @@ export default function AdminAlunoRecorrencia() {
     enabled: isRecorrenciaPkg,
   });
 
+  // CLAUDE.md, 2026-09-08: gerar_pacote_recorrencia (0018) cancela as aulas futuras scheduled de
+  // recorrência do próprio aluno antes de gerar as novas (evita duplicação ao regenerar). A tela
+  // precisa saber ANTES de gerar quantas seriam canceladas, pra avisar o professor — nunca
+  // silenciosamente.
+  const cancelaveisQuery = useQuery({
+    queryKey: ["aulas-cancelaveis-recorrencia", studentId],
+    queryFn: () => countAulasCancelaveisRecorrencia(studentId!),
+    enabled: !!studentId,
+  });
+
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["aluno-recorrencias", studentId] });
     queryClient.invalidateQueries({ queryKey: ["admin-student-detail", studentId] });
     queryClient.invalidateQueries({ queryKey: ["saldo-pacote"] });
+    queryClient.invalidateQueries({ queryKey: ["aulas-cancelaveis-recorrencia", studentId] });
     queryClient.invalidateQueries({ queryKey: ["admin-students"] });
     queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
   }
@@ -138,6 +152,15 @@ export default function AdminAlunoRecorrencia() {
   const ativas = recorrencias.filter((r) => r.ativo);
   const activasCount = ativas.length;
   const saldo = saldoQuery.data ?? null;
+  const cancelaveis = cancelaveisQuery.data ?? 0;
+
+  function pedirGeracao() {
+    if (cancelaveis > 0) {
+      setConfirmGerar(true);
+    } else {
+      gerarPacote.mutate({ totalAulas, startDate: effectiveStartDate });
+    }
+  }
 
   // Seletor de data de início (CLAUDE.md, 2026-09-08): só oferece datas que caem em algum dia
   // fixo ATIVO — nunca uma data solta. Se a seleção atual saiu do conjunto válido (aluno mudou os
@@ -236,7 +259,7 @@ export default function AdminAlunoRecorrencia() {
           <Button
             className="flex-1"
             disabled={activasCount === 0 || !effectiveStartDate || gerarPacote.isPending}
-            onClick={() => gerarPacote.mutate({ totalAulas, startDate: effectiveStartDate })}
+            onClick={pedirGeracao}
           >
             Gerar {totalAulas} aula{totalAulas > 1 ? "s" : ""}
           </Button>
@@ -301,6 +324,19 @@ export default function AdminAlunoRecorrencia() {
           </div>
         </SheetContent>
       </Sheet>
+
+      <ConfirmDialog
+        open={confirmGerar}
+        onOpenChange={setConfirmGerar}
+        title="GERAR PACOTE"
+        description={`${cancelaveis} aula${cancelaveis > 1 ? "s" : ""} do pacote anterior de ${student.name.split(" ")[0]} ${cancelaveis > 1 ? "serão canceladas" : "será cancelada"} (sem contar falta nem gastar crédito) antes de gerar as ${totalAulas} novas. Continuar?`}
+        confirmLabel="Gerar mesmo assim"
+        tone="default"
+        onConfirm={() => {
+          gerarPacote.mutate({ totalAulas, startDate: effectiveStartDate });
+          setConfirmGerar(false);
+        }}
+      />
     </div>
   );
 }

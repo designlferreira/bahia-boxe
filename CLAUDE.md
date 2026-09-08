@@ -525,8 +525,9 @@ reagendamento quanto em reposição (decisão 2).
 | 8 | `0015_mark_no_show_complete_booking_recorrencia.sql` | `create or replace` de `mark_no_show`/`complete_booking` (decisão 7): coalesce de `falta_consome_credito`; quando `pacote_id is not null`, usa esse pacote diretamente (não a busca "mais antigo ativo") e sobrescreve `used_classes` via `calcular_saldo_pacote()`; `pacote_id is null` → comportamento idêntico ao atual. Testada junto com a 0014, com pacote de recorrência gerado de verdade — por isso vem DEPOIS dela, não antes (rodar antes seria inofensivo mas ficaria sem cobertura real por uma etapa inteira) | 4 — **APLICADA (2026-09-07)**, verificação empírica pendente pela tela (Etapa 5), não por SQL |
 | 9 | `0016_gerar_pacote_recorrencia_overlap_check.sql` | `create or replace` de `gerar_pacote_recorrencia`: rejeita a geração inteira se algum slot se sobrepõe (intervalo real) a um booking `scheduled` do mesmo professor de OUTRO aluno — CAMADA 2 contra overbooking (ver seção própria abaixo) | 4 — **APLICADA (2026-09-08)** |
 | 10 | `0017_fix_finished_package_resurrection.sql` | `create or replace` de `mark_no_show`/`complete_booking`: `status` só é escrito quando o valor atual é `active` — corrige um pacote `finished` conseguir voltar a `active` como efeito colateral de concluir/marcar falta numa aula órfã ligada a ele por `pacote_id` (ver seção própria abaixo) | 4 — **APLICADA (2026-09-08)** |
-| 11 | `0018_reagendar_cancelar_aula.sql` | RPCs `reagendar_aula`/`cancelar_aula`, professor-only | 6 |
-| 12 | `0019_aviso_ausencia.sql` | `bookings.aviso_ausencia_em`/`.aviso_ausencia_motivo` (adiado pra cá — não adicionar coluna que nenhuma função usa ainda) + função pro aluno registrar | 8 |
+| 11 | `0018_gerar_pacote_recorrencia_cancela_anteriores.sql` | `create or replace` de `gerar_pacote_recorrencia`: cancela (`cancelado_por='professor'`) as aulas futuras `scheduled` do PRÓPRIO aluno ligadas a um pacote de recorrência anterior, antes de gerar as novas — evita duplicação ao regenerar (ver seção própria abaixo) | 4 — **APLICADA (2026-09-08)** |
+| 12 | `0019_reagendar_cancelar_aula.sql` | RPCs `reagendar_aula`/`cancelar_aula`, professor-only | 6 |
+| 13 | `0020_aviso_ausencia.sql` | `bookings.aviso_ausencia_em`/`.aviso_ausencia_motivo` (adiado pra cá — não adicionar coluna que nenhuma função usa ainda) + função pro aluno registrar | 8 |
 
 ### Etapa 5 — tela (2026-09-07, sem migration nova)
 
@@ -755,6 +756,52 @@ ganha `startDate?: string` opcional, repassado como `fromInstant` via
 `fromZonedTime` — omitido, comportamento idêntico ao de antes (a partir de
 agora). A tela sempre pré-seleciona a primeira opção (a mais próxima), sem
 exigir que o professor escolha manualmente se não quiser.
+
+### Duplicação de bookings ao regenerar pacote (2026-09-08)
+
+Achado na mesma rodada de teste que motivou a correção do item A. Como
+`computeRecorrenciaSlots` não sabe que o aluno já tem aulas futuras
+`scheduled` de um pacote de recorrência anterior ainda não esgotado,
+regenerar produzia datas idênticas às já agendadas — o aluno ficava com
+duas aulas `scheduled` no mesmo horário, visível e confuso na agenda.
+
+Opções descartadas: (1) rejeitar a regeneração inteira quando há aulas
+futuras pendentes — travaria uma renovação legítima, pior que o problema;
+(3) deixar como dívida — mesmo com A corrigido (pacote não ressuscita mais
+sozinho), o aluno continuaria vendo duas aulas marcadas pro mesmo horário.
+
+**Escolhida a opção 2**, com uma correção sobre a proposta original: as
+aulas futuras `scheduled` do PRÓPRIO aluno ligadas a QUALQUER pacote de
+recorrência (`pacote_id is not null` — não só o pacote imediatamente
+anterior, cobre também sobras acumuladas de gerações antigas de antes desta
+correção existir) são canceladas com `cancelado_por = 'professor'` (0018,
+`create or replace` sobre `gerar_pacote_recorrencia`) antes de gerar as
+novas. Não é escolha arbitrária: "cancelado por professor nunca consome
+crédito" já é a regra de crédito existente e testada (tabela em "Crédito —
+regra única") — as aulas descartadas não viram falta nem gastam nada do
+pacote velho. Só aulas FUTURAS e `scheduled` são candidatas; passadas,
+`completed`, `no_show`, `cancelled` ou `rescheduled` ficam intactas — são o
+registro real do que aconteceu, não sobra de agendamento.
+
+O cancelamento roda DENTRO da mesma função/transação, antes de
+`_create_package` e dos inserts em `bookings`: se qualquer checagem
+posterior falhar (recorrência inválida, CAMADA 2 de overlap), a exceção
+desfaz o cancelamento junto — nunca fica "cancelado mas sem pacote novo".
+
+**A tela avisa antes, nunca silenciosamente** (exigência explícita): nova
+`countAulasCancelaveisRecorrencia(studentId)` conta exatamente o que a RPC
+cancelaria; se `> 0`, o clique em "Gerar" abre um `ConfirmDialog`
+("N aula(s) do pacote anterior... serão canceladas... Continuar?") antes de
+chamar a mutation; se `0` (primeira geração), gera direto sem diálogo — não
+há nada a avisar.
+
+**Escopo aceito, não resolvido:** o pacote antigo (agora `finished`) não
+tem `used_classes` resincronizado por este cancelamento — só
+`complete_booking`/`mark_no_show` (0017) tocam nisso. Mesma classe da
+dívida já registrada pro `undo_lesson_action` (decisão 10):
+`calcular_saldo_pacote()`/`saldo_pacotes` continuam corretos a qualquer
+momento; só a cópia materializada de um pacote já fechado (que não é mais
+"o pacote ativo" de ninguém) pode ficar momentaneamente desatualizada.
 
 ### Pontos ainda em aberto
 

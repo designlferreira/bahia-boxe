@@ -937,6 +937,24 @@ export async function getSaldoPacote(pacoteId: string): Promise<SaldoPacote | nu
   return data ? mapSaldoPacote(data) : null;
 }
 
+/**
+ * Quantas aulas futuras `scheduled` de recorrência (`pacote_id is not null`) este aluno tem —
+ * exatamente o que `gerar_pacote_recorrencia` (0018) cancela (`cancelado_por = 'professor'`) antes
+ * de gerar um pacote novo. A tela usa isso pra avisar o professor ANTES de gerar, nunca depois.
+ */
+export async function countAulasCancelaveisRecorrencia(studentId: string): Promise<number> {
+  const nowIso = new Date().toISOString();
+  const { count, error } = await client()
+    .from("bookings")
+    .select("id", { count: "exact", head: true })
+    .eq("student_id", studentId)
+    .not("pacote_id", "is", null)
+    .eq("status", "scheduled")
+    .gt("start_time", nowIso);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
 // ---------------------------------------------------------------------------
 // admin · histórico
 // ---------------------------------------------------------------------------
