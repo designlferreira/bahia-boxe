@@ -8,6 +8,14 @@ import type {
 
 export type Role = "student" | "admin";
 
+/**
+ * Os dois fluxos de agendamento que coexistem na mesma tabela `bookings` (CLAUDE.md, Etapa 7).
+ * Minúsculo por consistência com o valor gravado no banco (`profiles.modo_agendamento`,
+ * `booking_status`, `origin`, `cancelado_por` são todos lowercase) — AUTOSSERVICO/RECORRENCIA em
+ * maiúsculo é só como o CLAUDE.md nomeia o conceito na prosa.
+ */
+export type ModoAgendamento = "autosservico" | "recorrencia";
+
 export interface Profile {
   id: string;
   name: string;
@@ -207,6 +215,8 @@ export interface AppNotification {
 export interface AdminSettings {
   adminId: string;
   noShowConsumesClass: boolean;
+  /** Já coalescido para 'autosservico' quando a coluna é NULL — nunca undefined/null pra quem lê. */
+  modoAgendamento: ModoAgendamento;
 }
 
 export type Sex = "female" | "male" | "other";

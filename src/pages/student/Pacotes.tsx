@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
@@ -7,11 +9,19 @@ import { Button } from "@/components/ui/button";
 import { SkeletonList } from "@/components/SkeletonCard";
 import { formatPriceLabel, packageProgressPct } from "@/lib/packageUtils";
 import { formatDateShort } from "@/lib/dateUtils";
-import { getPackageTemplates, getStudentAdminId, getStudentHome, requestPackage, requestSingleClass } from "@/integrations/backend/api";
+import {
+  getModoAgendamentoEfetivo,
+  getPackageTemplates,
+  getStudentAdminId,
+  getStudentHome,
+  requestPackage,
+  requestSingleClass,
+} from "@/integrations/backend/api";
 import type { PackageTemplate } from "@/integrations/backend/types";
 
 export default function StudentPacotes() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data: home } = useQuery({
@@ -27,10 +37,28 @@ export default function StudentPacotes() {
     staleTime: Infinity,
   });
 
+  // CLAUDE.md, Etapa 7: esta tela CRIA purchase_requests (AUTOSSERVICO — o aluno pede mais
+  // crédito pra se auto-agendar). Em RECORRENCIA o aluno não pede nada, o professor gera o pacote
+  // direto; redireciona igual a Agendar.tsx, mesmo motivo. Sem risco de encalhar configuração
+  // (diferente de AlunoRecorrencia.tsx): esta tela não tem estado próprio pra proteger o acesso.
+  const { data: modoEfetivo } = useQuery({
+    queryKey: ["modo-agendamento-efetivo", adminId],
+    queryFn: () => getModoAgendamentoEfetivo(adminId!),
+    enabled: !!adminId,
+    staleTime: Infinity,
+  });
+
+  useEffect(() => {
+    if (modoEfetivo === "recorrencia") {
+      navigate("/app/historico", { replace: true });
+      toast("Seu professor gerencia sua agenda por recorrência — fale com ele para renovar seu pacote.");
+    }
+  }, [modoEfetivo, navigate]);
+
   const { data: templates, isLoading } = useQuery({
     queryKey: ["package-templates", adminId],
     queryFn: () => getPackageTemplates(adminId!),
-    enabled: !!adminId,
+    enabled: !!adminId && modoEfetivo !== "recorrencia",
   });
 
   const request = useMutation({

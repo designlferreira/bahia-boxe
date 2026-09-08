@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { fromZonedTime } from "date-fns-tz";
 import { Plus } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard, SkeletonList } from "@/components/SkeletonCard";
 import { ErrorState } from "@/components/ErrorState";
@@ -19,6 +20,7 @@ import {
   countAulasCancelaveisRecorrencia,
   createAlunoRecorrencia,
   gerarPacoteRecorrencia,
+  getAdminSettings,
   getAdminStudentDetail,
   getAlunoRecorrencias,
   getRecorrenciaStartDateOptions,
@@ -49,6 +51,7 @@ const DURACAO_MINUTOS = 60;
 
 export default function AdminAlunoRecorrencia() {
   const { studentId } = useParams<{ studentId: string }>();
+  const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
   const [diaSemana, setDiaSemana] = useState(1);
@@ -61,6 +64,23 @@ export default function AdminAlunoRecorrencia() {
     queryKey: ["admin-student-detail", studentId],
     queryFn: () => getAdminStudentDetail(studentId!),
     enabled: !!studentId,
+  });
+
+  // CLAUDE.md, Etapa 7 — CORRIGIDO 2026-09-08: esta tela GERENCIA configuração
+  // (aluno_recorrencia) e só CRIA dado de verdade (bookings/packages) no botão "Gerar pacote".
+  // Redirecionar a tela inteira quando o professor está em AUTOSSERVICO — versão anterior desta
+  // migration — encalhava a configuração já feita: um professor que ativou RECORRENCIA, montou os
+  // dias fixos e voltou pra AUTOSSERVICO perdia todo acesso à tela, sem caminho pra ver ou
+  // desativar o que já tinha configurado. Mesmo problema que a exceção de `/admin/solicitacoes`
+  // já evitava (decisão 3) — só que replicado aqui por engano. A tela agora fica sempre acessível;
+  // só o botão "Gerar pacote" (a ação que materializa bookings/packages de verdade) é bloqueado
+  // quando o modo é AUTOSSERVICO. Leitura é da PRÓPRIA linha do professor (getAdminSettings já
+  // usada em Configuracoes.tsx) — não precisa da RPC modo_agendamento_efetivo, que existe pra
+  // atravessar a fronteira aluno→professor, não professor→próprio perfil.
+  const settingsQuery = useQuery({
+    queryKey: ["admin-settings", profile?.id],
+    queryFn: () => getAdminSettings(profile!.id),
+    enabled: !!profile,
   });
 
   const recorrenciasQuery = useQuery({
@@ -128,7 +148,7 @@ export default function AdminAlunoRecorrencia() {
     onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível gerar o pacote."),
   });
 
-  if (detailQuery.isLoading || recorrenciasQuery.isLoading) {
+  if (detailQuery.isLoading || recorrenciasQuery.isLoading || settingsQuery.isLoading) {
     return (
       <div className="page-container">
         <PageHeader title="RECORRÊNCIA" back />
@@ -153,6 +173,11 @@ export default function AdminAlunoRecorrencia() {
   const activasCount = ativas.length;
   const saldo = saldoQuery.data ?? null;
   const cancelaveis = cancelaveisQuery.data ?? 0;
+  // CLAUDE.md, Etapa 7: ver a tela (dias fixos, saldo, histórico) é sempre permitido — só GERAR
+  // pacote (a ação que materializa bookings/packages de verdade) exige o professor estar em
+  // RECORRENCIA. `undefined` (settings ainda carregando) não bloqueia: já coberto pelo loading gate
+  // acima, então aqui só resta `true`/`false` reais.
+  const emAutosservico = settingsQuery.data?.modoAgendamento === "autosservico";
 
   function pedirGeracao() {
     if (cancelaveis > 0) {
@@ -258,14 +283,20 @@ export default function AdminAlunoRecorrencia() {
           />
           <Button
             className="flex-1"
-            disabled={activasCount === 0 || !effectiveStartDate || gerarPacote.isPending}
+            disabled={emAutosservico || activasCount === 0 || !effectiveStartDate || gerarPacote.isPending}
             onClick={pedirGeracao}
           >
             Gerar {totalAulas} aula{totalAulas > 1 ? "s" : ""}
           </Button>
         </div>
-        {activasCount === 0 && (
-          <div className="text-[12px] text-amber mt-2">Ative pelo menos um dia fixo para gerar um pacote.</div>
+        {emAutosservico ? (
+          <div className="text-[12px] text-amber mt-2">
+            Ative o modo Recorrência em Configurações para gerar pacotes por aqui.
+          </div>
+        ) : (
+          activasCount === 0 && (
+            <div className="text-[12px] text-amber mt-2">Ative pelo menos um dia fixo para gerar um pacote.</div>
+          )
         )}
       </div>
 

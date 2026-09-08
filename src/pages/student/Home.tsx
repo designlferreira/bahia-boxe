@@ -9,7 +9,7 @@ import { SkeletonCard } from "@/components/SkeletonCard";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getStudentHome } from "@/integrations/backend/api";
+import { getModoAgendamentoEfetivo, getStudentAdminId, getStudentHome } from "@/integrations/backend/api";
 import { getStatusConfig } from "@/lib/bookingStatus";
 import { formatDayNumber, formatMonthShort, formatDateTime } from "@/lib/dateUtils";
 
@@ -23,11 +23,32 @@ export default function StudentHome() {
     enabled: !!profile,
   });
 
+  const { data: adminId } = useQuery({
+    queryKey: ["student-admin-id", profile?.id],
+    queryFn: () => getStudentAdminId(profile!.id),
+    enabled: !!profile,
+    staleTime: Infinity,
+  });
+
+  // CLAUDE.md, Etapa 7 — CORRIGIDO 2026-09-08: o botão principal decide QUAL AÇÃO oferecer
+  // (agendar sozinho x ver a agenda que o professor já montou), e isso é navegação — ramifica na
+  // FLAG (modo_agendamento), não no dado de um pacote específico. Antes ramificava em
+  // `recorrenciaSaldo` (existe saldo de recorrência NESTE pacote): um professor que ativa
+  // RECORRENCIA mas cujo aluno ainda segura um pacote `purchase` antigo veria "Agendar aula" —
+  // errado, porque `Agendar.tsx` já redireciona esse aluno pra fora mesmo assim.
+  const { data: modoEfetivo } = useQuery({
+    queryKey: ["modo-agendamento-efetivo", adminId],
+    queryFn: () => getModoAgendamentoEfetivo(adminId!),
+    enabled: !!adminId,
+    staleTime: Infinity,
+  });
+  const isRecorrencia = modoEfetivo === "recorrencia";
+
   if (!profile) return null;
 
-  // RECORRENCIA (CLAUDE.md, 2026-09-08): "crédito disponível" não existe pra quem não se
-  // auto-agenda — ActivePackageCard já resolve isso sozinho (mostra saldo.restantes em vez de
-  // credits quando saldo existe); aqui só precisamos do valor pra decidir o botão principal.
+  // ActivePackageCard já resolve sozinho "crédito disponível" não fazer sentido em recorrência
+  // (mostra saldo.restantes em vez de credits quando `saldo` existe) — isso aqui é só o dado que o
+  // card precisa, não decide mais navegação.
   const saldo = data?.recorrenciaSaldo ?? null;
 
   return (
@@ -107,13 +128,13 @@ export default function StudentHome() {
           <Button
             size="lg"
             className="w-full h-[58px] animate-bb-pulse"
-            onClick={() => navigate(saldo ? "/app/historico" : data.credits === 0 ? "/app/pacotes" : "/app/agendar")}
+            onClick={() => navigate(isRecorrencia ? "/app/historico" : data.credits === 0 ? "/app/pacotes" : "/app/agendar")}
           >
             <Calendar className="h-[19px] w-[19px]" />
-            {saldo ? "Ver minhas aulas" : data.credits === 0 ? "Solicitar pacote" : "Agendar aula"}
+            {isRecorrencia ? "Ver minhas aulas" : data.credits === 0 ? "Solicitar pacote" : "Agendar aula"}
           </Button>
           <div className="text-center text-xs text-muted-foreground mt-2.5">
-            {saldo
+            {isRecorrencia
               ? "Suas aulas já estão marcadas pelo professor"
               : data.credits === 0
                 ? "Seu pacote acabou — peça a renovação"

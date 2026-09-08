@@ -6,7 +6,14 @@ import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { Switch } from "@/components/ui/switch";
-import { getAdminSettings, updateNoShowConsumesClass } from "@/integrations/backend/api";
+import { cn } from "@/lib/utils";
+import { getAdminSettings, updateModoAgendamento, updateNoShowConsumesClass } from "@/integrations/backend/api";
+import type { ModoAgendamento } from "@/integrations/backend/types";
+
+const MODO_OPTIONS: { value: ModoAgendamento; label: string }[] = [
+  { value: "autosservico", label: "Autosserviço" },
+  { value: "recorrencia", label: "Recorrência" },
+];
 
 export default function AdminConfiguracoes() {
   const { profile } = useAuth();
@@ -25,6 +32,14 @@ export default function AdminConfiguracoes() {
     onSuccess: (_r, value) => {
       queryClient.invalidateQueries({ queryKey: key });
       toast(value ? "Falta passa a consumir crédito" : "Falta não consome mais crédito");
+    },
+  });
+
+  const toggleModo = useMutation({
+    mutationFn: (value: ModoAgendamento) => updateModoAgendamento(profile!.id, value),
+    onSuccess: (_r, value) => {
+      queryClient.invalidateQueries({ queryKey: key });
+      toast(value === "recorrencia" ? "Modo Recorrência ativado" : "Modo Autosserviço ativado");
     },
   });
 
@@ -48,6 +63,7 @@ export default function AdminConfiguracoes() {
       </button>
 
       {isLoading && <SkeletonCard height={80} />}
+      {isLoading && <SkeletonCard height={120} className="mt-3.5" />}
 
       {!isLoading && (
         <div className="card-dark p-4 flex items-center gap-3">
@@ -62,6 +78,40 @@ export default function AdminConfiguracoes() {
             checked={data?.noShowConsumesClass ?? true}
             onCheckedChange={(v) => toggle.mutate(v)}
           />
+        </div>
+      )}
+
+      {!isLoading && (
+        <div className="card-dark p-4 mt-3.5">
+          <div className="text-[14.5px] font-semibold text-foreground">Modo de agendamento</div>
+          <div className="text-[12.5px] text-muted-foreground mt-0.5">
+            Autosserviço: o aluno escolhe o horário na sua disponibilidade publicada. Recorrência:
+            você define dias fixos por aluno e gera os pacotes de aulas.
+          </div>
+          <div className="flex gap-2 mt-3">
+            {MODO_OPTIONS.map((opt) => {
+              const active = (data?.modoAgendamento ?? "autosservico") === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  aria-pressed={active}
+                  disabled={toggleModo.isPending}
+                  onClick={() => toggleModo.mutate(opt.value)}
+                  className={cn(
+                    "flex-1 h-10 rounded-xl text-[13px] font-semibold transition-colors",
+                    active ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground",
+                  )}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="text-[11.5px] text-muted-foreground/80 mt-2.5">
+            Trocar aqui não migra nenhum dado: pacotes e aulas já criados continuam exatamente como
+            estão, nos dois modos. Isto só decide qual fluxo fica disponível daqui pra frente.
+          </div>
         </div>
       )}
     </div>

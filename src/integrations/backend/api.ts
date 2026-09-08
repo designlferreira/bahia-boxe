@@ -12,6 +12,7 @@ import type {
   BoxingProfileAssessmentSummary,
   Guard,
   Laterality,
+  ModoAgendamento,
   PackageRecord,
   PackageTemplate,
   PurchaseRequest,
@@ -1395,16 +1396,42 @@ export async function restoreAvailabilityInterval(interval: AvailabilityInterval
 export async function getAdminSettings(adminId: string): Promise<AdminSettings | null> {
   const { data, error } = await client()
     .from("profiles")
-    .select("id, no_show_consumes_class")
+    .select("id, no_show_consumes_class, modo_agendamento")
     .eq("id", adminId)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  return data ? { adminId: data.id, noShowConsumesClass: data.no_show_consumes_class } : null;
+  return data
+    ? {
+        adminId: data.id,
+        noShowConsumesClass: data.no_show_consumes_class,
+        modoAgendamento: (data.modo_agendamento as ModoAgendamento | null) ?? "autosservico",
+      }
+    : null;
 }
 
 export async function updateNoShowConsumesClass(adminId: string, value: boolean) {
   const { error } = await client().from("profiles").update({ no_show_consumes_class: value }).eq("id", adminId);
   if (error) throw new Error(error.message);
+}
+
+export async function updateModoAgendamento(adminId: string, value: ModoAgendamento) {
+  const { error } = await client().from("profiles").update({ modo_agendamento: value }).eq("id", adminId);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Lê o modo de agendamento efetivo do professor a partir de OUTRA conta (ex.: o aluno checando o
+ * do próprio professor antes de abrir "Agendar"). Vai por RPC, não por `.from("profiles")`: a
+ * policy de `profiles` não abre leitura nesse sentido de propósito (supabase/README.md — "Aluno
+ * não enxerga o perfil do professor"), e reabri-la só por causa desta flag reabriria a tabela
+ * inteira, não só o campo. `modo_agendamento_efetivo()` (0022) já devolve coalescido para
+ * 'autosservico' quando a coluna é NULL. O próprio professor lendo o próprio modo usa
+ * `getAdminSettings` (leitura direta da própria linha, já permitida) em vez desta função.
+ */
+export async function getModoAgendamentoEfetivo(professorId: string): Promise<ModoAgendamento> {
+  const { data, error } = await client().rpc("modo_agendamento_efetivo", { p_professor_id: professorId });
+  if (error) throw new Error(error.message);
+  return data as ModoAgendamento;
 }
 
 // ---------------------------------------------------------------------------

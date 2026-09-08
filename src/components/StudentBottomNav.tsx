@@ -1,15 +1,39 @@
 import { NavLink } from "react-router-dom";
 import { Home, CalendarPlus, ListChecks, UserRound } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
+import { getModoAgendamentoEfetivo, getStudentAdminId } from "@/integrations/backend/api";
 
-const items = [
+const ALL_ITEMS = [
   { to: "/app/home", label: "Início", icon: Home },
-  { to: "/app/agendar", label: "Agendar", icon: CalendarPlus },
+  { to: "/app/agendar", label: "Agendar", icon: CalendarPlus, autosservicoOnly: true },
   { to: "/app/historico", label: "Aulas", icon: ListChecks },
   { to: "/app/minha-conta", label: "Conta", icon: UserRound },
 ];
 
 export function StudentBottomNav() {
+  const { profile } = useAuth();
+
+  const { data: adminId } = useQuery({
+    queryKey: ["student-admin-id", profile?.id],
+    queryFn: () => getStudentAdminId(profile!.id),
+    enabled: !!profile,
+    staleTime: Infinity,
+  });
+
+  // CLAUDE.md, Etapa 7: a rota /app/agendar já redireciona sozinha quando o professor está em
+  // RECORRENCIA (Agendar.tsx) — isso aqui é só não deixar a aba visível oferecendo uma tela que só
+  // vai empurrar o aluno pra outro lugar no toque seguinte.
+  const { data: modoEfetivo } = useQuery({
+    queryKey: ["modo-agendamento-efetivo", adminId],
+    queryFn: () => getModoAgendamentoEfetivo(adminId!),
+    enabled: !!adminId,
+    staleTime: Infinity,
+  });
+
+  const items = ALL_ITEMS.filter((item) => !item.autosservicoOnly || modoEfetivo !== "recorrencia");
+
   return (
     <nav
       aria-label="Navegação principal"

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { addDays } from "date-fns";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -9,7 +9,13 @@ import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatDayNumber, formatWeekdayLong, formatWeekdayShort } from "@/lib/dateUtils";
-import { getAvailableSlotsForDay, getStudentAdminId, getStudentHome, scheduleBooking } from "@/integrations/backend/api";
+import {
+  getAvailableSlotsForDay,
+  getModoAgendamentoEfetivo,
+  getStudentAdminId,
+  getStudentHome,
+  scheduleBooking,
+} from "@/integrations/backend/api";
 import type { DaySlot } from "@/integrations/backend/api";
 import { CalendarSearch } from "lucide-react";
 
@@ -38,10 +44,28 @@ export default function StudentAgendar() {
     staleTime: Infinity,
   });
 
+  // CLAUDE.md, Etapa 7: quando o professor está em RECORRENCIA, ele controla a agenda do aluno —
+  // "Agendar aula" é uma tela do fluxo AUTOSSERVICO e não deve criar reserva nenhuma nesse modo.
+  // Redireciona em vez de esconder o link só na Home, porque o link de volta ("Ver minhas aulas")
+  // ou um deep link salvo ainda levariam pra cá.
+  const { data: modoEfetivo } = useQuery({
+    queryKey: ["modo-agendamento-efetivo", adminId],
+    queryFn: () => getModoAgendamentoEfetivo(adminId!),
+    enabled: !!adminId,
+    staleTime: Infinity,
+  });
+
+  useEffect(() => {
+    if (modoEfetivo === "recorrencia") {
+      navigate("/app/historico", { replace: true });
+      toast("Seu professor gerencia sua agenda por recorrência — fale com ele para marcar aulas.");
+    }
+  }, [modoEfetivo, navigate]);
+
   const { data: slots, isLoading } = useQuery({
     queryKey: ["available-slots", adminId, selectedDate.toDateString()],
     queryFn: () => getAvailableSlotsForDay(adminId!, selectedDate),
-    enabled: !!adminId,
+    enabled: !!adminId && modoEfetivo !== "recorrencia",
   });
 
   const schedule = useMutation({

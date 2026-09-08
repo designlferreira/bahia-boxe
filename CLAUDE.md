@@ -577,7 +577,8 @@ reagendamento quanto em reposição (decisão 2).
 | 12 | `0019_cancelado_por_regeneracao.sql` | `cancelado_por` ganha o terceiro valor `'regeneracao'` (CHECK estendido); `gerar_pacote_recorrencia` passa a gravá-lo e a NÃO cancelar reposições (`replacement_for_booking_id is not null`); **backfill** das linhas já canceladas pela 0018 (`'professor'` → `'regeneracao'`) — único UPDATE de dados do arquivo (ver seção própria abaixo) | 4 |
 | 13 | `0020_reagendar_cancelar_aula.sql` | RPCs `reagendar_aula`/`cancelar_aula`, professor-only + **reordenação** de `complete_booking`/`mark_no_show` (ramo `pacote_id` antes do early-return de `is_replacement`) — ver seção própria abaixo | 6 |
 | 14 | `0021_undo_recorrencia_e_overlap_do_proprio_aluno.sql` | `undo_lesson_action` ganha o ramo de recorrência com **reabertura condicionada** (assimetria deliberada com a 0017 — ver seção própria); `gerar_pacote_recorrencia` cancela a grade ANTES de checar sobreposição e passa a checar também contra o próprio aluno, com mensagens distintas | 6 |
-| 15 | `0022_aviso_ausencia.sql` | `bookings.aviso_ausencia_em`/`.aviso_ausencia_motivo` (adiado pra cá — não adicionar coluna que nenhuma função usa ainda) + função pro aluno registrar | 8 |
+| 15 | `0022_modo_agendamento.sql` | `profiles.modo_agendamento` (nullable, `check in ('autosservico','recorrencia')`) + RPC `modo_agendamento_efetivo(p_professor_id)` | 7 — **APLICADA (2026-09-08)**, verificação por script pendente de rodar (`supabase/verify_modo_agendamento.sql`) |
+| 16 | `0023_aviso_ausencia.sql` | `bookings.aviso_ausencia_em`/`.aviso_ausencia_motivo` (adiado pra cá — não adicionar coluna que nenhuma função usa ainda) + função pro aluno registrar — **renumerada de 0022 pra 0023** quando a Etapa 7 (linha acima) tomou o número 0022 primeiro | 8 |
 
 ### Etapa 5 — tela (2026-09-07, sem migration nova)
 
@@ -1137,6 +1138,168 @@ origem: a Etapa 6 mexeu no modelo e parou na tela de detalhe.
    uma consulta por linha. O antecessor quase nunca está no conjunto já
    carregado (remarcar é mover para outro dia), então ele precisa mesmo ser
    buscado; o que não pode é buscar N vezes.
+
+### Etapa 7 — `modo_agendamento` (2026-09-08, 0022)
+
+**Nota de proveniência:** as decisões desta seção foram fechadas numa sessão anterior a esta
+edição do CLAUDE.md, e essa sessão foi encerrada por `/clear` antes de serem escritas aqui — ao
+contrário de toda a Etapa 1-6, que foi registrada pela mesma sessão que decidiu. O texto abaixo
+reconstrói as decisões a partir da confirmação do usuário na sessão seguinte (que recitou cada uma
+de volta antes de mandar implementar), não de um registro contemporâneo à decisão original. Ver a
+lição no topo deste arquivo: **é por isso que a regra "documentar antes de perder o contexto"
+existe** — esta seção quase não existiu.
+
+**O problema.** As Etapas 1-6 deram à RECORRENCIA todo o modelo de dados e as RPCs, mas nenhuma
+tela sabe que os dois fluxos não deveriam estar sempre os dois visíveis ao mesmo tempo: um
+professor 100% em recorrência ainda expõe "Agendar aula" pro aluno (que nunca deveria escolher
+horário sozinho nesse modo) e nada impede abrir a tela de recorrência de um aluno cujo professor
+nunca ativou esse fluxo. `modo_agendamento` é a flag que resolve isso — só decide QUAL fluxo cada
+tela oferece; não muda nenhuma regra de crédito, RPC de ciclo de vida de aula, ou policy de RLS
+além do necessário pra ler a própria flag.
+
+**Decisão 1 — vocabulário.** Valor gravado em minúsculo: `'autosservico'` / `'recorrencia'`
+(`profiles.modo_agendamento`, `text` + `check`). Consistência com o resto do banco vence
+(`booking_status`, `origin`, `kind`, `cancelado_por` são todos lowercase) — mesmo raciocínio já
+registrado em `cancelado_por` (decisão do entities). `AUTOSSERVICO`/`RECORRENCIA` maiúsculo
+continua existindo só na prosa deste arquivo e em constantes TypeScript (`ModoAgendamento` em
+`types.ts`), nunca no valor persistido.
+
+**Decisão 2 — leitura via RPC, não via policy nova.** `modo_agendamento_efetivo(p_professor_id)`
+(`security definer`, 0022) é o único jeito de alguém que NÃO é o próprio professor ler a flag —
+usado pelo aluno, do lado de `Agendar.tsx`, pra saber o modo do próprio professor antes de oferecer
+a tela de autoagendamento. A alternativa óbvia (abrir uma policy de `select` em `profiles` no
+sentido aluno→professor) foi descartada: essa fronteira é fechada de propósito neste projeto
+(`supabase/README.md`: "Aluno não enxerga o perfil do professor"; as views `student_booking_history`
+e `booking_history_app` existem justamente pra resolver `admin_name` sem abrir essa policy). RLS não
+filtra coluna — abrir `select` por causa de UMA flag reabriria a linha inteira do professor pro
+aluno, desproporcional a uma flag de navegação. A função devolve só o campo necessário, já
+coalescido (`coalesce(modo_agendamento, 'autosservico')`), com autorização interna própria (mesmo
+padrão de `calcular_saldo_pacote`, 0013): só o próprio professor ou um aluno matriculado com ele
+pode perguntar. O professor lendo o PRÓPRIO modo continua indo direto em `profiles` via
+`getAdminSettings` (mesmo caminho que já existia pra `no_show_consumes_class`) — a RPC só existe
+pra atravessar a fronteira que a policy não atravessa; não há razão pra uma leitura da própria
+linha, já permitida, passar por uma função a mais.
+
+**Decisão 3 (SUB-DECISÃO D) — bloqueio assimétrico: só onde o usuário CRIA dado do fluxo errado.**
+Duas superfícies de CRIAÇÃO, uma por fluxo. O critério é "quem CRIA dado", não "de quem é a tela"
+— **não confundir com uma separação por AUDIÊNCIA** (aluno sempre redirect, professor só some da
+navegação); um rascunho anterior desta etapa usou esse critério e ficou incompleto, ver a correção
+logo abaixo desta seção:
+
+- `student/Agendar.tsx` (cria `bookings` via `schedule_booking`, AUTOSSERVICO) — se
+  `modo_agendamento_efetivo(professorId) === 'recorrencia'`, redireciona o aluno pra
+  `/app/historico` com toast explicando ("seu professor gerencia sua agenda por recorrência").
+- `student/Pacotes.tsx` (cria `purchase_requests` via `requestPackage`/`requestSingleClass`,
+  AUTOSSERVICO — o aluno pede mais crédito pra se auto-agendar) — mesmo tratamento de
+  `Agendar.tsx`: redireciona pra `/app/historico`. Sem risco de encalhar nada: esta tela não tem
+  estado próprio pra proteger acesso, ao contrário de `AlunoRecorrencia.tsx` (ver correção abaixo).
+- `admin/AlunoRecorrencia.tsx` (cria `bookings`/`packages` via `gerar_pacote_recorrencia`,
+  RECORRENCIA) — **corrigido, ver seção "Correção: bloqueio por AÇÃO, não por TELA" abaixo.**
+
+**`/admin/solicitacoes` (`Pedidos.tsx`, tabela `purchase_requests`) foi DELIBERADAMENTE deixada de
+fora — não é uma omissão.** Ali o professor não cria dado do fluxo errado: ele DECIDE
+(aprovar/rejeitar) um pedido que o ALUNO já criou antes, possivelmente antes de o professor trocar
+de modo. Se essa tela fosse bloqueada por modo, um `purchase_request` pendente vira dado órfão sem
+caminho de resolução nenhum — o aluno não pode desfazer o próprio pedido, e o professor não teria
+como aprovar nem rejeitar. Bloquear a criação evita lixo novo; bloquear a leitura/decisão de um
+pedido que já existe apenas transforma o lixo em travado. A assimetria é o ponto, não um
+esquecimento — se algum dia parecer inconsistente com o resto (todas as outras superfícies de
+RECORRENCIA são bloqueadas por modo), é isso: comportamento decidido, releia esta seção antes de
+"corrigir".
+
+Nenhuma outra tela foi gateada nesta etapa (`Disponibilidade.tsx`, `Pacotes.tsx`/templates,
+`Pedidos.tsx`) — publicar disponibilidade ou manter templates de pacote comprável não cria dado
+inconsistente por si só mesmo com o professor em recorrência; escopo restrito às duas superfícies
+que efetivamente materializam aula/pacote em nome do aluno.
+
+**UI em `/admin/configuracoes`.** Mesmo cartão de padrão do `no_show_consumes_class` (leitura via
+`getAdminSettings`, escrita via mutation dedicada — aqui `updateModoAgendamento`), mas como
+seletor de dois valores nomeados, não um `Switch` booleano. Acompanha aviso explícito, sempre
+visível (não só num tooltip): **trocar a flag NÃO migra nenhum dado — pacotes e aulas já criados
+continuam exatamente como estão, nos dois modos.** Necessário porque nada nesta etapa reconcilia
+dado nenhum entre os dois fluxos; a flag é pura seleção de navegação. Um professor que já tem
+aulas AUTOSSERVICO e liga RECORRENCIA (ou vice-versa) não vê nada acontecer com o que já existe —
+só passa a ver telas diferentes daqui pra frente.
+
+**Verificação.** `supabase/verify_modo_agendamento.sql` — mesmo padrão de
+`verify_calcular_saldo_pacote.sql` (transação explícita terminada em `rollback`, resultado por
+tabela temporária lida antes do rollback, não por `RAISE NOTICE`). Roteiro combinado com o usuário:
+(1) propriedade nullable+coalesce — todo professor deve ler `'autosservico'` antes de qualquer
+escrita; (1b) um aluno matriculado lê o mesmo valor que o próprio professor (prova que a RPC
+atravessa a fronteira); (2) virar a flag pra `'recorrencia'` muda a leitura E não move nenhuma
+linha de `bookings`/`packages`; (3) voltar a flag reproduz exatamente o estado original — prova de
+que nada no caminho AUTOSSERVICO foi tocado, só ficou temporariamente inacessível pela tela.
+**Status real (2026-09-08): script escrito, AINDA NÃO EXECUTADO contra o banco** — mesma ressalva
+já registrada em outras migrations desta etapa (decisões 6 e 8): rodar antes de considerar a Etapa
+7 fechada. Só existe um professor neste banco (`supabase/README.md`), então o caso negativo "aluno
+de outro professor tentando ler este" não tem dado real pra exercitar — não fabricado, registrado
+como lacuna de cobertura, não como bug.
+
+**Fora do escopo desta etapa, registrado pra não parecer esquecimento:** nenhuma RPC de crédito
+(`complete_booking`, `mark_no_show`, `calcular_saldo_pacote`, etc.) foi tocada — `modo_agendamento`
+não participa de nenhuma regra de crédito, só de navegação. "Mudança de recorrência" (ponto em
+aberto já registrado abaixo) e o card "Recorrência" em `AlunoDetalhe.tsx` continuam visíveis mesmo
+quando o professor está em autosserviço (a tela de destino é que redireciona, o link não foi
+escondido) — deliberado, pra manter esta etapa no mínimo necessário; esconder o link é possível
+depois, sem migration nova.
+
+### Correção: bloqueio por AÇÃO, não por TELA (2026-09-08)
+
+**Achado pelo usuário, revisando a decisão 3 acima.** A implementação original redirecionava a
+tela `admin/AlunoRecorrencia.tsx` INTEIRA sempre que o professor estava em `'autosservico'` —
+mesmo tratamento de `Agendar.tsx`. Isso encalha configuração real: um professor que ativa
+RECORRENCIA, cadastra dias fixos pra um aluno, e depois volta pra AUTOSSERVICO (por qualquer
+motivo — testar, decidir que não era pra esse aluno, alternar sazonalmente) perde TODO acesso à
+tela, sem caminho nenhum pra ver, desativar ou entender o que já tinha configurado. É exatamente o
+"dado órfão sem caminho de resolução" que a exceção de `/admin/solicitacoes` (decisão 3, acima)
+já existia pra evitar — só que replicada aqui por não ter sido generalizada.
+
+A diferença entre `Agendar.tsx`/`Pacotes.tsx` (redirect de tela inteira está certo) e
+`AlunoRecorrencia.tsx` (não estava) é estrutural, não um detalhe de UX: as duas primeiras não têm
+NADA pra proteger acesso de leitura — `Agendar.tsx` é só a grade de horários do dia, `Pacotes.tsx`
+é só a lista de templates pra pedir; sair delas não esconde configuração de ninguém.
+`AlunoRecorrencia.tsx` é diferente: ela é ao mesmo tempo a tela de GERENCIAR configuração
+(`aluno_recorrencia` — ver/ativar/desativar dias fixos, ver saldo do pacote atual) e a tela de
+CRIAR compromisso novo (o botão "Gerar pacote", que materializa `packages`/`bookings` de verdade).
+Bloquear a tela inteira confundia as duas.
+
+**Correção:** a tela fica sempre acessível — dias fixos, saldo, histórico, tudo visível e
+editável (ativar/desativar dia fixo, adicionar novo) independente do modo. Só o botão **"Gerar
+pacote"** — a única ação que de fato materializa `bookings`/`packages`, o artefato que realmente
+conflita com AUTOSSERVICO — fica desabilitado quando o professor está em `'autosservico'`, com uma
+linha explicando o que fazer ("Ative o modo Recorrência em Configurações"). Mesmo princípio já
+usado em `/admin/solicitacoes`: bloquear a CRIAÇÃO evita lixo novo; bloquear a
+leitura/gerenciamento de configuração que já existe só transforma configuração em lixo travado.
+
+**Enquanto corrigia isso, três lacunas reais** (não decisões deliberadas — coisas que a etapa
+original simplesmente não cobriu):
+
+- **Botão principal da Home do aluno** (`student/Home.tsx`) ramificava em `recorrenciaSaldo`
+  (dado do PACOTE em mãos), não na flag. Consequência: um professor que ativa RECORRENCIA enquanto
+  o aluno ainda segura um pacote `purchase` antigo veria "Agendar aula" oferecido — que
+  `Agendar.tsx` redirecionaria de qualquer jeito, mas a Home prometia uma ação que a próxima tela
+  não cumpriria. Corrigido pra ramificar em `modo_agendamento_efetivo` — é decisão de NAVEGAÇÃO
+  (qual ação oferecer), não do pacote específico (princípio já registrado acima: flag decide o que
+  o professor OPERA, dado decide o que um pacote/aula É).
+- **Aba "Agendar" do `StudentBottomNav`** continuava visível e tocável mesmo com a rota
+  redirecionando sozinha — o aluno via a aba, tocava, e caía de volta imediatamente em
+  "Aulas". A aba some da navegação quando `modo_agendamento_efetivo === 'recorrencia'` (a ROTA
+  continua redirecionando também — defesa em duas camadas, mesmo padrão de `_create_package`:
+  esconder o caminho normal não é a única proteção).
+- **`student/Pacotes.tsx`** não tinha gate nenhum — ver decisão 3 corrigida acima.
+
+**Confirmado, NÃO são lacunas — continuam exatamente como decidido:**
+
+- `/admin/disponibilidade` e `/admin/solicitacoes` (+ item "Pedidos" do `AdminBottomNav`) seguem
+  SEM gate nenhum. Publicar disponibilidade não cria dado inconsistente por si só, e bloquear
+  solicitações estranharia pedidos pendentes — mesmo raciocínio de sempre, nenhum motivo novo pra
+  revisar só porque `AlunoRecorrencia.tsx` mudou de tratamento (a mudança ali foi de "tela inteira"
+  pra "ação específica", não de "sem gate" pra "com gate" — não se aplica aqui, essas duas telas já
+  não tinham NENHUMA ação equivalente a "Gerar pacote" pra isolar).
+- Card "Recorrência" em `AlunoDetalhe.tsx` continua visível em qualquer modo — e agora essa escolha
+  fica ainda mais consistente do que antes: como `AlunoRecorrencia.tsx` deixou de redirecionar
+  tela inteira, abrir o card em AUTOSSERVICO mostra a mesma configuração de sempre, só com "Gerar
+  pacote" desabilitado — nenhum comportamento surpreendente atrás do link.
 
 ### Pontos ainda em aberto
 
