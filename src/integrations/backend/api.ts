@@ -299,9 +299,20 @@ export async function getStudentHome(profileId: string) {
   if (suggestionRes.error) throw new Error(suggestionRes.error.message);
   const upcoming = (upcomingRes.data ?? [])[0];
   const suggestion = (suggestionRes.data ?? [])[0];
+
+  // RECORRENCIA (CLAUDE.md, 2026-09-08): "crédito disponível" (available_credits_for_student)
+  // não faz sentido pra quem não se auto-agenda — as aulas já nascem marcadas, então o número
+  // sempre bate em zero por construção (ver diagnóstico registrado no CLAUDE.md). O número certo
+  // pra esse aluno é "aulas restantes no pacote", vindo de saldo_pacotes (decisão 4 — única
+  // autoridade), não do materializado used_classes. `recorrenciaSaldo` fica null pra qualquer
+  // outra origem — `credits` continua exatamente como sempre foi, intocado.
+  const isRecorrenciaPkg = pkg?.origin === "recurrence" && pkg.status === "active";
+  const recorrenciaSaldo = isRecorrenciaPkg ? await getSaldoPacote(pkg!.id) : null;
+
   return {
     package: pkg,
     credits,
+    recorrenciaSaldo,
     nextBooking: upcoming ? mapBooking(upcoming) : null,
     suggestion: suggestion ? mapBooking(suggestion) : null,
   };
@@ -438,11 +449,15 @@ export async function getStudentBookingHistory(
   tab: "proximas" | "anteriores" | "todas",
 ): Promise<Booking[]> {
   const studentId = await studentIdForProfile(profileId);
+  // "proximas" precisa da mais próxima primeiro (ascendente); "anteriores"/"todas" continuam como
+  // sempre foram, mais recente primeiro (descendente) — bug real corrigido aqui (2026-09-08): as
+  // três abas reusavam a MESMA ordem descendente, então "proximas" mostrava a aula mais DISTANTE
+  // no topo em vez da mais próxima.
   const { data, error } = await client()
     .from("bookings")
     .select("*")
     .eq("student_id", studentId)
-    .order("start_time", { ascending: false });
+    .order("start_time", { ascending: tab === "proximas" });
   if (error) throw new Error(error.message);
   const now = Date.now();
   return (data ?? [])

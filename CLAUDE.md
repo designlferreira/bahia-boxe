@@ -649,6 +649,83 @@ a qual tela está renderizando. `saldo` (`saldo_pacotes`) só é buscado por
 quem chama, quando `pkg.origin === 'recurrence' && pkg.status === 'active'`
 — o card em si não decide isso.
 
+### "Crédito disponível" não existe na RECORRENCIA (2026-09-08)
+
+Achado em teste real: aluno com recorrência ativa ficava com crédito
+disponível ZERO permanentemente, e o alerta "peça a renovação" sempre
+ligado. Diagnosticado por leitura do corpo real de
+`available_credits_for_student` (RPC pré-existente, confirmada via
+`pg_get_functiondef`, NÃO alterada — continua servindo o AUTOSSERVICO
+corretamente):
+
+```sql
+select greatest(0,
+  coalesce(sum(total_classes - used_classes) dos pacotes 'active', 0)
+  - coalesce(count(*) de bookings 'scheduled'/'pending_confirmation' futuros, 0)
+);
+```
+
+Pra um pacote de recorrência, as N aulas nascem TODAS `scheduled` de uma vez
+(Etapa 4) — "aulas restantes" e "reservas futuras" são exatamente o MESMO
+conjunto de linhas, então a subtração dá zero por construção, durante toda a
+vida do pacote (concluir uma aula tira 1 de cada lado da subtração
+igualmente). Não é bug de cálculo — é um conceito ("quanto ainda posso
+agendar") que não existe pra quem não se auto-agenda. O número certo é
+"aulas restantes no pacote".
+
+**Decisão:** quando o pacote ativo do aluno tem `origin === 'recurrence'`,
+a Home do aluno (`student/Home.tsx`) para de ler `available_credits_for_student`
+pra esse card e passa a ler `saldo_pacotes.restantes` (decisão 4 — única
+autoridade, não `pkg.totalClasses - pkg.usedClasses`, que tem a lacuna já
+registrada do `undo_lesson_action`). `getStudentHome()` (`api.ts`) ganha um
+campo novo, `recorrenciaSaldo: SaldoPacote | null` — busca condicional, só
+quando há pacote `active` de recorrência; `credits` continua exatamente
+como sempre foi pra todo o resto.
+
+Rótulo/número/alerta do card de crédito ficam condicionais a
+`recorrenciaSaldo`: "Aulas restantes" em vez de "Créditos disponíveis",
+alerta de poucas aulas a partir de `restantes <= 2` (mesmo limiar de sempre,
+fonte diferente), texto do alerta sem "peça a renovação" (o aluno não pede
+nada nesse fluxo — quem recebe o alerta de "restam 2 ou menos aulas" é o
+professor, invariante já registrada acima).
+
+**Botão principal da Home também ramifica**, não só por causa do número
+zerado — o botão nunca fez sentido pra quem não se auto-agenda, e deixar
+"Solicitar pacote" (destino `/app/pacotes`) continuar aparecendo por
+acidente (por `credits === 0` bater sempre) escondia isso. Enquanto
+`modo_agendamento`/Etapa 7 não existe pra separar as telas de verdade: com
+`recorrenciaSaldo` presente, o botão vira "Ver minhas aulas" → `/app/historico`
+(mesma tela de "MINHAS AULAS" que já lista os agendamentos do aluno,
+inclusive futuros — aba "Próximas" já existente), com o texto de apoio
+"Suas aulas já estão marcadas pelo professor" em vez de "Escolha dia e
+horário em 2 toques".
+
+### Bug de ordenação em "Minhas Aulas" (2026-09-08)
+
+Achado ao investigar o item acima (não relacionado à RECORRENCIA — afeta
+qualquer aluno). `getStudentBookingHistory` (`api.ts`) buscava as aulas com
+`order by start_time desc` uma única vez e reusava esse resultado pras três
+abas (Próximas/Anteriores/Todas) só filtrando depois no cliente. Pra
+"Anteriores"/"Todas" isso é a ordem certa (mais recente primeiro); pra
+"Próximas" é a ordem ERRADA — mostrava a aula mais DISTANTE no topo em vez
+da mais próxima. Corrigido: a query agora ordena `ascending: tab ===
+'proximas'` — só essa aba passa a pedir ordem crescente, as outras duas
+continuam exatamente como sempre foram.
+
+**Outras listas verificadas, NÃO afetadas** (mesma varredura, por pedido
+explícito):
+- `getStudentHome`'s "próxima aula" — query dedicada, já `ascending: true`
+  + `limit(1)`, correta desde sempre.
+- `getAdminAgendaForDay` (agenda do professor por dia) — ordena por hora
+  ascendente explicitamente, sem relação com esse bug.
+- `getAdminStudentDetail`'s "ÚLTIMAS AULAS" — descendente por design
+  (recência, não "próximas"), correto como está.
+- `getAdminBookingHistory`/`AdminHistorico.tsx` — também descendente,
+  mas essa tela é uma auditoria (filtros por status, não abas
+  Próximas/Anteriores) — não tem a mesma promessa de "mais próxima primeiro"
+  que motivou a correção acima. Deixado como está; sinalizar se algum dia
+  precisar de uma aba "Próximas" análoga.
+
 ### Pontos ainda em aberto
 
 Decidir antes de chegar na etapa correspondente:
