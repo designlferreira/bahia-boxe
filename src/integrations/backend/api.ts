@@ -468,13 +468,17 @@ export async function getStudentBookingHistory(
     .from("bookings")
     .select("*")
     .eq("student_id", studentId)
+    .or(SEM_DESCARTE_DE_REGENERACAO)
     .order("start_time", { ascending: tab === "proximas" });
   if (error) throw new Error(error.message);
   const now = Date.now();
   return (data ?? [])
     .filter((r) => {
       const isFuture = new Date(r.start_time).getTime() > now;
-      if (tab === "proximas") return isFuture;
+      // "Próximas" é o que ainda vai acontecer: uma aula cancelada não vai. Nas abas de histórico,
+      // cancelamento pelo professor CONTINUA aparecendo — é um fato que o aluno viveu; só o
+      // descarte por regeneração some (filtrado na query acima), porque nunca foi compromisso.
+      if (tab === "proximas") return isFuture && r.status !== "cancelled";
       if (tab === "anteriores") return !isFuture;
       return true;
     })
@@ -796,13 +800,37 @@ export async function getAdminStudentDetail(studentId: string) {
     .single();
   if (error) throw new Error(error.message);
 
-  const [names, pkg, credits, historyRes] = await Promise.all([
+  const [names, pkg, credits, historyRes, completedRes, noShowRes] = await Promise.all([
     profileNames([row.profile_id]),
     activePackageForStudentRow(studentId),
     creditsAvailableFor(studentId),
-    client().from("bookings").select("*").eq("student_id", studentId).order("start_time", { ascending: false }).limit(6),
+    // Janela de exibição ("ÚLTIMAS AULAS"), não base de cálculo — ver os dois counts abaixo.
+    client()
+      .from("bookings")
+      .select("*")
+      .eq("student_id", studentId)
+      .or(SEM_DESCARTE_DE_REGENERACAO)
+      .order("start_time", { ascending: false })
+      .limit(6),
+    // Frequência/faltas contam sobre TODAS as aulas que aconteceram, não sobre a janela de 6:
+    // com recorrência, essa janela é composta só de aulas FUTURAS `scheduled` (ordem descendente
+    // por start_time), o que zerava a frequência de qualquer aluno em recorrência. `count` com
+    // `head: true` não transfere linha nenhuma. Descarte de regeneração é `cancelled`, então não
+    // entra em nenhum dos dois filtros de status — não precisa do `.or` aqui.
+    client()
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", studentId)
+      .eq("status", "completed"),
+    client()
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", studentId)
+      .eq("status", "no_show"),
   ]);
   if (historyRes.error) throw new Error(historyRes.error.message);
+  if (completedRes.error) throw new Error(completedRes.error.message);
+  if (noShowRes.error) throw new Error(noShowRes.error.message);
 
   const student: StudentRecord = {
     id: row.id,
@@ -811,7 +839,14 @@ export async function getAdminStudentDetail(studentId: string) {
     createdAt: row.created_at,
     name: names[row.profile_id] ?? "Aluno",
   };
-  return { student, package: pkg, credits, history: (historyRes.data ?? []).map(mapBooking) };
+  return {
+    student,
+    package: pkg,
+    credits,
+    history: (historyRes.data ?? []).map(mapBooking),
+    completedCount: completedRes.count ?? 0,
+    noShowCount: noShowRes.count ?? 0,
+  };
 }
 
 export async function assignPackageFromTemplate(studentId: string, templateId: string) {
@@ -1409,7 +1444,15 @@ async function deriveNotifications(userId: string): Promise<AppNotification[]> {
     const studentId = await studentIdForProfile(userId).catch(() => null);
     if (!studentId) return [];
     const [bookingsRes, requestsRes] = await Promise.all([
-      client().from("bookings").select("*").eq("student_id", studentId).order("start_time", { ascending: false }).limit(40),
+      // `.or(...)` antes do `limit(40)`: sem ele, as aulas descartadas por regeneração consomem a
+      // janela e empurram pra fora dela os eventos que viram notificação de verdade.
+      client()
+        .from("bookings")
+        .select("*")
+        .eq("student_id", studentId)
+        .or(SEM_DESCARTE_DE_REGENERACAO)
+        .order("start_time", { ascending: false })
+        .limit(40),
       client().from("purchase_requests").select("*").eq("student_id", studentId).neq("status", "pending").order("decided_at", { ascending: false }).limit(20),
     ]);
     for (const b of bookingsRes.data ?? []) {

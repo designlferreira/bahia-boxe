@@ -926,6 +926,53 @@ caminho ainda não existe. **Quando a Etapa 6 criar cancelamento manual
 gravando `'professor'`, este backfill deixa de ser seguro e não pode ser
 rodado de novo.**
 
+### Onde as aulas descartadas precisam sumir (2026-09-08)
+
+Quatro consultas em `api.ts` liam `bookings` sem filtrar por motivo de
+cancelamento. Todas passaram a usar a constante `SEM_DESCARTE_DE_REGENERACAO`
+(`"cancelado_por.is.null,cancelado_por.neq.regeneracao"`), via `.or(...)`:
+
+- **`getReplaceableBookingsForStudent`** — descarte de regeneração não é
+  reponível (ver seção acima). Filtro por MOTIVO, não por status.
+- **`getAdminStudentDetail`** (janela `limit(6)` de "ÚLTIMAS AULAS").
+- **`getStudentBookingHistory`** — mais: na aba "Próximas", também exclui
+  `cancelled` inteiro no filtro client-side ("próxima" é o que ainda vai
+  acontecer, e aula cancelada não vai). Nas abas de histórico, cancelamento
+  pelo professor CONTINUA aparecendo (é um fato que o aluno viveu); só o
+  descarte por regeneração some.
+- **`deriveNotifications`** — o `.or(...)` entra antes do `limit(40)`: sem
+  ele, as linhas descartadas consomem a janela e empurram pra fora os
+  eventos que viram notificação de verdade.
+
+**Por que `.or(is.null, neq)` e não `.neq(...)` sozinho:** em SQL,
+`cancelado_por <> 'regeneracao'` é NULL (não `true`) nas linhas com
+`cancelado_por` nulo — que são a esmagadora maioria (todo o AUTOSSERVICO).
+Um `.neq` puro descartaria justamente essas. Armadilha de lógica ternária,
+não preferência de estilo.
+
+**Consultas deliberadamente NÃO filtradas:** as que já excluem por status
+(`ACTIVE_STATUSES`, `.eq("status","scheduled")`, `.neq("status","cancelled")`
+— um descarte é `cancelled`, então nunca entra), as leituras de uma linha
+específica por id (detalhe de aula: se alguém abre o link direto, mostrar a
+aula é o certo) e `getAdminBookingHistory` (tela de auditoria, com filtro
+"Canceladas" próprio — ali o descarte é justamente o que se quer poder ver).
+
+**Frequência do aluno — corrigida junto, era número errado, não só ruído.**
+`AlunoDetalhe.tsx` calculava `completed / history.length` sobre a janela de
+6 linhas de qualquer status. Dois erros somados: o denominador incluía aulas
+`scheduled`/`cancelled`, e a janela em si é ordenada por `start_time desc` —
+com recorrência ela é composta SÓ de aulas futuras ainda não realizadas, o
+que zerava a frequência de todo aluno em recorrência. Agora
+`getAdminStudentDetail` devolve `completedCount`/`noShowCount` (dois
+`count: "exact", head: true`, sem transferir linha) sobre TODAS as aulas do
+aluno, e a tela calcula `completed / (completed + faltas)`. O card "Faltas"
+usa o mesmo count, pelo mesmo motivo.
+
+Observação registrada, não corrigida (fora do escopo pedido): a lista
+"ÚLTIMAS AULAS" continua sendo as 6 linhas mais recentes por `start_time`
+desc, o que com recorrência significa aulas FUTURAS, não "últimas". O número
+agora está certo; o rótulo da lista é que segue impreciso.
+
 ### Pontos ainda em aberto
 
 Decidir antes de chegar na etapa correspondente:

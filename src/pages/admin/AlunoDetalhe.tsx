@@ -96,10 +96,13 @@ export default function AdminAlunoDetalhe() {
     );
   }
 
-  const { student, credits, history } = data;
-  const faltas = history.filter((h) => h.status === "no_show").length;
-  const completed = history.filter((h) => h.status === "completed").length;
-  const freq = history.length > 0 ? Math.round((completed / history.length) * 100) : 0;
+  const { student, credits, history, completedCount, noShowCount } = data;
+  // Frequência sobre as aulas que CONTAM (realizadas + faltas), não sobre `history` — aquilo é a
+  // janela de exibição das 6 últimas linhas, que com recorrência é composta só de aulas futuras
+  // ainda `scheduled` e zerava a frequência de todo aluno em recorrência.
+  const faltas = noShowCount;
+  const consideradas = completedCount + noShowCount;
+  const freq = consideradas > 0 ? Math.round((completedCount / consideradas) * 100) : 0;
 
   return (
     <div className="page-container">
