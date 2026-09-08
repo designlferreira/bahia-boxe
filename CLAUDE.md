@@ -1159,6 +1159,35 @@ Decidir antes de chegar na etapa correspondente:
   novas, mas não tem UI de "editar" uma linha existente; o próximo pacote
   gerado sempre lê o conjunto ATUAL de linhas `ativo = true` no momento da
   geração (nunca retroage sobre pacotes/aulas já materializados).
+- **`availability_slots.is_active` nunca volta a `true` — vazamento silencioso
+  da grade** (dívida PRÉ-EXISTENTE, sem relação com RECORRENCIA, registrada
+  em 2026-09-08, **não corrigir agora**). `schedule_booking` marca o slot como
+  `is_active = false` no momento do agendamento (`0001:424`), e os únicos
+  outros escritores dessa coluna são as ações manuais da tela de
+  disponibilidade (`setSlotsActive`, via `toggleAvailabilityDay`/
+  `saveAvailabilityInterval`/`deleteAvailabilityInterval`) — verificado por
+  grep. **Nada reabre o slot quando a aula deixa de existir**: nem
+  `cancelBooking` (aluno), nem `rejectBooking` (professor recusa um pedido),
+  nem `cancelar_aula`/`reagendar_aula` (0020), nem o descarte por regeneração.
+  Cada agendamento que termina cancelado/recusado/remarcado queima um horário
+  concreto da grade publicada, até o professor republicar o intervalo na mão.
+
+  **Por que é silencioso:** `getAvailability` mostra só slots ativos enquanto
+  o dia tem algum ativo (`api.ts`, o `filter(s => s.is_active)` do
+  `relevant`), e `mergeHours` junta as horas restantes em intervalos. O
+  horário queimado simplesmente some do intervalo exibido — quem publicou
+  "18:00–21:00" passa a ver "18:00–19:00" e "20:00–21:00", sem nenhuma marca
+  explicando o buraco das 19:00. Piora com o tempo, dentro do horizonte de
+  `HORIZON_WEEKS`.
+
+  **Por que não é conserto de uma linha:** `is_active = false` hoje significa
+  DUAS coisas diferentes — "o professor despublicou esta hora" e "esta hora
+  está ocupada por uma aula" — e o código não consegue distinguir (o próprio
+  comentário do `relevant` depende dessa ambiguidade para manter escondido um
+  intervalo removido de propósito). Um `set is_active = true` no cancelamento
+  republicaria horas que o professor tirou de propósito. O conserto de
+  verdade separa os dois conceitos (coluna própria para "ocupado", ou derivar
+  ocupação dos `bookings` em vez do flag) — decidir antes de mexer.
 - **Desfazer só existe por 9 segundos** (achado em teste, 2026-09-08, não
   implementado — pré-existente, não é da Etapa 6). O ÚNICO ponto de entrada
   de `undo_lesson_action` na aplicação é a ação "Desfazer" do toast de
