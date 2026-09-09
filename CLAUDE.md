@@ -1485,71 +1485,91 @@ Nenhuma outra linha com horário artificial foi encontrada além desta.
 
 **(c) O aluno de teste `b12decb8-2f64-4bd8-b3a9-6c5b8b29d8a8` — roteiro de remoção completa.**
 
-**DECISÃO: remover por completo.** Roteiro em ordem de FK (children antes de parents), children
-sempre resolvidos antes do parent que os contém — **nada abaixo foi executado**:
+**DECISÃO: remover por completo.** Diagnóstico v3 rodado, bloco 0 completo (20 FKs) — o roteiro
+abaixo não tem mais nenhum "a confirmar", é a versão final. Mapa relevante, do bloco 0:
+
+| coluna (quem referencia) | tabela referenciada | on_delete |
+|---|---|---|
+| `bookings.pacote_id` | `packages` | NO ACTION |
+| `bookings.recorrencia_id` | `aluno_recorrencia` | NO ACTION |
+| `bookings.replacement_for_booking_id` | `bookings` (self) | NO ACTION |
+| `bookings.student_id` | `students` | CASCADE |
+| `credit_transactions.booking_id` | `bookings` | NO ACTION |
+| `credit_transactions.package_id` | `packages` | NO ACTION |
+| `credit_transactions.student_id` | `students` | NO ACTION |
+| `credit_transactions.reverses_transaction_id` | `credit_transactions` (self) | NO ACTION |
+| `credit_transactions.created_by` | `profiles` | NO ACTION |
+| `packages.recorrencia_id` | `aluno_recorrencia` | NO ACTION |
+| `packages.student_id` | `students` | CASCADE |
+| `purchase_requests.student_id` | `students` | CASCADE |
+| `aluno_recorrencia.aluno_id` | `students` | CASCADE |
+| `students.profile_id` | `profiles` | CASCADE |
+| `profiles.id` | `auth.users` | CASCADE |
+
+Regra usada pra montar a ordem: uma FK só bloqueia apagar a linha REFERENCIADA enquanto existir
+referência viva — nunca bloqueia apagar a linha que faz a referência. Então "o que preciso apagar
+antes de X" = "o que tem uma FK `NO ACTION`/`RESTRICT` apontando PARA X". As `CASCADE` (todas a
+partir de `students` ou de `auth.users`) são bônus — apagam sozinhas — mas não dispensam apagar os
+`NO ACTION` na ordem certa primeiro, porque um `DELETE` que dispara CASCADE ainda falha se o que
+sobrou no caminho tiver uma referência `NO ACTION` pendente (ex.: apagar `students` cascateia pra
+`packages`, mas isso falha se `credit_transactions`/`bookings` ainda apontarem pra esses pacotes).
+Por isso o roteiro continua manual e explícito, mesmo com tanta CASCADE por trás:
 
 1. **(SQL)** `update bookings set replacement_for_booking_id = null where student_id =
-   'b12decb8-...'` — quebra o vínculo interno `32d4c001 → 863d420d` **antes** de apagar qualquer
-   uma das duas, evitando depender de sequenciamento de linha-a-linha dentro de um `DELETE`
-   multi-linha sobre uma FK sem `on delete` (`bookings.replacement_for_booking_id`, `0001`). Só
-   afeta as 10 bookings deste aluno — o diagnóstico já confirmou que nenhuma bookings de OUTRO
-   aluno aponta pra dentro desse conjunto, então esse `UPDATE` não pode quebrar nada fora daqui.
-2. **(SQL)** `delete from credit_transactions where student_id = 'b12decb8-...'` (2 linhas) — antes
-   de apagar `bookings`/`packages`, porque `credit_transactions.booking_id` e `.package_id`
-   apontam pra eles (sem `on delete`). Confirmar antes (diagnóstico bloco E, `reversao_cruzada`)
-   que nenhuma OUTRA transação usa `reverses_transaction_id` apontando pra uma dessas 2 — essa FK
-   (`0001:42`) também não tem `on delete`, achado nesta revisão, não fazia parte da lista original
-   de duas.
-3. **(SQL)** `delete from bookings where student_id = 'b12decb8-...'` (10 linhas, já sem
-   `replacement_for_booking_id` interno pelo passo 1).
-4. **(SQL)** `delete from packages where student_id = 'b12decb8-...'` (3 linhas).
-5. **(SQL)** `delete from purchase_requests where student_id = 'b12decb8-...'` (1 linha) — ver
-   pergunta sobre este item logo abaixo.
-6. **(SQL, opcional)** `delete from aluno_recorrencia where aluno_id = 'b12decb8-...'` (3 linhas) —
-   **já é `on delete cascade` a partir de `students`** (`0009:15`), então o passo 8 já a
-   remove sozinha; fazer aqui só antecipa e permite conferir o número antes de chegar no passo
-   irreversível.
-7. **(informativo, sem ação)** `student_profiles` e `boxing_profile_assessments` (Perfil de Boxe,
-   fora do escopo de RECORRENCIA) também têm `on delete cascade` a partir de `students` (`0004:10`,
-   `0006:39`) — qualquer linha que este aluno de teste tenha ali some sozinha no passo 8, sem
-   `DELETE` próprio.
-8. **(SQL) 🛑 PARE E CONFIRA AQUI antes de seguir** — `delete from students where id =
-   'b12decb8-...'`. Este é o ponto sem volta fácil: depois dele, `students.profile_id` (o vínculo
-   com o login, se existir) só fica recuperável se você já tiver anotado o valor. Antes deste
-   passo, rode (o bloco E do diagnóstico já faz isso) `select profile_id from students where id =
-   'b12decb8-...'` e ANOTE o resultado — o passo 9 depende dele.
-9. **(fora de SQL puro, painel do Supabase)** Se o `profile_id` do passo 8 não for nulo (o
-   diagnóstico deve confirmar se aponta pra um profile de verdade, possivelmente
-   `a4ad5883-4ed2-44a2-9cd3-b239b70f9658` — reconstruído do título de um commit anterior desta
-   engagement, "Fix test student id: b12decb8-... is students.id, a4ad5883-... was profiles.id",
-   **não confirmado nesta sessão, conferir com o bloco E antes de agir**): apagar o login de teste
-   exige o **Supabase Dashboard → Authentication → Users** (ou a Auth Admin API) — não um `DELETE`
-   direto em `auth.users`, tabela que o Supabase gerencia por fora do SQL Editor comum. A ordem
-   entre apagar a linha de `profiles` via SQL e apagar o usuário pelo painel não importa (qualquer
-   uma resolve a outra, dependendo de como `profiles.id → auth.users.id` estiver configurado nesta
-   instância — o bloco 0 do diagnóstico, estendido pra incluir `profiles`, mostra isso); o que
-   importa é que os passos 1-8 já tenham rodado antes, senão `students.profile_id` ainda aponta pro
-   profile e o `DELETE`/a remoção pelo painel esbarra nele.
+   'b12decb8-...'` — quebra o vínculo interno `32d4c001 → 863d420d` antes de apagar qualquer uma
+   das duas. Só afeta as 10 bookings deste aluno; o diagnóstico já confirmou que nenhuma booking de
+   OUTRO aluno aponta pra dentro deste conjunto (`C_REFERENCIA_CRUZADA`: nenhuma encontrada).
+2. **(SQL)** `delete from credit_transactions where student_id = 'b12decb8-...'` (2 linhas) —
+   `reversao_cruzada` já confirmou que nenhuma OUTRA transação as reverte
+   (`reverses_transaction_id`). Precisa vir antes de `bookings`/`packages` (as duas colunas
+   `NO ACTION` que apontam pra eles).
+3. **(SQL)** `delete from bookings where student_id = 'b12decb8-...'` (10 linhas — self-ref já
+   nulo pelo passo 1; nada de fora aponta pra dentro, confirmado).
+4. **(SQL)** `delete from packages where student_id = 'b12decb8-...'` (3 linhas — nada mais aponta
+   pra elas depois dos passos 2-3).
+5. **(SQL, opcional)** `delete from purchase_requests`/`delete from aluno_recorrencia` deste aluno
+   — **ambas `on delete cascade` a partir de `students`** (confirmado no bloco 0), então o passo 6
+   já as remove sozinhas. Fazer aqui só antecipa a conferência do número; não é obrigatório.
+6. **(SQL) 🛑 PARE E CONFIRA AQUI antes de seguir** — antes de apagar `students`, rodar:
+   `select count(*) from credit_transactions where created_by = 'a4ad5883-4ed2-44a2-9cd3-b239b70f9658'`.
+   Único item do mapa acima ainda não verificado nesta sessão: `credit_transactions.created_by`
+   é `NO ACTION` contra `profiles`, e o passo 8 (apagar o profile) esbarraria nele se alguma
+   transação (de QUALQUER aluno, não só deste) tiver sido criada com esse profile como
+   `created_by` — estruturalmente não deveria acontecer (`created_by` só é preenchido por
+   `complete_booking`/`mark_no_show`, que exigem `is_admin()`, e este profile é `role=student`),
+   mas "não deveria" não é "confirmado". Se vier 0 (esperado), seguir. Se vier > 0, é um achado
+   novo — parar e decidir antes de continuar, não é coberto por este roteiro.
+7. **(SQL)** `delete from students where id = 'b12decb8-...'` — com os passos 1-4 feitos, isto
+   cascateia sozinho sobre `purchase_requests`/`aluno_recorrencia`/`student_profiles`/
+   `boxing_profile_assessments` (todas `on delete cascade` a partir de `students`, as duas últimas
+   confirmadas direto nas migrations `0004:10`/`0006:39`, fora do bloco 0 mas com o mesmo
+   `on delete cascade`).
+8. **(painel do Supabase, não SQL)** `students.profile_id = a4ad5883-4ed2-44a2-9cd3-b239b70f9658`
+   (`profiles.role='student'`, `name='teste'` — confirmado no bloco E, não é mais reconstrução de
+   commit antigo). Apagar o login em **Authentication → Users** — `profiles.id -> auth.users` é
+   `CASCADE`, então apagar o usuário ali já remove a linha de `profiles` sozinho; não precisa (nem
+   faz mal) apagar `profiles` via SQL antes. Só rodar isto depois do passo 7 — antes dele,
+   `students.profile_id` ainda aponta pro profile (`CASCADE` nessa direção apagaria `students`
+   também, o que não é o problema, mas inverteria a ordem sem necessidade).
 
-**Sobre o `purchase_request` (pergunta do usuário): não quebra nenhuma tela do professor.**
-`getPurchaseRequests` (`api.ts:1127`) busca só `status = 'pending'` e resolve o nome do aluno via
-`nameOf.get(r.student_id) ?? "Aluno"` — um `Map` com fallback, não um join que quebraria se o
-aluno sumisse. Mas isso é sobre a TELA, não sobre o BANCO: se o `purchase_request` ainda estiver
-`pending` quando `students` for apagado no passo 8, o `DELETE` de `students` provavelmente falha
-primeiro (a menos que `purchase_requests.student_id` tenha `on delete cascade`, o que o bloco 0
-agora também mostra) — é exatamente por isso que o passo 5 apaga o `purchase_request` ANTES do
-passo 8, então essa situação nunca chega a existir na prática se o roteiro for seguido em ordem.
-**Separado da segurança técnica:** se o status vier `pending` no diagnóstico (bloco E,
-`purchase_request_status`), isso significa que HOJE, antes de qualquer limpeza, esse pedido
-fictício já aparece em `/admin/solicitacoes` como um pedido real esperando decisão do professor —
-vale conferir e resolver (aprovar/rejeitar/apagar) independente do resto do roteiro, já que é
-visível na tela agora, produção ou não.
+**Sobre o `purchase_request` (pergunta do usuário): confirmado, não quebra nada — e nem está
+pendente hoje.** O diagnóstico trouxe o status: `bbbad2b6...` = **`approved`**, decidido em
+02/09/2026 — não `pending`. `getPurchaseRequests` (`api.ts:1127`) só busca `status='pending'`, logo
+esse pedido **não aparece** em `/admin/solicitacoes` hoje, independente de qualquer limpeza — a
+preocupação levantada antes (pedido fictício visível no inbox do professor) não se aplica. E
+mesmo que estivesse pendente, a tela não quebraria: `nameOf.get(r.student_id) ?? "Aluno"` é um
+`Map` com fallback, não um join que estoura se o aluno sumir.
 
-O roteiro completo — incluindo os itens 1, 2 e 9 (nulo de `replacement_for_booking_id`,
-`reverses_transaction_id` cruzado, e o vínculo `profiles`/`auth.users`) — depende do resultado do
-diagnóstico v3 (`supabase/diagnostico_limpeza_teste.sql`, blocos 0 e E), que estende o v2 rodado
-até aqui. Nenhum passo foi executado; quando for a hora, cada `DELETE`/`UPDATE` vai para um arquivo
-dedicado, revisado antes de rodar — nunca uma sessão de comandos soltos.
+**Achado tangencial, sem ação:** o bloco 0 revelou `bookings.slot_id -> availability_slots`
+(`NO ACTION`), FK que não fazia parte do que se sabia antes desta rodada. Não afeta este roteiro
+(não estamos apagando `availability_slots`), mas é outro dado a favor do item já registrado em
+"Pontos ainda em aberto" sobre `availability_slots.is_active` nunca voltar a `true` — o vínculo
+formal entre aula e slot existe via FK, reforçando que a coluna certa pra saber "este horário está
+ocupado" seria essa relação, não o campo `is_active` hoje sobrecarregado com dois significados.
+
+Nenhum passo foi executado. Quando for a hora de rodar, cada `DELETE`/`UPDATE` vai para um arquivo
+dedicado (incluindo a checagem do passo 6 embutida como guarda, não como suposição), revisado
+antes de rodar — nunca uma sessão de comandos soltos.
 
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
