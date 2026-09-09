@@ -1239,6 +1239,24 @@ professor tentando ler este" — só existe um professor neste banco (`supabase/
 real pra exercitar esse ramo do `raise exception 'not_allowed'`; não fabricado de propósito (mesmo
 critério já usado em `verify_create_package.sql`).
 
+**Verificação na aplicação de verdade (2026-09-09), além do script.** O usuário testou os três
+passos combinados diretamente no app, não só via SQL:
+
+1. **Professor em `autosservico`:** nada mudou em lugar nenhum — comportamento idêntico ao que
+   existia antes desta etapa, nas duas pontas (aluno e professor).
+2. **Trocar para `recorrencia`:** comportamento esperado nas duas pontas. Lado aluno: a aba
+   "Agendar" some do `StudentBottomNav`; `/app/agendar` e `/app/pacotes` redirecionam; o botão
+   principal da Home vira "Ver minhas aulas". Lado professor: `AlunoRecorrencia.tsx` passa a
+   permitir "Gerar pacote".
+3. **Voltar para `autosservico`:** tudo volta a como estava — **incluindo confirmação explícita de
+   que a tela de recorrência continuou acessível, com os dias fixos ainda editáveis**, prova em uso
+   real (não só em teoria de código) da correção "bloqueio por AÇÃO, não por TELA" registrada
+   abaixo: a tela nunca ficou bloqueada, só o botão "Gerar pacote".
+
+Com isso, a Etapa 7 tem dupla cobertura — script (`verify_modo_agendamento.sql`, transação com
+rollback, sem tocar dado real) e uso real da aplicação nas duas pontas — e as **Etapas 1 a 7 são
+dadas como completas e verificadas em 2026-09-09.**
+
 **Fora do escopo desta etapa, registrado pra não parecer esquecimento:** nenhuma RPC de crédito
 (`complete_booking`, `mark_no_show`, `calcular_saldo_pacote`, etc.) foi tocada — `modo_agendamento`
 não participa de nenhuma regra de crédito, só de navegação. "Mudança de recorrência" (ponto em
@@ -1388,3 +1406,179 @@ Decidir antes de chegar na etapa correspondente:
   prazo, um aluno com vários ciclos de recorrência ao longo do tempo acumula
   uma lista poluída. Não implementado agora — não urgente, registrado pra
   não sumir.
+
+### Limpeza de dados de teste antes de produção (proposta, 2026-09-09 — NADA EXECUTADO)
+
+Três categorias de dado acumulado ao testar as Etapas 1-7, levantadas pelo usuário ao fechar a
+Etapa 7. Nada abaixo foi rodado — é só a análise, com a decisão de execução em aberto até o
+usuário rodar o diagnóstico e decidir. Script de apoio, **somente leitura**:
+`supabase/diagnostico_limpeza_teste.sql` (mesmo padrão de `introspect.sql`: cola o resultado de
+volta, nada é escrito).
+
+**Sobre as duas FKs sem `on delete` que o usuário pediu pra lembrar** —
+`credit_transactions.booking_id` e `bookings.replacement_for_booking_id` (`0001`, `0001:100`):
+nenhuma das duas tem `on delete cascade`/`set null`, então um `DELETE FROM bookings` cuja linha
+ainda seja referenciada por qualquer uma delas **falha** (RESTRICT/NO ACTION), em vez de apagar em
+cascata ou deixar a referência solta — é uma trava de segurança, não um risco por si só, mas
+qualquer ordem de DELETE proposta abaixo precisa respeitá-la. **Essa caracterização (só essas duas
+FKs sem `on delete` entre as que importam aqui) vem de `introspect.sql` rodado numa sessão
+anterior, cujo resultado não está mais disponível nesta sessão** — o bloco 0 do script de
+diagnóstico novo reconfirma isso antes de qualquer execução real se apoiar nela; não tratar como
+fato reverificado até o usuário rodar esse bloco.
+
+**(a) As 24 aulas `cancelled`/`cancelado_por='regeneracao'` do aluno real LK
+(`4cd0e555-728b-47ba-ba3c-073b54d28af3`).**
+
+**Recomendação: deixar como está.** Três motivos, nenhum sozinho seria suficiente, juntos são:
+1. LK é aluno real, não conta de teste — essas 24 linhas são histórico de verdade (pacotes
+   regenerados de verdade durante os testes das Etapas 4-6), não lixo sintético. Apagar histórico
+   real de um aluno real por conveniência de limpeza é o tipo de operação que este projeto trata
+   como irreversível por padrão (`cancelado_por='regeneracao'` existe desde a 0019 exatamente pra
+   marcar "isso nunca foi um compromisso de verdade" sem precisar apagar a linha).
+2. Já são invisíveis em toda tela — o filtro `SEM_DESCARTE_DE_REGENERACAO`
+   (`.or("cancelado_por.is.null,cancelado_por.neq.regeneracao")`) esconde essas linhas de qualquer
+   lista voltada pro aluno ou professor desde a Etapa 5/6. Não há "prejuízo" visível em produção por
+   deixá-las: ninguém vê.
+3. Não contam em nenhum saldo — decisão 4 (resync de `used_classes` incondicional ao status) já
+   garante que essas linhas não inflam nem desinflam crédito de ninguém.
+
+O único jeito de isso "atrapalhar" seria se alguma delas tivesse `credit_transactions.booking_id`
+apontando pra ela (crédito debitado por engano numa aula que devia ter sido só descartada) — o
+bloco A do diagnóstico confere isso; se aparecer alguma linha com `credit_transactions_apontando >
+0`, tratar como achado novo antes de decidir qualquer coisa, não como parte desta recomendação.
+
+**(b) A aula `32d4c001...` movida no tempo por SQL pra testar `undo_lesson_action`, e qualquer
+outra com horário artificial.**
+
+**Esta SIM atrapalha se for deixada como está** — diferente da categoria (a). Se o status final
+dela ficou `scheduled` com `start_time` no passado (não confirmado nesta sessão — o bloco B do
+diagnóstico traz o estado atual), a tela vai mostrá-la como "Aguardando confirmação" pra sempre, um
+artefato visível e confuso pro professor real assim que ele começar a usar o app de verdade — não
+é dado invisível como a categoria (a).
+
+Duas opções, nenhuma decidida:
+- **Corrigir em vez de apagar** — um `UPDATE` revertendo `start_time` pra um horário futuro
+  plausível (ou pro valor original, se alguém tiver anotado qual era antes do `UPDATE` de teste —
+  não está registrado nesta sessão) resolve sem tocar em `status`/histórico. É a opção mais barata
+  e mais alinhada ao que a manipulação original fez (um `UPDATE` de teste desfeito por outro
+  `UPDATE`), mas exige decidir pra que data/hora mover.
+- **Apagar** — só depois de confirmar (bloco B) que nem `credit_transactions.booking_id` nem
+  `bookings.replacement_for_booking_id` de outra linha apontam pra ela; senão o `DELETE` falha
+  (RESTRICT) e teria que resolver a linha que referencia primeiro — o que pode não ser desejável
+  (apagar uma `credit_transaction` real de teste de `complete_booking`/`undo` é apagar prova exata
+  de que o teste do ciclo concluir→desfazer funcionou, documentado no CLAUDE.md como verificação da
+  Etapa 6).
+
+Recomendação provisória: **corrigir o `start_time`, não apagar** — evita mexer em qualquer FK e
+preserva o resto do histórico de teste já documentado. Mas a decisão de qual data usar (e se há
+mais alguma aula na mesma situação, que o bloco B do diagnóstico também busca por heurística
+`status='scheduled' and start_time < now()`) fica para o usuário depois de ver o resultado do
+diagnóstico.
+
+**(c) O aluno de teste `b12decb8-2f64-4bd8-b3a9-6c5b8b29d8a8` e o que ele acumulou.**
+
+**Recomendação: remover por completo antes de produção.** Diferente das categorias (a) e (b), esta
+é uma conta 100% sintética, criada só pra ter um segundo aluno isolado pros scripts de verificação
+(`verify_create_package.sql`, `verify_calcular_saldo_pacote.sql`) — não representa nenhum cliente
+real. Só existe um professor neste banco (`supabase/README.md`), e é a conta dele que vai pra
+produção: um aluno "teste" na própria lista de alunos dele, com pacotes/aulas fictícias, é
+confuso e poderia ser confundido com cliente de verdade — ao contrário da categoria (a), aqui não
+há razão nenhuma pra preservar "histórico real".
+
+Ordem seguindo as FKs conhecidas (children antes de parents), a confirmar contra o bloco 0 do
+diagnóstico antes de executar:
+1. `aluno_recorrencia` — **já é `on delete cascade` a partir de `students`** (`0009:15`,
+   `aluno_id ... references public.students(id) on delete cascade`), então some sozinho no passo 6
+   sem precisar de um `DELETE` próprio; listado aqui só pra registrar que não foi esquecido.
+2. `credit_transactions` onde `student_id` (ou `booking_id` de uma aula deste aluno) aponta pra
+   ele — apagar primeiro, é o nível mais "folha" da árvore; por ser aluno 100% sintético, apagar o
+   próprio ledger não tem o mesmo custo de "apagar prova de teste" da categoria (b), mas ainda
+   assim documentar quantas linhas antes de apagar (bloco C do diagnóstico já conta).
+3. `bookings` deste aluno — antes de apagar, checar (bloco C, última consulta) que nenhuma aula de
+   OUTRO aluno tem `replacement_for_booking_id` apontando pra uma aula deste; não deveria existir
+   (recorrência é isolada por aluno), mas não fica assumido sem essa checagem.
+4. `packages` deste aluno.
+5. `purchase_requests` deste aluno, se houver.
+6. `students` — a linha `b12decb8` em si (derruba `aluno_recorrencia` em cascata, passo 1).
+7. **Fora do alcance de SQL puro:** se essa conta tiver um `profiles`/`auth.users` dedicado (login
+   de teste de verdade, não só uma linha solta em `students`), apagar a linha de `profiles` exige
+   também remover o usuário em `auth.users` — isso é feito pelo Supabase Auth Admin API ou pelo
+   painel (Authentication → Users), não por um `DELETE` direto na tabela (o Supabase gerencia
+   `auth.users` por fora do SQL Editor comum). Verificar antes se esse aluno de teste tem
+   credencial de login própria ou é só uma linha de `students` sem login associado.
+
+Nenhum desses passos foi executado. Depois que o usuário rodar `diagnostico_limpeza_teste.sql` e
+reportar os números, a migration/script de limpeza real (se aprovada) segue o mesmo padrão de
+sempre — arquivo dedicado, revisado antes de rodar, nunca uma sessão de comandos soltos.
+
+### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
+
+Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
+sessão: leia isto primeiro, depois use o resto do arquivo (acima) como referência detalhada por
+decisão — não repita trabalho já fechado.
+
+**Pronto e verificado (Etapas 1 a 7, migrations `0008` a `0022`):**
+
+- **Etapa 1-2** — ledger de créditos (`credit_transactions`), `booking_status` ganha
+  `'rescheduled'`, tabela `aluno_recorrencia` (dias fixos por aluno), colunas de recorrência em
+  `packages`/`bookings`, `_create_package` extraído com defesa em duas camadas.
+- **Etapa 3** — `calcular_saldo_pacote(p_pacote_id)`, view de leitura, 8 casos de teste
+  (`verify_calcular_saldo_pacote.sql`).
+- **Etapa 4-5** — `gerar_pacote_recorrencia` (RPC que materializa `packages`+`bookings` a partir
+  dos dias fixos ativos), tela `AlunoRecorrencia.tsx` (dias fixos + gerar pacote + seletor de data
+  de início), duas camadas contra overbooking com AUTOSSERVICO, pacote finished não ressuscita
+  sozinho, regeneração cancela o pacote anterior em vez de duplicar (`cancelado_por='regeneracao'`,
+  aulas descartadas somem das listas do aluno/professor, frequência não conta essas linhas).
+- **Etapa 6** — `reagendar_aula`/`cancelar_aula` como RPCs próprias (só professor), status
+  `'rescheduled'` com vínculo pra aula nova, `undo_lesson_action` com ramo de recorrência e
+  Camada 2 checando overlap do próprio aluno, `useLessonActions` unificado entre Agenda e detalhe
+  da aula (mesma lógica nas duas superfícies).
+- **Etapa 7** — flag `profiles.modo_agendamento` (`'autosservico'`/`'recorrencia'`, nullable,
+  default efetivo via `coalesce` em `modo_agendamento_efetivo()`, nunca por `default` de coluna);
+  navegação gateada em `student/Agendar.tsx`, `student/Pacotes.tsx`, `StudentBottomNav`,
+  `student/Home.tsx` (CTA principal), com bloqueio por AÇÃO (não por TELA) em
+  `admin/AlunoRecorrencia.tsx` — a tela de gerenciar dias fixos fica sempre acessível, só "Gerar
+  pacote" é desabilitado fora de `'recorrencia'`. Verificado por script (`verify_modo_agendamento.sql`,
+  9/9 `OK`) E pela aplicação de verdade nos dois lados (aluno/professor), nos dois sentidos
+  (ligar/desligar a flag) — ver seção acima.
+- Todas as 15 migrations (`0008`-`0022`) aplicadas no banco real e confirmadas idempotentes
+  (reaplicação sem erro e sem efeito colateral) — inclusive a `0022`, corrigida depois de uma
+  reaplicação real ter falhado (ver seção "0022 não era idempotente" acima).
+
+**Dívida conhecida, registrada, não bloqueia nada (detalhe completo em "Pontos ainda em aberto"
+acima — não duplicar aqui, só apontar):**
+
+- `availability_slots.is_active` nunca volta a `true` depois que uma aula que ocupava o slot deixa
+  de existir (cancelamento/recusa/remarcação/descarte por regeneração) — vazamento silencioso e
+  PRÉ-EXISTENTE, sem relação com RECORRENCIA, precisa de decisão de design antes de corrigir
+  (separar "despublicado" de "ocupado" são dois conceitos hoje colapsados na mesma coluna).
+- `undo_lesson_action` só tem um ponto de entrada, o toast de 9 segundos após concluir/marcar
+  falta — sem UI permanente pra desfazer depois disso, mesmo a RPC continuando válida.
+- Lista de dias fixos em `AlunoRecorrencia.tsx` só cresce (desativar não remove da lista, sem
+  agrupamento) — UX, não bloqueia nada.
+- "Mudança de recorrência" sem decisão — hoje editar dias fixos nunca retroage sobre pacote já
+  gerado, só o próximo a ser gerado lê o conjunto atual; não há UI de "editar" uma linha existente,
+  só ativar/desativar/criar.
+- Feriados não são tratados na geração de pacote (gera todas as ocorrências do dia da semana, sem
+  pular nem sinalizar) — sem tabela de feriados no banco hoje.
+- **Limpeza de dados de teste antes de produção — proposta escrita, NADA executado** (seção acima):
+  aulas de regeneração do aluno real LK (recomendação: deixar), aula(s) com horário movido
+  manualmente por SQL pra testar undo (recomendação: corrigir, não apagar — atrapalha se deixada),
+  aluno de teste `b12decb8` (recomendação: remover por completo). Próximo passo: usuário roda
+  `supabase/diagnostico_limpeza_teste.sql` (só leitura) e reporta o resultado.
+
+**Fora do escopo — Etapa 8, NÃO iniciada (não implementar sem sinal explícito do usuário):**
+
+`aviso_ausencia` (ou nome equivalente a decidir) — mencionado no roteiro original da feature como
+a etapa seguinte à flag `modo_agendamento`, sem nenhum detalhe de requisito, migration, RPC ou tela
+ainda discutido nesta conversa. Uma sessão nova não deve inferir escopo desta etapa a partir do
+nome sozinho — o primeiro passo, quando for a hora, é o mesmo desta feature inteira: levantar
+requisito com o usuário, propor decisões de design ambíguas registrando alternativas e
+recomendação, e só depois desenhar migration.
+
+**Como este projeto trabalha (pra uma sessão nova manter a disciplina, não só o código):** nenhuma
+migration destrutiva; toda migration idempotente (`if not exists`/`drop ... if exists` + `add`
+nomeado); toda alegação sobre o banco real vem de um script que o usuário roda e cola o resultado
+de volta (nunca assumida); toda decisão de design que resolve ambiguidade do spec é registrada
+aqui com a alternativa rejeitada e o motivo, antes de implementar; "não decida sozinho" vale pra
+qualquer coisa estrutural ou de segurança — perguntar tem custo baixo, decidir errado sozinho não.
