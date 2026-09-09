@@ -16,10 +16,27 @@
 --    NULL significa "nunca configurado" e é lido como AUTOSSERVICO (default do fluxo legado-ativo,
 --    decisão registrada no CLAUDE.md) por `modo_agendamento_efetivo()` abaixo — nunca por um
 --    `default` de coluna, para o coalesce ficar num lugar só.
+--
+--    IDEMPOTENTE de propósito (`if not exists`/`if exists`), diferente da primeira versão deste
+--    arquivo — achado ao reaplicar num ambiente onde a coluna já existia: sem essas guardas, um
+--    `ADD COLUMN` puro falha (`column "modo_agendamento" of relation "profiles" already exists"`)
+--    numa segunda execução, mesmo que o restante do arquivo devesse rodar de novo sem problema
+--    nenhum (`create or replace function` já é idempotente por natureza). Coluna e CHECK viram dois
+--    passos separados — `drop constraint if exists` antes de `add constraint` com nome explícito
+--    (o mesmo nome que o Postgres já auto-gera pra um CHECK de coluna única, `<tabela>_<coluna>_check`,
+--    então recriar não muda nada em quem já rodou a versão anterior deste arquivo) — em vez do CHECK
+--    inline do `ADD COLUMN` original, que não dava como tornar seguro pra reaplicar sozinho.
 -- ---------------------------------------------------------------------------------------------
 
 alter table public.profiles
-  add column modo_agendamento text check (modo_agendamento in ('autosservico', 'recorrencia'));
+  add column if not exists modo_agendamento text;
+
+alter table public.profiles
+  drop constraint if exists profiles_modo_agendamento_check;
+
+alter table public.profiles
+  add constraint profiles_modo_agendamento_check
+  check (modo_agendamento in ('autosservico', 'recorrencia'));
 
 -- ---------------------------------------------------------------------------------------------
 -- 2. modo_agendamento_efetivo(p_professor_id) — único ponto de leitura da flag por quem NÃO é o

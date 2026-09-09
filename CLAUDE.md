@@ -1243,6 +1243,21 @@ quando o professor está em autosserviço (a tela de destino é que redireciona,
 escondido) — deliberado, pra manter esta etapa no mínimo necessário; esconder o link é possível
 depois, sem migration nova.
 
+### 0022 não era idempotente — corrigida (2026-09-09)
+
+`add column modo_agendamento text check (...)` sem `if not exists`: rodou certo na primeira vez
+(coluna, CHECK e a função, os três aplicados corretamente — confirmado por introspecção direta:
+`information_schema.columns`, `pg_get_constraintdef`, assinatura de `pg_proc`), mas uma reaplicação
+falhou em `ADD COLUMN` com `column "modo_agendamento" of relation "profiles" already exists`,
+diferente de toda migration anterior desta feature (todas usam `if not exists`/`add column if not
+exists`/o padrão de `do $$ ... drop constraint ... end $$` das 0010/0019). Corrigido: `add column
+if not exists`, e o CHECK vira `drop constraint if exists` + `add constraint` nomeado
+explicitamente como `profiles_modo_agendamento_check` — mesmo nome que o Postgres já tinha
+auto-gerado pro CHECK inline da versão anterior, então reaplicar não muda nada em quem já rodou.
+`create or replace function` já era idempotente, sem mudança. **Nenhum dado foi perdido nem
+precisou ser corrigido no banco** — o estado já estava certo, só a migration em si não era segura
+pra rodar duas vezes.
+
 ### Correção: bloqueio por AÇÃO, não por TELA (2026-09-08)
 
 **Achado pelo usuário, revisando a decisão 3 acima.** A implementação original redirecionava a
