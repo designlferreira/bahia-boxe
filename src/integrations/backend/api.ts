@@ -115,7 +115,7 @@ function mapPackage(r: any): PackageRecord {
   };
 }
 
-function mapAlunoRecorrencia(r: any): AlunoRecorrencia {
+function mapAlunoRecorrencia(r: any, temUso: boolean): AlunoRecorrencia {
   return {
     id: r.id,
     studentId: r.aluno_id,
@@ -124,6 +124,7 @@ function mapAlunoRecorrencia(r: any): AlunoRecorrencia {
     duracaoMinutos: parseIntervalMinutes(r.duracao),
     ativo: r.ativo,
     createdAt: r.created_at,
+    temUso,
   };
 }
 
@@ -949,14 +950,41 @@ export async function removeActivePackage(studentId: string) {
 // admin · recorrência (RECORRENCIA, Etapa 5 — CLAUDE.md)
 // ---------------------------------------------------------------------------
 
+/**
+ * `temUso` (CLAUDE.md, "excluir dia fixo de recorrência"): true se existe QUALQUER booking ou
+ * package — em qualquer status, inclusive cancelled/regeneracao — com esse recorrencia_id. Sem
+ * filtro de status de propósito: rastreabilidade de "por que esta aula existe" vale mesmo pra aula
+ * descartada. `bookings` é a checagem autoritativa; `packages` é redundante e sozinha incompleta
+ * (packages.recorrencia_id só grava o recorrencia_id do PRIMEIRO slot do array em
+ * gerar_pacote_recorrencia, 0019 — um pacote combinando dois dias fixos referencia só um deles).
+ * Checar as duas não corrige essa imprecisão, só garante que ela nunca deixa passar uma exclusão
+ * indevida (bookings sempre pega o caso que packages sozinho perderia).
+ */
 export async function getAlunoRecorrencias(studentId: string): Promise<AlunoRecorrencia[]> {
-  const { data, error } = await client()
-    .from("aluno_recorrencia")
-    .select("*")
-    .eq("aluno_id", studentId)
-    .order("dia_semana", { ascending: true });
+  const [rowsRes, bookingsRes, packagesRes] = await Promise.all([
+    client().from("aluno_recorrencia").select("*").eq("aluno_id", studentId).order("dia_semana", { ascending: true }),
+    client().from("bookings").select("recorrencia_id").eq("student_id", studentId).not("recorrencia_id", "is", null),
+    client().from("packages").select("recorrencia_id").eq("student_id", studentId).not("recorrencia_id", "is", null),
+  ]);
+  if (rowsRes.error) throw new Error(rowsRes.error.message);
+  if (bookingsRes.error) throw new Error(bookingsRes.error.message);
+  if (packagesRes.error) throw new Error(packagesRes.error.message);
+
+  const usados = new Set<string>([
+    ...(bookingsRes.data ?? []).map((r) => r.recorrencia_id as string),
+    ...(packagesRes.data ?? []).map((r) => r.recorrencia_id as string),
+  ]);
+  return (rowsRes.data ?? []).map((r) => mapAlunoRecorrencia(r, usados.has(r.id)));
+}
+
+/**
+ * Exclusão de verdade (não é o toggle `ativo`) — só é aceita pela RPC quando a recorrência nunca
+ * gerou nenhum booking/package (ver `temUso` acima e a migration 0023). Mensagem de erro amigável
+ * já vem da RPC via `error.message` (mesmo padrão de `reagendar_aula`/`cancelar_aula`).
+ */
+export async function excluirAlunoRecorrencia(id: string): Promise<void> {
+  const { error } = await client().rpc("excluir_aluno_recorrencia", { p_recorrencia_id: id });
   if (error) throw new Error(error.message);
-  return (data ?? []).map(mapAlunoRecorrencia);
 }
 
 export async function createAlunoRecorrencia(

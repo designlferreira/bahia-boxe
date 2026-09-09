@@ -1398,14 +1398,10 @@ Decidir antes de chegar na etapa correspondente:
   enquanto a transição em si for válida", comentário da 0001). Frágil para
   uma ação que corrige erro de registro. Falta um caminho permanente (ex.:
   botão "Desfazer" na tela de detalhe quando o status é `completed`/`no_show`).
-- **UX da lista de dias fixos** (achado pelo usuário em teste, 2026-09-08,
-  não bloqueia nada) — `AlunoRecorrencia.tsx` permite desativar um dia fixo
-  mas não excluí-lo, então a lista só cresce (linhas desativadas continuam
-  aparecendo, só com opacidade reduzida). Sem agrupamento (ativos primeiro,
-  por exemplo) nem qualquer ordenação além de `dia_semana` cru. A longo
-  prazo, um aluno com vários ciclos de recorrência ao longo do tempo acumula
-  uma lista poluída. Não implementado agora — não urgente, registrado pra
-  não sumir.
+- ~~**UX da lista de dias fixos**~~ — RESOLVIDO PARCIALMENTE (2026-09-09, ver seção "Excluir dia
+  fixo de recorrência" abaixo): agora dá pra excluir de verdade uma recorrência nunca usada, não só
+  desativar. O agrupamento/ordenação (ativos primeiro etc.) continua sem implementar — fora do
+  escopo da correção, registrado como sub-pendência ainda aberta.
 
 ### Limpeza de dados de teste antes de produção — diagnóstico rodado, decisões tomadas (2026-09-09)
 
@@ -1567,9 +1563,67 @@ mesmo que estivesse pendente, a tela não quebraria: `nameOf.get(r.student_id) ?
 formal entre aula e slot existe via FK, reforçando que a coluna certa pra saber "este horário está
 ocupado" seria essa relação, não o campo `is_active` hoje sobrecarregado com dois significados.
 
-Nenhum passo foi executado. Quando for a hora de rodar, cada `DELETE`/`UPDATE` vai para um arquivo
-dedicado (incluindo a checagem do passo 6 embutida como guarda, não como suposição), revisado
-antes de rodar — nunca uma sessão de comandos soltos.
+**Status real (2026-09-09): EXECUTADO.** `supabase/limpeza_aluno_teste_b12decb8.sql` rodou
+completo, confirmado pelo usuário — todos os passos, nenhuma guarda abortou. O aluno de teste
+`b12decb8` e tudo que ele tinha acumulado (packages, bookings — inclusive `32d4c001`, concluída ou
+não, tanto faz pro `DELETE` — credit_transactions, aluno_recorrencia, purchase_request,
+student_profiles, boxing_profile_assessments, login) não existem mais no banco. A decisão (a)
+também segue de pé (LK: nenhuma ação, deixado como estava). **As três categorias de limpeza de
+dados de teste estão fechadas.**
+
+### Excluir dia fixo de recorrência (2026-09-09)
+
+Resolve a pendência de UX registrada em "Pontos ainda em aberto": até aqui só existia o toggle
+`ativo` — a lista de dias fixos só crescia, sem forma de remover uma linha criada por engano.
+
+**FKs verificadas antes de decidir** (`diagnostico_limpeza_teste.sql`, bloco 0, introspecção real):
+`bookings.recorrencia_id -> aluno_recorrencia` e `packages.recorrencia_id -> aluno_recorrencia` são
+as duas `NO ACTION`, nunca `CASCADE` — apagar uma `aluno_recorrencia` referenciada falha, nunca
+apaga aulas em cascata. Isso descarta o cenário catastrófico, mas não decide a regra de negócio.
+
+**Regra decidida:** excluir só é permitido quando a recorrência nunca gerou **nada** — nenhum
+`booking` nem `package` com esse `recorrencia_id`, em **qualquer status**, inclusive
+`cancelled`/`regeneracao`. Rastreabilidade de "por que esta aula existe" vale mesmo pra aula
+descartada — mesmo raciocínio já aplicado às 24 aulas de regeneração do LK (seção acima). Se já
+gerou algo, o caminho é desativar, nunca excluir. **Sem exigir desativar antes de poder excluir**
+quando nunca houve uso — decisão explícita do usuário: duas ações pro mesmo fim seria fricção sem
+propósito.
+
+**Imprecisão conhecida sobre `packages.recorrencia_id`, registrada aqui por pedido explícito do
+usuário — vale além desta feature, não é bug desta migration:** `gerar_pacote_recorrencia` (0019)
+grava em `packages.recorrencia_id` só o `recorrencia_id` do **primeiro slot** do array
+(`set recorrencia_id = (p_slots->0->>'recorrencia_id')::uuid`). Um pacote que combina dois dias
+fixos (recorrência A e B) referencia só A no próprio `package` — mas cada `booking` individual
+carrega o `recorrencia_id` correto por linha. **`packages.recorrencia_id` não é uma lista completa
+de "de quais recorrências este pacote veio" quando há mais de um dia fixo envolvido** — não
+corrigido agora (fora do escopo desta migration), só não deixar ninguém confiar nesse campo achando
+que é completo. Consequência pra esta feature: a checagem em `bookings` é a **autoritativa**; a
+checagem em `packages` é defesa redundante e, sozinha, seria incompleta — as duas juntas continuam
+corretas porque `bookings` nunca erra (é aplicado a cada slot individualmente, na geração).
+
+**Implementação (migration `0023_excluir_aluno_recorrencia.sql`):**
+- RPC `excluir_aluno_recorrencia(p_recorrencia_id)` — professor dono do aluno, checa `exists` em
+  `bookings` OU `packages` com esse `recorrencia_id` (sem filtro de status); se achar, levanta
+  exceção com mensagem amigável em vez de deixar o erro cru de FK subir; se não achar, apaga.
+- **RLS de `aluno_recorrencia` deixou de ser uma policy única `for all`** (0009) — virou 4
+  policies (select/insert/update idênticas ao que já era; delete ganha a MESMA condição de negócio
+  da RPC). Backstop fail-closed: mesmo princípio já registrado pra `_create_package`/pro bloqueio
+  por ação da Etapa 7 ("esconder o botão não é a única proteção") — um `.delete()` direto pelo
+  client, bypassando a RPC, fica igualmente bloqueado pela RLS, com o mesmo critério.
+- Frontend: `getAlunoRecorrencias` ganhou um campo derivado `temUso` (duas queries companheiras,
+  `bookings`/`packages` por `student_id`, sem filtro de status, mescladas client-side — não é
+  coluna do banco). `AlunoRecorrencia.tsx` mostra um ícone de excluir sempre visível ao lado do
+  toggle; desabilitado com uma linha explicando ("Já gerou aula ou pacote — desative em vez de
+  excluir") quando `temUso`, habilitado com `ConfirmDialog` (`tone="destructive"`, componente já
+  usado nesta mesma tela) quando não. **Mensagem única para os dois motivos de bloqueio (bookings
+  OU packages), de propósito** — diferenciar exigiria expor qual dos dois bloqueou, o que o usuário
+  considerou desnecessário para um caso "improvável, mas possível" (packages sem bookings); a
+  mesma frase é usada no cliente e no texto da exceção da RPC, para não divergir.
+- Verificado: `tsc --noEmit` limpo, `vitest run` 39/39, `vite build` sem erro. **Não testado na
+  aplicação real ainda** — falta o usuário aplicar a migration `0023` e testar os três casos (dia
+  nunca usado → excluir funciona; dia com booking → botão desabilitado com a explicação; dia com
+  package mas sem booking → não exercitado, cenário "improvável" que ninguém construiu de propósito
+  pra testar).
 
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
@@ -1604,6 +1658,9 @@ decisão — não repita trabalho já fechado.
 - Todas as 15 migrations (`0008`-`0022`) aplicadas no banco real e confirmadas idempotentes
   (reaplicação sem erro e sem efeito colateral) — inclusive a `0022`, corrigida depois de uma
   reaplicação real ter falhado (ver seção "0022 não era idempotente" acima).
+- **Excluir dia fixo de recorrência** (`0023_excluir_aluno_recorrencia.sql`, 2026-09-09) — ver
+  seção própria acima. `tsc`/`vitest`/`vite build` verificados; **migration ainda não aplicada no
+  banco real nem testada na aplicação** — próximo passo de uma sessão nova, se for pedido.
 
 **Dívida conhecida, registrada, não bloqueia nada (detalhe completo em "Pontos ainda em aberto"
 acima — não duplicar aqui, só apontar):**
@@ -1614,18 +1671,18 @@ acima — não duplicar aqui, só apontar):**
   (separar "despublicado" de "ocupado" são dois conceitos hoje colapsados na mesma coluna).
 - `undo_lesson_action` só tem um ponto de entrada, o toast de 9 segundos após concluir/marcar
   falta — sem UI permanente pra desfazer depois disso, mesmo a RPC continuando válida.
-- Lista de dias fixos em `AlunoRecorrencia.tsx` só cresce (desativar não remove da lista, sem
-  agrupamento) — UX, não bloqueia nada.
+- Lista de dias fixos em `AlunoRecorrencia.tsx` — excluir uma recorrência nunca usada já é
+  possível (`0023`, 2026-09-09); falta só o agrupamento/ordenação (ativos primeiro, por exemplo) —
+  sub-pendência de UX ainda aberta, não bloqueia nada.
 - "Mudança de recorrência" sem decisão — hoje editar dias fixos nunca retroage sobre pacote já
   gerado, só o próximo a ser gerado lê o conjunto atual; não há UI de "editar" uma linha existente,
   só ativar/desativar/criar.
 - Feriados não são tratados na geração de pacote (gera todas as ocorrências do dia da semana, sem
   pular nem sinalizar) — sem tabela de feriados no banco hoje.
-- **Limpeza de dados de teste antes de produção — proposta escrita, NADA executado** (seção acima):
-  aulas de regeneração do aluno real LK (recomendação: deixar), aula(s) com horário movido
-  manualmente por SQL pra testar undo (recomendação: corrigir, não apagar — atrapalha se deixada),
-  aluno de teste `b12decb8` (recomendação: remover por completo). Próximo passo: usuário roda
-  `supabase/diagnostico_limpeza_teste.sql` (só leitura) e reporta o resultado.
+- ~~**Limpeza de dados de teste antes de produção**~~ — FECHADO e EXECUTADO (2026-09-09, ver seção
+  acima): LK ficou como estava, `32d4c001` e todo o resto do aluno de teste `b12decb8` foram
+  removidos via `supabase/limpeza_aluno_teste_b12decb8.sql`, confirmado pelo usuário. Nada
+  pendente aqui.
 
 **Fora do escopo — Etapa 8, NÃO iniciada (não implementar sem sinal explícito do usuário):**
 

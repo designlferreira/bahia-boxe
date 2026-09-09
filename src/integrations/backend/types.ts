@@ -139,6 +139,13 @@ export interface AlunoRecorrencia {
   duracaoMinutos: number;
   ativo: boolean;
   createdAt: string;
+  /**
+   * true se existe QUALQUER `booking` ou `package` (qualquer status, inclusive
+   * `cancelled`/`regeneracao`) com `recorrencia_id` = este id — ou seja, se esta recorrência já
+   * gerou algo. Computado client-side em `getAlunoRecorrencias` (não é coluna do banco); decide se
+   * "Excluir" fica disponível (CLAUDE.md, "excluir dia fixo de recorrência").
+   */
+  temUso: boolean;
 }
 
 /** Uma movimentação imutável em `credit_transactions` — o histórico, não o saldo. */

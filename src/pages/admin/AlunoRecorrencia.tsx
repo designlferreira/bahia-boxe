@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { fromZonedTime } from "date-fns-tz";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard, SkeletonList } from "@/components/SkeletonCard";
@@ -16,9 +16,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatDateShort, formatWeekdayShort, TIMEZONE } from "@/lib/dateUtils";
+import type { AlunoRecorrencia } from "@/integrations/backend/types";
 import {
   countAulasCancelaveisRecorrencia,
   createAlunoRecorrencia,
+  excluirAlunoRecorrencia,
   gerarPacoteRecorrencia,
   getAdminSettings,
   getAdminStudentDetail,
@@ -59,6 +61,7 @@ export default function AdminAlunoRecorrencia() {
   const [totalAulas, setTotalAulas] = useState(8);
   const [startDate, setStartDate] = useState<string | null>(null);
   const [confirmGerar, setConfirmGerar] = useState(false);
+  const [excluirAlvo, setExcluirAlvo] = useState<AlunoRecorrencia | null>(null);
 
   const detailQuery = useQuery({
     queryKey: ["admin-student-detail", studentId],
@@ -136,6 +139,18 @@ export default function AdminAlunoRecorrencia() {
       });
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível alterar a recorrência."),
+  });
+
+  // CLAUDE.md, "excluir dia fixo de recorrência" — só aceita quando `temUso` é false (checagem
+  // dupla bookings/packages, sem filtro de status, na RPC e espelhada na RLS de DELETE). A
+  // mensagem de erro amigável já vem pronta em `error.message` (excluir_aluno_recorrencia, 0023).
+  const excluirRecorrencia = useMutation({
+    mutationFn: (id: string) => excluirAlunoRecorrencia(id),
+    onSuccess: () => {
+      invalidate();
+      toast("Recorrência excluída", { className: "!text-amber" });
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível excluir a recorrência."),
   });
 
   const gerarPacote = useMutation({
@@ -224,12 +239,29 @@ export default function AdminAlunoRecorrencia() {
               <div className="text-[12.5px] text-muted-foreground mt-0.5">
                 {r.horario} · {r.duracaoMinutos} min
               </div>
+              {r.temUso && (
+                <div className="text-[11px] text-muted-foreground mt-1">
+                  Já gerou aula ou pacote — desative em vez de excluir.
+                </div>
+              )}
             </div>
             <Switch
               aria-label="Alternar recorrência"
               checked={r.ativo}
               onCheckedChange={(checked) => toggleAtivo.mutate({ id: r.id, ativo: checked })}
             />
+            <button
+              type="button"
+              aria-label="Excluir recorrência"
+              disabled={r.temUso}
+              onClick={() => setExcluirAlvo(r)}
+              className={cn(
+                "h-9 w-9 shrink-0 rounded-lg flex items-center justify-center transition-colors active:scale-95",
+                r.temUso ? "text-muted-foreground/30" : "text-destructive hover:bg-destructive/10",
+              )}
+            >
+              <Trash2 className="h-[18px] w-[18px]" />
+            </button>
           </div>
         ))}
       </div>
@@ -366,6 +398,23 @@ export default function AdminAlunoRecorrencia() {
         onConfirm={() => {
           gerarPacote.mutate({ totalAulas, startDate: effectiveStartDate });
           setConfirmGerar(false);
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!excluirAlvo}
+        onOpenChange={(open) => !open && setExcluirAlvo(null)}
+        title="EXCLUIR RECORRÊNCIA"
+        description={
+          excluirAlvo
+            ? `Excluir ${WEEKDAY_LABELS[excluirAlvo.diaSemana].toLowerCase()} às ${excluirAlvo.horario}? Esta ação não pode ser desfeita.`
+            : ""
+        }
+        confirmLabel="Excluir"
+        tone="destructive"
+        onConfirm={() => {
+          if (excluirAlvo) excluirRecorrencia.mutate(excluirAlvo.id);
+          setExcluirAlvo(null);
         }}
       />
     </div>
