@@ -1619,11 +1619,12 @@ corretas porque `bookings` nunca erra (é aplicado a cada slot individualmente, 
   OU packages), de propósito** — diferenciar exigiria expor qual dos dois bloqueou, o que o usuário
   considerou desnecessário para um caso "improvável, mas possível" (packages sem bookings); a
   mesma frase é usada no cliente e no texto da exceção da RPC, para não divergir.
-- Verificado: `tsc --noEmit` limpo, `vitest run` 39/39, `vite build` sem erro. **Não testado na
-  aplicação real ainda** — falta o usuário aplicar a migration `0023` e testar os três casos (dia
-  nunca usado → excluir funciona; dia com booking → botão desabilitado com a explicação; dia com
-  package mas sem booking → não exercitado, cenário "improvável" que ninguém construiu de propósito
-  pra testar).
+- Verificado: `tsc --noEmit` limpo, `vitest run` 39/39, `vite build` sem erro. **Status real
+  (2026-09-09): migration `0023` aplicada no banco real e testada na aplicação, confirmado pelo
+  usuário ("feito e testado").** O caso "package sem booking" (packages referencia só o primeiro
+  slot, ver imprecisão acima) continua não exercitado de propósito — cenário "improvável" que
+  ninguém construiu pra testar, não é uma lacuna de verificação, é a mesma decisão de escopo já
+  registrada.
 
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
@@ -1659,8 +1660,8 @@ decisão — não repita trabalho já fechado.
   (reaplicação sem erro e sem efeito colateral) — inclusive a `0022`, corrigida depois de uma
   reaplicação real ter falhado (ver seção "0022 não era idempotente" acima).
 - **Excluir dia fixo de recorrência** (`0023_excluir_aluno_recorrencia.sql`, 2026-09-09) — ver
-  seção própria acima. `tsc`/`vitest`/`vite build` verificados; **migration ainda não aplicada no
-  banco real nem testada na aplicação** — próximo passo de uma sessão nova, se for pedido.
+  seção própria acima. `tsc`/`vitest`/`vite build` verificados; **aplicada e testada na
+  aplicação, confirmado pelo usuário.**
 
 **Dívida conhecida, registrada, não bloqueia nada (detalhe completo em "Pontos ainda em aberto"
 acima — não duplicar aqui, só apontar):**
