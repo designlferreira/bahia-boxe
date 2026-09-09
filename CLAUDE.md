@@ -1407,109 +1407,149 @@ Decidir antes de chegar na etapa correspondente:
   uma lista poluída. Não implementado agora — não urgente, registrado pra
   não sumir.
 
-### Limpeza de dados de teste antes de produção (proposta, 2026-09-09 — NADA EXECUTADO)
+### Limpeza de dados de teste antes de produção — diagnóstico rodado, decisões tomadas (2026-09-09)
 
 Três categorias de dado acumulado ao testar as Etapas 1-7, levantadas pelo usuário ao fechar a
-Etapa 7. Nada abaixo foi rodado — é só a análise, com a decisão de execução em aberto até o
-usuário rodar o diagnóstico e decidir. Script de apoio, **somente leitura**:
-`supabase/diagnostico_limpeza_teste.sql` (mesmo padrão de `introspect.sql`: cola o resultado de
-volta, nada é escrito).
+Etapa 7. **`supabase/diagnostico_limpeza_teste.sql` (somente leitura) já rodou contra o banco
+real** e as três decisões abaixo já foram tomadas pelo usuário a partir do resultado — mas **nada
+de DELETE/UPDATE foi executado ainda**; esta seção documenta a decisão e o roteiro, não a
+execução.
 
-**Sobre as duas FKs sem `on delete` que o usuário pediu pra lembrar** —
-`credit_transactions.booking_id` e `bookings.replacement_for_booking_id` (`0001`, `0001:100`):
-nenhuma das duas tem `on delete cascade`/`set null`, então um `DELETE FROM bookings` cuja linha
-ainda seja referenciada por qualquer uma delas **falha** (RESTRICT/NO ACTION), em vez de apagar em
-cascata ou deixar a referência solta — é uma trava de segurança, não um risco por si só, mas
-qualquer ordem de DELETE proposta abaixo precisa respeitá-la. **Essa caracterização (só essas duas
-FKs sem `on delete` entre as que importam aqui) vem de `introspect.sql` rodado numa sessão
-anterior, cujo resultado não está mais disponível nesta sessão** — o bloco 0 do script de
-diagnóstico novo reconfirma isso antes de qualquer execução real se apoiar nela; não tratar como
-fato reverificado até o usuário rodar esse bloco.
+**Bug achado na v1/v2 do script, corrigido antes do resultado valer algo:** o bloco 0 (ON DELETE
+das FKs) não aparecia na saída, sem erro nenhum. Causa: o filtro comparava
+`con.conrelid::regclass::text` contra uma string QUALIFICADA (`'public.bookings'`). O cast
+`regclass::text` do Postgres devolve o nome mais curto que resolve sem ambiguidade dado o
+`search_path` da sessão — como `public` está no search_path por padrão, o valor real era
+`'bookings'` (sem prefixo), a comparação nunca batia, e a CTE devolvia 0 linhas **silenciosamente**
+(união vazia não é erro, e as outras seções continuaram aparecendo normalmente). Corrigido
+filtrando por `pg_namespace.nspname` + `pg_class.relname` direto — mesmo padrão que
+`introspect.sql` já usava e por isso nunca teve esse problema. Lição generalizável, mesma família
+do aviso já registrado no cabeçalho do `introspect.sql` sobre o SQL Editor só mostrar a última
+instrução: **nunca comparar `::regclass::text` contra um nome qualificado — comparar por
+namespace + relname**, ou usar `pg_get_constraintdef` (como o `introspect.sql` original já fazia)
+em vez de reconstruir o texto column a column. A v3 do script também ganhou uma contagem de
+conferência no próprio bloco 0 (se der 0 nessa contagem, o bloco tem outro problema — não
+interpretar silêncio como "nenhuma FK existe").
+
+**Resultado do diagnóstico (resumo):**
+- **(A) LK:** as 24 linhas são todas `cancelled`/`regeneracao`, `credit_transactions_apontando=0`
+  e `referenciada_como_original_de=0` em TODAS — nenhuma FK trava nada aqui.
+- **(B) horário artificial:** só uma linha achada, a própria `32d4c001...`, `scheduled` em
+  07/09 21:59 (passado) — **não é do LK, é do aluno de teste `b12decb8`** (as duas categorias (b) e
+  (c) se sobrepõem nesta linha específica). É `replacement_for_booking_id` de `863d420d...`
+  (criada por `reagendar_aula`, Etapa 6). Zero FKs apontando pra ela (nem `credit_transactions`,
+  nem outra `bookings.replacement_for_booking_id`).
+- **(C) aluno de teste `b12decb8`:** 1 `students`, 3 `aluno_recorrencia`, 10 `bookings`, 3
+  `packages`, 2 `credit_transactions`, 1 `purchase_request`. Nenhuma referência cruzada de outro
+  aluno.
 
 **(a) As 24 aulas `cancelled`/`cancelado_por='regeneracao'` do aluno real LK
 (`4cd0e555-728b-47ba-ba3c-073b54d28af3`).**
 
-**Recomendação: deixar como está.** Três motivos, nenhum sozinho seria suficiente, juntos são:
-1. LK é aluno real, não conta de teste — essas 24 linhas são histórico de verdade (pacotes
-   regenerados de verdade durante os testes das Etapas 4-6), não lixo sintético. Apagar histórico
-   real de um aluno real por conveniência de limpeza é o tipo de operação que este projeto trata
-   como irreversível por padrão (`cancelado_por='regeneracao'` existe desde a 0019 exatamente pra
-   marcar "isso nunca foi um compromisso de verdade" sem precisar apagar a linha).
-2. Já são invisíveis em toda tela — o filtro `SEM_DESCARTE_DE_REGENERACAO`
-   (`.or("cancelado_por.is.null,cancelado_por.neq.regeneracao")`) esconde essas linhas de qualquer
-   lista voltada pro aluno ou professor desde a Etapa 5/6. Não há "prejuízo" visível em produção por
-   deixá-las: ninguém vê.
-3. Não contam em nenhum saldo — decisão 4 (resync de `used_classes` incondicional ao status) já
-   garante que essas linhas não inflam nem desinflam crédito de ninguém.
+**DECISÃO: deixar como está**, confirmando a recomendação original — o diagnóstico não achou
+nenhuma `credit_transaction` nem `replacement_for_booking_id` apontando pra nenhuma das 24, então
+nem o argumento de FK entraria em jogo; a razão de fundo continua sendo histórico real de aluno
+real, já invisível em toda tela (`SEM_DESCARTE_DE_REGENERACAO`) e fora de qualquer saldo (decisão
+4). Nada a fazer aqui.
 
-O único jeito de isso "atrapalhar" seria se alguma delas tivesse `credit_transactions.booking_id`
-apontando pra ela (crédito debitado por engano numa aula que devia ter sido só descartada) — o
-bloco A do diagnóstico confere isso; se aparecer alguma linha com `credit_transactions_apontando >
-0`, tratar como achado novo antes de decidir qualquer coisa, não como parte desta recomendação.
+**(b) A aula `32d4c001...`, replacement de `863d420d...`, pacote `585c88ac...`.**
 
-**(b) A aula `32d4c001...` movida no tempo por SQL pra testar `undo_lesson_action`, e qualquer
-outra com horário artificial.**
+**DECISÃO: concluir pela aplicação (`complete_booking`), não mexer por SQL.** Mecânica confirmada
+lendo `0013_calcular_saldo_pacote.sql` e `0020_reagendar_cancelar_aula.sql` (não assumida — as
+duas migrations foram relidas pra esta resposta):
 
-**Esta SIM atrapalha se for deixada como está** — diferente da categoria (a). Se o status final
-dela ficou `scheduled` com `start_time` no passado (não confirmado nesta sessão — o bloco B do
-diagnóstico traz o estado atual), a tela vai mostrá-la como "Aguardando confirmação" pra sempre, um
-artefato visível e confuso pro professor real assim que ele começar a usar o app de verdade — não
-é dado invisível como a categoria (a).
+- `calcular_saldo_pacote` agrupa `bookings` por `cadeia_id` e só aplica a regra de crédito no
+  **terminal** de cada cadeia (a linha que nenhuma outra referencia via
+  `replacement_for_booking_id`) — `863d420d` (original, agora `rescheduled`) nunca conta sozinha,
+  só `32d4c001` conta, porque é ela o terminal (confirmado: `referenciada_como_original_de=0`).
+- `complete_booking` (0020) checa `pacote_id is not null` **antes** de checar `is_replacement` —
+  comentário da própria migration: "RECORRENCIA primeiro... `is_replacement` é irrelevante". Como
+  `32d4c001.pacote_id = 585c88ac` (herdado do original por `reagendar_aula`), concluir cai direto
+  no ramo de recorrência: marca `status='completed'`, recalcula `calcular_saldo_pacote(585c88ac)` e
+  grava o resultado em `packages.used_classes`/`status` — **nenhum `credit_transactions` é criado**
+  (esse insert só acontece no ramo `pacote_id is null`, que este booking não é).
+- Efeito líquido: `585c88ac.used_classes` sobe em 1 (a cadeia de `863d420d`→`32d4c001`, que hoje
+  não conta porque o terminal está `scheduled`, passa a contar); `status` vira `finished` se isso
+  atingir o total, senão continua `active`. `863d420d` permanece `rescheduled` para sempre, sem
+  mudança — já não contava antes, não passa a contar agora.
+- É seguro: nenhuma FK aponta para `32d4c001` (diagnóstico bloco B), a UI (gate client-side de
+  "só concluir aula já passada") deixa passar porque `start_time` já é 07/09 (passado), e o efeito
+  é idêntico ao de concluir qualquer aula normal de recorrência — a manipulação manual do
+  `start_time` não introduz nenhum caminho especial, só destravou a UI pra alcançar o mesmo botão
+  que uma aula de verdade alcançaria sozinha com o tempo.
+- Como o pacote `585c88ac` e o aluno `b12decb8` inteiro estão marcados pra remoção total (decisão
+  (c) abaixo), esse ajuste de saldo é transitório — não precisa reconciliar nada depois, ele some
+  junto no passo 3 do roteiro de (c).
 
-Duas opções, nenhuma decidida:
-- **Corrigir em vez de apagar** — um `UPDATE` revertendo `start_time` pra um horário futuro
-  plausível (ou pro valor original, se alguém tiver anotado qual era antes do `UPDATE` de teste —
-  não está registrado nesta sessão) resolve sem tocar em `status`/histórico. É a opção mais barata
-  e mais alinhada ao que a manipulação original fez (um `UPDATE` de teste desfeito por outro
-  `UPDATE`), mas exige decidir pra que data/hora mover.
-- **Apagar** — só depois de confirmar (bloco B) que nem `credit_transactions.booking_id` nem
-  `bookings.replacement_for_booking_id` de outra linha apontam pra ela; senão o `DELETE` falha
-  (RESTRICT) e teria que resolver a linha que referencia primeiro — o que pode não ser desejável
-  (apagar uma `credit_transaction` real de teste de `complete_booking`/`undo` é apagar prova exata
-  de que o teste do ciclo concluir→desfazer funcionou, documentado no CLAUDE.md como verificação da
-  Etapa 6).
+Nenhuma outra linha com horário artificial foi encontrada além desta.
 
-Recomendação provisória: **corrigir o `start_time`, não apagar** — evita mexer em qualquer FK e
-preserva o resto do histórico de teste já documentado. Mas a decisão de qual data usar (e se há
-mais alguma aula na mesma situação, que o bloco B do diagnóstico também busca por heurística
-`status='scheduled' and start_time < now()`) fica para o usuário depois de ver o resultado do
-diagnóstico.
+**(c) O aluno de teste `b12decb8-2f64-4bd8-b3a9-6c5b8b29d8a8` — roteiro de remoção completa.**
 
-**(c) O aluno de teste `b12decb8-2f64-4bd8-b3a9-6c5b8b29d8a8` e o que ele acumulou.**
+**DECISÃO: remover por completo.** Roteiro em ordem de FK (children antes de parents), children
+sempre resolvidos antes do parent que os contém — **nada abaixo foi executado**:
 
-**Recomendação: remover por completo antes de produção.** Diferente das categorias (a) e (b), esta
-é uma conta 100% sintética, criada só pra ter um segundo aluno isolado pros scripts de verificação
-(`verify_create_package.sql`, `verify_calcular_saldo_pacote.sql`) — não representa nenhum cliente
-real. Só existe um professor neste banco (`supabase/README.md`), e é a conta dele que vai pra
-produção: um aluno "teste" na própria lista de alunos dele, com pacotes/aulas fictícias, é
-confuso e poderia ser confundido com cliente de verdade — ao contrário da categoria (a), aqui não
-há razão nenhuma pra preservar "histórico real".
+1. **(SQL)** `update bookings set replacement_for_booking_id = null where student_id =
+   'b12decb8-...'` — quebra o vínculo interno `32d4c001 → 863d420d` **antes** de apagar qualquer
+   uma das duas, evitando depender de sequenciamento de linha-a-linha dentro de um `DELETE`
+   multi-linha sobre uma FK sem `on delete` (`bookings.replacement_for_booking_id`, `0001`). Só
+   afeta as 10 bookings deste aluno — o diagnóstico já confirmou que nenhuma bookings de OUTRO
+   aluno aponta pra dentro desse conjunto, então esse `UPDATE` não pode quebrar nada fora daqui.
+2. **(SQL)** `delete from credit_transactions where student_id = 'b12decb8-...'` (2 linhas) — antes
+   de apagar `bookings`/`packages`, porque `credit_transactions.booking_id` e `.package_id`
+   apontam pra eles (sem `on delete`). Confirmar antes (diagnóstico bloco E, `reversao_cruzada`)
+   que nenhuma OUTRA transação usa `reverses_transaction_id` apontando pra uma dessas 2 — essa FK
+   (`0001:42`) também não tem `on delete`, achado nesta revisão, não fazia parte da lista original
+   de duas.
+3. **(SQL)** `delete from bookings where student_id = 'b12decb8-...'` (10 linhas, já sem
+   `replacement_for_booking_id` interno pelo passo 1).
+4. **(SQL)** `delete from packages where student_id = 'b12decb8-...'` (3 linhas).
+5. **(SQL)** `delete from purchase_requests where student_id = 'b12decb8-...'` (1 linha) — ver
+   pergunta sobre este item logo abaixo.
+6. **(SQL, opcional)** `delete from aluno_recorrencia where aluno_id = 'b12decb8-...'` (3 linhas) —
+   **já é `on delete cascade` a partir de `students`** (`0009:15`), então o passo 8 já a
+   remove sozinha; fazer aqui só antecipa e permite conferir o número antes de chegar no passo
+   irreversível.
+7. **(informativo, sem ação)** `student_profiles` e `boxing_profile_assessments` (Perfil de Boxe,
+   fora do escopo de RECORRENCIA) também têm `on delete cascade` a partir de `students` (`0004:10`,
+   `0006:39`) — qualquer linha que este aluno de teste tenha ali some sozinha no passo 8, sem
+   `DELETE` próprio.
+8. **(SQL) 🛑 PARE E CONFIRA AQUI antes de seguir** — `delete from students where id =
+   'b12decb8-...'`. Este é o ponto sem volta fácil: depois dele, `students.profile_id` (o vínculo
+   com o login, se existir) só fica recuperável se você já tiver anotado o valor. Antes deste
+   passo, rode (o bloco E do diagnóstico já faz isso) `select profile_id from students where id =
+   'b12decb8-...'` e ANOTE o resultado — o passo 9 depende dele.
+9. **(fora de SQL puro, painel do Supabase)** Se o `profile_id` do passo 8 não for nulo (o
+   diagnóstico deve confirmar se aponta pra um profile de verdade, possivelmente
+   `a4ad5883-4ed2-44a2-9cd3-b239b70f9658` — reconstruído do título de um commit anterior desta
+   engagement, "Fix test student id: b12decb8-... is students.id, a4ad5883-... was profiles.id",
+   **não confirmado nesta sessão, conferir com o bloco E antes de agir**): apagar o login de teste
+   exige o **Supabase Dashboard → Authentication → Users** (ou a Auth Admin API) — não um `DELETE`
+   direto em `auth.users`, tabela que o Supabase gerencia por fora do SQL Editor comum. A ordem
+   entre apagar a linha de `profiles` via SQL e apagar o usuário pelo painel não importa (qualquer
+   uma resolve a outra, dependendo de como `profiles.id → auth.users.id` estiver configurado nesta
+   instância — o bloco 0 do diagnóstico, estendido pra incluir `profiles`, mostra isso); o que
+   importa é que os passos 1-8 já tenham rodado antes, senão `students.profile_id` ainda aponta pro
+   profile e o `DELETE`/a remoção pelo painel esbarra nele.
 
-Ordem seguindo as FKs conhecidas (children antes de parents), a confirmar contra o bloco 0 do
-diagnóstico antes de executar:
-1. `aluno_recorrencia` — **já é `on delete cascade` a partir de `students`** (`0009:15`,
-   `aluno_id ... references public.students(id) on delete cascade`), então some sozinho no passo 6
-   sem precisar de um `DELETE` próprio; listado aqui só pra registrar que não foi esquecido.
-2. `credit_transactions` onde `student_id` (ou `booking_id` de uma aula deste aluno) aponta pra
-   ele — apagar primeiro, é o nível mais "folha" da árvore; por ser aluno 100% sintético, apagar o
-   próprio ledger não tem o mesmo custo de "apagar prova de teste" da categoria (b), mas ainda
-   assim documentar quantas linhas antes de apagar (bloco C do diagnóstico já conta).
-3. `bookings` deste aluno — antes de apagar, checar (bloco C, última consulta) que nenhuma aula de
-   OUTRO aluno tem `replacement_for_booking_id` apontando pra uma aula deste; não deveria existir
-   (recorrência é isolada por aluno), mas não fica assumido sem essa checagem.
-4. `packages` deste aluno.
-5. `purchase_requests` deste aluno, se houver.
-6. `students` — a linha `b12decb8` em si (derruba `aluno_recorrencia` em cascata, passo 1).
-7. **Fora do alcance de SQL puro:** se essa conta tiver um `profiles`/`auth.users` dedicado (login
-   de teste de verdade, não só uma linha solta em `students`), apagar a linha de `profiles` exige
-   também remover o usuário em `auth.users` — isso é feito pelo Supabase Auth Admin API ou pelo
-   painel (Authentication → Users), não por um `DELETE` direto na tabela (o Supabase gerencia
-   `auth.users` por fora do SQL Editor comum). Verificar antes se esse aluno de teste tem
-   credencial de login própria ou é só uma linha de `students` sem login associado.
+**Sobre o `purchase_request` (pergunta do usuário): não quebra nenhuma tela do professor.**
+`getPurchaseRequests` (`api.ts:1127`) busca só `status = 'pending'` e resolve o nome do aluno via
+`nameOf.get(r.student_id) ?? "Aluno"` — um `Map` com fallback, não um join que quebraria se o
+aluno sumisse. Mas isso é sobre a TELA, não sobre o BANCO: se o `purchase_request` ainda estiver
+`pending` quando `students` for apagado no passo 8, o `DELETE` de `students` provavelmente falha
+primeiro (a menos que `purchase_requests.student_id` tenha `on delete cascade`, o que o bloco 0
+agora também mostra) — é exatamente por isso que o passo 5 apaga o `purchase_request` ANTES do
+passo 8, então essa situação nunca chega a existir na prática se o roteiro for seguido em ordem.
+**Separado da segurança técnica:** se o status vier `pending` no diagnóstico (bloco E,
+`purchase_request_status`), isso significa que HOJE, antes de qualquer limpeza, esse pedido
+fictício já aparece em `/admin/solicitacoes` como um pedido real esperando decisão do professor —
+vale conferir e resolver (aprovar/rejeitar/apagar) independente do resto do roteiro, já que é
+visível na tela agora, produção ou não.
 
-Nenhum desses passos foi executado. Depois que o usuário rodar `diagnostico_limpeza_teste.sql` e
-reportar os números, a migration/script de limpeza real (se aprovada) segue o mesmo padrão de
-sempre — arquivo dedicado, revisado antes de rodar, nunca uma sessão de comandos soltos.
+O roteiro completo — incluindo os itens 1, 2 e 9 (nulo de `replacement_for_booking_id`,
+`reverses_transaction_id` cruzado, e o vínculo `profiles`/`auth.users`) — depende do resultado do
+diagnóstico v3 (`supabase/diagnostico_limpeza_teste.sql`, blocos 0 e E), que estende o v2 rodado
+até aqui. Nenhum passo foi executado; quando for a hora, cada `DELETE`/`UPDATE` vai para um arquivo
+dedicado, revisado antes de rodar — nunca uma sessão de comandos soltos.
 
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
