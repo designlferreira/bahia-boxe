@@ -577,7 +577,7 @@ reagendamento quanto em reposição (decisão 2).
 | 12 | `0019_cancelado_por_regeneracao.sql` | `cancelado_por` ganha o terceiro valor `'regeneracao'` (CHECK estendido); `gerar_pacote_recorrencia` passa a gravá-lo e a NÃO cancelar reposições (`replacement_for_booking_id is not null`); **backfill** das linhas já canceladas pela 0018 (`'professor'` → `'regeneracao'`) — único UPDATE de dados do arquivo (ver seção própria abaixo) | 4 |
 | 13 | `0020_reagendar_cancelar_aula.sql` | RPCs `reagendar_aula`/`cancelar_aula`, professor-only + **reordenação** de `complete_booking`/`mark_no_show` (ramo `pacote_id` antes do early-return de `is_replacement`) — ver seção própria abaixo | 6 |
 | 14 | `0021_undo_recorrencia_e_overlap_do_proprio_aluno.sql` | `undo_lesson_action` ganha o ramo de recorrência com **reabertura condicionada** (assimetria deliberada com a 0017 — ver seção própria); `gerar_pacote_recorrencia` cancela a grade ANTES de checar sobreposição e passa a checar também contra o próprio aluno, com mensagens distintas | 6 |
-| 15 | `0022_modo_agendamento.sql` | `profiles.modo_agendamento` (nullable, `check in ('autosservico','recorrencia')`) + RPC `modo_agendamento_efetivo(p_professor_id)` | 7 — **APLICADA (2026-09-08), idempotência corrigida e CONFIRMADA por reexecução real (2026-09-09)** — rodar de novo devolveu "Success", coluna/CHECK/função intactos; verificação de comportamento por script ainda pendente (`supabase/verify_modo_agendamento.sql`) |
+| 15 | `0022_modo_agendamento.sql` | `profiles.modo_agendamento` (nullable, `check in ('autosservico','recorrencia')`) + RPC `modo_agendamento_efetivo(p_professor_id)` | 7 — **APLICADA e VERIFICADA por script (2026-09-09)** — idempotência confirmada por reexecução real; os 9 casos de `supabase/verify_modo_agendamento.sql` vieram `OK` (nenhum `DIVERGIU`/`ERRO`): propriedade nullable+coalesce vale pro professor e pro aluno lendo pela RPC, virar/voltar a flag muda só a leitura efetiva sem tocar uma linha sequer de `bookings`/`packages` (51/21 antes e depois, nos dois sentidos) |
 | 16 | `0023_aviso_ausencia.sql` | `bookings.aviso_ausencia_em`/`.aviso_ausencia_motivo` (adiado pra cá — não adicionar coluna que nenhuma função usa ainda) + função pro aluno registrar — **renumerada de 0022 pra 0023** quando a Etapa 7 (linha acima) tomou o número 0022 primeiro | 8 |
 
 ### Etapa 5 — tela (2026-09-07, sem migration nova)
@@ -1229,11 +1229,15 @@ escrita; (1b) um aluno matriculado lê o mesmo valor que o próprio professor (p
 atravessa a fronteira); (2) virar a flag pra `'recorrencia'` muda a leitura E não move nenhuma
 linha de `bookings`/`packages`; (3) voltar a flag reproduz exatamente o estado original — prova de
 que nada no caminho AUTOSSERVICO foi tocado, só ficou temporariamente inacessível pela tela.
-**Status real (2026-09-08): script escrito, AINDA NÃO EXECUTADO contra o banco** — mesma ressalva
-já registrada em outras migrations desta etapa (decisões 6 e 8): rodar antes de considerar a Etapa
-7 fechada. Só existe um professor neste banco (`supabase/README.md`), então o caso negativo "aluno
-de outro professor tentando ler este" não tem dado real pra exercitar — não fabricado, registrado
-como lacuna de cobertura, não como bug.
+**Status real (2026-09-09): EXECUTADO contra o banco, os 9 casos vieram `OK`** — nenhum `DIVERGIU`
+nem `ERRO`. Confirmado empiricamente, não só por leitura: propriedade nullable+coalesce vale pro
+professor e pro aluno matriculado lendo pela RPC (prova que ela atravessa a fronteira de
+`profiles`); virar a flag pra `'recorrencia'` muda só a leitura (`bookings`=51/`packages`=21,
+idênticos antes e depois); voltar a flag reproduz o estado original e os dados continuam intactos.
+Único caso ainda sem cobertura empírica, aceito como lacuna e não como bug: "aluno de OUTRO
+professor tentando ler este" — só existe um professor neste banco (`supabase/README.md`), sem dado
+real pra exercitar esse ramo do `raise exception 'not_allowed'`; não fabricado de propósito (mesmo
+critério já usado em `verify_create_package.sql`).
 
 **Fora do escopo desta etapa, registrado pra não parecer esquecimento:** nenhuma RPC de crédito
 (`complete_booking`, `mark_no_show`, `calcular_saldo_pacote`, etc.) foi tocada — `modo_agendamento`
