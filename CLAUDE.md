@@ -1890,6 +1890,62 @@ Verificado: `tsc -b --noEmit` limpo, `vitest run` 73/73 (25 novos: `physicalAnch
 aplicação real ainda** — inclui uma migration nova (0024), então precisa rodar no Supabase antes de
 qualquer teste end-to-end.
 
+### Resultado combinado — corrigindo a lacuna da escolha forçada (2026-09-11) — implementado
+
+Retomando a dívida registrada na seção anterior: com escolha forçada valendo 24%-30% do score de
+cada avaliação (era ~12% na v1), ignorá-la no resultado combinado deixou de ser uma aproximação
+pequena e virou um bug visível — o arquétipo combinado pode divergir dos dois individuais e a tela
+de comparação mostra os três lado a lado, sem explicação possível ("você: Out-Boxer, professor:
+Out-Boxer, combinado: Counterpuncher").
+
+**O que precisou ser persistido: nada.** As respostas de escolha forçada já são gravadas em
+`boxing_profile_assessments.answers` (jsonb) desde a migration 0006 — o score de escolha forçada é
+recalculável a partir dali, não precisava de coluna nova. O que faltava era só PASSAR essa informação
+pra `combineAssessments`, que hoje só recebia `dimensionScores`.
+
+**Correção (`src/lib/boxingProfile/combined.ts`):**
+- `behavioralScoreRaw` (a mesma fórmula usada em `scoring.ts`) foi exportada em vez de duplicada —
+  nunca deveria haver uma segunda cópia dessa conta.
+- `CombinableAssessment` ganhou `answers`, `assessmentType`, `assessmentLength` e `profileScores`.
+  Como consequência, o tipo que satisfaz essa forma deixou de ser `BoxingProfileAssessmentSummary`
+  (o resumo leve de `getBoxingProfileHistory`, sem `answers`) e passou a ser `BoxingProfileAssessment`
+  (o registro completo) — de propósito: obriga quem chama a buscar o registro completo, não dá pra
+  esquecer silenciosamente.
+- Caso os dois existam: o score de escolha forçada de cada lado é recalculado a partir de `answers` +
+  as perguntas aplicáveis daquela voz/variante (`getQuestions(assessmentType, assessmentLength)`) —
+  os dois já saem normalizados 0-100, então se combinam pela média, mesma filosofia já usada pra
+  dimensão. O peso da mistura (`forcedChoiceWeight`) usado na combinação é a média dos dois pesos de
+  origem (`FORCED_CHOICE_WEIGHT[self.length]`/`[coach.length]`).
+- **Achado da revisão, não pedido originalmente:** o caso PARCIAL (só um dos dois respondeu) tinha a
+  MESMA omissão, e ali a correção é ainda mais direta — o `profileScores` certo (com escolha forçada
+  e tudo) já existia, calculado no momento em que aquela avaliação foi enviada. A versão anterior
+  descartava isso e recalculava do zero só com peso de dimensão. Agora usa `only.profileScores`
+  direto, sem recalcular nada.
+
+**Registrado por pedido explícito, não decisão própria:** a média dos dois pesos (`forcedChoiceWeight`)
+quando aluno e professor usam variantes diferentes (curta com professor, completa com aluno, etc.) é
+**convenção por ausência de razão melhor, não uma calibração**. Não existe um peso "certo" pra
+combinar uma leitura de 14 itens com uma de 37 — o aviso de "não diretamente comparável" já existente
+na tela cobre o usuário sobre isso; a média é só o que o código faz quando não há uma resposta
+fundamentada melhor. Registrado aqui pra ninguém, daqui a alguns meses, ler esse número e achar que
+foi calibrado.
+
+**Efeito colateral descoberto e tratado — carregamento da tela de comparação:** como
+`BoxingProfileComparisonView` agora exige o registro completo (com `answers`), e a lista de
+histórico só traz o resumo leve, as três telas que montam essa comparação (`PerfilLutador.tsx`,
+`AlunoPerfilBoxe.tsx`, e a rota órfã mas ainda ativa `PerfilLutadorComparacao.tsx`) precisaram de 2
+requisições novas cada (`getBoxingProfileAssessment` pros dois ids), disparadas só quando as duas
+avaliações já existem — não em toda visita à tela. Antes, a comparação renderizava assim que o
+resumo do histórico chegava, sem espera adicional; agora há uma janela real de carregamento entre o
+resumo resolver e os dois registros completos chegarem. Tratado com skeleton (`SkeletonList`, mesmo
+padrão já usado em todo o app) nessa janela, e um `ErrorState` com retry se alguma das duas
+requisições falhar — em vez de deixar a tela piscar entre "nada" e a comparação.
+
+Verificado: `tsc -b --noEmit` limpo, `vitest run` 75/75 (2 novos testes em `combined.test.ts`
+demonstrando o bug corrigido: com dimensões empatadas entre os 6 perfis, respostas de escolha
+forçada favorecendo o mesmo perfil dos dois lados agora decidem o arquétipo combinado — sem elas,
+cai no desempate fixo), `vite build` sem erro. **Não testado na aplicação real ainda.**
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
