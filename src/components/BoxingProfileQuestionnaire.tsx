@@ -70,8 +70,17 @@ export function BoxingProfileQuestionnaire({
   const [confirmExit, setConfirmExit] = useState(false);
 
   useEffect(() => {
-    setAnswers(loadDraft(draftKey));
-    setIndex(0);
+    const draft = loadDraft(draftKey);
+    setAnswers(draft);
+    // Retoma na primeira pergunta ainda sem resposta, não sempre em 0 — a versão anterior
+    // restaurava as respostas mas reabria em 0 incondicionalmente, então dava pra chegar na
+    // pergunta certa clicando "Avançar" várias vezes, sem perder nada, só com fricção. Gaps no
+    // meio (responder 5 sem ter respondido 3/4) não são possíveis pela UI hoje — `goNext` só anda
+    // uma pergunta por vez e exige a atual respondida — mas `findIndex` cobre esse caso também se
+    // um dia deixar de ser verdade. Se tudo já estiver respondido, abre na última (pra revisar/
+    // enviar), não fora do array.
+    const firstUnanswered = questions.findIndex((q) => draft[q.id] === undefined);
+    setIndex(firstUnanswered === -1 ? questions.length - 1 : firstUnanswered);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey]);
 
