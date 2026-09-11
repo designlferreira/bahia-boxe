@@ -1,5 +1,5 @@
 import { BoxingRadarChart } from "@/components/BoxingRadarChart";
-import { DIMENSIONS, DIMENSION_LABELS, FIGHTER_PROFILE_LABELS } from "@/lib/boxingProfile";
+import { DIMENSIONS, DIMENSION_LABELS, FIGHTER_PROFILE_LABELS, combineAssessments } from "@/lib/boxingProfile";
 import type { BoxingProfileAssessmentSummary } from "@/integrations/backend/types";
 
 interface BoxingProfileComparisonViewProps {
@@ -45,12 +45,25 @@ const VIEWER_COPY: Record<
 };
 
 /**
+ * Aviso de divergência — viewer-simétrico de propósito: "as leituras se distanciam" trata o
+ * desacordo como propriedade da comparação, não erro de alguém, então o mesmo texto serve pro
+ * aluno lendo sobre si e pro professor lendo sobre o aluno. Sem "desta vez": isso sugeriria que
+ * existe um histórico comparável de referência, o que não é verdade na primeira avaliação dupla.
+ */
+function divergenceText(dim: string | null): string {
+  const scope = dim ? ` em ${dim}` : "";
+  return `As duas leituras se distanciam mais do que o normal${scope}. Não significa que uma esteja certa e a outra errada — são ângulos diferentes sobre o mesmo momento. Pode valer a pena conversar sobre isso no próximo treino.`;
+}
+
+/**
  * Comparação Aluno×Professor lado a lado — sempre neutra, nunca "quem está certo". Só monta
  * quando as duas avaliações existem; quem chama decide o que mostrar se faltar uma das duas.
  */
 export function BoxingProfileComparisonView({ self, coach, viewer }: BoxingProfileComparisonViewProps) {
   const copy = VIEWER_COPY[viewer];
   const samePrimaryProfile = self.primaryProfile === coach.primaryProfile;
+  // Nunca null aqui: as duas avaliações sempre existem quando este componente é montado.
+  const combined = combineAssessments(self, coach)!;
 
   return (
     <div>
@@ -70,6 +83,12 @@ export function BoxingProfileComparisonView({ self, coach, viewer }: BoxingProfi
       </div>
       <p className="text-[11.5px] text-muted-foreground leading-relaxed mb-5">{samePrimaryProfile ? copy.agree : copy.differ}</p>
 
+      {combined.isDivergent && (
+        <p className="text-[11.5px] text-amber leading-relaxed mb-5 -mt-2.5">
+          {divergenceText(combined.divergentDimension ? DIMENSION_LABELS[combined.divergentDimension] : null)}
+        </p>
+      )}
+
       <div className="card-dark p-4 mb-2 flex flex-col items-center">
         <BoxingRadarChart scores={self.dimensionScores} compareScores={coach.dimensionScores} />
         <div className="flex items-center gap-4 mt-1">
@@ -85,18 +104,26 @@ export function BoxingProfileComparisonView({ self, coach, viewer }: BoxingProfi
       <div className="card-dark p-4 mb-5">
         <div className="flex items-center text-[10.5px] uppercase tracking-wide text-muted-foreground font-semibold mb-2.5">
           <span className="flex-1">Dimensão</span>
-          <span className="w-12 text-right">{copy.selfColumn}</span>
-          <span className="w-12 text-right">{copy.coachColumn}</span>
+          <span className="w-11 text-right">{copy.selfColumn}</span>
+          <span className="w-11 text-right">{copy.coachColumn}</span>
+          <span className="w-11 text-right">Combin.</span>
         </div>
         <div className="flex flex-col gap-2">
           {DIMENSIONS.map((dim) => (
             <div key={dim} className="flex items-center text-[13px]">
               <span className="flex-1 text-foreground/80">{DIMENSION_LABELS[dim]}</span>
-              <span className="w-12 text-right font-semibold text-foreground tabular-nums">{self.dimensionScores[dim]}</span>
-              <span className="w-12 text-right font-semibold text-muted-foreground tabular-nums">{coach.dimensionScores[dim]}</span>
+              <span className="w-11 text-right font-semibold text-foreground tabular-nums">{self.dimensionScores[dim]}</span>
+              <span className="w-11 text-right font-semibold text-muted-foreground tabular-nums">{coach.dimensionScores[dim]}</span>
+              <span className="w-11 text-right font-semibold text-accent tabular-nums">{combined.dimensionScores[dim]}</span>
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="card-dark p-3.5 mb-5">
+        <div className="text-[10.5px] uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">Resultado combinado</div>
+        <div className="text-[14px] font-semibold text-foreground leading-snug">{FIGHTER_PROFILE_LABELS[combined.primaryProfile]}</div>
+        <div className="text-[12px] text-accent font-semibold mt-0.5">{combined.profileScores[combined.primaryProfile]}%</div>
       </div>
 
       <p className="text-[11.5px] text-muted-foreground leading-relaxed">{copy.disclaimer}</p>

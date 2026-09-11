@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { BoxingProfileScoresSummary } from "@/components/BoxingProfileScoresSummary";
 import { BoxingProfileComparisonView } from "@/components/BoxingProfileComparisonView";
+import { BoxingProfilePartialNotice } from "@/components/BoxingProfilePartialNotice";
 import { getAdminStudentDetail, getBoxingProfileHistory } from "@/integrations/backend/api";
 
 /** Mesmo limiar do fluxo do aluno — abaixo disso, reavaliar mostra um aviso (não bloqueante). */
@@ -62,7 +63,7 @@ export default function AdminAlunoPerfilBoxe() {
       {isError && <ErrorState onRetry={() => refetch()} />}
       {isLoading && !isError && <SkeletonList count={3} height={100} />}
 
-      {!isLoading && !isError && !latestCoach && (
+      {!isLoading && !isError && !latestCoach && !latestSelf && (
         <EmptyState
           icon={Sparkles}
           title="Você ainda não avaliou este aluno"
@@ -72,6 +73,19 @@ export default function AdminAlunoPerfilBoxe() {
         />
       )}
 
+      {/* Aluno já se autoavaliou, você ainda não — mesmo par de telas do lado do aluno
+          (PerfilLutador.tsx), espelhado aqui: mostra a leitura do aluno sozinha em vez de escondê-la
+          atrás do estado vazio genérico (CLAUDE.md, "Resultado combinado de Perfil de Boxe"). */}
+      {!isLoading && !isError && !latestCoach && latestSelf && (
+        <>
+          <BoxingProfileScoresSummary assessment={latestSelf} heroLabel="Autoavaliação do aluno" radarHeading="RADAR" />
+          <BoxingProfilePartialNotice text="Por enquanto, este resultado usa só a autoavaliação do aluno. Assim que você avaliar como professor, o combinado passa a considerar as duas leituras." />
+          <Button className="w-full" onClick={goToQuestionnaire}>
+            <Sparkles className="h-4 w-4 mr-1.5" /> Avaliar como professor
+          </Button>
+        </>
+      )}
+
       {!isLoading && !isError && latestCoach && latestSelf && (
         <BoxingProfileComparisonView self={latestSelf} coach={latestCoach} viewer="admin" />
       )}
@@ -79,9 +93,7 @@ export default function AdminAlunoPerfilBoxe() {
       {!isLoading && !isError && latestCoach && !latestSelf && (
         <>
           <BoxingProfileScoresSummary assessment={latestCoach} heroLabel="Sua leitura sobre o aluno" radarHeading="RADAR" />
-          <p className="text-[11.5px] text-muted-foreground leading-relaxed -mt-3 mb-5">
-            O aluno ainda não fez a própria autoavaliação — quando ele fizer, a comparação aparece aqui automaticamente.
-          </p>
+          <BoxingProfilePartialNotice text="Por enquanto, este resultado usa só a sua avaliação como professor. Assim que o aluno fizer a autoavaliação, o combinado passa a considerar as duas leituras." />
         </>
       )}
 

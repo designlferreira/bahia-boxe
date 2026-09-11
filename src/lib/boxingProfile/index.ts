@@ -6,3 +6,4 @@ export * from "./versions";
 export * from "./scoring";
 export * from "./recommendations";
 export * from "./interpretations";
+export * from "./combined";

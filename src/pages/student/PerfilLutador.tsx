@@ -12,6 +12,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { BoxingProfileResultView } from "@/components/BoxingProfileResultView";
 import { BoxingProfileScoresSummary } from "@/components/BoxingProfileScoresSummary";
 import { BoxingProfileComparisonView } from "@/components/BoxingProfileComparisonView";
+import { BoxingProfilePartialNotice } from "@/components/BoxingProfilePartialNotice";
 import { getBoxingProfileHistory, studentIdForProfile } from "@/integrations/backend/api";
 
 /** Abaixo disso, refazer o teste mostra um aviso (não bloqueante) antes de seguir. */
@@ -89,9 +90,7 @@ export default function StudentPerfilLutador() {
       {!isLoading && !isError && !latest && latestCoach && (
         <>
           <BoxingProfileScoresSummary assessment={latestCoach} heroLabel="Leitura do seu professor" radarHeading="RADAR" />
-          <p className="text-[11.5px] text-muted-foreground leading-relaxed -mt-3 mb-5">
-            Isso é a leitura técnica do seu professor sobre você. Faça sua autoavaliação pra ver as duas lado a lado.
-          </p>
+          <BoxingProfilePartialNotice text="Por enquanto, este resultado usa só a avaliação do seu professor. Assim que você fizer sua autoavaliação, o combinado passa a considerar as duas leituras." />
           <Button className="w-full" onClick={goToQuestionnaire}>
             <Sparkles className="h-4 w-4 mr-1.5" /> Descobrir meu perfil
           </Button>
@@ -104,7 +103,12 @@ export default function StudentPerfilLutador() {
           avaliação do professor"). */}
       {!isLoading && !isError && latest && latestCoach && <BoxingProfileComparisonView self={latest} coach={latestCoach} viewer="student" />}
 
-      {!isLoading && !isError && latest && !latestCoach && <BoxingProfileResultView assessment={latest} />}
+      {!isLoading && !isError && latest && !latestCoach && (
+        <>
+          <BoxingProfilePartialNotice text="Por enquanto, este resultado usa só a sua autoavaliação. Assim que seu professor avaliar você, o combinado passa a considerar as duas leituras." />
+          <BoxingProfileResultView assessment={latest} />
+        </>
+      )}
 
       {!isLoading && !isError && latest && (
         <div className="flex flex-col gap-2.5 mt-5">
