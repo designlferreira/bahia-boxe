@@ -1677,6 +1677,53 @@ Verificado: `tsc --noEmit` limpo, `vitest run` 39/39, `vite build` sem erro, nas
 testado na aplicação real ainda** — nenhuma migration nova nesta rodada (mudança só de frontend),
 mas nenhum dos três foi confirmado em uso real.
 
+### Resultado combinado de Perfil de Boxe (2026-09-11) — plano aprovado, textos em aprovação, nada implementado
+
+Retomando o achado "média entre as duas avaliações" (citado como fora de escopo na rodada anterior).
+Decisões confirmadas antes de qualquer código:
+
+- **Média simples 50/50**, sem peso pro professor — mesmo enquadramento de "duas perspectivas" que
+  `BoxingProfileComparisonView.tsx` já usa, não "nota e correção".
+- **Combinação por dimensão, não por arquétipo**: média de cada uma das 8 competências primeiro; o
+  arquétipo do resultado combinado é derivado dessa média, nunca média dos arquétipos individuais.
+- **Derivar, não armazenar** — mesmo padrão de `calcular_saldo_pacote`: função pura sobre os dois
+  `BoxingProfileAssessmentSummary` que já existem, recalculada a cada leitura.
+- **Convive, não substitui** — aluno e professor continuam vendo o resultado individual normalmente;
+  o combinado aparece como seção adicional.
+- **Se só um dos dois respondeu**: mostra a avaliação disponível como resultado, marcado como
+  PARCIAL — não esconde, não força esperar o outro lado.
+- **Se divergem muito**: convida a conversar ou refazer; não esconde o resultado nem o marca como
+  "menos confiável".
+
+**Correção de premissa durante a discussão do limiar:** a escala de cada dimensão é 0-100 (inteiro,
+arredondado), não 0-10 nem 1-5 — o 1-5 é só a escala de resposta Likert. `computeDimensionScores`
+converte via `score = ((média - 1) / 4) * 100` (`src/lib/boxingProfile/scoring.ts`).
+
+**Contagem de perguntas por dimensão — é mista, como o usuário suspeitava:** attack, defense,
+movement, reading e conditioning têm 4 perguntas cada; precision, power e speed têm 3
+(`src/lib/boxingProfile/questions.ts`). Isso muda o **passo mínimo** de cada dimensão (100/4/n):
+8,33 pontos de score para as de 3 perguntas, 6,25 para as de 4 — mas **não muda o significado de um
+limiar fixo**, porque `score = 25×média − 25` tem inclinação constante (25 pontos de score por 1
+ponto Likert de diferença média), **independente de n**. Ou seja: um limiar de 25 pontos de score já
+equivale exatamente a "1 ponto Likert de diferença média" em qualquer dimensão, tenha ela 3 ou 4
+perguntas — não é preciso (nem faz diferença numérica) reescrever a fórmula em termos de Likert, só
+nomear a constante dessa forma no código pra deixar isso explícito e não depender de alguém redescobrir
+a álgebra depois. A única imprecisão real é o arredondamento de cada lado antes da subtração (± 1 no
+diff, igual pra todas as dimensões, não diferencial por n).
+
+**Limiares de divergência — ponto de partida, não validados por dados:**
+- Isolado por dimensão: diferença > 25 pontos de score (= 1 ponto Likert de diferença média).
+- Agregado: média das 8 diferenças > 15 pontos de score.
+- Dispara com `OR` entre os dois — desacordo espalhado OU concentrado numa única competência.
+
+**Os dois números (25 e 15) são derivados da mecânica da escala, não de casos reais observados.**
+Revisar quando houver avaliações duplas suficientes pra checar se disparam com a frequência certa —
+sem isso, esses números vão parecer validados daqui a alguns meses sem nunca terem sido.
+
+Pendente antes de implementar: aprovação dos textos do "resultado parcial" e do "aviso de
+divergência" (enquadramento como convite, não acusação) — proposto, aguardando confirmação do
+usuário. Nenhum código escrito ainda.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
