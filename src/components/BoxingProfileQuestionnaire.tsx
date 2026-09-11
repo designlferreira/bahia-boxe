@@ -104,12 +104,12 @@ export function BoxingProfileQuestionnaire({
   const question = questions[index];
   const answered = answers[question.id] !== undefined;
   const isLast = index === questions.length - 1;
-  const missing = useMemo(() => missingQuestionIds(answers), [answers]);
+  const missing = useMemo(() => missingQuestionIds(answers, questions), [answers, questions]);
 
   function goNext() {
     if (!answered) return;
     if (isLast) {
-      if (!isComplete(answers)) {
+      if (!isComplete(answers, questions)) {
         toast.error(`Faltam ${missing.length} questão(ões) para concluir. Volte e responda todas.`);
         return;
       }

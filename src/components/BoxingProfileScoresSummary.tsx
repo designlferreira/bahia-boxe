@@ -1,6 +1,6 @@
 import { Trophy } from "lucide-react";
 import { BoxingRadarChart } from "@/components/BoxingRadarChart";
-import { DIMENSIONS, DIMENSION_LABELS, FIGHTER_PROFILES, FIGHTER_PROFILE_LABELS } from "@/lib/boxingProfile";
+import { DIMENSIONS, DIMENSION_LABELS, FIGHTER_PROFILES, FIGHTER_PROFILE_LABELS, SCORING_VERSION } from "@/lib/boxingProfile";
 import type { BoxingProfileAssessmentSummary } from "@/integrations/backend/types";
 
 interface BoxingProfileScoresSummaryProps {
@@ -27,10 +27,25 @@ export function BoxingProfileScoresSummary({
   description,
   radarHeading = "SEU RADAR",
 }: BoxingProfileScoresSummaryProps) {
-  const { primaryProfile, secondaryProfile, dimensionScores, profileScores } = assessment;
+  const { primaryProfile, secondaryProfile, dimensionScores, profileScores, assessmentLength, scoringVersion } = assessment;
+  const isOldFormula = scoringVersion !== SCORING_VERSION;
 
   return (
     <div>
+      {(assessmentLength === "short" || isOldFormula) && (
+        <div className="flex flex-wrap gap-1.5 mb-2.5">
+          {assessmentLength === "short" && (
+            <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground bg-secondary rounded-full px-2.5 py-1">
+              Versão rápida
+            </span>
+          )}
+          {isOldFormula && (
+            <span className="text-[10px] font-bold uppercase tracking-wide text-amber bg-amber/10 rounded-full px-2.5 py-1">
+              Calculado pela fórmula anterior
+            </span>
+          )}
+        </div>
+      )}
       <div className="rounded-[20px] p-5 mb-4 bg-[linear-gradient(150deg,#1F1B0C,#171717_60%)] border border-amber/30">
         <div className="flex items-center gap-1.5 text-amber text-[11px] font-bold uppercase tracking-wide mb-2">
           <Trophy className="h-3.5 w-3.5" /> {heroLabel}

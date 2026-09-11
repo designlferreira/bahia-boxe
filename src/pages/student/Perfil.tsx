@@ -19,11 +19,12 @@ interface Form {
   sex: Sex | null;
   heightCm: string;
   weightKg: string;
+  wingspanCm: string;
   guard: Guard | null;
   laterality: Laterality | null;
 }
 
-const empty: Form = { sex: null, heightCm: "", weightKg: "", guard: null, laterality: null };
+const empty: Form = { sex: null, heightCm: "", weightKg: "", wingspanCm: "", guard: null, laterality: null };
 
 export default function StudentPerfil() {
   const { profile } = useAuth();
@@ -54,6 +55,7 @@ export default function StudentPerfil() {
         sex: data.sex,
         heightCm: data.heightCm !== null ? String(data.heightCm) : "",
         weightKg: data.weightKg !== null ? String(data.weightKg) : "",
+        wingspanCm: data.wingspanCm !== null ? String(data.wingspanCm) : "",
         guard: data.guard,
         laterality: data.laterality,
       });
@@ -66,6 +68,7 @@ export default function StudentPerfil() {
         sex: form.sex,
         heightCm: form.heightCm.trim() ? Number(form.heightCm.replace(",", ".")) : null,
         weightKg: form.weightKg.trim() ? Number(form.weightKg.replace(",", ".")) : null,
+        wingspanCm: form.wingspanCm.trim() ? Number(form.wingspanCm.replace(",", ".")) : null,
         guard: form.guard,
         laterality: form.laterality,
       }),
@@ -145,7 +148,7 @@ export default function StudentPerfil() {
           ))}
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3 mb-5">
+      <div className="grid grid-cols-2 gap-3 mb-3">
         <div>
           <Label htmlFor="height">Altura (cm)</Label>
           <Input
@@ -166,6 +169,19 @@ export default function StudentPerfil() {
             placeholder="59.5"
           />
         </div>
+      </div>
+      <div className="mb-5">
+        <Label htmlFor="wingspan">Envergadura (cm)</Label>
+        <div className="text-[12px] text-muted-foreground mb-2.5 -mt-1">
+          Distância entre as pontas dos dedos com os braços abertos. Opcional — usada no Perfil de Boxe (versão completa).
+        </div>
+        <Input
+          id="wingspan"
+          inputMode="numeric"
+          value={form.wingspanCm}
+          onChange={(e) => setForm((f) => ({ ...f, wingspanCm: e.target.value.replace(/[^\d]/g, "") }))}
+          placeholder="168"
+        />
       </div>
 
       <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Boxe</div>

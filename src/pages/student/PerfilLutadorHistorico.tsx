@@ -34,8 +34,14 @@ export default function StudentPerfilLutadorHistorico() {
   // comparação tem tela própria (`/app/perfil-lutador/comparacao`).
   const history = rawHistory?.filter((a) => a.assessmentType === "self");
 
+  // "Evolução por dimensão" só usa avaliações completas: a curta tem 1 pergunta por dimensão em
+  // vez de 3-4, uma medição bem mais ruidosa — misturar as duas no mesmo gráfico de tendência
+  // sugeriria uma precisão que a curta não tem (CLAUDE.md, "Compatibilidade entre curta e
+  // completa"). A lista "Avaliações realizadas" abaixo continua mostrando as duas, com um selo.
+  const fullHistory = history?.filter((a) => a.assessmentLength === "full");
+
   // Do mais antigo pro mais recente — é a ordem que a visão de evolução por dimensão precisa.
-  const chronological = history ? [...history].reverse() : [];
+  const chronological = fullHistory ? [...fullHistory].reverse() : [];
   const oldest = chronological[0];
   const newest = chronological[chronological.length - 1];
 
@@ -56,7 +62,7 @@ export default function StudentPerfilLutadorHistorico() {
 
       {!isLoading && !isError && history && history.length > 0 && (
         <>
-          {history.length >= 2 && oldest && newest && (
+          {chronological.length >= 2 && oldest && newest && (
             <>
               <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2.5">
                 Evolução por dimensão
@@ -109,7 +115,14 @@ export default function StudentPerfilLutadorHistorico() {
                   <span className="text-[14.5px] font-semibold text-foreground">{FIGHTER_PROFILE_LABELS[a.primaryProfile]}</span>
                   <span className="text-[12px] text-muted-foreground">{formatDateShort(a.completedAt)}</span>
                 </div>
-                <div className="text-[12.5px] text-accent font-semibold">{a.profileScores[a.primaryProfile]}% de compatibilidade</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[12.5px] text-accent font-semibold">{a.profileScores[a.primaryProfile]}% de compatibilidade</span>
+                  {a.assessmentLength === "short" && (
+                    <span className="text-[9.5px] font-bold uppercase tracking-wide text-muted-foreground bg-secondary rounded-full px-2 py-0.5">
+                      Rápida
+                    </span>
+                  )}
+                </div>
               </button>
             ))}
           </div>

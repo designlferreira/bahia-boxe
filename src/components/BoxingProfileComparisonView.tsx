@@ -65,8 +65,21 @@ export function BoxingProfileComparisonView({ self, coach, viewer }: BoxingProfi
   // Nunca null aqui: as duas avaliações sempre existem quando este componente é montado.
   const combined = combineAssessments(self, coach)!;
 
+  // CLAUDE.md, "Compatibilidade entre curta e completa" — curta tem 1 pergunta por dimensão em vez
+  // de 3-4, e uma fórmula diferente não é a mesma régua: nos dois casos os números abaixo (inclusive
+  // o combinado) não são diretamente comparáveis entre si, mesmo continuando a mostrá-los.
+  const lengthMismatch = self.assessmentLength !== coach.assessmentLength;
+  const versionMismatch = self.scoringVersion !== coach.scoringVersion;
+
   return (
     <div>
+      {(lengthMismatch || versionMismatch) && (
+        <p className="text-[11.5px] text-amber leading-relaxed mb-4 bg-amber/10 rounded-xl px-3.5 py-2.5">
+          {lengthMismatch
+            ? "Essas duas avaliações usam versões diferentes do questionário (rápida e completa) — os números abaixo não são diretamente comparáveis."
+            : "Essas duas avaliações foram calculadas por versões diferentes da fórmula — os números abaixo não são diretamente comparáveis."}
+        </p>
+      )}
       <p className="text-[13px] text-muted-foreground leading-relaxed mb-4">{copy.intro}</p>
 
       <div className="grid grid-cols-2 gap-2.5 mb-2.5">
