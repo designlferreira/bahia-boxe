@@ -1677,7 +1677,7 @@ Verificado: `tsc --noEmit` limpo, `vitest run` 39/39, `vite build` sem erro, nas
 testado na aplicação real ainda** — nenhuma migration nova nesta rodada (mudança só de frontend),
 mas nenhum dos três foi confirmado em uso real.
 
-### Resultado combinado de Perfil de Boxe (2026-09-11) — plano aprovado, textos em aprovação, nada implementado
+### Resultado combinado de Perfil de Boxe (2026-09-11) — implementado
 
 Retomando o achado "média entre as duas avaliações" (citado como fora de escopo na rodada anterior).
 Decisões confirmadas antes de qualquer código:
@@ -1720,9 +1720,51 @@ diff, igual pra todas as dimensões, não diferencial por n).
 Revisar quando houver avaliações duplas suficientes pra checar se disparam com a frequência certa —
 sem isso, esses números vão parecer validados daqui a alguns meses sem nunca terem sido.
 
-Pendente antes de implementar: aprovação dos textos do "resultado parcial" e do "aviso de
-divergência" (enquadramento como convite, não acusação) — proposto, aguardando confirmação do
-usuário. Nenhum código escrito ainda.
+**Ressalva levantada e resolvida:** a contagem de perguntas por dimensão é mista (attack, defense,
+movement, reading, conditioning têm 4; precision, power, speed têm 3) — o que muda é só o passo
+mínimo de cada dimensão (100/4/n: 8,33 ou 6,25), não o significado do limiar de 25, porque a
+inclinação score/média-Likert (`likertScoreFromAverage`) é constante e independente de n. Por isso a
+constante do limiar isolado é computada como `likertScoreFromAverage(2) - likertScoreFromAverage(1)`
+em vez de um `25` solto (`src/lib/boxingProfile/combined.ts`) — se a fórmula de conversão mudar um
+dia, o limiar acompanha automaticamente, e o nome no código já diz o que ele representa.
+
+**Textos aprovados** (com uma correção: "desta vez" removido do aviso de divergência — sugeria haver
+histórico comparável, o que não existe na primeira avaliação dupla, e carregava tom de "saiu
+diferente do esperado" que o resto da frase evita):
+- Parcial (4 variantes, viewer × lado faltante — mesma frase-molde, troca só quem falta e quem age):
+  "Por enquanto, este resultado usa só {a avaliação disponível}. Assim que {o outro lado avaliar},
+  o combinado passa a considerar as duas leituras." Quando quem lê é quem pode preencher o lado que
+  falta (aluno sem autoavaliação, professor sem avaliação), o botão de ação já fica logo abaixo.
+- Divergência (texto único, viewer-simétrico — "as leituras se distanciam" trata o desacordo como
+  propriedade da comparação, nunca erro de alguém): "As duas leituras se distanciam mais do que o
+  normal{ em <Dimensão>}. Não significa que uma esteja certa e a outra errada — são ângulos
+  diferentes sobre o mesmo momento. Pode valer a pena conversar sobre isso no próximo treino." O
+  trecho "em <Dimensão>" só aparece quando o gatilho ISOLADO disparou; quando é só o agregado
+  (desacordo espalhado, nenhuma dimensão isolada estoura), a frase não nomeia nenhuma.
+
+**Implementação:**
+- `src/lib/boxingProfile/combined.ts` (novo, com `combined.test.ts`, 8 casos): `combineAssessments`
+  pura, testável isoladamente como `scoring.ts` já é. Arquétipo combinado calculado pelos mesmos
+  pesos de `computeProfileScoresRaw`, **sem** o bônus comportamental (Q30-Q32) — essa camada só
+  recebe `dimensionScores` já calculados de cada avaliação, não as respostas brutas; o bônus vale no
+  máximo +12 num score de 0-100, então a ausência dele não muda o perfil predominante na prática
+  esperada. Tipo aceito é um `CombinableAssessment` mínimo (só `dimensionScores`), não
+  `BoxingProfileAssessmentSummary` direto — evita um ciclo de import, já que `integrations/backend/
+  types.ts` importa `Dimension` deste mesmo pacote.
+- `BoxingProfileComparisonView.tsx`: ganhou uma 3ª coluna "Combin." na tabela por dimensão (atende o
+  pedido original de "ver a nota individual de cada um ao lado da combinada"), um card de "Resultado
+  combinado" com o arquétipo derivado, e o aviso de divergência quando `combined.isDivergent`. Nunca
+  parcial aqui — as duas avaliações sempre existem quando este componente monta.
+- `BoxingProfilePartialNotice.tsx` (novo, componente compartilhado): badge "RESULTADO PARCIAL" +
+  texto — usado nos 4 pontos onde só um lado existe (`PerfilLutador.tsx` × 2, `AlunoPerfilBoxe.tsx`
+  × 2). `AlunoPerfilBoxe.tsx` ganhou uma 4ª ramificação que não existia (`!latestCoach && latestSelf`
+  — aluno já se autoavaliou, professor ainda não): antes, esse caso caía no mesmo estado vazio
+  genérico de "nada existe ainda", escondendo a autoavaliação do aluno do professor; agora mostra a
+  leitura do aluno com o aviso parcial e o CTA "Avaliar como professor", espelhando exatamente o que
+  `PerfilLutador.tsx` já fazia pro caso inverso.
+
+Verificado: `tsc --noEmit` limpo, `vitest run` 48/48 (9 novos em `combined.test.ts`), `vite build`
+sem erro. **Não testado na aplicação real ainda.**
 
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
