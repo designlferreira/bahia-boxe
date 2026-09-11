@@ -72,7 +72,12 @@ export default function AdminDashboard() {
           {data.awaitingConfirmation.length > 0 && (
             <button
               type="button"
-              onClick={() => navigate("/admin/agenda")}
+              // Leva pra data da pendência mais ANTIGA (data.awaitingConfirmation já vem ordenada
+              // por start_time ascendente, getAdminDashboard) — é a que tem mais chance de ser
+              // esquecida de vez, e a Agenda lê esse state só na primeira renderização pra pular
+              // direto pra semana/dia certos, em vez de sempre abrir em "hoje" (CLAUDE.md, "Agenda
+              // com navegação livre").
+              onClick={() => navigate("/admin/agenda", { state: { date: data.awaitingConfirmation[0].startTime } })}
               className="w-full text-left rounded-[20px] p-4 mb-4 bg-[linear-gradient(150deg,#1A1F27,#171717_62%)] border border-primary/30 flex items-center gap-3 active:scale-[0.99] transition-transform animate-bb-up"
             >
               <div className="h-10 w-10 shrink-0 rounded-full bg-primary/15 flex items-center justify-center">

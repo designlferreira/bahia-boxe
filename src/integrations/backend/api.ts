@@ -681,6 +681,26 @@ async function creditsByStudent(studentIds: string[]): Promise<Record<string, nu
 // admin · agenda (timeline)
 // ---------------------------------------------------------------------------
 
+/**
+ * Toda aula `scheduled` cujo horário já passou (aguardando confirmação), sem limite de quantos
+ * dias atrás — mesma condição de `awaitingRes` em `getAdminDashboard`, extraída pra cá porque a
+ * Agenda também precisa dela: marcar visualmente, na semana visível, quais dias têm pendência
+ * (CLAUDE.md, "Agenda com navegação livre"), e o banner do Dashboard precisa da mais antiga (`[0]`,
+ * já vem ordenada por `start_time` ascendente) pra navegar direto pra ela.
+ */
+export async function getAwaitingConfirmationBookings(adminId: string): Promise<Booking[]> {
+  const nowIso = new Date().toISOString();
+  const { data, error } = await client()
+    .from("bookings")
+    .select("*")
+    .eq("admin_id", adminId)
+    .eq("status", "scheduled")
+    .lt("end_time", nowIso)
+    .order("start_time", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapBooking);
+}
+
 export interface TimelineEntry {
   hour: string;
   free: boolean;

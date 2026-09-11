@@ -1,4 +1,4 @@
-import { format, formatDistanceToNowStrict } from "date-fns";
+import { formatDistanceToNowStrict } from "date-fns";
 import { toZonedTime, formatInTimeZone } from "date-fns-tz";
 import { ptBR } from "date-fns/locale";
 
@@ -76,6 +76,8 @@ export function relativeTime(date: string | Date) {
   });
 }
 
-export function isoDateOnly(date: Date) {
-  return format(date, "yyyy-MM-dd");
+/** "yyyy-MM-dd" no fuso BRT — chave de dia pra agrupar/comparar datas (ex.: marcar num calendário
+ *  quais dias têm pendência), sem depender do fuso do navegador. */
+export function isoDateOnly(date: string | Date) {
+  return formatInTimeZone(date, TIMEZONE, "yyyy-MM-dd");
 }
