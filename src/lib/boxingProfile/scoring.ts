@@ -56,8 +56,12 @@ export function computeDimensionScores(answers: Answers, likertQuestions: Likert
  * self-only na voz do professor automática: com menos itens aplicáveis, o mesmo peso final
  * (`FORCED_CHOICE_WEIGHT`) continua valendo o mesmo percentual do score, só dividido entre menos
  * perguntas (CLAUDE.md, "peso da escolha forçada sobe" — ponto 2/3).
+ *
+ * Exportada porque `combined.ts` reusa exatamente esta fórmula pra recompor o score de escolha
+ * forçada de cada lado ao montar o resultado combinado — nunca deveria haver uma segunda cópia
+ * desta conta (CLAUDE.md, "Resultado combinado — corrigindo a lacuna da escolha forçada").
  */
-function behavioralScoreRaw(answers: Answers, profile: FighterProfileKey, behavioralQuestionIds: string[]): number {
+export function behavioralScoreRaw(answers: Answers, profile: FighterProfileKey, behavioralQuestionIds: string[]): number {
   if (behavioralQuestionIds.length === 0) return 0;
   let votes = 0;
   for (const id of behavioralQuestionIds) {

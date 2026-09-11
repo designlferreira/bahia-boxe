@@ -1,14 +1,23 @@
 import { DIMENSIONS, type Dimension } from "./dimensions";
 import { FIGHTER_PROFILES, FIGHTER_PROFILE_WEIGHTS, type FighterProfileKey } from "./fighterProfiles";
-import { rankProfiles, roundScores, likertScoreFromAverage } from "./scoring";
+import { rankProfiles, roundScores, likertScoreFromAverage, behavioralScoreRaw, type Answers } from "./scoring";
+import { getQuestions } from "./questions";
+import type { AssessmentType } from "./assessmentType";
+import { FORCED_CHOICE_WEIGHT, type AssessmentLength } from "./assessmentLength";
 
 /**
  * Só o formato que a combinação precisa — evita um ciclo de import (`integrations/backend/types.ts`
- * já importa `Dimension` daqui; se este arquivo importasse `BoxingProfileAssessmentSummary` de lá,
- * fecharia o ciclo). `BoxingProfileAssessmentSummary` satisfaz esta forma estruturalmente.
+ * já importa `Dimension` daqui; se este arquivo importasse `BoxingProfileAssessment` de lá, fecharia
+ * o ciclo). `BoxingProfileAssessment` (o tipo completo, com `answers`) satisfaz esta forma
+ * estruturalmente — `BoxingProfileAssessmentSummary` (sem `answers`) NÃO satisfaz mais, de propósito:
+ * é o que força quem chama a buscar o registro completo, não só o resumo leve da lista de histórico.
  */
 export interface CombinableAssessment {
+  assessmentType: AssessmentType;
+  assessmentLength: AssessmentLength;
   dimensionScores: Record<Dimension, number>;
+  profileScores: Record<FighterProfileKey, number>;
+  answers: Answers;
 }
 
 /**
@@ -47,37 +56,28 @@ function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
 }
 
-/**
- * Score de cada perfil a partir dos scores de dimensão, pelos mesmos pesos de
- * `computeProfileScoresRaw` — sem o componente de escolha forçada, que não existe nesta camada: só
- * os `dimensionScores` já calculados de cada avaliação chegam aqui, não as respostas brutas.
- *
- * Isso era uma aproximação pequena na v1 (bônus aditivo de no máximo ~12 pontos). Na v2, escolha
- * forçada é 24%-30% do score de cada avaliação (`FORCED_CHOICE_WEIGHT`) — a aproximação aqui ficou
- * bem maior: o arquétipo combinado pode divergir do que sairia se a escolha forçada de cada lado
- * entrasse na conta. Não implementado — precisaria persistir o score de escolha forçada de cada
- * avaliação separadamente (hoje só o score final misturado é salvo), uma mudança de schema maior
- * que o pedido original. Registrado como dívida conhecida (CLAUDE.md, "Resultado combinado e o peso
- * maior da escolha forçada").
- */
-function weightedProfileScores(dimensionScores: Record<Dimension, number>): Record<FighterProfileKey, number> {
-  const result = {} as Record<FighterProfileKey, number>;
-  for (const profile of FIGHTER_PROFILES) {
-    const weights = FIGHTER_PROFILE_WEIGHTS[profile];
-    const weighted = DIMENSIONS.reduce((acc, dim) => acc + dimensionScores[dim] * weights[dim], 0);
-    result[profile] = clamp(weighted, 0, 100);
-  }
-  return result;
+function behavioralQuestionIdsFor(a: CombinableAssessment): string[] {
+  return getQuestions(a.assessmentType, a.assessmentLength)
+    .filter((q) => q.type === "behavioral")
+    .map((q) => q.id);
 }
 
 /**
- * Combina autoavaliação + avaliação do professor numa leitura só, por dimensão — nunca média de
- * arquétipos: a média acontece nas 8 competências primeiro, o arquétipo combinado é derivado dessa
- * média (CLAUDE.md, "Resultado combinado de Perfil de Boxe"). Deriva, não armazena — chamar de novo
- * sempre que uma das duas mudar, mesmo padrão de `calcular_saldo_pacote`.
+ * Combina autoavaliação + avaliação do professor numa leitura só. Dimensões primeiro: a média
+ * acontece nas 8 competências (nunca média de arquétipos); a escolha forçada entra na mesma lógica
+ * — cada lado tem seu próprio score de escolha forçada recalculado a partir das respostas brutas
+ * (mesma fórmula de `computeProfileScoresRaw`, via `behavioralScoreRaw`), e os dois já vêm
+ * normalizados 0-100 então se combinam pela média, igual às dimensões. O arquétipo final é derivado
+ * dos dois combinados, nunca de um dos dois arquétipos individuais (CLAUDE.md, "Resultado
+ * combinado" e "corrigindo a lacuna da escolha forçada").
  *
- * Se só um dos dois existir, retorna esse lado como está, marcado `isPartial`. Se nenhum existir,
- * retorna `null` — quem chama decide o que mostrar nesse caso (hoje, nada).
+ * Deriva, não armazena — chamar de novo sempre que uma das duas mudar, mesmo padrão de
+ * `calcular_saldo_pacote`.
+ *
+ * Se só um dos dois existir, retorna o `profileScores`/`dimensionScores` QUE JÁ EXISTEM naquela
+ * avaliação, marcado `isPartial` — nada é recalculado (achado da revisão: a versão anterior
+ * recalculava do zero só com peso de dimensão aqui, descartando o número certo, que já incluía a
+ * escolha forçada daquela avaliação). Se nenhum existir, retorna `null`.
  */
 export function combineAssessments(
   self: CombinableAssessment | undefined,
@@ -87,12 +87,10 @@ export function combineAssessments(
 
   if (!self || !coach) {
     const only = (self ?? coach)!;
-    const dimensionScoresRaw = only.dimensionScores;
-    const profileScoresRaw = weightedProfileScores(dimensionScoresRaw);
-    const rankedProfiles = rankProfiles(profileScoresRaw, dimensionScoresRaw);
+    const rankedProfiles = rankProfiles(only.profileScores, only.dimensionScores);
     return {
-      dimensionScores: roundScores(dimensionScoresRaw),
-      profileScores: roundScores(profileScoresRaw),
+      dimensionScores: roundScores(only.dimensionScores),
+      profileScores: roundScores(only.profileScores),
       rankedProfiles,
       primaryProfile: rankedProfiles[0],
       secondaryProfile: rankedProfiles[1],
@@ -110,7 +108,28 @@ export function combineAssessments(
     diffs[dim] = Math.abs(self.dimensionScores[dim] - coach.dimensionScores[dim]);
   }
 
-  const profileScoresRaw = weightedProfileScores(dimensionScoresRaw);
+  const selfBehavioralIds = behavioralQuestionIdsFor(self);
+  const coachBehavioralIds = behavioralQuestionIdsFor(coach);
+
+  /**
+   * Peso da escolha forçada usado na combinação: a média dos dois pesos de origem. Quando as duas
+   * avaliações são da mesma variante (o caso comum), os dois pesos já são iguais e isso não muda
+   * nada. Quando divergem (curta com professor, completa com aluno, por exemplo — já sinalizado
+   * como "não diretamente comparável" na tela), não existe um peso "certo" pra combinar uma leitura
+   * de 14 itens com uma de 37 — a média é convenção por ausência de razão melhor, não uma
+   * calibração. Registrado assim no CLAUDE.md pra não parecer validado depois.
+   */
+  const forcedChoiceWeight = (FORCED_CHOICE_WEIGHT[self.assessmentLength] + FORCED_CHOICE_WEIGHT[coach.assessmentLength]) / 2;
+
+  const profileScoresRaw = {} as Record<FighterProfileKey, number>;
+  for (const profile of FIGHTER_PROFILES) {
+    const weights = FIGHTER_PROFILE_WEIGHTS[profile];
+    const dimensionScore = DIMENSIONS.reduce((acc, dim) => acc + dimensionScoresRaw[dim] * weights[dim], 0);
+    const behavioralScore = (behavioralScoreRaw(self.answers, profile, selfBehavioralIds) + behavioralScoreRaw(coach.answers, profile, coachBehavioralIds)) / 2;
+    const blended = (1 - forcedChoiceWeight) * dimensionScore + forcedChoiceWeight * behavioralScore;
+    profileScoresRaw[profile] = clamp(blended, 0, 100);
+  }
+
   const rankedProfiles = rankProfiles(profileScoresRaw, dimensionScoresRaw);
 
   let maxDiff = -Infinity;
