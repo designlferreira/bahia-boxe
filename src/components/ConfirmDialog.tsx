@@ -1,5 +1,6 @@
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -35,13 +36,21 @@ export function ConfirmDialog({
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription className="whitespace-pre-line">{description}</DialogDescription>
         <div className="flex gap-2.5">
-          <Button variant="secondary" size="lg" className="flex-1" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="secondary"
+            size="lg"
+            className="flex-1 h-auto min-h-14 whitespace-normal py-3 text-center leading-tight"
+            onClick={() => onOpenChange(false)}
+          >
             {cancelLabel}
           </Button>
           <Button
             variant={tone === "destructive" ? "destructive" : "default"}
             size="lg"
-            className={tone === "destructive" ? "flex-1 !bg-destructive !text-destructive-foreground !border-none" : "flex-1"}
+            className={cn(
+              "flex-1 h-auto min-h-14 whitespace-normal py-3 text-center leading-tight",
+              tone === "destructive" && "!bg-destructive !text-destructive-foreground !border-none",
+            )}
             disabled={confirmDisabled}
             onClick={() => {
               onOpenChange(false);
