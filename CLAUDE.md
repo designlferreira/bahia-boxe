@@ -1766,6 +1766,130 @@ diferente do esperado" que o resto da frase evita):
 Verificado: `tsc --noEmit` limpo, `vitest run` 48/48 (9 novos em `combined.test.ts`), `vite build`
 sem erro. **Não testado na aplicação real ainda.**
 
+### Reforma do questionário de Perfil de Boxe — versão curta/completa (2026-09-11) — implementado
+
+**Diagnóstico que motivou a reforma:** as 29 perguntas Likert originais são todas de competência
+positivamente ancorada ("consigo X") — medem NÍVEL TÉCNICO, não estilo. Um iniciante pontua baixo em
+tudo, um avançado pontua alto em tudo, e o arquétipo saía de diferenças relativas pequenas e
+ruidosas entre dimensões. Só as perguntas de escolha forçada (Q30-Q32) mediam estilo de verdade
+(obrigam a uma troca), mas contribuíam no máximo 12 de 100. Correção: separar as duas saídas — score
+por dimensão = competência = Likert = evolução; arquétipo = preferência = escolha forçada = estilo.
+
+**1) Versão curta — as 8 perguntas Likert.** Uma por dimensão, critério explícito: o item menos
+contaminado por nível técnico geral e mais ligado a uma tendência de estilo (fraseado como hábito —
+"uso X" — em vez de capacidade — "consigo X" — quando havia opção assim):
+
+| Dimensão | Escolhida | Por quê |
+|---|---|---|
+| Ataque | Q3 | Iniciativa (liderar vs. esperar), não execução técnica. |
+| Defesa | Q7 | "Uso diferentes recursos... dependendo da situação" — variedade/adaptação, não capacidade. |
+| Movimentação | Q11 | "Uso passos laterais e mudanças de ângulo" — tendência de estilo clássica. |
+| Precisão | Q15 | Timing de contragolpe (bate com o maior peso da dimensão: counterpuncher). |
+| Potência | Q16 | Mais fraca no critério (potência é traço físico, não estilo) — a menos misturada com OUTRA habilidade entre as 3. |
+| Velocidade | Q21 | Flexibilidade de alternância entre ataque/defesa, não velocidade de mão pura. |
+| Leitura tática | Q24 | "Uso fintas... pra provocar reações" — manipulação tática, marca de counterpuncher/boxer-puncher. |
+| Condicionamento | Q29 | Também mais fraca no critério (capacidade física) — a menos misturada com técnica entre as 4. |
+
+Potência e Condicionamento resistem ao critério de propósito — são dimensões inerentemente sobre
+capacidade física, não sobre estilo; isso é limitação da dimensão, não da escolha.
+
+**2) Peso da escolha forçada sobe — mecânica trocada, não só a constante.** A v1 somava o bônus
+comportamental (até +4/questão) direto ao score de dimensões e cortava tudo no clamp de 100 — pra um
+aluno tecnicamente avançado (dimensões perto de 100), isso absorvia quase todo o bônus exatamente
+onde ele deveria pesar mais. Simplesmente subir a constante pioraria isso. v2 troca por uma
+**mistura ponderada de dois sinais normalizados independentemente**:
+`score = (1 − w) × scoreDimensões + w × scoreEscolhaForçada`, onde `scoreEscolhaForçada` é
+`100 × (votos recebidos ÷ votos máximos possíveis nos itens aplicáveis)` — normalizado pelo NÚMERO de
+itens de cada voz/variante, não um total fixo (`src/lib/boxingProfile/scoring.ts`,
+`computeProfileScoresRaw`). `w = 0.24` completa, `0.30` curta (`FORCED_CHOICE_WEIGHT`,
+`assessmentLength.ts`). Isso garante que a escolha forçada sempre vale essa fração do score final,
+não importa o nível técnico — e resolve de graça a exclusão dos itens self-only na voz do professor:
+com menos itens aplicáveis, o mesmo `w` continua valendo o mesmo percentual, só dividido entre menos
+perguntas.
+
+**Ressalva do usuário, resolvida:** a contagem de perguntas por dimensão é mista (3 ou 4), o que
+muda o passo mínimo de cada dimensão, mas não muda o significado de um limiar fixo, porque a
+inclinação score/média-Likert é constante — mesmo raciocínio já registrado na seção "Resultado
+combinado" acima, reaproveitado aqui.
+
+**3) Cinco itens novos de escolha forçada — FC-A a FC-E (ids q33-q37).** FC-A (fadiga), FC-B (depois
+de machucar o adversário) e FC-C (contra desvantagem física) são compartilhados entre aluno e
+professor. FC-D (fonte de satisfação) e FC-E (treino preferido) são **self-only** — motivação
+interna, que o professor observa mal ("ele vê o que o aluno faz, não o que o aluno gosta"; também
+mais estável que técnica e menos sujeita a desejabilidade social, porque nenhuma opção é "a resposta
+certa"). Nunca ganham entrada em `COACH_TEXT` — `buildQuestions` filtra por presença de texto, então
+`COACH_QUESTIONS` nunca as inclui, sem precisar de uma lista de exclusão redundante.
+
+As opções de FC-A/B/C tiveram que ser reescritas em infinitivo neutro (mesmo padrão de Q30-Q32) —
+vieram do usuário conjugadas em 1ª pessoa, o que quebraria a voz do professor (pergunta em 3ª pessoa
+seguida de uma opção na voz do aluno). Um ajuste veio do próprio usuário durante a revisão: a opção C
+de FC-C mudou de "esperar o adversário se abrir e golpear com força" pra "...e punir o erro" — a
+versão anterior misturava dois sinais (timing = counterpuncher, força = puncher), ambíguo contra a
+opção "trocar mesmo assim" (também puncher). O que define o contragolpe é o timing, não a potência.
+
+**Resolução da "trava do professor"** (curta vs. completa dele usando os mesmos itens de escolha
+forçada): por decisão do usuário, a curta e a completa do professor usam exatamente as mesmas 6
+perguntas forçadas (todas, exceto as 2 self-only) — o que diferencia as duas variantes na voz dele é
+só o número de perguntas Likert (8 vs. 29), que é a diferença que importa de qualquer forma.
+
+Totais finais: aluno completa 37 (29+8), aluno curta 14 (8+6 — inclui FC-D, não inclui FC-B/FC-E),
+professor completa 35 (29+6), professor curta 14 (8+6, mesmas 6 da completa).
+
+**4) Âncora física — envergadura ÷ altura, só bônus (decisão revisada).** `student_profiles.wingspan_cm`
+(nova coluna, nullable, mesma política de `height_cm`). Índice ≥ 1,03 (envergadura longa): Out-Boxer
++5, Counterpuncher +3. Índice ≤ 0,97 (envergadura curta): Pressure Fighter +5, Puncher +3. Entre os
+dois, zona morta, sem efeito. **Proposta original tinha penalidade simétrica (±5 nos dois pares) —
+o usuário cortou isso**: antropometria favorece um estilo, não desqualifica outro; penalizar Pressure
+Fighter por braço longo afirmaria que ele não pode pressionar, o que é falso — só rema contra a
+biomecânica. O efeito assimétrico (só bônus) já produz a separação sem essa afirmação. `null` quando
+falta altura ou envergadura — nunca estima uma a partir da outra (`src/lib/boxingProfile/
+physicalAnchor.ts`). Só se aplica na versão completa, aplicado sobre o score já misturado do ponto 2,
+antes do arredondamento final (um único clamp no fim da pipeline, não vários acumulando).
+
+Snapshot obrigatório: `boxing_profile_assessments.wingspan_index_used` (nova coluna, nullable) grava
+o índice usado NAQUELE momento — sem isso, um resultado antigo mudaria de leitura silenciosamente se
+o aluno crescer ou corrigir uma medida depois. Mesma disciplina de imutabilidade da migration 0006.
+
+**5) Avaliações antigas — marcadas, nunca recalculadas.** A infraestrutura já existia
+(`questionnaire_version`/`scoring_version` por avaliação, imutável desde a migration 0006) — só
+faltava a parte visual. `QUESTIONNAIRE_VERSION`/`SCORING_VERSION` bumped pra `-v2`.
+`scoringVersion` foi promovido de "só no registro completo" pra também estar em
+`BoxingProfileAssessmentSummary` (é uma string barata, listas/comparação precisam dela sem buscar o
+registro inteiro). `BoxingProfileScoresSummary` mostra um selo "Calculado pela fórmula anterior"
+quando `scoringVersion !== SCORING_VERSION` — aparece automaticamente em toda tela que usa esse
+componente (resultado individual, professor, comparação), sem precisar repetir a lógica em cada uma.
+
+**6) Compatibilidade entre curta e completa.** Novo eixo ortogonal ao do ponto 5:
+`boxing_profile_assessments.assessment_length` ('short'/'full', default 'full' pras linhas
+existentes — todas eram do questionário único da v1). `BoxingProfileAssessmentSummary.assessmentLength`
+no tipo. A tela "Minha evolução" (`PerfilLutadorHistorico.tsx`) filtra o gráfico de "Evolução por
+dimensão" pra só avaliações `full` — a curta tem 1 pergunta por dimensão em vez de 3-4, uma medição
+bem mais ruidosa, misturar as duas sugeriria uma precisão que a curta não tem. A lista "Avaliações
+realizadas" abaixo continua mostrando as duas, com um selo "Rápida" nas curtas. `BoxingProfileComparisonView`
+ganhou um aviso quando `self.assessmentLength !== coach.assessmentLength` (ou `scoringVersion`
+diferente): "essas duas avaliações usam versões diferentes... não são diretamente comparáveis" —
+continua mostrando os números, só com a ressalva em destaque, em vez de esconder o resultado.
+
+**Dívida registrada, não implementada:** `combineAssessments` (resultado combinado, seção anterior)
+ainda ignora o componente de escolha forçada — era uma aproximação pequena na v1 (bônus de ~12
+pontos), mas agora que escolha forçada é 24%-30% do score de cada avaliação, essa aproximação ficou
+bem maior: o arquétipo combinado pode divergir do que sairia se a escolha forçada de cada lado
+entrasse na conta. Corrigir isso exigiria persistir o score de escolha forçada de cada avaliação
+separadamente (hoje só o score final misturado é salvo) — mudança de schema maior que o pedido desta
+rodada. Registrado em `src/lib/boxingProfile/combined.ts`.
+
+**Novo fluxo de UI:** as duas páginas de questionário (`PerfilLutadorQuestionario.tsx`,
+`AlunoPerfilBoxeQuestionario.tsx`) ganharam uma tela de escolha (`BoxingProfileLengthChoice.tsx`)
+antes de começar a responder — rápida ou completa, com o aviso de que os resultados não são
+diretamente comparáveis. `draftKey` do rascunho em `localStorage` passou a incluir a variante
+(`....self.<id>.<length>`), senão um rascunho curto e um completo colidiriam na mesma chave.
+`StudentPerfil.tsx` ganhou o campo "Envergadura (cm)", opcional, ao lado de altura/peso.
+
+Verificado: `tsc -b --noEmit` limpo, `vitest run` 73/73 (25 novos: `physicalAnchor.test.ts` completo
++ reescrita de `scoring.test.ts`/`questions.test.ts` pra v2), `vite build` sem erro. **Não testado na
+aplicação real ainda** — inclui uma migration nova (0024), então precisa rodar no Supabase antes de
+qualquer teste end-to-end.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
