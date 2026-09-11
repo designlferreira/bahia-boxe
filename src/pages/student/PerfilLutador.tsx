@@ -13,7 +13,7 @@ import { BoxingProfileResultView } from "@/components/BoxingProfileResultView";
 import { BoxingProfileScoresSummary } from "@/components/BoxingProfileScoresSummary";
 import { BoxingProfileComparisonView } from "@/components/BoxingProfileComparisonView";
 import { BoxingProfilePartialNotice } from "@/components/BoxingProfilePartialNotice";
-import { getBoxingProfileHistory, studentIdForProfile } from "@/integrations/backend/api";
+import { getBoxingProfileAssessment, getBoxingProfileHistory, studentIdForProfile } from "@/integrations/backend/api";
 
 /** Abaixo disso, refazer o teste mostra um aviso (não bloqueante) antes de seguir. */
 const RECENT_ASSESSMENT_HOURS = 24;
@@ -48,6 +48,24 @@ export default function StudentPerfilLutador() {
   const isRecent = latest
     ? Date.now() - new Date(latest.completedAt).getTime() < RECENT_ASSESSMENT_HOURS * 60 * 60 * 1000
     : false;
+
+  // A comparação precisa dos registros COMPLETOS (com `answers`), não do resumo leve de
+  // `getBoxingProfileHistory` — `combineAssessments` recompõe o score de escolha forçada de cada
+  // lado a partir das respostas brutas (CLAUDE.md, "corrigindo a lacuna da escolha forçada"). Só
+  // busca quando as duas existem, ou seja, só quando a comparação vai realmente aparecer.
+  const bothExist = !!latest && !!latestCoach;
+  const selfFullQuery = useQuery({
+    queryKey: ["boxing-profile-assessment", latest?.id],
+    queryFn: () => getBoxingProfileAssessment(latest!.id),
+    enabled: bothExist,
+  });
+  const coachFullQuery = useQuery({
+    queryKey: ["boxing-profile-assessment", latestCoach?.id],
+    queryFn: () => getBoxingProfileAssessment(latestCoach!.id),
+    enabled: bothExist,
+  });
+  const comparisonLoading = bothExist && (selfFullQuery.isLoading || coachFullQuery.isLoading);
+  const comparisonError = bothExist && (selfFullQuery.isError || coachFullQuery.isError);
 
   function goToQuestionnaire() {
     navigate("/app/perfil-lutador/questionario");
@@ -100,8 +118,20 @@ export default function StudentPerfilLutador() {
       {/* As duas existem: comparação INLINE, igual já acontecia no lado do professor
           (AlunoPerfilBoxe.tsx) — antes disso ficava atrás de um botão secundário fácil de não
           notar, e nada avisava que a avaliação do professor existia (CLAUDE.md, "aluno descobre a
-          avaliação do professor"). */}
-      {!isLoading && !isError && latest && latestCoach && <BoxingProfileComparisonView self={latest} coach={latestCoach} viewer="student" />}
+          avaliação do professor"). Precisa dos dois registros completos (ver comentário acima) —
+          skeleton enquanto eles chegam, pra não deixar a tela piscar entre o resumo e a comparação. */}
+      {!isLoading && !isError && bothExist && comparisonLoading && <SkeletonList count={3} height={110} />}
+      {!isLoading && !isError && bothExist && comparisonError && (
+        <ErrorState
+          onRetry={() => {
+            selfFullQuery.refetch();
+            coachFullQuery.refetch();
+          }}
+        />
+      )}
+      {!isLoading && !isError && bothExist && selfFullQuery.data && coachFullQuery.data && (
+        <BoxingProfileComparisonView self={selfFullQuery.data} coach={coachFullQuery.data} viewer="student" />
+      )}
 
       {!isLoading && !isError && latest && !latestCoach && (
         <>

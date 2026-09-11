@@ -6,7 +6,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/SkeletonCard";
 import { BoxingProfileComparisonView } from "@/components/BoxingProfileComparisonView";
-import { getBoxingProfileHistory, studentIdForProfile } from "@/integrations/backend/api";
+import { getBoxingProfileAssessment, getBoxingProfileHistory, studentIdForProfile } from "@/integrations/backend/api";
 
 export default function StudentPerfilLutadorComparacao() {
   const { profile } = useAuth();
@@ -32,6 +32,22 @@ export default function StudentPerfilLutadorComparacao() {
   const latestSelf = history?.find((a) => a.assessmentType === "self");
   const latestCoach = history?.find((a) => a.assessmentType === "coach");
 
+  // A comparação precisa dos registros COMPLETOS (com `answers`) — ver mesmo comentário em
+  // PerfilLutador.tsx/AlunoPerfilBoxe.tsx.
+  const bothExist = !!latestSelf && !!latestCoach;
+  const selfFullQuery = useQuery({
+    queryKey: ["boxing-profile-assessment", latestSelf?.id],
+    queryFn: () => getBoxingProfileAssessment(latestSelf!.id),
+    enabled: bothExist,
+  });
+  const coachFullQuery = useQuery({
+    queryKey: ["boxing-profile-assessment", latestCoach?.id],
+    queryFn: () => getBoxingProfileAssessment(latestCoach!.id),
+    enabled: bothExist,
+  });
+  const comparisonLoading = bothExist && (selfFullQuery.isLoading || coachFullQuery.isLoading);
+  const comparisonError = bothExist && (selfFullQuery.isError || coachFullQuery.isError);
+
   return (
     <div className="page-container">
       <PageHeader title="VOCÊ × PROFESSOR" back />
@@ -51,8 +67,17 @@ export default function StudentPerfilLutadorComparacao() {
         />
       )}
 
-      {!isLoading && !isError && latestSelf && latestCoach && (
-        <BoxingProfileComparisonView self={latestSelf} coach={latestCoach} viewer="student" />
+      {!isLoading && !isError && bothExist && comparisonLoading && <SkeletonList count={3} height={110} />}
+      {!isLoading && !isError && bothExist && comparisonError && (
+        <ErrorState
+          onRetry={() => {
+            selfFullQuery.refetch();
+            coachFullQuery.refetch();
+          }}
+        />
+      )}
+      {!isLoading && !isError && bothExist && selfFullQuery.data && coachFullQuery.data && (
+        <BoxingProfileComparisonView self={selfFullQuery.data} coach={coachFullQuery.data} viewer="student" />
       )}
     </div>
   );

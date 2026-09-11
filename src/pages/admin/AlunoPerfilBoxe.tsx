@@ -11,7 +11,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { BoxingProfileScoresSummary } from "@/components/BoxingProfileScoresSummary";
 import { BoxingProfileComparisonView } from "@/components/BoxingProfileComparisonView";
 import { BoxingProfilePartialNotice } from "@/components/BoxingProfilePartialNotice";
-import { getAdminStudentDetail, getBoxingProfileHistory } from "@/integrations/backend/api";
+import { getAdminStudentDetail, getBoxingProfileAssessment, getBoxingProfileHistory } from "@/integrations/backend/api";
 
 /** Mesmo limiar do fluxo do aluno — abaixo disso, reavaliar mostra um aviso (não bloqueante). */
 const RECENT_ASSESSMENT_HOURS = 24;
@@ -43,6 +43,24 @@ export default function AdminAlunoPerfilBoxe() {
   const isRecentCoach = latestCoach
     ? Date.now() - new Date(latestCoach.completedAt).getTime() < RECENT_ASSESSMENT_HOURS * 60 * 60 * 1000
     : false;
+
+  // A comparação precisa dos registros COMPLETOS (com `answers`), não do resumo leve de
+  // `getBoxingProfileHistory` — `combineAssessments` recompõe o score de escolha forçada de cada
+  // lado a partir das respostas brutas (CLAUDE.md, "corrigindo a lacuna da escolha forçada"). Só
+  // busca quando as duas existem, ou seja, só quando a comparação vai realmente aparecer.
+  const bothExist = !!latestSelf && !!latestCoach;
+  const selfFullQuery = useQuery({
+    queryKey: ["boxing-profile-assessment", latestSelf?.id],
+    queryFn: () => getBoxingProfileAssessment(latestSelf!.id),
+    enabled: bothExist,
+  });
+  const coachFullQuery = useQuery({
+    queryKey: ["boxing-profile-assessment", latestCoach?.id],
+    queryFn: () => getBoxingProfileAssessment(latestCoach!.id),
+    enabled: bothExist,
+  });
+  const comparisonLoading = bothExist && (selfFullQuery.isLoading || coachFullQuery.isLoading);
+  const comparisonError = bothExist && (selfFullQuery.isError || coachFullQuery.isError);
 
   function goToQuestionnaire() {
     navigate(`/admin/alunos/${studentId}/perfil-lutador/questionario`);
@@ -86,8 +104,19 @@ export default function AdminAlunoPerfilBoxe() {
         </>
       )}
 
-      {!isLoading && !isError && latestCoach && latestSelf && (
-        <BoxingProfileComparisonView self={latestSelf} coach={latestCoach} viewer="admin" />
+      {/* Skeleton enquanto os dois registros completos chegam — sem isso, a tela pisca entre "nada"
+          e a comparação assim que as duas avaliações existem (ver comentário acima). */}
+      {!isLoading && !isError && bothExist && comparisonLoading && <SkeletonList count={3} height={110} />}
+      {!isLoading && !isError && bothExist && comparisonError && (
+        <ErrorState
+          onRetry={() => {
+            selfFullQuery.refetch();
+            coachFullQuery.refetch();
+          }}
+        />
+      )}
+      {!isLoading && !isError && bothExist && selfFullQuery.data && coachFullQuery.data && (
+        <BoxingProfileComparisonView self={selfFullQuery.data} coach={coachFullQuery.data} viewer="admin" />
       )}
 
       {!isLoading && !isError && latestCoach && !latestSelf && (

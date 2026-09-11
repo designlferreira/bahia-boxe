@@ -1,10 +1,16 @@
 import { BoxingRadarChart } from "@/components/BoxingRadarChart";
 import { DIMENSIONS, DIMENSION_LABELS, FIGHTER_PROFILE_LABELS, combineAssessments } from "@/lib/boxingProfile";
-import type { BoxingProfileAssessmentSummary } from "@/integrations/backend/types";
+import type { BoxingProfileAssessment } from "@/integrations/backend/types";
 
 interface BoxingProfileComparisonViewProps {
-  self: BoxingProfileAssessmentSummary;
-  coach: BoxingProfileAssessmentSummary;
+  /**
+   * O registro COMPLETO (com `answers`), não o resumo leve de `getBoxingProfileHistory` —
+   * `combineAssessments` precisa das respostas brutas pra recompor o score de escolha forçada de
+   * cada lado (CLAUDE.md, "corrigindo a lacuna da escolha forçada"). Quem chama busca os dois via
+   * `getBoxingProfileAssessment(id)` antes de montar este componente.
+   */
+  self: BoxingProfileAssessment;
+  coach: BoxingProfileAssessment;
   /** Quem está lendo — só muda os rótulos/o texto de apoio, nunca os números. */
   viewer: "student" | "admin";
 }
