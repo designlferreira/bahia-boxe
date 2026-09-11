@@ -126,13 +126,18 @@ export const FIGHTER_PROFILE_WEIGHTS: Record<FighterProfileKey, Record<Dimension
 };
 
 /**
- * PESO DAS QUESTÕES COMPORTAMENTAIS (Q30-Q32) — bônus aditivo, em pontos (escala 0-100), somado
- * ao score de dimensões antes do clamp final. Cada questão contribui no máximo +4 pontos pro
- * perfil mais alinhado com a opção escolhida — um "voto" real, mas que nunca sozinho decide o
- * perfil (o grosso do score continua vindo das 29 questões técnicas). Um perfil que "vencesse" as
- * três questões comportamentais receberia no máximo +10 a +12 pontos de bônus total.
+ * VOTOS DAS QUESTÕES DE ESCOLHA FORÇADA — cada opção escolhida vale até +4 "votos" pro perfil mais
+ * alinhado (às vezes +2 pra um segundo, como voto de consolação). v1 somava isso como bônus
+ * aditivo direto ao score de dimensões; v2 normaliza (votos recebidos ÷ votos possíveis nos itens
+ * aplicáveis) num score próprio de 0-100 e faz uma MISTURA PONDERADA com o score de dimensões —
+ * `FORCED_CHOICE_WEIGHT` em `assessmentLength.ts` decide a fração de cada um (24% completa / 30%
+ * curta). Ver `computeProfileScoresRaw` em `scoring.ts`; a mudança de mecânica está registrada no
+ * CLAUDE.md ("Peso da escolha forçada").
  *
- * A opção D de cada questão representa "alternar/variar" — por design, ela sempre favorece
+ * Q30-Q32 são os 3 itens originais; Q33-Q35 (FC-A/B/C) são os 3 novos compartilhados entre aluno e
+ * professor; Q36-Q37 (FC-D/E) são self-only, sobre motivação interna.
+ *
+ * Em Q30-Q32, a opção D representa "alternar/variar" — por design, ela sempre favorece
  * boxer_puncher (a definição desse perfil é justamente versatilidade) e secundariamente
  * pressure_boxer (pressão que não depende só de trocação franca também é uma forma de variar).
  */
@@ -154,6 +159,40 @@ export const BEHAVIORAL_WEIGHTS: Record<string, Partial<Record<FighterProfileKey
   "q32:B": { pressure_fighter: 4, pressure_boxer: 2 }, // aumentar pressão e volume
   "q32:C": { puncher: 4, boxer_puncher: 2 }, // buscar golpes mais contundentes
   "q32:D": { boxer_puncher: 4, pressure_boxer: 2 }, // variar estratégia
+
+  // FC-A (q33) — comportamento sob fadiga: "fadiga remove controle consciente, o que sobra é a
+  // tendência real" — o item mais discriminante do conjunto novo (CLAUDE.md, item 3).
+  "q33:A": { pressure_fighter: 4, puncher: 2 }, // avançar mais, resolver logo
+  "q33:B": { out_boxer: 4 }, // recuar e usar o jab para controlar o que sobrou
+  "q33:C": { puncher: 4 }, // economizar e esperar o golpe decisivo
+  "q33:D": { counterpuncher: 4 }, // esperar o erro do adversário
+
+  // FC-B (q34) — depois de machucar o adversário
+  "q34:A": { pressure_fighter: 4, puncher: 2 }, // ir para cima para finalizar
+  "q34:B": { boxer_puncher: 4 }, // manter o plano, sem se afobar
+  "q34:C": { out_boxer: 4 }, // recuar e reorganizar antes de voltar
+  "q34:D": { counterpuncher: 4 }, // esperar a reação do adversário para aproveitar
+
+  // FC-C (q35) — contra desvantagem física: obriga decisão estratégica com custo, sem opção confortável.
+  "q35:A": { out_boxer: 4 }, // distância e movimentação
+  "q35:B": { pressure_fighter: 4 }, // colar para anular a força
+  "q35:C": { counterpuncher: 4 }, // esperar o adversário se abrir e punir o erro (timing, não potência)
+  "q35:D": { puncher: 4 }, // trocar mesmo assim
+
+  // FC-D (q36) — fonte de satisfação, SELF-ONLY: motivação interna é mais estável que técnica e
+  // menos sujeita a desejabilidade social (nenhuma opção é "a resposta certa").
+  "q36:A": { counterpuncher: 4, out_boxer: 2 }, // acertar um golpe difícil no momento exato
+  "q36:B": { pressure_fighter: 4 }, // impor o ritmo do começo ao fim
+  "q36:C": { puncher: 4 }, // ter batido forte
+  "q36:D": { out_boxer: 4 }, // não ter sido tocado
+  "q36:E": { boxer_puncher: 4 }, // ter feito tudo que treinou
+
+  // FC-E (q37) — treino preferido, SELF-ONLY: mesma razão de q36.
+  "q37:A": { out_boxer: 4, counterpuncher: 2 }, // sparring técnico, sem força
+  "q37:B": { pressure_fighter: 4, puncher: 2 }, // sparring forte
+  "q37:C": { puncher: 4 }, // saco pesado
+  "q37:D": { boxer_puncher: 4 }, // manopla e coordenação
+  "q37:E": { pressure_fighter: 4 }, // corda, corrida, condicionamento
 };
 
 /**

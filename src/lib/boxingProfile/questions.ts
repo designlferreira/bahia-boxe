@@ -1,4 +1,5 @@
 import type { AssessmentType } from "./assessmentType";
+import type { AssessmentLength } from "./assessmentLength";
 import type { Dimension } from "./dimensions";
 
 export const LIKERT_OPTIONS = [
@@ -17,12 +18,12 @@ export interface LikertQuestion {
 }
 
 export interface BehavioralOption {
-  value: "A" | "B" | "C" | "D";
+  value: "A" | "B" | "C" | "D" | "E";
   label: string;
 }
 
 export interface BehavioralQuestion {
-  id: string; // "q30".."q32"
+  id: string; // "q30".."q37"
   type: "behavioral";
   text: string;
   options: BehavioralOption[];
@@ -31,15 +32,36 @@ export interface BehavioralQuestion {
 export type Question = LikertQuestion | BehavioralQuestion;
 
 type LikertSkeleton = { id: string; type: "likert"; dimension: Dimension };
-type BehavioralSkeleton = { id: string; type: "behavioral"; options: BehavioralOption[] };
+type BehavioralSkeleton = { id: string; type: "behavioral"; options: BehavioralOption[]; selfOnly?: true };
 type QuestionSkeleton = LikertSkeleton | BehavioralSkeleton;
 
 /**
- * Os 32 ids, na ordem do questionário, com dimensão (Q1-29) ou opções (Q30-32) — a ÚNICA fonte
- * disso. 'self' e 'coach' compartilham exatamente este esqueleto: mesmo id, mesma dimensão, mesmas
- * opções comportamentais. Só o texto muda de voz (ver `SELF_TEXT`/`COACH_TEXT` abaixo), então o
- * motor de pontuação (que só olha `id`/`dimension`/`options`, nunca `text`) funciona sem alteração
- * pras duas avaliações.
+ * As 8 perguntas Likert (uma por dimensão) usadas na versão CURTA — o critério foi escolher, em
+ * cada dimensão, o item menos contaminado por nível técnico geral e mais ligado a uma tendência de
+ * estilo (fraseado como hábito — "uso X" — em vez de capacidade — "consigo X"), quando havia opção
+ * assim. Potência (Q16) e Condicionamento (Q29) resistem ao critério: são dimensões inerentemente
+ * sobre capacidade física, não sobre estilo — escolhidas por serem as menos misturadas com OUTRAS
+ * habilidades entre as opções da própria dimensão, não por serem limpas (CLAUDE.md, "Versão curta —
+ * as 8 perguntas Likert").
+ */
+const SHORT_LIKERT_IDS: readonly string[] = ["q3", "q7", "q11", "q15", "q16", "q21", "q24", "q29"];
+
+/**
+ * Os 6 itens de escolha forçada da versão CURTA do aluno — 3 atuais (Q30-32) + FC-A/FC-C/FC-D. A
+ * versão completa do aluno usa todos os 8 (essa lista não se aplica lá). Ficam de fora: FC-B e
+ * FC-E (CLAUDE.md, "Versão curta do aluno — quais 6 de 8").
+ */
+const SELF_SHORT_BEHAVIORAL_IDS: readonly string[] = ["q30", "q31", "q32", "q33", "q35", "q36"];
+
+/**
+ * Os 5 itens novos de escolha forçada, na ordem em que foram especificados: FC-A=q33, FC-B=q34,
+ * FC-C=q35, FC-D=q36 (self-only), FC-E=q37 (self-only). FC-D/FC-E são sobre motivação interna, que
+ * o professor observa mal — por isso `selfOnly`, e por isso não têm entrada em `COACH_TEXT`.
+ *
+ * As opções de FC-A/FC-B/FC-C são neutras (infinitivo), o mesmo padrão de Q30-Q32 — só assim um
+ * único array de opções serve pras duas vozes (o enunciado muda de pessoa, a opção não). FC-D/FC-E
+ * não precisam disso: nunca aparecem na voz do professor, então ficam na 1ª pessoa como
+ * especificadas.
  */
 const QUESTION_SKELETON: QuestionSkeleton[] = [
   // Ataque — Q1-Q4
@@ -87,7 +109,7 @@ const QUESTION_SKELETON: QuestionSkeleton[] = [
   { id: "q28", type: "likert", dimension: "conditioning" },
   { id: "q29", type: "likert", dimension: "conditioning" },
 
-  // Comportamentais — Q30-Q32 (as opções já são neutras em 3ª pessoa, valem pras duas vozes)
+  // Comportamentais originais — Q30-Q32 (opções já neutras em 3ª pessoa, valem pras duas vozes)
   {
     id: "q30",
     type: "behavioral",
@@ -118,9 +140,73 @@ const QUESTION_SKELETON: QuestionSkeleton[] = [
       { value: "D", label: "Variar estratégia para dificultar a adaptação." },
     ],
   },
+
+  // FC-A — comportamento sob fadiga (q33)
+  {
+    id: "q33",
+    type: "behavioral",
+    options: [
+      { value: "A", label: "Avançar mais, resolver logo." },
+      { value: "B", label: "Recuar e usar o jab para controlar o que sobrou." },
+      { value: "C", label: "Economizar e esperar uma chance de acertar um golpe decisivo." },
+      { value: "D", label: "Esperar o erro do adversário para contra-atacar." },
+    ],
+  },
+
+  // FC-B — depois de machucar o adversário (q34)
+  {
+    id: "q34",
+    type: "behavioral",
+    options: [
+      { value: "A", label: "Ir para cima para finalizar." },
+      { value: "B", label: "Manter o plano, sem se afobar." },
+      { value: "C", label: "Recuar e reorganizar antes de voltar." },
+      { value: "D", label: "Esperar a reação do adversário para aproveitar." },
+    ],
+  },
+
+  // FC-C — contra desvantagem física (q35)
+  {
+    id: "q35",
+    type: "behavioral",
+    options: [
+      { value: "A", label: "Usar distância e movimentação para não deixar o adversário acertar." },
+      { value: "B", label: "Colar no adversário para anular a força." },
+      { value: "C", label: "Esperar o adversário se abrir e punir o erro." },
+      { value: "D", label: "Trocar mesmo assim." },
+    ],
+  },
+
+  // FC-D — fonte de satisfação (q36) — SELF-ONLY: motivação interna, o professor observa mal
+  {
+    id: "q36",
+    type: "behavioral",
+    selfOnly: true,
+    options: [
+      { value: "A", label: "Ter acertado um golpe difícil no momento exato." },
+      { value: "B", label: "Ter imposto o ritmo do começo ao fim." },
+      { value: "C", label: "Ter batido forte." },
+      { value: "D", label: "Não ter sido tocado." },
+      { value: "E", label: "Ter conseguido fazer tudo que treinei." },
+    ],
+  },
+
+  // FC-E — treino preferido (q37) — SELF-ONLY: mesma razão de q36
+  {
+    id: "q37",
+    type: "behavioral",
+    selfOnly: true,
+    options: [
+      { value: "A", label: "Sparring técnico, sem força." },
+      { value: "B", label: "Sparring forte." },
+      { value: "C", label: "Saco pesado." },
+      { value: "D", label: "Manopla e coordenação." },
+      { value: "E", label: "Corda, corrida, condicionamento." },
+    ],
+  },
 ];
 
-/** Texto na voz do aluno, respondendo sobre si mesmo — o questionário original (Fase 1). */
+/** Texto na voz do aluno, respondendo sobre si mesmo — o questionário original (Fase 1) + os 5 itens novos da v2. */
 const SELF_TEXT: Record<string, string> = {
   q1: "Quando consigo encurtar a distância, consigo manter uma sequência de golpes sem me desorganizar.",
   q2: "Consigo alternar golpes na cabeça e no corpo durante minhas combinações.",
@@ -162,12 +248,19 @@ const SELF_TEXT: Record<string, string> = {
   q30: "Quando enfrento alguém que recua bastante, prefiro:",
   q31: "Quando o adversário inicia um ataque, minha tendência natural é:",
   q32: "Quando tenho vantagem no combate, prefiro:",
+
+  q33: "No último round, já cansado, o que acontece com você naturalmente?",
+  q34: "Você acerta um golpe limpo e percebe que o adversário sentiu. O que faz?",
+  q35: "Contra alguém visivelmente mais forte fisicamente que você:",
+  q36: "O que te dá mais satisfação num treino?",
+  q37: "Se você pudesse escolher, qual treino faria mais vezes?",
 };
 
 /**
  * Texto na voz do professor, observando o aluno — Fase 2 (avaliação 'coach'). Mesmo conteúdo
  * técnico de cada pergunta do `SELF_TEXT`, reformulado em 3ª pessoa; nenhuma pergunta foi
- * adicionada, removida ou trocada de dimensão.
+ * adicionada, removida ou trocada de dimensão. Sem entrada para q36/q37 (FC-D/FC-E) — são
+ * self-only, `buildQuestions` nunca as inclui na lista do professor.
  */
 const COACH_TEXT: Record<string, string> = {
   q1: "Quando consegue encurtar a distância, o aluno mantém uma sequência de golpes sem se desorganizar.",
@@ -210,27 +303,50 @@ const COACH_TEXT: Record<string, string> = {
   q30: "Quando o aluno enfrenta alguém que recua bastante, ele tende a:",
   q31: "Quando o adversário inicia um ataque, a tendência natural do aluno é:",
   q32: "Quando o aluno tem vantagem no combate, ele tende a:",
+
+  q33: "No último round, já cansado, o que acontece com o aluno naturalmente?",
+  q34: "O aluno acerta um golpe limpo e percebe que o adversário sentiu. O que ele faz?",
+  q35: "Contra alguém visivelmente mais forte fisicamente que o aluno, ele tende a:",
 };
 
-function buildQuestions(textById: Record<string, string>): Question[] {
-  return QUESTION_SKELETON.map((s) =>
-    s.type === "likert"
-      ? { id: s.id, type: "likert", dimension: s.dimension, text: textById[s.id] }
-      : { id: s.id, type: "behavioral", text: textById[s.id], options: s.options },
-  );
+function buildQuestions(textById: Record<string, string>, skeleton: QuestionSkeleton[]): Question[] {
+  return skeleton
+    .filter((s) => textById[s.id] !== undefined)
+    .map((s) =>
+      s.type === "likert"
+        ? { id: s.id, type: "likert", dimension: s.dimension, text: textById[s.id] }
+        : { id: s.id, type: "behavioral", text: textById[s.id], options: s.options },
+    );
 }
 
-/** As 32 perguntas na voz do aluno (autoavaliação — 'self'). */
-export const QUESTIONS: Question[] = buildQuestions(SELF_TEXT);
+/** As 37 perguntas na voz do aluno (autoavaliação — 'self'), versão completa: 29 Likert + 8 forçadas. */
+export const QUESTIONS: Question[] = buildQuestions(SELF_TEXT, QUESTION_SKELETON);
 
-/** As mesmas 32 perguntas (mesmos ids/dimensões), na voz do professor observando o aluno ('coach'). */
-export const COACH_QUESTIONS: Question[] = buildQuestions(COACH_TEXT);
+/**
+ * As perguntas na voz do professor observando o aluno ('coach'), versão completa: 29 Likert + 6
+ * forçadas — as mesmas 6 servem pra completa E pra curta do professor (CLAUDE.md, "a trava do
+ * professor está resolvida por construção"); só o número de Likert muda entre as duas.
+ */
+export const COACH_QUESTIONS: Question[] = buildQuestions(COACH_TEXT, QUESTION_SKELETON);
 
-export function getQuestions(assessmentType: AssessmentType): Question[] {
-  return assessmentType === "coach" ? COACH_QUESTIONS : QUESTIONS;
+/**
+ * Ponto único de acesso: dado quem responde e qual variante, devolve a lista de perguntas certa,
+ * na ordem do questionário. `length` default 'full' preserva o comportamento de quem só passa
+ * `assessmentType` (compatibilidade com chamadas existentes).
+ */
+export function getQuestions(assessmentType: AssessmentType, length: AssessmentLength = "full"): Question[] {
+  const full = assessmentType === "coach" ? COACH_QUESTIONS : QUESTIONS;
+  if (length === "full") return full;
+
+  const coachBehavioralIds = new Set(COACH_QUESTIONS.filter((q) => q.type === "behavioral").map((q) => q.id));
+  const shortBehavioralIds = assessmentType === "coach" ? coachBehavioralIds : new Set(SELF_SHORT_BEHAVIORAL_IDS);
+  const shortIds = new Set([...SHORT_LIKERT_IDS, ...shortBehavioralIds]);
+  return full.filter((q) => shortIds.has(q.id));
 }
 
+/** Os 29 itens Likert da voz do aluno (versão completa) — referência de conveniência para testes/scripts; para pontuar uma avaliação real, use as perguntas efetivamente apresentadas (`getQuestions`), nunca esta lista fixa. */
 export const LIKERT_QUESTIONS = QUESTIONS.filter((q): q is LikertQuestion => q.type === "likert");
+/** Os 8 itens de escolha forçada da voz do aluno (versão completa) — mesma ressalva de `LIKERT_QUESTIONS`. */
 export const BEHAVIORAL_QUESTIONS = QUESTIONS.filter((q): q is BehavioralQuestion => q.type === "behavioral");
 
 export const TOTAL_QUESTIONS = QUESTIONS.length;

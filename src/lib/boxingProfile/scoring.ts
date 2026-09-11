@@ -1,25 +1,29 @@
 import { DIMENSIONS, type Dimension } from "./dimensions";
-import { LIKERT_QUESTIONS, BEHAVIORAL_QUESTIONS, QUESTIONS } from "./questions";
+import type { LikertQuestion, Question } from "./questions";
 import { FIGHTER_PROFILES, FIGHTER_PROFILE_WEIGHTS, BEHAVIORAL_WEIGHTS, PROFILE_TIEBREAK_PRIORITY, type FighterProfileKey } from "./fighterProfiles";
+import { applyWingspanAnchor } from "./physicalAnchor";
 
-export type BehavioralValue = "A" | "B" | "C" | "D";
-/** `answers.q1` = 1-5 (Likert), `answers.q30` = "A"|"B"|"C"|"D". */
+export type BehavioralValue = "A" | "B" | "C" | "D" | "E";
+/** `answers.q1` = 1-5 (Likert), `answers.q30` = "A".."E" (a maioria dos itens tem só A-D; ver `questions.ts`). */
 export type Answers = Record<string, number | BehavioralValue>;
 
-export function missingQuestionIds(answers: Answers): string[] {
-  return QUESTIONS.filter((q) => answers[q.id] === undefined || answers[q.id] === null).map((q) => q.id);
+/**
+ * `questions` é sempre a lista efetivamente apresentada (`getQuestions(assessmentType, length)`) —
+ * nunca uma lista fixa. Curta e completa, aluno e professor, têm conjuntos de ids diferentes; usar
+ * a lista errada aqui diria "faltam perguntas" para ids que nunca foram perguntados.
+ */
+export function missingQuestionIds(answers: Answers, questions: Question[]): string[] {
+  return questions.filter((q) => answers[q.id] === undefined || answers[q.id] === null).map((q) => q.id);
 }
 
-export function isComplete(answers: Answers): boolean {
-  return missingQuestionIds(answers).length === 0;
+export function isComplete(answers: Answers, questions: Question[]): boolean {
+  return missingQuestionIds(answers, questions).length === 0;
 }
 
 /**
  * score = ((average - 1) / 4) * 100 — média 1→0, média 3→50, média 5→100, média 4.2→80.
- * Exportada (não só usada internamente) porque nenhuma dimensão do questionário atual tem um
- * número de questões que produza média 4.2 exata a partir de respostas inteiras 1-5 (todas têm 3
- * ou 4 questões) — o caso de teste obrigatório da especificação só é alcançável testando a
- * fórmula isolada, não através de `computeDimensionScores`.
+ * Exportada (não só usada internamente) porque é a peça usada em outros lugares pra converter uma
+ * diferença de score em "pontos Likert de diferença" (ex. `combined.ts`) sem repetir a fórmula.
  */
 export function likertScoreFromAverage(average: number): number {
   return ((average - 1) / 4) * 100;
@@ -27,13 +31,15 @@ export function likertScoreFromAverage(average: number): number {
 
 /**
  * Score bruto (0-100, ponto flutuante) de cada uma das oito competências, a partir da média das
- * respostas Likert daquela dimensão. Não arredonda — arredondar aqui, antes de usar o valor no
- * peso dos perfis, acumularia erro. Arredondamento só acontece em `roundForDisplay`.
+ * respostas Likert daquela dimensão — só as perguntas efetivamente apresentadas (`likertQuestions`)
+ * entram na média; na versão curta isso é 1 pergunta por dimensão, não 3-4. Não arredonda —
+ * arredondar aqui, antes de usar o valor no peso dos perfis, acumularia erro. Arredondamento só
+ * acontece em `roundScores`.
  */
-export function computeDimensionScores(answers: Answers): Record<Dimension, number> {
+export function computeDimensionScores(answers: Answers, likertQuestions: LikertQuestion[]): Record<Dimension, number> {
   const result = {} as Record<Dimension, number>;
   for (const dim of DIMENSIONS) {
-    const questions = LIKERT_QUESTIONS.filter((q) => q.dimension === dim);
+    const questions = likertQuestions.filter((q) => q.dimension === dim);
     const sum = questions.reduce((acc, q) => {
       const v = answers[q.id];
       return acc + (typeof v === "number" ? v : 0);
@@ -44,38 +50,54 @@ export function computeDimensionScores(answers: Answers): Record<Dimension, numb
   return result;
 }
 
-/** Soma dos bônus comportamentais (Q30-Q32) de um perfil, a partir das opções escolhidas. */
-function behavioralBonus(answers: Answers, profile: FighterProfileKey): number {
-  let bonus = 0;
-  for (const q of BEHAVIORAL_QUESTIONS) {
-    const chosen = answers[q.id];
+/**
+ * Score de escolha forçada de um perfil (0-100), normalizado pelo número de itens efetivamente
+ * aplicáveis (`behavioralQuestionIds`) — não um total fixo. Isso é o que torna a exclusão dos itens
+ * self-only na voz do professor automática: com menos itens aplicáveis, o mesmo peso final
+ * (`FORCED_CHOICE_WEIGHT`) continua valendo o mesmo percentual do score, só dividido entre menos
+ * perguntas (CLAUDE.md, "peso da escolha forçada sobe" — ponto 2/3).
+ */
+function behavioralScoreRaw(answers: Answers, profile: FighterProfileKey, behavioralQuestionIds: string[]): number {
+  if (behavioralQuestionIds.length === 0) return 0;
+  let votes = 0;
+  for (const id of behavioralQuestionIds) {
+    const chosen = answers[id];
     if (typeof chosen !== "string") continue;
-    const weights = BEHAVIORAL_WEIGHTS[`${q.id}:${chosen}`];
-    bonus += weights?.[profile] ?? 0;
+    const weights = BEHAVIORAL_WEIGHTS[`${id}:${chosen}`];
+    votes += weights?.[profile] ?? 0;
   }
-  return bonus;
+  const maxPossibleVotes = 4 * behavioralQuestionIds.length; // cada item vale no máximo +4 pro perfil mais alinhado.
+  return (votes / maxPossibleVotes) * 100;
+}
+
+function clamp(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v));
 }
 
 /**
- * Score bruto (ponto flutuante, pode passar de 100 antes do clamp) de cada um dos seis perfis:
- * média ponderada das oito competências (pesos de FIGHTER_PROFILE_WEIGHTS, que somam 1 por
- * perfil) + o bônus aditivo das três questões comportamentais.
+ * Score bruto (ponto flutuante) de cada um dos seis perfis: mistura ponderada de dois sinais
+ * normalizados independentemente — a média ponderada das oito dimensões (competência) e o score de
+ * escolha forçada (estilo) — em vez do antigo bônus aditivo direto. A v1 somava o bônus por cima do
+ * score de dimensões e cortava tudo no clamp de 100; pra um aluno já tecnicamente avançado (score
+ * de dimensões perto de 100), isso absorvia quase todo o bônus de escolha forçada exatamente onde
+ * ele deveria pesar mais. A mistura ponderada garante que `forcedChoiceWeight` sempre vale essa
+ * fração do score final, não importa o nível técnico (CLAUDE.md, "peso da escolha forçada sobe").
  */
 export function computeProfileScoresRaw(
   dimensionScores: Record<Dimension, number>,
   answers: Answers,
+  behavioralQuestionIds: string[],
+  forcedChoiceWeight: number,
 ): Record<FighterProfileKey, number> {
   const result = {} as Record<FighterProfileKey, number>;
   for (const profile of FIGHTER_PROFILES) {
     const weights = FIGHTER_PROFILE_WEIGHTS[profile];
-    const weighted = DIMENSIONS.reduce((acc, dim) => acc + dimensionScores[dim] * weights[dim], 0);
-    result[profile] = clamp(weighted + behavioralBonus(answers, profile), 0, 100);
+    const dimensionScore = DIMENSIONS.reduce((acc, dim) => acc + dimensionScores[dim] * weights[dim], 0);
+    const behavioralScore = behavioralScoreRaw(answers, profile, behavioralQuestionIds);
+    const blended = (1 - forcedChoiceWeight) * dimensionScore + forcedChoiceWeight * behavioralScore;
+    result[profile] = clamp(blended, 0, 100);
   }
   return result;
-}
-
-function clamp(v: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, v));
 }
 
 /** Arredonda pra a camada de apresentação/persistência — chamar por último, nunca antes de calcular. */
@@ -118,10 +140,22 @@ export interface ScoringResult {
   secondaryProfile: FighterProfileKey;
 }
 
-/** Ponto de entrada único — respostas completas entram, resultado pronto pra exibir/persistir sai. */
-export function scoreAssessment(answers: Answers): ScoringResult {
-  const dimensionScoresRaw = computeDimensionScores(answers);
-  const profileScoresRaw = computeProfileScoresRaw(dimensionScoresRaw, answers);
+/**
+ * Ponto de entrada único — respostas completas entram, resultado pronto pra exibir/persistir sai.
+ *
+ * `questions` é a lista efetivamente apresentada (decide quais Likert entram na média de cada
+ * dimensão e quais itens de escolha forçada contam). `forcedChoiceWeight` vem de
+ * `FORCED_CHOICE_WEIGHT[length]`. `wingspanIndex` só se aplica na versão completa, quando altura e
+ * envergadura existem no cadastro do aluno — `null` (o default) não modifica nada (CLAUDE.md,
+ * "Âncora física").
+ */
+export function scoreAssessment(answers: Answers, questions: Question[], forcedChoiceWeight: number, wingspanIndex: number | null = null): ScoringResult {
+  const likertQuestions = questions.filter((q): q is LikertQuestion => q.type === "likert");
+  const behavioralQuestionIds = questions.filter((q) => q.type === "behavioral").map((q) => q.id);
+
+  const dimensionScoresRaw = computeDimensionScores(answers, likertQuestions);
+  const profileScoresRawBase = computeProfileScoresRaw(dimensionScoresRaw, answers, behavioralQuestionIds, forcedChoiceWeight);
+  const profileScoresRaw = applyWingspanAnchor(profileScoresRawBase, wingspanIndex);
   const rankedProfiles = rankProfiles(profileScoresRaw, dimensionScoresRaw);
 
   return {

@@ -47,7 +47,19 @@ function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
 }
 
-/** Score de cada perfil a partir dos scores de dimensão, pelos mesmos pesos de `computeProfileScoresRaw` — sem o bônus comportamental (Q30-Q32), que não existe nesta camada: só os `dimensionScores` já calculados de cada avaliação chegam aqui, não as respostas brutas. O bônus vale no máximo +12 pontos num score de 0-100, então a ausência dele não muda o perfil predominante na prática esperada. */
+/**
+ * Score de cada perfil a partir dos scores de dimensão, pelos mesmos pesos de
+ * `computeProfileScoresRaw` — sem o componente de escolha forçada, que não existe nesta camada: só
+ * os `dimensionScores` já calculados de cada avaliação chegam aqui, não as respostas brutas.
+ *
+ * Isso era uma aproximação pequena na v1 (bônus aditivo de no máximo ~12 pontos). Na v2, escolha
+ * forçada é 24%-30% do score de cada avaliação (`FORCED_CHOICE_WEIGHT`) — a aproximação aqui ficou
+ * bem maior: o arquétipo combinado pode divergir do que sairia se a escolha forçada de cada lado
+ * entrasse na conta. Não implementado — precisaria persistir o score de escolha forçada de cada
+ * avaliação separadamente (hoje só o score final misturado é salvo), uma mudança de schema maior
+ * que o pedido original. Registrado como dívida conhecida (CLAUDE.md, "Resultado combinado e o peso
+ * maior da escolha forçada").
+ */
 function weightedProfileScores(dimensionScores: Record<Dimension, number>): Record<FighterProfileKey, number> {
   const result = {} as Record<FighterProfileKey, number>;
   for (const profile of FIGHTER_PROFILES) {
