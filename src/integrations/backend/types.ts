@@ -206,6 +206,7 @@ export interface PurchaseRequest {
 export type NotificationEntity =
   | { type: "booking"; id: string }
   | { type: "purchase_requests" }
+  | { type: "boxing_profile" }
   | null;
 
 export interface AppNotification {

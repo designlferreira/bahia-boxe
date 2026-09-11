@@ -1604,7 +1604,7 @@ async function deriveNotifications(userId: string): Promise<AppNotification[]> {
   } else {
     const studentId = await studentIdForProfile(userId).catch(() => null);
     if (!studentId) return [];
-    const [bookingsRes, requestsRes] = await Promise.all([
+    const [bookingsRes, requestsRes, coachAssessmentsRes] = await Promise.all([
       // `.or(...)` antes do `limit(40)`: sem ele, as aulas descartadas por regeneração consomem a
       // janela e empurram pra fora dela os eventos que viram notificação de verdade.
       client()
@@ -1615,6 +1615,16 @@ async function deriveNotifications(userId: string): Promise<AppNotification[]> {
         .order("start_time", { ascending: false })
         .limit(40),
       client().from("purchase_requests").select("*").eq("student_id", studentId).neq("status", "pending").order("decided_at", { ascending: false }).limit(20),
+      // CLAUDE.md, "aluno descobre a avaliação do professor": sem isso, nada avisava o aluno que
+      // uma avaliação 'coach' existia — ele só encontrava se abrisse Perfil de Boxe por conta
+      // própria. RLS já deixava ler (0006/0007); faltava só aparecer aqui.
+      client()
+        .from("boxing_profile_assessments")
+        .select("id, completed_at")
+        .eq("student_id", studentId)
+        .eq("assessment_type", "coach")
+        .order("completed_at", { ascending: false })
+        .limit(20),
     ]);
     for (const b of bookingsRes.data ?? []) {
       if (b.status === "rejected" || b.status === "rejected_with_suggestion") {
@@ -1651,6 +1661,18 @@ async function deriveNotifications(userId: string): Promise<AppNotification[]> {
         createdAt: r.decided_at ?? r.created_at,
         read: false,
         entity: { type: "purchase_requests" },
+      });
+    }
+    for (const a of coachAssessmentsRes.data ?? []) {
+      items.push({
+        id: `boxing-profile:${a.id}`,
+        userId,
+        kind: "system",
+        title: "Seu professor te avaliou",
+        description: "Veja a leitura dele sobre o seu Perfil de Boxe, ao lado da sua autoavaliação.",
+        createdAt: a.completed_at,
+        read: false,
+        entity: { type: "boxing_profile" },
       });
     }
   }
