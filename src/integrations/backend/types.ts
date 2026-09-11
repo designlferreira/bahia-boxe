@@ -1,6 +1,7 @@
 import type { BookingStatus } from "@/lib/bookingStatus";
 import type {
   Answers as BoxingAnswers,
+  AssessmentLength as BoxingAssessmentLength,
   AssessmentType as BoxingAssessmentType,
   Dimension as BoxingDimension,
   FighterProfileKey,
@@ -245,6 +246,8 @@ export interface StudentProfile {
   sex: Sex | null;
   heightCm: number | null;
   weightKg: number | null;
+  /** Envergadura — usada só pela âncora física do Perfil de Boxe (versão completa). */
+  wingspanCm: number | null;
   guard: Guard | null;
   laterality: Laterality | null;
   /** Não usado mais — o resultado real do Perfil de Boxe vive em `boxing_profile_assessments`. */
@@ -262,11 +265,16 @@ export interface BoxingProfileAssessmentSummary {
   secondaryProfile: FighterProfileKey;
   dimensionScores: Record<BoxingDimension, number>;
   profileScores: Record<FighterProfileKey, number>;
+  /** Curta (14 perguntas) ou completa (35-37) — os scores das duas NÃO são diretamente comparáveis. */
+  assessmentLength: BoxingAssessmentLength;
+  /** Promovido pro nível "summary" (não só no registro completo) pra listas/comparação poderem marcar avaliações de fórmula anterior sem buscar o registro inteiro. */
+  scoringVersion: string;
 }
 
 export interface BoxingProfileAssessment extends BoxingProfileAssessmentSummary {
   answers: BoxingAnswers;
   questionnaireVersion: string;
-  scoringVersion: string;
+  /** Envergadura ÷ altura usada nesta avaliação — só quando a âncora física foi aplicada (completa + as duas medidas existiam). Snapshot imutável, nunca recalculado. */
+  wingspanIndexUsed: number | null;
   createdAt: string;
 }

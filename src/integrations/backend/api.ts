@@ -24,11 +24,15 @@ import type {
 import type { BookingStatus } from "@/lib/bookingStatus";
 import type { ClassGuidelines } from "@/lib/classGuidelines";
 import {
+  computeWingspanIndex,
+  FORCED_CHOICE_WEIGHT,
+  getQuestions as getBoxingProfileQuestions,
   isComplete as isBoxingProfileComplete,
   QUESTIONNAIRE_VERSION as BOXING_QUESTIONNAIRE_VERSION,
   scoreAssessment as scoreBoxingProfile,
   SCORING_VERSION as BOXING_SCORING_VERSION,
   type Answers as BoxingAnswers,
+  type AssessmentLength as BoxingAssessmentLength,
 } from "@/lib/boxingProfile";
 
 /**
@@ -1755,6 +1759,7 @@ function mapStudentProfile(studentId: string, r: any | null): StudentProfile {
     sex: r?.sex ?? null,
     heightCm: r?.height_cm ?? null,
     weightKg: r?.weight_kg ?? null,
+    wingspanCm: r?.wingspan_cm ?? null,
     guard: r?.guard ?? null,
     laterality: r?.laterality ?? null,
     fighterProfileResult: r?.fighter_profile_result ?? null,
@@ -1770,7 +1775,7 @@ export async function getStudentProfile(studentId: string): Promise<StudentProfi
 
 export async function saveStudentProfile(
   studentId: string,
-  patch: Pick<StudentProfile, "sex" | "heightCm" | "weightKg" | "guard" | "laterality">,
+  patch: Pick<StudentProfile, "sex" | "heightCm" | "weightKg" | "wingspanCm" | "guard" | "laterality">,
 ) {
   const { error } = await client()
     .from("student_profiles")
@@ -1780,6 +1785,7 @@ export async function saveStudentProfile(
         sex: patch.sex,
         height_cm: patch.heightCm,
         weight_kg: patch.weightKg,
+        wingspan_cm: patch.wingspanCm,
         guard: patch.guard,
         laterality: patch.laterality,
         updated_at: new Date().toISOString(),
@@ -1882,6 +1888,8 @@ function mapAssessmentSummary(r: any): BoxingProfileAssessmentSummary {
     secondaryProfile: r.secondary_profile,
     dimensionScores: r.dimension_scores,
     profileScores: r.profile_scores,
+    assessmentLength: r.assessment_length,
+    scoringVersion: r.scoring_version,
   };
 }
 
@@ -1897,7 +1905,9 @@ function mapAssessmentSummary(r: any): BoxingProfileAssessmentSummary {
 export async function getBoxingProfileHistory(studentId: string): Promise<BoxingProfileAssessmentSummary[]> {
   const { data, error } = await client()
     .from("boxing_profile_assessments")
-    .select("id, assessment_type, assessed_by, completed_at, primary_profile, secondary_profile, dimension_scores, profile_scores")
+    .select(
+      "id, assessment_type, assessed_by, completed_at, primary_profile, secondary_profile, dimension_scores, profile_scores, assessment_length, scoring_version",
+    )
     .eq("student_id", studentId)
     .order("completed_at", { ascending: false });
   if (error) throw new Error(error.message);
@@ -1912,22 +1922,40 @@ export async function getBoxingProfileAssessment(id: string): Promise<BoxingProf
     ...mapAssessmentSummary(data),
     answers: data.answers,
     questionnaireVersion: data.questionnaire_version,
-    scoringVersion: data.scoring_version,
+    wingspanIndexUsed: data.wingspan_index_used,
     createdAt: data.created_at,
   };
 }
 
 /**
+ * Índice de envergadura (envergadura ÷ altura) do aluno agora, pro momento da avaliação — só usado
+ * quando `length === "full"`. `null` se altura ou envergadura não estiverem preenchidas no
+ * cadastro; nunca estima uma a partir da outra (CLAUDE.md, "Âncora física").
+ */
+async function currentWingspanIndex(studentId: string): Promise<number | null> {
+  const { data, error } = await client().from("student_profiles").select("height_cm, wingspan_cm").eq("student_id", studentId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return computeWingspanIndex(data?.height_cm ?? null, data?.wingspan_cm ?? null);
+}
+
+/**
  * Único ponto de escrita: calcula o resultado (scoreAssessment, determinístico, sem IA em
  * runtime) e persiste tudo — respostas, scores das 8 dimensões, scores dos 6 perfis, versão do
- * questionário e do algoritmo — numa única inserção atômica. Uma avaliação concluída nunca é
- * atualizada depois; refazer o teste sempre cria uma linha nova.
+ * questionário e do algoritmo, variante (curta/completa) e o índice de envergadura usado (se
+ * aplicável) — numa única inserção atômica. Uma avaliação concluída nunca é atualizada depois;
+ * refazer o teste sempre cria uma linha nova.
  */
-export async function submitBoxingProfileAssessment(studentId: string, answers: BoxingAnswers): Promise<BoxingProfileAssessment> {
-  if (!isBoxingProfileComplete(answers)) {
+export async function submitBoxingProfileAssessment(
+  studentId: string,
+  answers: BoxingAnswers,
+  length: BoxingAssessmentLength,
+): Promise<BoxingProfileAssessment> {
+  const questions = getBoxingProfileQuestions("self", length);
+  if (!isBoxingProfileComplete(answers, questions)) {
     throw new Error("Responda todas as questões antes de concluir.");
   }
-  const result = scoreBoxingProfile(answers);
+  const wingspanIndex = length === "full" ? await currentWingspanIndex(studentId) : null;
+  const result = scoreBoxingProfile(answers, questions, FORCED_CHOICE_WEIGHT[length], wingspanIndex);
   const { data, error } = await client()
     .from("boxing_profile_assessments")
     .insert({
@@ -1935,6 +1963,8 @@ export async function submitBoxingProfileAssessment(studentId: string, answers: 
       assessment_type: "self",
       questionnaire_version: BOXING_QUESTIONNAIRE_VERSION,
       scoring_version: BOXING_SCORING_VERSION,
+      assessment_length: length,
+      wingspan_index_used: wingspanIndex,
       answers,
       dimension_scores: result.dimensionScores,
       profile_scores: result.profileScores,
@@ -1948,27 +1978,33 @@ export async function submitBoxingProfileAssessment(studentId: string, answers: 
     ...mapAssessmentSummary(data),
     answers: data.answers,
     questionnaireVersion: data.questionnaire_version,
-    scoringVersion: data.scoring_version,
+    wingspanIndexUsed: data.wingspan_index_used,
     createdAt: data.created_at,
   };
 }
 
 /**
- * Avaliação 'coach': o professor responde as mesmas 32 perguntas (voz reformulada, mesmos ids),
- * sobre um aluno seu. Mesmo motor de pontuação de `submitBoxingProfileAssessment` — ele não lê
- * texto de pergunta, só id/dimensão/opção, que são idênticos entre as duas vozes. RLS
- * (`boxing_profile_assessments_admin_insert`, migration 0007) garante no banco que só o professor
- * dono do aluno grava, e sempre com `assessed_by = auth.uid()`; não confiamos nisso só no cliente.
+ * Avaliação 'coach': o professor responde as mesmas perguntas (voz reformulada, mesmos ids, exceto
+ * os 2 itens self-only), sobre um aluno seu. Mesmo motor de pontuação de
+ * `submitBoxingProfileAssessment` — ele não lê texto de pergunta, só id/dimensão/opção, que são
+ * idênticos entre as duas vozes. RLS (`boxing_profile_assessments_admin_insert`, migration 0007)
+ * garante no banco que só o professor dono do aluno grava, e sempre com `assessed_by = auth.uid()`;
+ * não confiamos nisso só no cliente.
  */
 export async function submitCoachBoxingProfileAssessment(
   studentId: string,
   assessedBy: string,
   answers: BoxingAnswers,
+  length: BoxingAssessmentLength,
 ): Promise<BoxingProfileAssessment> {
-  if (!isBoxingProfileComplete(answers)) {
+  const questions = getBoxingProfileQuestions("coach", length);
+  if (!isBoxingProfileComplete(answers, questions)) {
     throw new Error("Responda todas as questões antes de concluir.");
   }
-  const result = scoreBoxingProfile(answers);
+  // A âncora física é sobre o corpo do ALUNO, não de quem preenche — mesma fonte (`student_profiles`
+  // do aluno) que a avaliação 'self' usaria pra ele.
+  const wingspanIndex = length === "full" ? await currentWingspanIndex(studentId) : null;
+  const result = scoreBoxingProfile(answers, questions, FORCED_CHOICE_WEIGHT[length], wingspanIndex);
   const { data, error } = await client()
     .from("boxing_profile_assessments")
     .insert({
@@ -1977,6 +2013,8 @@ export async function submitCoachBoxingProfileAssessment(
       assessed_by: assessedBy,
       questionnaire_version: BOXING_QUESTIONNAIRE_VERSION,
       scoring_version: BOXING_SCORING_VERSION,
+      assessment_length: length,
+      wingspan_index_used: wingspanIndex,
       answers,
       dimension_scores: result.dimensionScores,
       profile_scores: result.profileScores,
@@ -1990,7 +2028,7 @@ export async function submitCoachBoxingProfileAssessment(
     ...mapAssessmentSummary(data),
     answers: data.answers,
     questionnaireVersion: data.questionnaire_version,
-    scoringVersion: data.scoring_version,
+    wingspanIndexUsed: data.wingspan_index_used,
     createdAt: data.created_at,
   };
 }
