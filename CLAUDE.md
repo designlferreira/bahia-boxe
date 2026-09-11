@@ -1626,6 +1626,57 @@ corretas porque `bookings` nunca erra (é aplicado a cada slot individualmente, 
   ninguém construiu pra testar, não é uma lacuna de verificação, é a mesma decisão de escopo já
   registrada.
 
+### Achados de uso pós-lançamento (2026-09-11) — três corrigidos, mediação em aberto
+
+Fora do escopo RECORRENCIA — achados testando o app já em uso real. Oito no total, três levas
+implementadas nesta rodada (as mais graves); os outros três (média entre as duas avaliações de
+Perfil de Boxe, teste curto vs. completo, arte compartilhável) ficaram de fora, a trazer depois.
+
+**LEVA 1 — Agenda não navegava pro passado.** Não era limite deliberado: `Agenda.tsx` gerava
+sempre "hoje + 6 dias" (`addDays(new Date(), i)`), sem estado de semana nem botão de retroceder —
+a query (`getAdminAgendaForDay`) sempre aceitou qualquer data. Consequência real, não só de UX:
+aula esquecida sem concluir nunca consome crédito, inflando o saldo do aluno em silêncio. Corrigido:
+`weekStart`/`selectedDate` navegáveis por blocos de 7 dias, sem limite; o banner "aguardando
+confirmação" do Dashboard passa a levar direto pra data da pendência mais ANTIGA (`awaitingConfirmation[0]`,
+já ordenada); dias da semana visível com pendência ganham um marcador visual, usando uma query nova
+(`getAwaitingConfirmationBookings` — mesma condição de `getAdminDashboard`, sem limite de dias
+atrás, custo baixo: é sempre um conjunto pequeno de exceções, não volume normal).
+
+**LEVA 2b — aluno não descobria a avaliação do professor.** Não era RLS nem query — as duas já
+permitiam o aluno ler a avaliação `'coach'` desde as migrations `0006`/`0007`. Era descoberta: o
+lado do professor mostra a comparação inline automaticamente quando as duas avaliações existem
+(`AlunoPerfilBoxe.tsx`); o lado do aluno escondia atrás de um botão secundário, e nada notificava.
+Corrigido: `PerfilLutador.tsx` (aluno) ganhou os mesmos 4 ramos que o professor já tinha —
+comparação **inline** quando as duas existem, sem clique — e `deriveNotifications` passou a avisar
+quando o professor avalia (`entity: "boxing_profile"`, rota `/app/perfil-lutador`).
+
+**Pergunta em aberto, ainda não decidida — mediação da comparação:** o usuário perguntou se a
+tela de comparação precisa de mais enquadramento antes do aluno ver a leitura do professor sem
+contexto, já que a autoavaliação e a avaliação técnica podem divergir bastante. **O que a tela já
+mostra hoje** (`BoxingProfileComparisonView.tsx`, existia antes desta rodada, não foi alterado pela
+correção de inline — só passou a aparecer sem precisar de clique): intro neutra ("duas leituras
+sobre o mesmo momento"), os dois perfis lado a lado com score, radar sobreposto, tabela das 8
+dimensões comparadas, uma frase de "concordam"/"divergem" já escrita sem hierarquia ("é normal, pode
+ser um bom tema pra conversar no treino" — nunca "seu professor está certo"), e um disclaimer final
+explícito ("nenhuma das duas leituras anula a outra: uma é autopercepção, a outra é observação
+técnica externa"). Avaliação registrada, não é decisão: a tela já evita ativamente o enquadramento
+"nota vs. correção" — o texto já foi escrito assim de propósito desde que essa tela existe. Ampliar
+a mediação (ex.: sugerir explicitamente "converse com seu professor sobre isso" de forma mais
+proeminente, ou avisar o aluno ANTES de abrir a comparação pela primeira vez) é possível, mas é
+acréscimo sobre uma base que já não é fria/numérica pura — não implementado, aguardando decisão.
+
+**LEVA 3 — questionário de Perfil de Boxe não retomava o índice.** `BoxingProfileQuestionnaire.tsx`
+restaurava `answers` do rascunho em `localStorage` corretamente, mas fazia `setIndex(0)`
+incondicional no mesmo efeito — nunca calculava a posição certa. Corrigido: retoma na primeira
+pergunta sem resposta (`questions.findIndex`), ou na última se tudo já estiver respondido (revisar/
+enviar). Confirmado que gaps no meio do rascunho não são possíveis pela UI atual (`goNext` só avança
+uma pergunta por vez, exige a atual respondida) — `findIndex` cobre esse caso também, se um dia
+deixar de ser verdade.
+
+Verificado: `tsc --noEmit` limpo, `vitest run` 39/39, `vite build` sem erro, nas três levas. **Não
+testado na aplicação real ainda** — nenhuma migration nova nesta rodada (mudança só de frontend),
+mas nenhum dos três foi confirmado em uso real.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
