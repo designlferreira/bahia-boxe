@@ -1946,54 +1946,27 @@ demonstrando o bug corrigido: com dimensões empatadas entre os 6 perfis, respos
 forçada favorecendo o mesmo perfil dos dois lados agora decidem o arquétipo combinado — sem elas,
 cai no desempate fixo), `vite build` sem erro. **Não testado na aplicação real ainda.**
 
-### Arte compartilhável do Perfil de Boxe (2026-09-14) — decisões de plano, nada implementado
+### Arte compartilhável do Perfil de Boxe — cancelada (2026-09-14)
 
-Retomando o achado "arte compartilhável" (citado como fora de escopo desde a rodada de "achados de
-uso"). Decisões antes do código:
+Cogitada em duas versões: primeiro 6 combinações (2 formatos — story/feed — × 3 conteúdos —
+arquétipo só / +radar / +3 pontos fortes), geração via SVG próprio rasterizado (Canvas 2D e
+`html2canvas` descartados nesse meio-tempo — o segundo especificamente por reimplementar CSS sem o
+motor do navegador, arriscado neste app porque o tema inteiro usa `hsl(var(--accent))`); depois um
+pivô pra um template único com foto realista fixa de atleta (nome, arquétipo e uma pontuação
+agregada nova sobrepostos por cima). O Story B (arquétipo + radar) chegou a ser implementado e
+revisado visualmente antes do pivô.
 
-- **Geração de imagem: SVG montado especificamente pra exportação, rasterizado via
-  `Image` + `canvas` + `toBlob`** — não Canvas 2D puro (mesmo custo/risco, mas SVG reaproveita a
-  matemática do radar já testada em `BoxingRadarChart.tsx`) e não `html2canvas`/`html-to-image`
-  (descartado: essas libs reimplementam CSS em JS sem o motor do navegador, e são conhecidas por
-  falhar em resolver variáveis CSS — que é exatamente como todo o tema deste app é construído,
-  `hsl(var(--accent))` etc. Não é risco teórico pra este projeto específico).
-- **RESTRIÇÃO, não preferência de implementação — nunca usar `<foreignObject>` no SVG de
-  exportação.** Suporte inconsistente ao rasterizar via `canvas.drawImage` em versões mais antigas
-  de iOS Safari. Todo texto do SVG de exportação usa `<text>`/`<tspan>` nativo, nunca HTML dentro do
-  SVG. Quem for mexer nisso depois precisa saber que essa restrição é sobre COMPATIBILIDADE (imagem
-  pode sair corrompida/em branco num aparelho real), não estilo de código — trocar por
-  `foreignObject` "porque é mais fácil de estilizar" quebra silenciosamente em produção, sem erro
-  visível em dev.
-- **Compartilhamento em 3 camadas:** (1) `navigator.canShare({ files })` verdadeiro → Web Share API
-  com o PNG gerado — cobre iOS Safari 15+ e Chrome Android; (2) sem suporte a arquivo → download
-  direto (`<a download>`, funciona bem no Android); (3) nem isso (iOS mais antigo, ou dentro de um
-  webview do Instagram/Facebook que restringe `navigator.share`) → mostrar a imagem em tela cheia
-  com "toque e segure pra salvar", já que o `download` do Safari iOS é inconsistente mas o
-  longpress-salvar numa `<img>` normal é nativo e confiável. **A camada 3 é construída com o mesmo
-  cuidado das outras duas, não como último recurso improvisado** — decisão explícita, porque pode
-  virar o caminho PRINCIPAL no iOS se a ressalva abaixo se confirmar.
-- **NÃO VERIFICADO — Web Share API dentro do PWA instalado (modo standalone) no iOS**: há um
-  histórico de suporte mais fraco a `navigator.share` em apps instalados na tela de início vs. Safari
-  aba-de-navegador comum, numa versão específica do iOS 16. Não testado neste ambiente. O usuário vai
-  testar no app instalado antes de confiar na camada 1 como caminho principal no iOS.
-- **Curta/rápida ganha selo discreto na arte: "VERSÃO CURTA"**, pequeno, num canto — mesmo nome que o
-  app já usa internamente (não um termo novo tipo "teste rápido"), para não sugerir que o
-  questionário inteiro é superficial. Nunca "PARCIAL"/"baixa precisão" — isso não se aplica aqui de
-  qualquer forma, porque a arte é sempre do individual (ver abaixo), e "parcial" é uma propriedade da
-  COMPARAÇÃO, não de uma autoavaliação sozinha.
-- **Só o resultado INDIVIDUAL do aluno é compartilhável — nunca o combinado.** A leitura do
-  professor é dado dele sobre um terceiro; compartilhar isso publicamente muda de mão quem está
-  exposto. Se um dia isso for pedido, é uma decisão própria, não uma extensão natural desta.
-- **Marca: a marca fixa do app** (`Bahia Boxe`, `public/favicon.svg`) — não existe campo de
-  academia configurável hoje (`AdminSettings` não tem isso, é um app de um tenant só). Não inventar
-  esse campo agora; se um dia houver mais de uma academia, isso volta como decisão própria.
-- **Entrada na interface:** botão "Compartilhar" dentro de `BoxingProfileResultView` (aparece tanto
-  em `PerfilLutadorResultado.tsx` quanto na landing do aluno quando só existe autoavaliação), abrindo
-  um modal Radix Dialog com formato, conteúdo e nome editável — um passo curto, não uma rota nova.
-- **Dado necessário: nenhum novo.** As 3 opções de conteúdo (arquétipo só; arquétipo + radar;
-  arquétipo + 3 pontos fortes) já são deriváveis de `BoxingProfileAssessmentSummary`
-  (`primaryProfile`, `profileScores`, `dimensionScores`, `topStrengths()` já existe em
-  `scoring.ts`) — feature 100% front-end, sem migration nem mudança em `api.ts`.
+**Cancelada, não pausada** — bloqueio real: o template com foto dependia de um arquivo PNG final que
+precisaria vir de fora (nenhuma ferramenta de geração de imagem fotorrealista disponível), e ao
+tentar fechar os detalhes desse template (cidade da unidade, fórmula da pontuação "92", critério das
+estrelas) apareceram inconsistências com o que já está estabelecido no app (nenhum conceito de
+"unidade"/cidade existe no schema; o app é de um tenant só, Salvador/Bahia) sem uma resposta clara o
+suficiente pra seguir. Se a ideia do card com foto voltar um dia, o bloqueio a resolver primeiro é
+esse arquivo-base, não o conceito em si.
+
+Nada disso chegou a ser commitado — toda a implementação (Story B incluso) foi revertida do working
+tree antes de qualquer commit, sem impacto em produção. Nenhuma migration foi criada em nenhum
+momento (a feature era 100% front-end desde o plano original).
 
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
