@@ -51,6 +51,63 @@ const HOURS = Array.from({ length: 24 }, (_, h) => h);
 const hhmm = (h: number) => String(h).padStart(2, "0") + ":00";
 const DURACAO_MINUTOS = 60;
 
+/** Agrupa por `diaSemana` (ordem do calendário, 0=domingo) e ordena por horário dentro de cada dia. */
+function groupByDiaSemana(items: AlunoRecorrencia[]): { diaSemana: number; items: AlunoRecorrencia[] }[] {
+  const groups: { diaSemana: number; items: AlunoRecorrencia[] }[] = [];
+  for (let dia = 0; dia < 7; dia++) {
+    const doDia = items.filter((r) => r.diaSemana === dia).sort((a, b) => a.horario.localeCompare(b.horario));
+    if (doDia.length > 0) groups.push({ diaSemana: dia, items: doDia });
+  }
+  return groups;
+}
+
+interface RecorrenciaDiaGroupProps {
+  grupo: { diaSemana: number; items: AlunoRecorrencia[] };
+  onToggle: (vars: { id: string; ativo: boolean }) => void;
+  onExcluir: (r: AlunoRecorrencia) => void;
+}
+
+/** Um dia da semana com todos os horários daquele dia embaixo — o cabeçalho evita repetir "Segunda" em cada linha. */
+function RecorrenciaDiaGroup({ grupo, onToggle, onExcluir }: RecorrenciaDiaGroupProps) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="text-[13px] font-semibold text-foreground/85">{WEEKDAY_LABELS[grupo.diaSemana]}</div>
+      <div className="flex flex-col gap-2">
+        {grupo.items.map((r) => (
+          <div key={r.id} className={cn("card-dark p-3.5 flex items-center gap-3", !r.ativo && "opacity-50")}>
+            <div className="flex-1">
+              <div className="text-[14.5px] font-semibold text-foreground">{r.horario}</div>
+              <div className="text-[12.5px] text-muted-foreground mt-0.5">{r.duracaoMinutos} min</div>
+              {r.temUso && (
+                <div className="text-[11px] text-muted-foreground mt-1">
+                  Já gerou aula ou pacote — desative em vez de excluir.
+                </div>
+              )}
+            </div>
+            <Switch
+              aria-label="Alternar recorrência"
+              checked={r.ativo}
+              onCheckedChange={(checked) => onToggle({ id: r.id, ativo: checked })}
+            />
+            <button
+              type="button"
+              aria-label="Excluir recorrência"
+              disabled={r.temUso}
+              onClick={() => onExcluir(r)}
+              className={cn(
+                "h-9 w-9 shrink-0 rounded-lg flex items-center justify-center transition-colors active:scale-95",
+                r.temUso ? "text-muted-foreground/30" : "text-destructive hover:bg-destructive/10",
+              )}
+            >
+              <Trash2 className="h-[18px] w-[18px]" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminAlunoRecorrencia() {
   const { studentId } = useParams<{ studentId: string }>();
   const { profile } = useAuth();
@@ -185,6 +242,10 @@ export default function AdminAlunoRecorrencia() {
   const { student, credits } = detailQuery.data;
   const recorrencias = recorrenciasQuery.data ?? [];
   const ativas = recorrencias.filter((r) => r.ativo);
+  // CLAUDE.md, "UX da lista de dias fixos" — ativos antes de inativos; dentro de cada grupo,
+  // por dia da semana (ordem do calendário, `diaSemana` 0=domingo) e depois por horário.
+  const ativasOrdenadas = groupByDiaSemana(recorrencias.filter((r) => r.ativo));
+  const inativasOrdenadas = groupByDiaSemana(recorrencias.filter((r) => !r.ativo));
   const activasCount = ativas.length;
   const saldo = saldoQuery.data ?? null;
   const cancelaveis = cancelaveisQuery.data ?? 0;
@@ -224,7 +285,7 @@ export default function AdminAlunoRecorrencia() {
         </Button>
       </div>
 
-      <div className="flex flex-col gap-2.5 mb-5">
+      <div className="flex flex-col gap-4 mb-5">
         {recorrencias.length === 0 && (
           <div className="border border-dashed border-[#2E2E2E] rounded-[13px] p-4 text-center">
             <div className="text-[12.5px] text-muted-foreground">
@@ -232,38 +293,29 @@ export default function AdminAlunoRecorrencia() {
             </div>
           </div>
         )}
-        {recorrencias.map((r) => (
-          <div key={r.id} className={cn("card-dark p-3.5 flex items-center gap-3", !r.ativo && "opacity-50")}>
-            <div className="flex-1">
-              <div className="text-[14.5px] font-semibold text-foreground">{WEEKDAY_LABELS[r.diaSemana]}</div>
-              <div className="text-[12.5px] text-muted-foreground mt-0.5">
-                {r.horario} · {r.duracaoMinutos} min
-              </div>
-              {r.temUso && (
-                <div className="text-[11px] text-muted-foreground mt-1">
-                  Já gerou aula ou pacote — desative em vez de excluir.
-                </div>
-              )}
-            </div>
-            <Switch
-              aria-label="Alternar recorrência"
-              checked={r.ativo}
-              onCheckedChange={(checked) => toggleAtivo.mutate({ id: r.id, ativo: checked })}
-            />
-            <button
-              type="button"
-              aria-label="Excluir recorrência"
-              disabled={r.temUso}
-              onClick={() => setExcluirAlvo(r)}
-              className={cn(
-                "h-9 w-9 shrink-0 rounded-lg flex items-center justify-center transition-colors active:scale-95",
-                r.temUso ? "text-muted-foreground/30" : "text-destructive hover:bg-destructive/10",
-              )}
-            >
-              <Trash2 className="h-[18px] w-[18px]" />
-            </button>
+
+        {ativasOrdenadas.length > 0 && (
+          <div className="flex flex-col gap-3">
+            {/* Só rotula "Ativos" quando há inativos pra distinguir — com uma lista só, o rótulo é ruído. */}
+            {inativasOrdenadas.length > 0 && (
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Ativos</div>
+            )}
+            {ativasOrdenadas.map((grupo) => (
+              <RecorrenciaDiaGroup key={grupo.diaSemana} grupo={grupo} onToggle={toggleAtivo.mutate} onExcluir={setExcluirAlvo} />
+            ))}
           </div>
-        ))}
+        )}
+
+        {inativasOrdenadas.length > 0 && (
+          <div className="flex flex-col gap-3">
+            {ativasOrdenadas.length > 0 && (
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Inativos</div>
+            )}
+            {inativasOrdenadas.map((grupo) => (
+              <RecorrenciaDiaGroup key={grupo.diaSemana} grupo={grupo} onToggle={toggleAtivo.mutate} onExcluir={setExcluirAlvo} />
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="card-dark p-4">
