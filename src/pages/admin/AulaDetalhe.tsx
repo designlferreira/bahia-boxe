@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { History, Repeat } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { ErrorState } from "@/components/ErrorState";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +18,7 @@ export default function AdminAulaDetalhe() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [confirmUndo, setConfirmUndo] = useState(false);
 
   const { data: detail, isLoading, isError, refetch } = useQuery({
     queryKey: ["admin-booking", id],
@@ -152,6 +155,41 @@ export default function AdminAulaDetalhe() {
           )}
         </div>
       )}
+
+      {/* CLAUDE.md, "Desfazer só existe por 9 segundos" — a RPC undo_lesson_action não tem janela
+          de tempo (continua válida enquanto a transição em si for válida), mas até aqui o único
+          ponto de entrada era a ação do toast logo após concluir/registrar falta. Caminho
+          permanente: disponível sempre que o status ainda for completed/no_show, não só nos
+          primeiros 9 segundos. */}
+      {(booking.status === "completed" || booking.status === "no_show") && (
+        <Button
+          variant="secondary"
+          size="lg"
+          className="w-full"
+          disabled={actions.isBusy(booking.id)}
+          onClick={() => setConfirmUndo(true)}
+        >
+          Desfazer {booking.status === "completed" ? "conclusão" : "falta"}
+        </Button>
+      )}
+
+      <ConfirmDialog
+        open={confirmUndo}
+        onOpenChange={setConfirmUndo}
+        title="DESFAZER?"
+        description={
+          booking.status === "completed"
+            ? "A aula volta a ficar aguardando confirmação, desfazendo a conclusão registrada. O saldo do aluno se ajusta de acordo."
+            : "A aula volta a ficar aguardando confirmação, desfazendo a falta registrada. O saldo do aluno se ajusta de acordo."
+        }
+        confirmLabel="Desfazer"
+        cancelLabel="Cancelar"
+        tone="default"
+        onConfirm={() => {
+          actions.undo(booking.id);
+          setConfirmUndo(false);
+        }}
+      />
 
       {actions.dialogs}
     </div>
