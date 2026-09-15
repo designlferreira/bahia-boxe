@@ -1405,9 +1405,44 @@ Decidir antes de chegar na etapa correspondente:
   resolvê-lo. **Confirmado: isso também fecha "`pending_confirmation` não
   bloqueia slot" (Overbooking entre RECORRENCIA e AUTOSSERVICO, ponto 2) de
   graça — a nova checagem olha `status in ('scheduled', 'pending_confirmation')`
-  nos dois lados, não só `scheduled`.** Plano de implementação (migrations,
-  RPC, backfill de dados existentes, salvaguarda de concorrência) a trazer
-  antes de codar — mudança ampla, toca fluxo em produção.
+  nos dois lados, não só `scheduled`.**
+
+  **Achado ao desenhar o plano, mais grave que o pedido original:** a guarda
+  de `schedule_booking` contra double-booking (`exists (b.slot_id = p_slot_id
+  and status = 'scheduled')`) NUNCA protegeu contra colisão com RECORRENCIA —
+  `bookings.slot_id` só é escrito por essa mesma função (confirmado por grep
+  em todas as migrations); uma aula de recorrência nunca tem `slot_id`. A
+  única coisa que hoje impede um aluno de AUTOSSERVICO agendar em cima de uma
+  aula de RECORRENCIA é a tela "Agendar" não oferecer o horário (via a view
+  `available_slots`) — barreira de cliente, não de banco. **Decidido: corrigir
+  junto, não é escopo extra** — proposta: **exclusion constraint** em
+  `bookings` (`EXCLUDE USING gist (admin_id WITH =, tsrange(start_time,
+  end_time) WITH &&) WHERE (status in ('scheduled','pending_confirmation'))`,
+  precisa de `btree_gist`) — mesmo padrão que `packages_one_trial_per_student`/
+  `ux_packages_one_active_purchase_per_student` já usam pra outros
+  invariantes, só que agora no nível de banco, não de tela.
+
+  **Diagnósticos SOMENTE LEITURA escritos, aguardando o usuário rodar** (nada
+  executado ainda):
+  - `supabase/diagnostico_concorrencia_bookings.sql` — quantos pares de
+    bookings do mesmo professor já se sobrepõem hoje (bloquearia a exclusion
+    constraint de ser criada).
+  - `supabase/diagnostico_backfill_is_active.sql` — quantas linhas
+    `is_active = false`, de quantos professores, quantas têm um booking ligado
+    por `slot_id` (evidência forte de "queimado por aula AUTOSSERVICO") vs.
+    sem vínculo (ambíguo — pode ser recorrência por coincidência de horário,
+    ou desativação de propósito), e a idade de cada uma pelo `start_time` do
+    slot (futuro / <7d / 7-30d / 30-90d / 90d+).
+
+  **Alternativa ao backfill automático, a considerar depois de ver os
+  números:** não reabrir nada sozinho — em vez disso, mostrar ao professor,
+  na tela de disponibilidade, quais horários estão despublicados, com um
+  botão de reativar. Devolve a decisão pra quem sabe a resposta (queimado ou
+  proposital) em vez de o código adivinhar.
+
+  Ordem combinada: diagnósticos → decisões (à vista dos números) → migration.
+  Plano de implementação completo (migration, RPC, o que fazer com o backfill)
+  a trazer depois que os dois diagnósticos rodarem.
 - **Trial que nunca expira, revisitado e mantido em aberto (2026-09-15).**
   Reabrimos a "consequência aceita conscientemente" registrada acima (Etapa 1)
   — continua sem solução, de propósito. `grant_trial_credit` dispara `after
