@@ -31,7 +31,7 @@ export default function StudentPerfilLutadorHistorico() {
   // também traz avaliações 'coach' (o professor pode ler as do próprio aluno, migration 0007), que
   // não pertencem a essa linha do tempo. Comparar a nota do aluno hoje com a leitura de outra
   // pessoa no passado não seria "evolução", seria misturar dois avaliadores diferentes — essa
-  // comparação tem tela própria (`/app/perfil-lutador/comparacao`).
+  // comparação é a tela de "Perfil de Boxe" (`PerfilLutador.tsx`), inline, quando as duas existem.
   const history = rawHistory?.filter((a) => a.assessmentType === "self");
 
   // "Evolução por dimensão" só usa avaliações completas: a curta tem 1 pergunta por dimensão em

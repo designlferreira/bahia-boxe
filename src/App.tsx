@@ -25,7 +25,6 @@ import StudentPerfilLutador from "@/pages/student/PerfilLutador";
 import StudentPerfilLutadorQuestionario from "@/pages/student/PerfilLutadorQuestionario";
 import StudentPerfilLutadorResultado from "@/pages/student/PerfilLutadorResultado";
 import StudentPerfilLutadorHistorico from "@/pages/student/PerfilLutadorHistorico";
-import StudentPerfilLutadorComparacao from "@/pages/student/PerfilLutadorComparacao";
 
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminAgenda from "@/pages/admin/Agenda";
@@ -80,7 +79,6 @@ function AppRoutes() {
           <Route path="/app/perfil-lutador/questionario" element={<StudentPerfilLutadorQuestionario />} />
           <Route path="/app/perfil-lutador/resultado/:id" element={<StudentPerfilLutadorResultado />} />
           <Route path="/app/perfil-lutador/historico" element={<StudentPerfilLutadorHistorico />} />
-          <Route path="/app/perfil-lutador/comparacao" element={<StudentPerfilLutadorComparacao />} />
           <Route path="/app/minha-conta/alterar-senha" element={<AlterarSenha backTo="/app/minha-conta" />} />
           <Route path="/app/minhas-aulas" element={<Navigate to="/app/historico" replace />} />
         </Route>
