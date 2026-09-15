@@ -21,6 +21,26 @@ import { CalendarSearch } from "lucide-react";
 
 const DAY_COUNT = 7;
 
+/**
+ * `schedule_booking` (RPC) levanta códigos em snake_case, não texto — nenhuma tela nunca traduzia
+ * isso pro aluno (a mutation não tinha `onError` nenhum, então toda falha era silenciosa). Mapa
+ * completo porque adicionar o primeiro tratamento só para o código novo (`slot_already_booked`,
+ * agora também coberto pela exclusion constraint) e deixar os outros sete mudos ao lado dele seria
+ * inconsistente.
+ */
+const SCHEDULE_BOOKING_ERRORS: Record<string, string> = {
+  slot_not_available: "Esse horário não está mais disponível.",
+  slot_not_for_student: "Esse horário não é do seu professor.",
+  slot_already_booked: "Esse horário acabou de ser ocupado. Escolha outro.",
+  no_active_package_or_no_credits: "Você não tem créditos disponíveis no momento.",
+  no_credits_left_for_future_bookings: "Seus créditos já estão todos reservados em outras aulas.",
+};
+
+function scheduleBookingErrorMessage(err: unknown) {
+  const code = err instanceof Error ? err.message : "";
+  return SCHEDULE_BOOKING_ERRORS[code] ?? "Não foi possível agendar essa aula.";
+}
+
 export default function StudentAgendar() {
   const { profile } = useAuth();
   const navigate = useNavigate();
@@ -76,6 +96,10 @@ export default function StudentAgendar() {
       queryClient.invalidateQueries({ queryKey: ["student-history"] });
       navigate("/app/home");
       toast.success("Aula agendada!");
+    },
+    onError: (err) => {
+      toast.error(scheduleBookingErrorMessage(err));
+      queryClient.invalidateQueries({ queryKey: ["available-slots"] });
     },
   });
 
