@@ -1388,20 +1388,25 @@ Decidir antes de chegar na etapa correspondente:
   republicaria horas que o professor tirou de propósito. O conserto de
   verdade separa os dois conceitos (coluna própria para "ocupado", ou derivar
   ocupação dos `bookings` em vez do flag) — decidir antes de mexer.
-- **Desfazer só existe por 9 segundos** (achado em teste, 2026-09-08, não
-  implementado — pré-existente, não é da Etapa 6). O ÚNICO ponto de entrada
-  de `undo_lesson_action` na aplicação é a ação "Desfazer" do toast de
-  sucesso de concluir/falta, com `UNDO_TOAST_MS = 9000`
-  (`useLessonActions.tsx`). Professor que fecha o toast, troca de tela ou
-  simplesmente demora perde o desfazer **para sempre** — mesmo com a RPC
-  continuando a aceitar (ela não tem janela de tempo: "continua válido
-  enquanto a transição em si for válida", comentário da 0001). Frágil para
-  uma ação que corrige erro de registro. Falta um caminho permanente (ex.:
-  botão "Desfazer" na tela de detalhe quando o status é `completed`/`no_show`).
-- ~~**UX da lista de dias fixos**~~ — RESOLVIDO PARCIALMENTE (2026-09-09, ver seção "Excluir dia
-  fixo de recorrência" abaixo): agora dá pra excluir de verdade uma recorrência nunca usada, não só
-  desativar. O agrupamento/ordenação (ativos primeiro etc.) continua sem implementar — fora do
-  escopo da correção, registrado como sub-pendência ainda aberta.
+- ~~**Desfazer só existe por 9 segundos**~~ — RESOLVIDO (2026-09-15). `admin/AulaDetalhe.tsx` ganhou
+  um botão "Desfazer conclusão"/"Desfazer falta" (com `ConfirmDialog`, mesmo padrão das outras ações
+  da tela), visível sempre que `booking.status` for `completed`/`no_show` — sem janela de tempo,
+  igual à RPC. O toast continua existindo do mesmo jeito (ação imediata, sem confirmação — faz
+  sentido logo após a própria ação); o botão é o caminho permanente pra quando o professor fecha o
+  toast, troca de tela ou só percebe o erro depois.
+- ~~**UX da lista de dias fixos**~~ — RESOLVIDO POR COMPLETO (2026-09-15, `AlunoRecorrencia.tsx`).
+  Faltava o agrupamento/ordenação desde a correção parcial de 2026-09-09 (que só tinha resolvido a
+  exclusão). Agora: ativos antes de inativos (duas seções, só rotuladas quando as duas existem —
+  com uma lista só, o rótulo é ruído); dentro de cada uma, agrupado por dia da semana (ordem do
+  calendário) com um cabeçalho por dia em vez de repetir o nome do dia em cada linha; dentro do dia,
+  ordenado por horário.
+- ~~**Rota órfã `/app/perfil-lutador/comparacao`**~~ — REMOVIDA (2026-09-15). Sem nenhuma entrada na
+  interface desde que a comparação virou inline no histórico/perfil (achados de uso, 2026-09-11) —
+  só acessível digitando a URL direto. Decisão: remover, não dar um caminho visível novo. Argumento:
+  o conteúdo é 100% redundante com o que já aparece em `PerfilLutador.tsx` quando as duas avaliações
+  existem (mesmo `BoxingProfileComparisonView`, mesmos dados) — manter a rota separada só duplicaria
+  pra sempre a lógica de loading/erro/skeleton das duas telas, por zero valor novo pro usuário.
+  `PerfilLutadorComparacao.tsx` apagado, rota e import removidos de `App.tsx`.
 
 ### Limpeza de dados de teste antes de produção — diagnóstico rodado, decisões tomadas (2026-09-09)
 
