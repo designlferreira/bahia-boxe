@@ -1483,12 +1483,61 @@ Decidir antes de chegar na etapa correspondente:
   correto; reabri-las republicaria em massa horários que o professor tirou de
   propósito.
 
-  Ordem combinada: diagnósticos → decisões (à vista dos números) → migration.
-  Plano de implementação completo (migration com `schedule_booking` corrigido,
-  view `available_slots` corrigida, os dois consumidores em `api.ts`, e a
-  exclusion constraint) a trazer depois de confirmar que o diagnóstico de
-  concorrência (`supabase/diagnostico_concorrencia_bookings.sql`) rodou
-  corretamente.
+  **Diagnóstico de concorrência RODADO e limpo (2026-09-15): 0 pares
+  sobrepostos, 0 professores afetados** (a primeira leitura do usuário tinha
+  sido a aba errada do SQL Editor — o arquivo sempre esteve correto). A
+  exclusion constraint pôde ser criada sem violar nenhuma linha existente.
+
+  **IMPLEMENTADO (2026-09-15), cinco migrations, uma por etapa:**
+  - `0025` — `schedule_booking`: sai o `update ... is_active = false`; a
+    guarda contra double-booking troca `slot_id` (que RECORRENCIA nunca
+    preenche) por sobreposição de intervalo contra qualquer booking ativo do
+    professor, nos dois status. Insert protegido por bloco aninhado com
+    `exception when exclusion_violation` (dormente até a `0028`). Achado ao
+    mexer aqui: a mutation de agendar no app (`Agendar.tsx`) nunca teve
+    `onError` — toda falha de `schedule_booking`, sempre, era silenciosa; e os
+    códigos que a função levanta (`slot_already_booked` etc.) nunca tinham
+    tradução para português. Os dois corrigidos juntos, no mesmo commit —
+    senão a mensagem legível da constraint não chegaria a lugar nenhum.
+  - `0026` — view `available_slots`: igualdade exata de horário e só
+    `scheduled` viram sobreposição de intervalo e os dois status. Mesmas
+    colunas, mesmo único consumidor (`getAvailableSlotsForDay`); não passou a
+    filtrar `is_active` — isso nunca foi decidido, então não mudou.
+  - `0027` — `gerar_pacote_recorrencia` e `reagendar_aula` ganham o mesmo
+    bloco aninhado com `exclusion_violation` (resposta à pergunta (b) do
+    usuário: sem isso, a rejeição da constraint apareceria como erro cru de
+    Postgres nesses dois lugares). De caminho: `reagendar_aula` tinha a MESMA
+    lacuna que `schedule_booking` tinha antes da `0025` — sua checagem de
+    sobreposição só olhava `status = 'scheduled'`, nunca
+    `pending_confirmation`. Corrigida junto, mesma lacuna, não escopo extra.
+  - `0028` — a exclusion constraint em si
+    (`bookings_sem_sobreposicao_por_professor`, `EXCLUDE USING gist`,
+    `tstzrange(start_time, end_time, '[)')`, `btree_gist` novo nesta base).
+    **Decisão sobre ordem (pergunta (a) do usuário): vem POR ÚLTIMO, de
+    propósito.** As três migrations anteriores já sabem traduzir
+    `exclusion_violation` em mensagem legível ANTES desta existir — nesta
+    ordem, a constraint nunca chega a mostrar erro cru pra ninguém, nem por
+    um instante. A ordem inversa (constraint primeiro) protegeria a mesma
+    coisa alguns minutos mais cedo, mas abriria uma janela real em que uma
+    colisão rejeitada apareceria como texto cru do Postgres — o resultado
+    "confuso" que a pergunta (a) queria evitar.
+  - `0029` — `UPDATE` pontual por id, reabre só o slot do grupo C
+    (`751d725f-a307-4023-b800-26d7b75892fa`). As 338 do grupo D não são
+    tocadas.
+
+  **Achado ao revisar `getAvailability`/`getAdminAgendaForDay` (item 3 do
+  pedido original do usuário): NENHUMA das duas precisou de mudança.**
+  Confirmado por grep em todas as migrations: `schedule_booking` (`0001:424`)
+  sempre foi o ÚNICO lugar em todo o banco que escrevia `is_active = false`
+  por causa de uma reserva — nenhuma das duas funções lê `is_active` como
+  sinal de ocupação; as duas já derivavam "ocupado" direto de `bookings`
+  (contagem por hora / busca por hora exata), só que por outro motivo
+  (`bookedCount`, timeline). Bastou a `0025` parar de escrever `is_active`
+  errado para a leitura ficar automaticamente correta nos dois — inclusive
+  corrige de brinde um bug lateral do `getAvailability`: hoje, reservar UM
+  horário dentro de um dia com vários horários publicados fazia aquele
+  horário sumir do editor de disponibilidade do professor (parecia
+  despublicado), porque `is_active = false` o tirava do filtro `relevant`.
 - **Trial que nunca expira, revisitado e mantido em aberto (2026-09-15).**
   Reabrimos a "consequência aceita conscientemente" registrada acima (Etapa 1)
   — continua sem solução, de propósito. `grant_trial_credit` dispara `after
