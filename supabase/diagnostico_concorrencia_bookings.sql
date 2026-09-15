@@ -15,7 +15,7 @@
 --   AMOSTRA — até 50 pares concretos (ids, horários, status) pra inspecionar de perto. Se o
 --     RESUMO der zero, a AMOSTRA sai vazia — não é erro, é a constraint já podendo ser criada.
 
-with overlaps as (
+with sobreposicoes as (
   select
     b1.admin_id,
     b1.id as booking_1,
@@ -40,8 +40,8 @@ with overlaps as (
 
 select 0 as ord, 0 as sub, 'RESUMO' as secao,
   format('pares sobrepostos: %s | professores distintos afetados: %s',
-    (select count(*) from overlaps),
-    (select count(distinct admin_id) from overlaps)
+    (select count(*) from sobreposicoes),
+    (select count(distinct admin_id) from sobreposicoes)
   ) as linha
 
 union all
@@ -52,6 +52,6 @@ select 1, row_number() over (order by admin_id, start_1), 'AMOSTRA (até 50 pare
     booking_1, start_1, end_1, status_1, coalesce(slot_id_1::text, 'null'),
     booking_2, start_2, end_2, status_2, coalesce(slot_id_2::text, 'null')
   )
-from (select * from overlaps order by admin_id, start_1 limit 50) sample_overlaps
+from (select * from sobreposicoes order by admin_id, start_1 limit 50) amostra_sobreposicoes
 
 order by ord, sub;

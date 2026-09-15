@@ -1422,27 +1422,43 @@ Decidir antes de chegar na etapa correspondente:
   `ux_packages_one_active_purchase_per_student` já usam pra outros
   invariantes, só que agora no nível de banco, não de tela.
 
-  **Diagnósticos SOMENTE LEITURA escritos, aguardando o usuário rodar** (nada
-  executado ainda):
-  - `supabase/diagnostico_concorrencia_bookings.sql` — quantos pares de
-    bookings do mesmo professor já se sobrepõem hoje (bloquearia a exclusion
-    constraint de ser criada).
-  - `supabase/diagnostico_backfill_is_active.sql` — quantas linhas
-    `is_active = false`, de quantos professores, quantas têm um booking ligado
-    por `slot_id` (evidência forte de "queimado por aula AUTOSSERVICO") vs.
-    sem vínculo (ambíguo — pode ser recorrência por coincidência de horário,
-    ou desativação de propósito), e a idade de cada uma pelo `start_time` do
-    slot (futuro / <7d / 7-30d / 30-90d / 90d+).
+  **Diagnóstico de backfill RODADO (2026-09-15) — resultado derruba a premissa
+  do backfill automático.** 355 linhas `is_active = false`, 1 professor. Só 9
+  (menos de 3%) têm `slot_id` vinculado (evidência direta de queima por
+  AUTOSSERVICO). Das 346 restantes, 274 são de horários FUTUROS — e nenhuma
+  tem `slot_id`, ou seja, não foram queimadas por aula de autosserviço (se
+  fossem, teriam o vínculo). São desativação deliberada do professor, ou
+  queima por RECORRENCIA (que nunca preenche `slot_id`). **Backfill automático
+  descartado**: reabriria 346 linhas ambíguas pra corrigir 9 casos
+  comprovados — republicaria em massa horários que o professor provavelmente
+  tirou de propósito.
 
-  **Alternativa ao backfill automático, a considerar depois de ver os
-  números:** não reabrir nada sozinho — em vez disso, mostrar ao professor,
-  na tela de disponibilidade, quais horários estão despublicados, com um
-  botão de reativar. Devolve a decisão pra quem sabe a resposta (queimado ou
-  proposital) em vez de o código adivinhar.
+  **DECIDIDO: sem backfill automático.** Caminho escolhido — a tela de
+  disponibilidade passa a mostrar ao professor quais horários estão
+  despublicados, com um botão de reativar. Ele sabe quais tirou de propósito;
+  o código não tem como saber.
+
+  **Terceiro diagnóstico, pra separar as 346 ambíguas antes de desenhar essa
+  tela** (`supabase/diagnostico_ambiguas_is_active.sql`, rodado/aguardando
+  resultado): cruza cada linha ambígua com bookings SOBREPOSTOS por intervalo
+  (não por `slot_id`), em qualquer status, incluindo `cancelled`/`rescheduled`.
+  Achado ao escrever este diagnóstico, além do pedido original: "existe
+  booking sobrepondo" sozinho não separa direito — um booking sobreposto pode
+  estar ATIVO agora (`scheduled`/`pending_confirmation`), e nesse caso o
+  horário está genuinamente ocupado NESTE MOMENTO — `is_active = false` está
+  CORRETO, não é vazamento, e oferecer "reativar" nesse caso seria perigoso
+  (sugeriria liberar um horário que uma recorrência está usando agora). Por
+  isso o corte final é em 4 grupos, não 2: (A) `slot_id` vinculado — os 9
+  já conhecidos; (B) sem `slot_id`, mas ocupado AGORA por booking ativo —
+  correto, não mostrar como reativável; (C) sem `slot_id`, já foi ocupado mas
+  o booking não está mais ativo — candidato real a vazamento; (D) nunca teve
+  nenhum booking ali — candidato a desativação deliberada. Só (C) e (D)
+  deveriam aparecer na tela nova; (B) precisa continuar escondido/bloqueado
+  exatamente como um slot ocupado de verdade.
 
   Ordem combinada: diagnósticos → decisões (à vista dos números) → migration.
-  Plano de implementação completo (migration, RPC, o que fazer com o backfill)
-  a trazer depois que os dois diagnósticos rodarem.
+  Plano de implementação completo (migration da exclusion constraint, RPC, e
+  o desenho da tela de reativação) a trazer depois do terceiro diagnóstico.
 - **Trial que nunca expira, revisitado e mantido em aberto (2026-09-15).**
   Reabrimos a "consequência aceita conscientemente" registrada acima (Etapa 1)
   — continua sem solução, de propósito. `grant_trial_credit` dispara `after
