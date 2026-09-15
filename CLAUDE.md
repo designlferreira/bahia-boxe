@@ -1439,9 +1439,9 @@ Decidir antes de chegar na etapa correspondente:
   o código não tem como saber.
 
   **Terceiro diagnóstico, pra separar as 346 ambíguas antes de desenhar essa
-  tela** (`supabase/diagnostico_ambiguas_is_active.sql`, rodado/aguardando
-  resultado): cruza cada linha ambígua com bookings SOBREPOSTOS por intervalo
-  (não por `slot_id`), em qualquer status, incluindo `cancelled`/`rescheduled`.
+  tela** (`supabase/diagnostico_ambiguas_is_active.sql`, RODADO 2026-09-15):
+  cruza cada linha ambígua com bookings SOBREPOSTOS por intervalo (não por
+  `slot_id`), em qualquer status, incluindo `cancelled`/`rescheduled`.
   Achado ao escrever este diagnóstico, além do pedido original: "existe
   booking sobrepondo" sozinho não separa direito — um booking sobreposto pode
   estar ATIVO agora (`scheduled`/`pending_confirmation`), e nesse caso o
@@ -1452,13 +1452,43 @@ Decidir antes de chegar na etapa correspondente:
   já conhecidos; (B) sem `slot_id`, mas ocupado AGORA por booking ativo —
   correto, não mostrar como reativável; (C) sem `slot_id`, já foi ocupado mas
   o booking não está mais ativo — candidato real a vazamento; (D) nunca teve
-  nenhum booking ali — candidato a desativação deliberada. Só (C) e (D)
-  deveriam aparecer na tela nova; (B) precisa continuar escondido/bloqueado
-  exatamente como um slot ocupado de verdade.
+  nenhum booking ali — candidato a desativação deliberada.
+
+  **Resultado: A=9, B=7, C=1, D=338.** A hipótese que motivou toda a
+  investigação — vazamento causado por RECORRENCIA ocupando um horário e
+  nunca reabrindo — tem UMA linha comprovada (grupo C, slot
+  `751d725f-a307-4023-b800-26d7b75892fa`). As outras 338 (95% do total de 355)
+  nunca tiveram nenhum booking sobrepondo aquele horário, em nenhum status:
+  são desativação deliberada do professor, não dano do bug.
+
+  **DECIDIDO (2026-09-15): tela de reativação sai de escopo.** Construir uma
+  superfície nova (UI + fluxo de "reativar horário despublicado") para
+  resolver um único caso comprovado não se paga. Registrado aqui com os
+  números acima para que ninguém reabra essa ideia sem ver primeiro que o
+  vazamento real é de 1 linha em 355, não de centenas.
+
+  **A Opção B (derivar ocupação de `bookings`, nunca mais escrever sobre
+  ocupação) continua — mas o motivo mudou.** Não é mais reparar dano
+  acumulado (não há dano acumulado relevante a reparar — ver números acima);
+  é impedir que o problema cresça. O bug está contido hoje porque o volume de
+  uso ainda é pequeno (1 vazamento real); com mais alunos e mais
+  cancelamentos, a proporção muda — e corrigir a mecânica agora, antes do
+  volume crescer, é barato, depois não é.
+
+  **A única linha do grupo C será corrigida à mão** (UPDATE pontual por id em
+  `751d725f-a307-4023-b800-26d7b75892fa`, a entregar quando a migration da
+  Opção B estiver pronta) — não por script de backfill.
+
+  **Nenhum backfill nas 338 do grupo D.** Ficam como estão — esse é o estado
+  correto; reabri-las republicaria em massa horários que o professor tirou de
+  propósito.
 
   Ordem combinada: diagnósticos → decisões (à vista dos números) → migration.
-  Plano de implementação completo (migration da exclusion constraint, RPC, e
-  o desenho da tela de reativação) a trazer depois do terceiro diagnóstico.
+  Plano de implementação completo (migration com `schedule_booking` corrigido,
+  view `available_slots` corrigida, os dois consumidores em `api.ts`, e a
+  exclusion constraint) a trazer depois de confirmar que o diagnóstico de
+  concorrência (`supabase/diagnostico_concorrencia_bookings.sql`) rodou
+  corretamente.
 - **Trial que nunca expira, revisitado e mantido em aberto (2026-09-15).**
   Reabrimos a "consequência aceita conscientemente" registrada acima (Etapa 1)
   — continua sem solução, de propósito. `grant_trial_credit` dispara `after
