@@ -1385,9 +1385,51 @@ Decidir antes de chegar na etapa correspondente:
   está ocupada por uma aula" — e o código não consegue distinguir (o próprio
   comentário do `relevant` depende dessa ambiguidade para manter escondido um
   intervalo removido de propósito). Um `set is_active = true` no cancelamento
-  republicaria horas que o professor tirou de propósito. O conserto de
-  verdade separa os dois conceitos (coluna própria para "ocupado", ou derivar
-  ocupação dos `bookings` em vez do flag) — decidir antes de mexer.
+  republicaria horas que o professor tirou de propósito.
+
+  **DECIDIDO (2026-09-15): Opção B — derivar ocupação de `bookings`, nunca mais
+  escrever nada sobre ocupação.** `is_active` volta a significar só "publicado".
+  Argumento decisivo: elimina a CLASSE do bug (não sobra flag pra alguém
+  esquecer de limpar) em vez de mover o risco pra uma coluna nova — e o
+  histórico deste projeto já mostra que "lembrar de limpar em todo caminho de
+  cancelamento futuro" é exatamente o que não acontece. Peso extra: 3 dos 4
+  pontos que leem esse sinal (`getAvailability`, `getAdminAgendaForDay`, e a
+  própria RPC via a checagem nova) já buscam `bookings` em paralelo por outro
+  motivo — não é consulta nova.
+
+  **Condição não-negociável, faz parte da mesma mudança, não é dívida
+  separada:** a comparação de sobreposição vira por INTERVALO real
+  (`existente.start < candidato.end AND existente.end > candidato.start`),
+  não por igualdade exata de horário — adotar a igualdade exata (o que a view
+  `available_slots` já faz hoje) em mais lugares ampliaria esse bug em vez de
+  resolvê-lo. **Confirmado: isso também fecha "`pending_confirmation` não
+  bloqueia slot" (Overbooking entre RECORRENCIA e AUTOSSERVICO, ponto 2) de
+  graça — a nova checagem olha `status in ('scheduled', 'pending_confirmation')`
+  nos dois lados, não só `scheduled`.** Plano de implementação (migrations,
+  RPC, backfill de dados existentes, salvaguarda de concorrência) a trazer
+  antes de codar — mudança ampla, toca fluxo em produção.
+- **Trial que nunca expira, revisitado e mantido em aberto (2026-09-15).**
+  Reabrimos a "consequência aceita conscientemente" registrada acima (Etapa 1)
+  — continua sem solução, de propósito. `grant_trial_credit` dispara `after
+  insert on students` (`0001:750-773`), antes de qualquer `aluno_recorrencia`
+  poder existir — então "não conceder trial a aluno em recorrência" não é
+  implementável ali; a versão que corresponderia ao mecanismo seria revogar o
+  trial no momento em que a recorrência é configurada, não negar a concessão
+  na origem. Das três opções levantadas (expirar por data / não conceder /
+  consumir o trial antes do pacote de recorrência), a terceira foi descartada
+  — desfaz de propósito a correção da Etapa 1 que fez `pacote_id` ser fonte
+  direta pro débito de recorrência. Sobra expirar por data, que depende de
+  duas respostas de negócio ainda em aberto, sem data pra decidir:
+  1. **A partir de quando conta a expiração** — cadastro do aluno, ou primeira
+     aula/uso?
+  2. **O que acontece com o crédito não utilizado ao expirar** — some do saldo
+     sem rastro, ou vira uma entrada explícita no ledger explicando o sumiço?
+
+  Sem cron/scheduler neste projeto, qualquer expiração só pode ser aplicada
+  NA LEITURA (`available_credits_for_student` excluindo trial vencido), nunca
+  como transição de status ativa. **Não implementar até essas duas perguntas
+  serem respondidas — o crédito parado não degrada nada sozinho, só infla um
+  número que ninguém usa pra decidir.**
 - ~~**Desfazer só existe por 9 segundos**~~ — RESOLVIDO (2026-09-15). `admin/AulaDetalhe.tsx` ganhou
   um botão "Desfazer conclusão"/"Desfazer falta" (com `ConfirmDialog`, mesmo padrão das outras ações
   da tela), visível sempre que `booking.status` for `completed`/`no_show` — sem janela de tempo,
