@@ -1360,8 +1360,9 @@ Decidir antes de chegar na etapa correspondente:
   gerado sempre lê o conjunto ATUAL de linhas `ativo = true` no momento da
   geração (nunca retroage sobre pacotes/aulas já materializados).
 - **`availability_slots.is_active` nunca volta a `true` — vazamento silencioso
-  da grade** (dívida PRÉ-EXISTENTE, sem relação com RECORRENCIA, registrada
-  em 2026-09-08, **não corrigir agora**). `schedule_booking` marca o slot como
+  da grade — RESOLVIDO (2026-09-16), testado na aplicação real.** (dívida
+  PRÉ-EXISTENTE, sem relação com RECORRENCIA, registrada em 2026-09-08).
+  `schedule_booking` marcava o slot como
   `is_active = false` no momento do agendamento (`0001:424`), e os únicos
   outros escritores dessa coluna são as ações manuais da tela de
   disponibilidade (`setSlotsActive`, via `toggleAvailabilityDay`/
@@ -1538,6 +1539,23 @@ Decidir antes de chegar na etapa correspondente:
   horário dentro de um dia com vários horários publicados fazia aquele
   horário sumir do editor de disponibilidade do professor (parecia
   despublicado), porque `is_active = false` o tirava do filtro `relevant`.
+
+  **Migrations 0025-0029 aplicadas sem erro (2026-09-16).** A `0028` passar
+  confirma o que o diagnóstico já indicava: zero sobreposição na base real no
+  momento da criação da constraint. **Testado na aplicação de verdade pelo
+  usuário, quatro cenários:**
+  - agendar por AUTOSSERVICO some da lista do aluno mas continua publicado no
+    editor do professor — o bug lateral do `getAvailability` descrito acima,
+    confirmado corrigido;
+  - cancelar devolve o horário sozinho, sem nenhuma ação manual do professor
+    — é a prova direta de que a Opção B funciona (ocupação deriva de
+    `bookings`, não fica presa em `is_active`);
+  - colisão entre RECORRENCIA e AUTOSSERVICO recusa com mensagem legível, não
+    erro cru;
+  - falha de `schedule_booking` agora aparece na tela (`Agendar.tsx`), o que
+    nunca acontecia antes desta migration.
+
+  **Dívida fechada.**
 - **Trial que nunca expira, revisitado e mantido em aberto (2026-09-15).**
   Reabrimos a "consequência aceita conscientemente" registrada acima (Etapa 1)
   — continua sem solução, de propósito. `grant_trial_credit` dispara `after
