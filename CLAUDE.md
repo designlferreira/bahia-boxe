@@ -29,6 +29,18 @@ Portanto:
    Ler o corpo de função aplicado via `pg_get_functiondef` quando a pergunta
    for sobre o que está no banco — o arquivo da migration é a intenção, o
    banco é o fato.
+4. **O app é PWA com service worker (`vite-plugin-pwa`, `registerType:
+   "autoUpdate"`, `vite.config.ts`).** Uma mudança de frontend já commitada e
+   deployada pode não aparecer pra quem está usando o app até fechar e
+   reabrir (ou dar hard refresh) — `autoUpdate` atualiza o service worker em
+   segundo plano, não força reload de quem já tem o app aberto. Aconteceu de
+   verdade (2026-09-16): navegação da Agenda reportada como quebrada
+   ("só existe a seta de voltar"), código lido de ponta a ponta sem achar
+   nada — os dois botões eram simétricos, sem condição nenhuma diferenciando
+   um do outro. Era cache do service worker; hard refresh resolveu. **Antes
+   de investigar um bug visual que não bate com o código lido, pedir hard
+   refresh primeiro** — só vale abrir uma investigação de código se o
+   sintoma persistir depois disso.
 
 ---
 
