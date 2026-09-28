@@ -42,6 +42,16 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* Seleção de texto e cursor no tom do app, não o azul padrão do navegador. */
+  ::selection {
+    background-color: hsl(var(--accent) / 0.3);
+    color: hsl(var(--foreground));
+  }
+  input,
+  textarea {
+    caret-color: hsl(var(--accent));
+  }
+
   html,
   body,
   #root {

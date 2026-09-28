@@ -133,7 +133,7 @@ export function ActivePackageCard({ pkg, credits, saldo, hideAlert, audience = "
 
       {pkg && total > 0 ? (
         <>
-          <div aria-hidden className="mt-4 mb-2.5">
+          <div aria-hidden className="mt-4 mb-3">
             {total <= MAX_PIPS ? (
               <div className="flex gap-1">
                 {Array.from({ length: total }, (_, i) => (

@@ -213,7 +213,7 @@ function Seeded({ data, modo, children }: { data: HomeData; modo: Modo; children
 
 function Frame({ title, note, children }: { title: string; note: string; children: ReactNode }) {
   return (
-    <figure className="w-[375px] shrink-0">
+    <figure className="w-full max-w-[375px] shrink-0">
       <figcaption className="mb-2 px-1">
         <div className="text-sm font-semibold text-foreground">{title}</div>
         <div className="text-xs text-muted-foreground">{note}</div>

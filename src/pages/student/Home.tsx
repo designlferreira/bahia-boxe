@@ -103,14 +103,14 @@ export default function StudentHome() {
 
       {isLoading && (
         <div role="status" aria-label="Carregando seu painel">
-          <SkeletonCard height={168} className="mb-3.5" />
+          <SkeletonCard height={168} className="mb-4" />
         </div>
       )}
       {isError && <ErrorState title="Não foi possível carregar seu painel" onRetry={() => refetch()} />}
 
       {data && (
         <>
-          <div className="mb-3.5 animate-bb-up">
+          <div className="mb-4 animate-bb-up">
             <ActivePackageCard pkg={data.package} credits={data.credits} saldo={saldo} audience="student" />
           </div>
 
@@ -118,7 +118,7 @@ export default function StudentHome() {
             <button
               type="button"
               onClick={() => navigate(`/app/aula/${data.suggestion!.id}`)}
-              className="w-full text-left flex gap-3 items-center p-3.5 rounded-2xl bg-amber/10 border border-amber/30 mb-3.5 active:scale-[0.98] transition-transform"
+              className="w-full text-left flex gap-3 items-center p-4 rounded-2xl bg-amber/10 border border-amber/30 mb-4 active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <div className="h-[38px] w-[38px] rounded-xl bg-amber/15 flex items-center justify-center shrink-0">
                 <Clock3 className="h-[18px] w-[18px] text-amber" aria-hidden />
@@ -134,13 +134,13 @@ export default function StudentHome() {
             </button>
           )}
 
-          <h2 className="font-display text-[19px] tracking-wide text-foreground mt-1 mb-2.5">PRÓXIMA AULA</h2>
+          <h2 className="font-display text-[19px] tracking-wide text-foreground mt-2 mb-3">PRÓXIMA AULA</h2>
           {data.nextBooking ? (
             <button
               type="button"
               onClick={() => navigate(`/app/aula/${data.nextBooking!.id}`)}
               aria-label={`${formatDate(data.nextBooking.startTime)}, ${formatTime(data.nextBooking.startTime)}, ${getStatusConfig(data.nextBooking.status).label}. Ver detalhes`}
-              className="w-full text-left card-dark p-4 flex gap-3.5 items-center mb-5 active:scale-[0.98] transition-transform"
+              className="w-full text-left card-dark p-4 flex gap-4 items-center mb-6 active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <div aria-hidden className="w-[54px] text-center border-r border-border pr-3">
                 <div className="font-display text-3xl leading-none text-foreground">
@@ -161,7 +161,7 @@ export default function StudentHome() {
               <ChevronRight className="h-[18px] w-[18px] text-muted-foreground" aria-hidden />
             </button>
           ) : (
-            <div className="rounded-2xl border border-dashed border-border p-6 text-center mb-5">
+            <div className="rounded-2xl border border-dashed border-border p-6 text-center mb-6">
               <div className="text-[15px] text-foreground/85 mb-1">Nenhuma aula agendada</div>
               <div className="text-sm text-muted-foreground">
                 {!modoPronto
@@ -176,7 +176,7 @@ export default function StudentHome() {
           )}
 
           {!modoPronto ? (
-            <SkeletonCard height={58} />
+            <SkeletonCard height={56} />
           ) : cta ? (
             <>
               {/* Sem pulso: um brilho pulsando pra sempre dizia "urgente" a cada visita, até pra
@@ -186,13 +186,13 @@ export default function StudentHome() {
               <Button
                 size="lg"
                 variant={isRecorrencia ? "secondary" : "default"}
-                className="w-full h-[58px]"
+                className="w-full h-14"
                 onClick={() => navigate(cta.to)}
               >
                 <Calendar className="h-[19px] w-[19px]" aria-hidden />
                 {cta.label}
               </Button>
-              <div className="text-center text-sm text-muted-foreground mt-2.5">{cta.hint}</div>
+              <div className="text-center text-sm text-muted-foreground mt-3">{cta.hint}</div>
             </>
           ) : pedido ? (
             // Sem aulas e com pedido em espera: não há nada a fazer além de aguardar, então não há
