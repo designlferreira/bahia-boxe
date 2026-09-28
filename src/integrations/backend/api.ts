@@ -1141,6 +1141,42 @@ export async function markNoShow(bookingId: string) {
   if (error) throw new Error(error.message);
 }
 
+export interface RegraDeConsumo {
+  /** Marcar falta desconta 1 aula do aluno? */
+  falta: boolean;
+  /** Cancelar dizendo que foi o aluno desconta 1 aula? */
+  cancelamentoPeloAluno: boolean;
+  /** De onde veio a regra — a janela diz isso ao professor. */
+  origem: "pacote" | "configuracao" | "reposicao" | "sem_pacote";
+}
+
+/**
+ * O que a falta (ou o cancelamento pelo aluno) faz com a aula do aluno — a MESMA regra que o banco
+ * aplica, pra janela de confirmação não prometer outra coisa. Antes a janela lia só a configuração
+ * do professor, mas numa aula de pacote de recorrência quem manda é a regra gravada no pacote no dia
+ * em que ele foi criado (decisão 3 do CLAUDE.md) — se o professor mudou a configuração depois, a
+ * janela dizia o contrário do que acontecia.
+ * - Aula com `pacote_id`: `coalesce(pacote.falta_consome_credito, configuração)` pros dois casos
+ *   (`calcular_saldo_pacote`, 0013).
+ * - Sem pacote (autosserviço): falta segue a configuração, reposição nunca desconta
+ *   (`mark_no_show`, 0020); cancelar nunca desconta (`cancelar_aula` não lança nada no ledger).
+ */
+export async function getRegraDeConsumo(booking: Booking, padraoDoProfessor: boolean): Promise<RegraDeConsumo> {
+  if (booking.pacoteId) {
+    const { data, error } = await client()
+      .from("packages")
+      .select("falta_consome_credito")
+      .eq("id", booking.pacoteId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    const snapshot = data?.falta_consome_credito as boolean | null | undefined;
+    const consome = snapshot ?? padraoDoProfessor;
+    return { falta: consome, cancelamentoPeloAluno: consome, origem: snapshot == null ? "configuracao" : "pacote" };
+  }
+  if (booking.isReplacement) return { falta: false, cancelamentoPeloAluno: false, origem: "reposicao" };
+  return { falta: padraoDoProfessor, cancelamentoPeloAluno: false, origem: "sem_pacote" };
+}
+
 /**
  * Reverte a conclusão/falta mais recente ainda não revertida desta aula: status volta a
  * `scheduled` e, se havia consumido crédito, o ledger recebe um `undo` referenciado à transação

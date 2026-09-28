@@ -423,7 +423,7 @@ const DASH_CASES: { title: string; note: string; data: unknown }[] = [
         { ...aulaDe("s1", "Ana Beatriz Souza", 1, 7, "pending_confirmation"), antecessorInicio: null },
         { ...aulaDe("s2", "Carlos Henrique Lima", 2, 18, "pending_confirmation", { replacementForBookingId: "orig-1" }), antecessorInicio: at(1, 19) },
       ],
-      awaitingConfirmation: [aulaDe("s3", "Diego Martins", -1, 19, "scheduled"), aulaEm("s8", "Julia Pereira", -90, "scheduled")],
+      awaitingConfirmation: [aulaDe("s3", "Diego Martins", -1, 19, "scheduled", { pacoteId: "pkg-rec" }), aulaEm("s8", "Julia Pereira", -90, "scheduled")],
       purchaseRequests: 1,
       atRisk: RISCO,
       primeirosPassos: null,
@@ -481,6 +481,10 @@ function SeededAdmin({ data, children }: { data: unknown; children: ReactNode })
       },
     });
     qc.setQueryData(["admin-dashboard", ADMIN_ID], data);
+    // Professor configurado pra falta NÃO descontar, mas o pacote de recorrência do Diego foi criado
+    // quando descontava: a janela de falta tem que seguir o pacote (regra da aula, não a geral).
+    qc.setQueryData(["admin-settings", ADMIN_ID], { adminId: ADMIN_ID, noShowConsumesClass: false, modoAgendamento: "autosservico", whatsapp: null });
+    qc.setQueryData(["regra-consumo", "a-s3--1-19", false], { falta: true, cancelamentoPeloAluno: true, origem: "pacote" });
     qc.setQueryData(["notifications", ADMIN_ID], []);
     return qc;
   });

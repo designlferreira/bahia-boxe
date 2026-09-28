@@ -10,12 +10,15 @@ import {
   cancelarAula,
   completeBooking,
   getAdminSettings,
+  getRegraDeConsumo,
   markAsReplacement,
   markNoShow,
   reagendarAula,
   undoLessonAction,
 } from "@/integrations/backend/api";
+import type { RegraDeConsumo } from "@/integrations/backend/api";
 import type { Booking } from "@/integrations/backend/types";
+import { formatDateTime } from "@/lib/dateUtils";
 
 const UNDO_TOAST_MS = 9000;
 
@@ -28,6 +31,23 @@ interface Target {
   studentName: string;
 }
 
+/** Falta/cancelamento: a janela precisa da regra DESTA aula (null = não deu pra ler). */
+interface TargetComRegra extends Target {
+  regra: RegraDeConsumo | null;
+}
+
+/** Texto da consequência da falta, dizendo de onde vem a regra. */
+function textoFalta(regra: RegraDeConsumo | null) {
+  if (!regra) return "O que acontece com a aula segue a regra do pacote do aluno.";
+  if (regra.origem === "reposicao") return "É uma reposição: a falta não desconta aula.";
+  const fonte = regra.origem === "pacote" ? "Pela regra deste pacote" : "Pela sua configuração";
+  if (regra.falta) return `${fonte}, a falta desconta 1 aula do aluno.`;
+  // Recorrência: a aula fica "a repor". Autosserviço: a aula simplesmente volta pro saldo de agendar.
+  return regra.origem === "sem_pacote"
+    ? `${fonte}, a falta não desconta aula: ela continua disponível para o aluno agendar.`
+    : `${fonte}, a falta não desconta aula: o aluno pode repor.`;
+}
+
 /**
  * Concluir/falta/desfazer/reposição — a mesma lógica de domínio, usada tanto na lista da Agenda
  * quanto na tela de Detalhes da aula, pra não duplicar as mutations e os diálogos de confirmação
@@ -37,10 +57,10 @@ export function useLessonActions(onChanged: () => void) {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [confirmComplete, setConfirmComplete] = useState<Target | null>(null);
-  const [confirmNoShow, setConfirmNoShow] = useState<Target | null>(null);
+  const [confirmNoShow, setConfirmNoShow] = useState<TargetComRegra | null>(null);
   const [replacementTarget, setReplacementTarget] = useState<Target | null>(null);
   const [reagendarTarget, setReagendarTarget] = useState<Target | null>(null);
-  const [cancelarTarget, setCancelarTarget] = useState<Target | null>(null);
+  const [cancelarTarget, setCancelarTarget] = useState<TargetComRegra | null>(null);
 
   const { data: settings } = useQuery({
     queryKey: ["admin-settings", profile?.id],
@@ -48,6 +68,24 @@ export function useLessonActions(onChanged: () => void) {
     enabled: !!profile,
   });
   const noShowConsumesClass = settings?.noShowConsumesClass ?? true;
+
+  /** Lê a regra da aula antes de abrir a janela (é rápido; se falhar, a janela usa um texto neutro). */
+  async function comRegra(booking: Booking, studentName: string): Promise<TargetComRegra> {
+    try {
+      const padrao = profile
+        ? ((await queryClient.fetchQuery({ queryKey: ["admin-settings", profile.id], queryFn: () => getAdminSettings(profile.id) }))
+            ?.noShowConsumesClass ?? true)
+        : noShowConsumesClass;
+      const regra = await queryClient.fetchQuery({
+        queryKey: ["regra-consumo", booking.id, padrao],
+        queryFn: () => getRegraDeConsumo(booking, padrao),
+        staleTime: 60_000,
+      });
+      return { booking, studentName, regra };
+    } catch {
+      return { booking, studentName, regra: null };
+    }
+  }
 
   function after() {
     onChanged();
@@ -149,11 +187,11 @@ export function useLessonActions(onChanged: () => void) {
         open={!!confirmNoShow}
         onOpenChange={(o) => !o && setConfirmNoShow(null)}
         title="REGISTRAR FALTA?"
-        description={`Confirme que o aluno não compareceu a esta aula.\n\n${
-          noShowConsumesClass
-            ? "De acordo com as configurações atuais, o crédito desta aula será consumido."
-            : "De acordo com as configurações atuais, o crédito desta aula será mantido."
-        }`}
+        description={
+          confirmNoShow
+            ? `${confirmNoShow.studentName} não veio à aula de ${formatDateTime(confirmNoShow.booking.startTime)}.\n\n${textoFalta(confirmNoShow.regra)}`
+            : ""
+        }
         confirmLabel="Registrar falta"
         cancelLabel="Cancelar"
         tone="default"
@@ -189,7 +227,7 @@ export function useLessonActions(onChanged: () => void) {
           onOpenChange={(o) => !o && setCancelarTarget(null)}
           booking={cancelarTarget.booking}
           studentName={cancelarTarget.studentName}
-          noShowConsumesClass={noShowConsumesClass}
+          alunoCancelarConsome={cancelarTarget.regra ? cancelarTarget.regra.cancelamentoPeloAluno : null}
           pending={cancelar.isPending}
           onConfirm={(canceladoPor) => cancelar.mutate({ bookingId: cancelarTarget.booking.id, canceladoPor })}
         />
@@ -200,10 +238,14 @@ export function useLessonActions(onChanged: () => void) {
   return {
     isBusy,
     openComplete: (booking: Booking, studentName: string) => setConfirmComplete({ booking, studentName }),
-    openNoShow: (booking: Booking, studentName: string) => setConfirmNoShow({ booking, studentName }),
+    openNoShow: (booking: Booking, studentName: string) => {
+      void comRegra(booking, studentName).then(setConfirmNoShow);
+    },
     openReplacement: (booking: Booking, studentName: string) => setReplacementTarget({ booking, studentName }),
     openReagendar: (booking: Booking, studentName: string) => setReagendarTarget({ booking, studentName }),
-    openCancelar: (booking: Booking, studentName: string) => setCancelarTarget({ booking, studentName }),
+    openCancelar: (booking: Booking, studentName: string) => {
+      void comRegra(booking, studentName).then(setCancelarTarget);
+    },
     undo: (bookingId: string) => undo.mutate(bookingId),
     undoPending: undo.isPending,
     dialogs,
