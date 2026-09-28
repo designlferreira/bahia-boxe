@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Calendar, Check, ChevronRight, Hourglass } from "lucide-react";
+import { Calendar, Check, ChevronRight, Hourglass, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -12,7 +12,13 @@ import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { SlotTakenError, acceptSuggestion, declineSuggestion, restoreSuggestion, getModoAgendamentoEfetivo, getStudentAdminId, getStudentHome } from "@/integrations/backend/api";
+import {
+  SlotTakenError,
+  acceptSuggestion,
+  declineSuggestion,
+  getWhatsappDoProfessor,
+  restoreSuggestion,
+  getModoAgendamentoEfetivo, getStudentAdminId, getStudentHome } from "@/integrations/backend/api";
 import type { Booking } from "@/integrations/backend/types";
 import { getStatusConfig } from "@/lib/bookingStatus";
 import { formatDayNumber, formatMonthShort, formatDate, formatDateShort, formatTime, formatRelativeDay } from "@/lib/dateUtils";
@@ -95,6 +101,15 @@ export default function StudentHome() {
     staleTime: Infinity,
   });
   const isRecorrencia = modoEfetivo === "recorrencia";
+
+  // Canal do aluno com o professor (decisão do Lucas, 2026-09-28): o WhatsApp de cada professor,
+  // cadastrado em Configurações (0032). Sem número cadastrado, o botão não aparece.
+  const { data: whatsapp } = useQuery({
+    queryKey: ["whatsapp-professor", adminId],
+    queryFn: () => getWhatsappDoProfessor(adminId!),
+    enabled: !!adminId,
+    staleTime: 60 * 60 * 1000,
+  });
   // Sem esperar o modo, o botão nascia "Agendar aula" e virava "Ver minhas aulas" um instante
   // depois, na frente do aluno. Se uma das duas consultas falhar, cai no autosserviço (default
   // efetivo de `modo_agendamento_efetivo`) em vez de esconder o botão pra sempre.
@@ -342,6 +357,24 @@ export default function StudentHome() {
           {/* Abaixo do botão principal, não acima do saldo: era a primeira coisa da tela (~150px)
               e empurrava o botão pra perto da barra de navegação. Instalar é útil, mas não é a
               tarefa de quem abre a Home. */}
+          {whatsapp && (
+            // Rede de segurança pra quando a tela não cobre a situação do aluno — o que antes ele
+            // resolvia mandando mensagem. Discreto: não compete com o botão principal.
+            <a
+              href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(`Olá! Aqui é ${profile.name.split(" ")[0]}.`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-6 flex items-center gap-3 rounded-2xl border border-border p-4 active:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <MessageCircle className="h-5 w-5 text-foreground/85 shrink-0" aria-hidden />
+              <div className="flex-1 min-w-0">
+                <div className="text-[15px] font-semibold text-foreground">Falar com o professor</div>
+                <div className="text-sm text-muted-foreground">Abre uma conversa no WhatsApp</div>
+              </div>
+              <ChevronRight className="h-[18px] w-[18px] text-muted-foreground shrink-0" aria-hidden />
+            </a>
+          )}
+
           <PWAInstallBanner className="mt-6 mb-0" />
 
           <BoxingProfileHomeCard />

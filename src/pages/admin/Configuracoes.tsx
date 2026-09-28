@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -6,8 +7,15 @@ import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { getAdminSettings, updateModoAgendamento, updateNoShowConsumesClass } from "@/integrations/backend/api";
+import {
+  getAdminSettings,
+  normalizeWhatsapp,
+  updateModoAgendamento,
+  updateNoShowConsumesClass,
+  updateWhatsapp,
+} from "@/integrations/backend/api";
 import type { ModoAgendamento } from "@/integrations/backend/types";
 
 const MODO_OPTIONS: { value: ModoAgendamento; label: string }[] = [
@@ -41,6 +49,24 @@ export default function AdminConfiguracoes() {
       queryClient.invalidateQueries({ queryKey: key });
       toast(value === "recorrencia" ? "Modo Recorrência ativado" : "Modo Autosserviço ativado");
     },
+  });
+
+  // WhatsApp que os alunos usam pra falar com o professor (0032).
+  const [whatsappInput, setWhatsappInput] = useState("");
+  useEffect(() => {
+    if (data) setWhatsappInput(data.whatsapp ? formatWhatsapp(data.whatsapp) : "");
+  }, [data?.whatsapp]); // eslint-disable-line react-hooks/exhaustive-deps
+  const whatsappNormalizado = whatsappInput.trim() ? normalizeWhatsapp(whatsappInput) : null;
+  const whatsappInvalido = !!whatsappInput.trim() && !whatsappNormalizado;
+  const whatsappMudou = (whatsappNormalizado ?? null) !== (data?.whatsapp ?? null);
+
+  const saveWhatsapp = useMutation({
+    mutationFn: () => updateWhatsapp(profile!.id, whatsappNormalizado),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: key });
+      toast.success(whatsappNormalizado ? "WhatsApp salvo" : "WhatsApp removido");
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível salvar."),
   });
 
   return (
@@ -114,6 +140,48 @@ export default function AdminConfiguracoes() {
           </div>
         </div>
       )}
+
+      {!isLoading && (
+        <div className="card-dark p-4 mt-3.5">
+          <label htmlFor="whatsapp" className="text-[15px] font-semibold text-foreground">
+            WhatsApp para os alunos
+          </label>
+          <div className="text-sm text-muted-foreground mt-0.5">
+            Aparece na tela inicial do aluno como "Falar com o professor". Deixe em branco para não mostrar.
+          </div>
+          <input
+            id="whatsapp"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder="(11) 94703-4983"
+            value={whatsappInput}
+            onChange={(e) => setWhatsappInput(e.target.value)}
+            aria-invalid={whatsappInvalido}
+            aria-describedby={whatsappInvalido ? "whatsapp-erro" : undefined}
+            className="input-dark h-12 mt-3"
+          />
+          {whatsappInvalido && (
+            <div id="whatsapp-erro" className="text-sm text-[hsl(var(--red-text))] mt-2">
+              Número incompleto. Use DDD + número, por exemplo (11) 94703-4983.
+            </div>
+          )}
+          <Button
+            className="w-full mt-3"
+            variant="secondary"
+            disabled={!whatsappMudou || whatsappInvalido || saveWhatsapp.isPending}
+            onClick={() => saveWhatsapp.mutate()}
+          >
+            {saveWhatsapp.isPending ? "Salvando…" : "Salvar WhatsApp"}
+          </Button>
+        </div>
+      )}
     </div>
   );
+}
+
+/** "5511947034983" -> "+55 (11) 94703-4983" (só pra exibir; o banco guarda só dígitos). */
+function formatWhatsapp(digits: string) {
+  const m = digits.match(/^55(\d{2})(\d{4,5})(\d{4})$/);
+  return m ? `+55 (${m[1]}) ${m[2]}-${m[3]}` : `+${digits}`;
 }

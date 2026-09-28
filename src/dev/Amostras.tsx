@@ -215,6 +215,7 @@ function Seeded({
     qc.setQueryData(["student-home", PROFILE.id], data);
     qc.setQueryData(["student-admin-id", PROFILE.id], ADMIN_ID);
     qc.setQueryData(["modo-agendamento-efetivo", ADMIN_ID], modo);
+    qc.setQueryData(["whatsapp-professor", ADMIN_ID], "5511947034983");
     qc.setQueryData(["notifications", PROFILE.id], []);
     qc.setQueryData(["my-student-id", PROFILE.id], "amostra-student");
     qc.setQueryData(["boxing-profile-history", "amostra-student"], []);

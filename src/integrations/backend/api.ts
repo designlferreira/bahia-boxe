@@ -1,6 +1,7 @@
 import { addDays, addWeeks, format } from "date-fns";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { TIMEZONE, formatDate, formatTime } from "@/lib/dateUtils";
+export { normalizeWhatsapp } from "@/lib/whatsapp";
 import { supabase } from "@/integrations/supabase/client";
 import type {
   AdminSettings,
@@ -1528,7 +1529,7 @@ export async function restoreAvailabilityInterval(interval: AvailabilityInterval
 export async function getAdminSettings(adminId: string): Promise<AdminSettings | null> {
   const { data, error } = await client()
     .from("profiles")
-    .select("id, no_show_consumes_class, modo_agendamento")
+    .select("id, no_show_consumes_class, modo_agendamento, whatsapp")
     .eq("id", adminId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -1537,6 +1538,7 @@ export async function getAdminSettings(adminId: string): Promise<AdminSettings |
         adminId: data.id,
         noShowConsumesClass: data.no_show_consumes_class,
         modoAgendamento: (data.modo_agendamento as ModoAgendamento | null) ?? "autosservico",
+        whatsapp: data.whatsapp ?? null,
       }
     : null;
 }
@@ -1549,6 +1551,21 @@ export async function updateNoShowConsumesClass(adminId: string, value: boolean)
 export async function updateModoAgendamento(adminId: string, value: ModoAgendamento) {
   const { error } = await client().from("profiles").update({ modo_agendamento: value }).eq("id", adminId);
   if (error) throw new Error(error.message);
+}
+
+export async function updateWhatsapp(adminId: string, whatsapp: string | null) {
+  const { error } = await client().from("profiles").update({ whatsapp }).eq("id", adminId);
+  if (error) throw new Error("Não foi possível salvar o WhatsApp. Confira o número e tente de novo.");
+}
+
+/**
+ * WhatsApp do professor, lido pelo aluno. Por RPC pelo mesmo motivo de
+ * `getModoAgendamentoEfetivo` logo abaixo: o aluno não lê a linha de `profiles` do professor.
+ */
+export async function getWhatsappDoProfessor(professorId: string): Promise<string | null> {
+  const { data, error } = await client().rpc("whatsapp_do_professor", { p_professor_id: professorId });
+  if (error) throw new Error(error.message);
+  return (data as string | null) ?? null;
 }
 
 /**
