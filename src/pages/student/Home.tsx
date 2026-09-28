@@ -140,7 +140,6 @@ export default function StudentHome() {
         <NotificationBell userId={profile.id} />
       </div>
 
-      <PWAInstallBanner />
 
       {isLoading && (
         // Mesmo formato da tela pronta (cartão de saldo, rótulo, próxima aula, botão) — antes era só
@@ -290,6 +289,11 @@ export default function StudentHome() {
               </div>
             </div>
           ) : null}
+
+          {/* Abaixo do botão principal, não acima do saldo: era a primeira coisa da tela (~150px)
+              e empurrava o botão pra perto da barra de navegação. Instalar é útil, mas não é a
+              tarefa de quem abre a Home. */}
+          <PWAInstallBanner className="mt-6 mb-0" />
 
           <BoxingProfileHomeCard />
         </>

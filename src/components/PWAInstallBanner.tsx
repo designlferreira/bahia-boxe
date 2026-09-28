@@ -1,10 +1,31 @@
 import { useEffect, useState } from "react";
 import { Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
+
+/**
+ * O navegador dispara `beforeinstallprompt` UMA vez, cedo, no carregamento. Um banner montado
+ * depois disso (na Home ele só aparece quando os dados chegam) perderia o evento e nunca apareceria.
+ * Por isso o evento é capturado aqui, no nível do módulo — importado por main -> App -> páginas,
+ * logo no início —, e cada banner lê o que já foi capturado.
+ */
+let capturedPrompt: BeforeInstallPromptEvent | null = null;
+const subscribers = new Set<(e: BeforeInstallPromptEvent | null) => void>();
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    capturedPrompt = e as BeforeInstallPromptEvent;
+    subscribers.forEach((fn) => fn(capturedPrompt));
+  });
+  window.addEventListener("appinstalled", () => {
+    capturedPrompt = null;
+    subscribers.forEach((fn) => fn(null));
+  });
 }
 
 /** Quanto tempo o "Agora não" esconde o banner na Home antes de oferecer de novo. */
@@ -36,26 +57,25 @@ interface PWAInstallBannerProps {
    * instalação de propósito, então aparece sempre que o navegador permitir instalar.
    */
   placement?: "optional" | "settings";
+  className?: string;
 }
 
-export function PWAInstallBanner({ placement = "optional" }: PWAInstallBannerProps) {
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
+export function PWAInstallBanner({ placement = "optional", className }: PWAInstallBannerProps) {
+  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(capturedPrompt);
   const [hidden, setHidden] = useState(() => placement === "optional" && isSnoozed());
 
   useEffect(() => {
-    function onPrompt(e: Event) {
-      e.preventDefault();
-      setDeferred(e as BeforeInstallPromptEvent);
-    }
-    window.addEventListener("beforeinstallprompt", onPrompt);
-    return () => window.removeEventListener("beforeinstallprompt", onPrompt);
+    subscribers.add(setDeferred);
+    return () => {
+      subscribers.delete(setDeferred);
+    };
   }, []);
 
   if (!deferred || hidden) return null;
 
   return (
     // Neutro de propósito: dourado é crédito/conquista no spec (§12.1), e isto não é nenhum dos dois.
-    <section aria-label="Instalar o aplicativo" className="rounded-2xl border border-border bg-card p-4 mb-4">
+    <section aria-label="Instalar o aplicativo" className={cn("rounded-2xl border border-border bg-card p-4 mb-4", className)}>
       <div className="flex items-start gap-3">
         <div className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
           <Smartphone className="h-[18px] w-[18px] text-foreground/85" aria-hidden />
@@ -72,7 +92,9 @@ export function PWAInstallBanner({ placement = "optional" }: PWAInstallBannerPro
           onClick={async () => {
             await deferred.prompt();
             await deferred.userChoice;
-            setDeferred(null);
+            // O mesmo evento não pode ser usado duas vezes — some de todos os banners.
+            capturedPrompt = null;
+            subscribers.forEach((fn) => fn(null));
           }}
         >
           Instalar
