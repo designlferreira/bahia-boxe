@@ -177,30 +177,42 @@ export default function AdminDashboard() {
             })}
           </div>
 
-          <h2 className="section-title mb-3">Alunos em risco</h2>
+          <h2 className="section-title mb-1">Alunos em risco</h2>
+          <div className="text-sm text-muted-foreground mb-3">Pacote acabando ou faltas seguidas.</div>
           <div className="flex flex-col gap-2.5">
             {data.atRisk.length === 0 && (
-              <div className="text-[13px] text-muted-foreground">Nenhum aluno em risco no momento.</div>
+              <div className="text-sm text-muted-foreground">Nenhum aluno em risco no momento.</div>
             )}
-            {data.atRisk.map(({ student, credits }) => (
+            {/* No máximo 3 aqui: com muitos alunos a lista empurrava o resto do painel pra baixo. */}
+            {data.atRisk.slice(0, 3).map(({ student, motivo, grave }) => (
               <button
                 key={student.id}
                 type="button"
                 onClick={() => navigate(`/admin/alunos/${student.id}`)}
                 className="w-full text-left card-dark p-3.5 flex items-center gap-3 active:scale-[0.985] transition-transform"
               >
-                <div className="h-[38px] w-[38px] rounded-full bg-secondary flex items-center justify-center text-[13px] font-semibold text-foreground/80">
+                <div
+                  aria-hidden
+                  className="h-[38px] w-[38px] rounded-full bg-secondary flex items-center justify-center text-[13px] font-semibold text-foreground/80"
+                >
                   {student.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
                 </div>
-                <div className="flex-1">
-                  <div className="text-[14.5px] font-semibold text-foreground">{student.name}</div>
-                  <div className={`text-xs ${credits === 0 ? "text-destructive" : "text-amber"}`}>
-                    {credits === 0 ? "Sem créditos" : "Resta 1 crédito"}
-                  </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[15px] font-semibold text-foreground">{student.name}</div>
+                  <div className={`text-sm ${grave ? "text-[hsl(var(--red-text))]" : "text-amber"}`}>{motivo}</div>
                 </div>
-                <ChevronRight className="h-[18px] w-[18px] text-muted-foreground" />
+                <ChevronRight className="h-[18px] w-[18px] text-muted-foreground" aria-hidden />
               </button>
             ))}
+            {data.atRisk.length > 3 && (
+              <button
+                type="button"
+                onClick={() => navigate("/admin/alunos")}
+                className="min-h-11 text-sm font-semibold text-foreground underline underline-offset-4 self-start"
+              >
+                Ver todos ({data.atRisk.length})
+              </button>
+            )}
           </div>
         </>
       )}

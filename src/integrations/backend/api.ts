@@ -745,7 +745,7 @@ export async function getAdminDashboard(adminId: string) {
 
   const byId = new Map(students.map((s) => [s.id, s]));
   const nameOf = (studentId: string) => byId.get(studentId)?.name ?? "Aluno";
-  const credits = await creditsByStudent(students.map((s) => s.id));
+  const atRisk = await alunosEmRisco(students);
 
   return {
     kpiToday: todayRes.count ?? 0,
@@ -753,10 +753,98 @@ export async function getAdminDashboard(adminId: string) {
     pending: (pendingRes.data ?? []).map((r) => ({ ...mapBooking(r), studentName: nameOf(r.student_id) })),
     upcoming: (upcomingRes.data ?? []).map((r) => ({ ...mapBooking(r), studentName: nameOf(r.student_id) })),
     awaitingConfirmation: (awaitingRes.data ?? []).map((r) => ({ ...mapBooking(r), studentName: nameOf(r.student_id) })),
-    atRisk: students
-      .map((student) => ({ student, credits: credits[student.id] ?? 0 }))
-      .filter((x) => x.credits <= 1),
+    atRisk,
   };
+}
+
+/** Quantas aulas restantes no pacote disparam o alerta (CLAUDE.md: "restarem 2 ou menos"). */
+const RISCO_AULAS_RESTANTES = 2;
+/** Faltas seguidas, nas aulas mais recentes, que disparam o alerta (decisão do Lucas, 2026-09-28). */
+const RISCO_FALTAS_SEGUIDAS = 2;
+
+export interface AlunoEmRisco {
+  student: StudentRecord;
+  /** Frase pronta pro professor ("Restam 2 aulas no pacote", "2 faltas seguidas"...). */
+  motivo: string;
+  /** Sem aula nenhuma (ou sem pacote): mais urgente que "restam poucas". */
+  grave: boolean;
+}
+
+/**
+ * "Aluno em risco" (decisão do Lucas, 2026-09-28): pacote acabando OU faltando muito.
+ *
+ * Pacote acabando = aulas RESTANTES no pacote (total − usadas), não "créditos para agendar". A conta
+ * antiga (`creditsByStudent` <= 1) desconta as aulas já marcadas — na recorrência todas as aulas
+ * restantes já nascem marcadas, então dava 0 pra TODO aluno de recorrência e o painel pintava
+ * todos de vermelho "Sem créditos" (mesmo problema já registrado no CLAUDE.md pro cartão do aluno).
+ * Pacote de recorrência lê `saldo_pacotes` (a autoridade — decisão 4), não o `used_classes`
+ * materializado. A aula experimental não conta como pacote.
+ *
+ * Faltando muito = as RISCO_FALTAS_SEGUIDAS aulas mais recentes (concluídas ou faltas) foram faltas.
+ */
+async function alunosEmRisco(students: StudentRecord[]): Promise<AlunoEmRisco[]> {
+  if (students.length === 0) return [];
+  const ids = students.map((s) => s.id);
+  const desde = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString();
+  const [pkgRes, aulasRes] = await Promise.all([
+    client()
+      .from("packages")
+      .select("id, student_id, total_classes, used_classes, origin")
+      .in("student_id", ids)
+      .eq("status", "active")
+      .neq("origin", "trial"),
+    client()
+      .from("bookings")
+      .select("student_id, status, start_time")
+      .in("student_id", ids)
+      .in("status", ["completed", "no_show"])
+      .gte("start_time", desde)
+      .order("start_time", { ascending: false }),
+  ]);
+  if (pkgRes.error) throw new Error(pkgRes.error.message);
+  if (aulasRes.error) throw new Error(aulasRes.error.message);
+
+  const recIds = (pkgRes.data ?? []).filter((p) => p.origin === "recurrence").map((p) => p.id);
+  const saldoRes = recIds.length
+    ? await client().from("saldo_pacotes").select("pacote_id, restantes").in("pacote_id", recIds)
+    : { data: [], error: null };
+  if (saldoRes.error) throw new Error(saldoRes.error.message);
+  const restantesRec = new Map((saldoRes.data ?? []).map((r) => [r.pacote_id as string, r.restantes as number]));
+
+  const restantes = new Map<string, number>();
+  for (const p of pkgRes.data ?? []) {
+    const r = p.origin === "recurrence" ? (restantesRec.get(p.id) ?? 0) : Math.max(0, p.total_classes - p.used_classes);
+    restantes.set(p.student_id, (restantes.get(p.student_id) ?? 0) + r);
+  }
+
+  const ultimas = new Map<string, string[]>();
+  for (const a of aulasRes.data ?? []) {
+    const list = ultimas.get(a.student_id) ?? [];
+    if (list.length < RISCO_FALTAS_SEGUIDAS) ultimas.set(a.student_id, [...list, a.status]);
+  }
+
+  const out: AlunoEmRisco[] = [];
+  for (const student of students) {
+    const motivos: string[] = [];
+    let grave = false;
+    const r = restantes.get(student.id);
+    if (r === undefined) {
+      motivos.push("Sem pacote ativo");
+      grave = true;
+    } else if (r === 0) {
+      motivos.push("Sem aulas no pacote");
+      grave = true;
+    } else if (r <= RISCO_AULAS_RESTANTES) {
+      motivos.push(r === 1 ? "Resta 1 aula no pacote" : `Restam ${r} aulas no pacote`);
+    }
+    const u = ultimas.get(student.id) ?? [];
+    if (u.length === RISCO_FALTAS_SEGUIDAS && u.every((s) => s === "no_show")) {
+      motivos.push(`${RISCO_FALTAS_SEGUIDAS} faltas seguidas`);
+    }
+    if (motivos.length) out.push({ student, motivo: motivos.join(" · "), grave });
+  }
+  // Mais urgente primeiro; dentro do grupo, por nome.
+  return out.sort((a, b) => Number(b.grave) - Number(a.grave) || a.student.name.localeCompare(b.student.name));
 }
 
 /**

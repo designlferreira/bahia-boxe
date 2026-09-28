@@ -14,13 +14,14 @@ import { BrowserRouter } from "react-router-dom";
 import { addDays, subDays } from "date-fns";
 import { AuthContext } from "@/context/AuthContext";
 import StudentHome from "@/pages/student/Home";
+import AdminDashboard from "@/pages/admin/Dashboard";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
 import { RemarcacaoSheet } from "@/components/RemarcacaoSheet";
 import { formatInTimeZone } from "date-fns-tz";
 import { TIMEZONE } from "@/lib/dateUtils";
 import { DIMENSIONS, FIGHTER_PROFILES, SCORING_VERSION, type FighterProfileKey } from "@/lib/boxingProfile";
-import type { AppNotification, BoxingProfileAssessment } from "@/integrations/backend/types";
+import type { AppNotification, BoxingProfileAssessment, StudentRecord } from "@/integrations/backend/types";
 import type { Booking, PackageRecord, Profile, PurchaseRequest, SaldoPacote } from "@/integrations/backend/types";
 
 const PROFILE: Profile = {
@@ -368,6 +369,93 @@ function AmostraRemarcacao() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Painel do professor
+// ---------------------------------------------------------------------------
+
+const PROFESSOR: Profile = { id: ADMIN_ID, name: "Lucas Ferreira", role: "admin", email: "prof@exemplo.invalid", createdAt: at(-200, 10) };
+
+function aluno(id: string, name: string): StudentRecord {
+  return { id, profileId: `p-${id}`, adminId: ADMIN_ID, name, createdAt: at(-90, 10) };
+}
+function aulaDe(studentId: string, studentName: string, days: number, hour: number, status: Booking["status"], extra: Partial<Booking> = {}) {
+  const start = at(days, hour);
+  return {
+    ...booking(days, status, { id: `a-${studentId}-${days}-${hour}`, studentId, startTime: start, endTime: at(days, hour + 1), ...extra }),
+    studentName,
+  };
+}
+
+const DASH_CASES: { title: string; note: string; data: unknown }[] = [
+  {
+    title: "Dia movimentado",
+    note: "2 pedidos (1 remarcação), 1 aula sem confirmar, 2 alunos em risco",
+    data: {
+      kpiToday: 5,
+      activeStudents: 12,
+      pending: [
+        aulaDe("s1", "Ana Beatriz Souza", 1, 7, "pending_confirmation"),
+        aulaDe("s2", "Carlos Henrique Lima", 2, 18, "pending_confirmation", { replacementForBookingId: "orig-1" }),
+      ],
+      awaitingConfirmation: [aulaDe("s3", "Diego Martins", -1, 19, "scheduled")],
+      upcoming: [
+        aulaDe("s4", "Fernanda Rocha", 0, 17, "scheduled"),
+        aulaDe("s5", "Gustavo Alves", 0, 18, "scheduled"),
+        aulaDe("s1", "Ana Beatriz Souza", 1, 7, "pending_confirmation"),
+      ],
+      atRisk: [
+        { student: aluno("s6", "Helena Costa"), motivo: "Sem aulas no pacote", grave: true },
+        { student: aluno("s7", "Igor Nascimento"), motivo: "Restam 2 aulas no pacote · 2 faltas seguidas", grave: false },
+        { student: aluno("s9", "Karina Duarte"), motivo: "Resta 1 aula no pacote", grave: false },
+        { student: aluno("s10", "Leonardo Prado"), motivo: "2 faltas seguidas", grave: false },
+      ],
+    },
+  },
+  {
+    title: "Dia calmo",
+    note: "nada pendente, 3 próximas aulas",
+    data: {
+      kpiToday: 2,
+      activeStudents: 8,
+      pending: [],
+      awaitingConfirmation: [],
+      upcoming: [
+        aulaDe("s4", "Fernanda Rocha", 0, 17, "scheduled"),
+        aulaDe("s5", "Gustavo Alves", 0, 18, "scheduled"),
+        aulaDe("s8", "Julia Pereira", 1, 7, "scheduled"),
+      ],
+      atRisk: [],
+    },
+  },
+  {
+    title: "Professor começando",
+    note: "nenhum aluno ainda",
+    data: { kpiToday: 0, activeStudents: 0, pending: [], awaitingConfirmation: [], upcoming: [], atRisk: [] },
+  },
+];
+
+function SeededAdmin({ data, children }: { data: unknown; children: ReactNode }) {
+  const [client] = useState(() => {
+    const qc = new QueryClient({
+      defaultOptions: {
+        queries: { staleTime: Infinity, retry: false, queryFn: () => Promise.reject(new Error("amostra: consulta não simulada")) },
+      },
+    });
+    qc.setQueryData(["admin-dashboard", ADMIN_ID], data);
+    qc.setQueryData(["notifications", ADMIN_ID], []);
+    return qc;
+  });
+  return (
+    <QueryClientProvider client={client}>
+      <AuthContext.Provider
+        value={{ profile: PROFESSOR, loading: false, signIn: () => Promise.reject(new Error("amostra")), signOut: async () => {}, refreshProfile: () => {} }}
+      >
+        {children}
+      </AuthContext.Provider>
+    </QueryClientProvider>
+  );
+}
+
 export default function Amostras() {
   return (
     <BrowserRouter>
@@ -385,6 +473,17 @@ export default function Amostras() {
               <Seeded data={c.data} modo={c.modo}>
                 <StudentHome />
               </Seeded>
+            </Frame>
+          ))}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Painel do professor</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {DASH_CASES.map((c) => (
+            <Frame key={c.title} title={c.title} note={c.note}>
+              <SeededAdmin data={c.data}>
+                <AdminDashboard />
+              </SeededAdmin>
             </Frame>
           ))}
         </div>
