@@ -44,6 +44,18 @@ Portanto:
 
 ---
 
+## Fluxo de branches
+
+- Trabalhe sempre na branch "dev". Antes de começar qualquer tarefa, confirme
+  com "git branch" que está nela.
+- Nunca faça commit, push ou merge direto na "main".
+- Só faça merge de "dev" para "main" quando o Lucas disser explicitamente que
+  aprovou.
+- Depois de cada push na "dev", avise que o preview da Vercel foi atualizado
+  para eu testar.
+
+---
+
 ## Domínio: agendamento
 
 Existem DOIS fluxos de agendamento coexistindo, selecionados pela flag
