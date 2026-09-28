@@ -481,69 +481,36 @@ export class SlotTakenError extends Error {
   }
 }
 
+/** Traduz os códigos das RPCs de sugestão (0030) — o app não mostra texto cru do banco. */
+function sugestaoError(message: string | undefined, fallback: string): Error {
+  const m = message ?? "";
+  if (m.includes("slot_taken")) return new SlotTakenError();
+  if (m.includes("no_credits")) return new Error("Você não tem aulas restantes para aceitar este horário. Peça mais aulas.");
+  if (m.includes("suggestion_expired")) return new Error("O horário sugerido já passou. Escolha outro horário.");
+  if (m.includes("suggestion_not_available")) return new Error("Essa sugestão não está mais disponível.");
+  return new Error(fallback);
+}
+
+/**
+ * Aceite, recusa e desfazer da sugestão passam por RPC (0030). Antes eram UPDATE direto em
+ * `bookings` e NUNCA funcionaram: a policy de UPDATE do aluno só alcança aula `scheduled`, e uma
+ * aula com sugestão está `rejected_with_suggestion` — o UPDATE afetava 0 linhas, sem erro.
+ */
 export async function acceptSuggestion(bookingId: string) {
-  const { data: current, error: readErr } = await client()
-    .from("bookings")
-    .select("suggested_start_time, suggested_end_time")
-    .eq("id", bookingId)
-    .single();
-  if (readErr) throw new Error(readErr.message);
-  const { data, error } = await client()
-    .from("bookings")
-    .update({
-      start_time: current.suggested_start_time,
-      end_time: current.suggested_end_time,
-      status: "scheduled",
-      suggested_start_time: null,
-      suggested_end_time: null,
-    })
-    .eq("id", bookingId)
-    .select()
-    .maybeSingle();
-  // Update direto na tabela (não passa por RPC): a colisão com outra aula do professor vem da
-  // exclusion constraint da 0028 como erro cru do Postgres, em inglês ("conflicting key value
-  // violates exclusion constraint..."), que ia parar no toast do aluno. 23P01 = exclusion_violation.
-  if (error?.code === "23P01") throw new SlotTakenError();
-  if (error) throw new Error("Não foi possível aceitar o novo horário. Tente de novo em instantes.");
-  if (!data) throw new SlotTakenError();
-  return mapBooking(data);
+  const { error } = await client().rpc("aceitar_sugestao", { p_booking_id: bookingId });
+  if (error) throw sugestaoError(error.message, "Não foi possível aceitar o novo horário. Tente de novo em instantes.");
 }
 
-/**
- * O aluno diz "não" ao horário que o professor sugeriu. A aula fica como `rejected` — o mesmo
- * estado de uma recusa sem sugestão —, e a sugestão some da Home. Mesmo tipo de escrita direta que
- * `acceptSuggestion` já faz; o filtro por status garante que só mexe numa sugestão ainda aberta.
- */
+/** O aluno diz "não" ao horário sugerido; a aula fica `rejected` e o horário sugerido fica guardado pro desfazer. */
 export async function declineSuggestion(bookingId: string) {
-  const { data, error } = await client()
-    .from("bookings")
-    .update({ status: "rejected", suggested_start_time: null, suggested_end_time: null })
-    .eq("id", bookingId)
-    .eq("status", "rejected_with_suggestion")
-    .select("id")
-    .maybeSingle();
-  if (error) throw new Error("Não foi possível recusar o horário. Tente de novo em instantes.");
-  if (!data) throw new Error("Essa sugestão não está mais disponível.");
+  const { error } = await client().rpc("recusar_sugestao", { p_booking_id: bookingId });
+  if (error) throw sugestaoError(error.message, "Não foi possível recusar o horário. Tente de novo em instantes.");
 }
 
-/**
- * Desfaz `declineSuggestion`: devolve a sugestão exatamente como estava. Só age sobre a aula que
- * continua `rejected` (nada aconteceu com ela desde a recusa). Se o horário sugerido tiver sido
- * ocupado nesse meio-tempo, a sugestão volta mesmo assim — quem barra a colisão é o aceite.
- */
-export async function restoreSuggestion(bookingId: string, suggestedStart: string, suggestedEnd: string) {
-  const { data, error } = await client()
-    .from("bookings")
-    .update({
-      status: "rejected_with_suggestion",
-      suggested_start_time: suggestedStart,
-      suggested_end_time: suggestedEnd,
-    })
-    .eq("id", bookingId)
-    .eq("status", "rejected")
-    .select("id")
-    .maybeSingle();
-  if (error || !data) throw new Error("Não foi possível desfazer. A sugestão não está mais disponível.");
+/** Desfaz a recusa — o banco usa o horário sugerido que já guardou, o cliente não manda nenhum. */
+export async function restoreSuggestion(bookingId: string) {
+  const { error } = await client().rpc("desfazer_recusa_sugestao", { p_booking_id: bookingId });
+  if (error) throw sugestaoError(error.message, "Não foi possível desfazer.");
 }
 
 // ---------------------------------------------------------------------------

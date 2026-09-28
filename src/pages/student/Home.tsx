@@ -61,7 +61,7 @@ export default function StudentHome() {
         action: {
           label: "Desfazer",
           onClick: () =>
-            restoreSuggestion(suggestion.id, suggestion.suggestedStartTime!, suggestion.suggestedEndTime!)
+            restoreSuggestion(suggestion.id)
               .then(() => {
                 queryClient.invalidateQueries({ queryKey: ["student-home"] });
                 queryClient.invalidateQueries({ queryKey: ["student-history"] });
