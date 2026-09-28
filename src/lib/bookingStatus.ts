@@ -49,9 +49,19 @@ const FALLBACK: StatusConfig = {
 };
 
 /** Never index STATUS_MAP directly — always go through this so an unknown/legacy status renders safely. */
-export function getStatusConfig(status: string | null | undefined): StatusConfig {
+/**
+ * Rótulos que mudam quando quem lê é o aluno. "Pendente" é a palavra do professor (ele tem uma
+ * pendência pra resolver); pro aluno, o que importa é de quem ele está esperando.
+ */
+const STUDENT_LABEL: Partial<Record<BookingStatus, string>> = {
+  pending_confirmation: "Aguardando o professor",
+};
+
+export function getStatusConfig(status: string | null | undefined, audience: "admin" | "student" = "admin"): StatusConfig {
   if (!status) return FALLBACK;
-  return STATUS_MAP[status as BookingStatus] ?? FALLBACK;
+  const cfg = STATUS_MAP[status as BookingStatus] ?? FALLBACK;
+  const studentLabel = audience === "student" ? STUDENT_LABEL[status as BookingStatus] : undefined;
+  return studentLabel ? { ...cfg, label: studentLabel } : cfg;
 }
 
 export function isFutureStatus(status: BookingStatus) {

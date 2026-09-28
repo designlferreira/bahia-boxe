@@ -127,7 +127,7 @@ export default function StudentAulaDetalhe() {
     );
   }
 
-  const cfg = getStatusConfig(booking.status);
+  const cfg = getStatusConfig(booking.status, "student");
   const cancelable = (booking.status === "scheduled" || booking.status === "pending_confirmation") &&
     new Date(booking.startTime).getTime() > Date.now();
   const arrival = guidelines ? arrivalMessage(guidelines.arrivalMinutes) : null;

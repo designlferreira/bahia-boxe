@@ -61,6 +61,20 @@ export function formatWeekdayLong(date: string | Date) {
   return WEEKDAY_LONG[toZonedTime(typeof date === "string" ? new Date(date) : date, TIMEZONE).getDay()];
 }
 
+/**
+ * "Hoje" / "Amanhã" / dia da semana por extenso — pra próxima aula, onde "30 SET" obrigava o aluno a
+ * fazer a conta de que dia é. Além de 6 dias, o dia da semana sozinho fica ambíguo; aí a data do
+ * bloco ao lado desambigua. Comparação por dia civil no fuso do app, não por 24h corridas.
+ */
+export function formatRelativeDay(date: string | Date) {
+  const key = (d: Date) => formatInTimeZone(d, TIMEZONE, "yyyy-MM-dd");
+  const target = key(typeof date === "string" ? new Date(date) : date);
+  const now = new Date();
+  if (target === key(now)) return "Hoje";
+  if (target === key(new Date(now.getTime() + 24 * 60 * 60 * 1000))) return "Amanhã";
+  return formatWeekdayLong(date);
+}
+
 export function formatNextClass(startTime: string, endTime: string) {
   return `${formatDateTime(startTime)} – ${formatTime(endTime)}`;
 }

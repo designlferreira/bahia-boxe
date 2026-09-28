@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { SlotTakenError, acceptSuggestion, declineSuggestion, getModoAgendamentoEfetivo, getStudentAdminId, getStudentHome } from "@/integrations/backend/api";
 import type { Booking } from "@/integrations/backend/types";
 import { getStatusConfig } from "@/lib/bookingStatus";
-import { formatDayNumber, formatMonthShort, formatDate, formatDateShort, formatTime, formatWeekdayLong } from "@/lib/dateUtils";
+import { formatDayNumber, formatMonthShort, formatDate, formatDateShort, formatTime, formatRelativeDay } from "@/lib/dateUtils";
 
 export default function StudentHome() {
   const { profile } = useAuth();
@@ -250,7 +250,7 @@ export default function StudentHome() {
             <button
               type="button"
               onClick={() => navigate(`/app/aula/${data.nextBooking!.id}`)}
-              aria-label={`${formatDate(data.nextBooking.startTime)}, ${formatTime(data.nextBooking.startTime)}, ${getStatusConfig(data.nextBooking.status).label}. Ver detalhes`}
+              aria-label={`${["Hoje", "Amanhã"].includes(formatRelativeDay(data.nextBooking.startTime)) ? formatRelativeDay(data.nextBooking.startTime) + ", " : ""}${formatDate(data.nextBooking.startTime)}, ${formatTime(data.nextBooking.startTime)}, ${getStatusConfig(data.nextBooking.status, "student").label}. Ver detalhes`}
               className="w-full text-left card-dark p-4 flex gap-4 items-center mb-6 active:scale-[0.98] active:bg-secondary transition-[transform,background-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <div aria-hidden className="w-[54px] text-center border-r border-border pr-3">
@@ -263,10 +263,11 @@ export default function StudentHome() {
               </div>
               <div className="flex-1">
                 <div className="text-base font-semibold text-foreground mb-1">
-                  {formatWeekdayLong(data.nextBooking.startTime)} · {formatTime(data.nextBooking.startTime)}
+                  {formatRelativeDay(data.nextBooking.startTime)} ·{" "}
+                  <span className="whitespace-nowrap">{formatTime(data.nextBooking.startTime)}</span>
                 </div>
-                <Badge className={getStatusConfig(data.nextBooking.status).badgeClass}>
-                  {getStatusConfig(data.nextBooking.status).label}
+                <Badge className={getStatusConfig(data.nextBooking.status, "student").badgeClass}>
+                  {getStatusConfig(data.nextBooking.status, "student").label}
                 </Badge>
               </div>
               <ChevronRight className="h-[18px] w-[18px] text-muted-foreground" aria-hidden />

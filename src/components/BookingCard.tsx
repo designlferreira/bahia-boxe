@@ -26,7 +26,8 @@ export function BookingCard({
   actions,
   highlight,
 }: BookingCardProps) {
-  const cfg = getStatusConfig(status);
+  // Hoje só usado pelo histórico do aluno — rótulos na voz do aluno.
+  const cfg = getStatusConfig(status, "student");
   const Wrapper = onClick ? "button" : "div";
 
   return (
