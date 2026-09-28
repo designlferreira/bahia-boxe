@@ -1257,11 +1257,9 @@ export async function getPurchaseRequests(adminId: string) {
   if (templatesRes.error) throw new Error(templatesRes.error.message);
   if (activePkgsRes.error) throw new Error(activePkgsRes.error.message);
 
-  // O que `approve_purchase_request` (função do banco, lida via pg_get_functiondef em 2026-09-28)
-  // encerra ao aprovar:
-  //   - pedido de PACOTE -> assign_package_from_template -> fecha os pacotes ativos NÃO-trial;
-  //   - pedido de AULA AVULSA -> `update packages set status='finished' where status='active'`,
-  //     sem filtro de origem: fecha TODOS, inclusive a aula experimental.
+  // O que `approve_purchase_request` encerra ao aprovar: os pacotes ativos NÃO-trial, nos dois
+  // tipos de pedido (pacote -> assign_package_from_template; aula avulsa -> _create_package, desde
+  // a 0031 — antes a aula avulsa fechava também a experimental).
   // As aulas já agendadas não se perdem (a conclusão debita do pacote novo pela busca "mais antigo
   // ativo com vaga"); o que se perde é o que sobrava pra agendar. Aqui só se conta total − usadas
   // de cada pacote que seria fechado.
@@ -1276,9 +1274,7 @@ export async function getPurchaseRequests(adminId: string) {
 
   return rows.map((r) => {
     const request = mapRequest(r);
-    const closed = (activeByStudent.get(r.student_id) ?? []).filter(
-      (p) => request.kind !== "package" || p.origin !== "trial",
-    );
+    const closed = (activeByStudent.get(r.student_id) ?? []).filter((p) => p.origin !== "trial");
     return {
       request,
       studentName: nameOf.get(r.student_id) ?? "Aluno",
