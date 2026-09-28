@@ -509,6 +509,23 @@ export async function acceptSuggestion(bookingId: string) {
   return mapBooking(data);
 }
 
+/**
+ * O aluno diz "não" ao horário que o professor sugeriu. A aula fica como `rejected` — o mesmo
+ * estado de uma recusa sem sugestão —, e a sugestão some da Home. Mesmo tipo de escrita direta que
+ * `acceptSuggestion` já faz; o filtro por status garante que só mexe numa sugestão ainda aberta.
+ */
+export async function declineSuggestion(bookingId: string) {
+  const { data, error } = await client()
+    .from("bookings")
+    .update({ status: "rejected", suggested_start_time: null, suggested_end_time: null })
+    .eq("id", bookingId)
+    .eq("status", "rejected_with_suggestion")
+    .select("id")
+    .maybeSingle();
+  if (error) throw new Error("Não foi possível recusar o horário. Tente de novo em instantes.");
+  if (!data) throw new Error("Essa sugestão não está mais disponível.");
+}
+
 // ---------------------------------------------------------------------------
 // student · histórico / detalhe
 // ---------------------------------------------------------------------------

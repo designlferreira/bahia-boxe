@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -11,8 +12,9 @@ import { SkeletonCard } from "@/components/SkeletonCard";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
-import { SlotTakenError, acceptSuggestion, getModoAgendamentoEfetivo, getStudentAdminId, getStudentHome } from "@/integrations/backend/api";
+import { SlotTakenError, acceptSuggestion, declineSuggestion, getModoAgendamentoEfetivo, getStudentAdminId, getStudentHome } from "@/integrations/backend/api";
 import type { Booking } from "@/integrations/backend/types";
 import { getStatusConfig } from "@/lib/bookingStatus";
 import { formatDayNumber, formatMonthShort, formatDate, formatDateShort, formatTime, formatWeekdayLong } from "@/lib/dateUtils";
@@ -43,6 +45,17 @@ export default function StudentHome() {
       err instanceof SlotTakenError
         ? toast.error(err.message, { action: { label: "Ver horários", onClick: () => navigate("/app/agendar") } })
         : toast.error(err instanceof Error ? err.message : "Não foi possível aceitar o novo horário."),
+  });
+
+  const [confirmDecline, setConfirmDecline] = useState(false);
+  const decline = useMutation({
+    mutationFn: (suggestion: Booking) => declineSuggestion(suggestion.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["student-home"] });
+      queryClient.invalidateQueries({ queryKey: ["student-history"] });
+      navigate("/app/agendar");
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível recusar o horário."),
   });
 
   const { data: adminId, isError: adminIdError } = useQuery({
@@ -161,28 +174,11 @@ export default function StudentHome() {
 
       {data && (
         <>
-          <div className="mb-4 animate-bb-up">
-            {!semPacote ? (
-              <ActivePackageCard
-                pkg={pacoteMostrado}
-                credits={data.credits}
-                saldo={saldo}
-                audience="student"
-                // Só no autosserviço, sem pedido já em espera (duplicaria) e quando o botão principal
-                // ainda é "Agendar aula" — com crédito 0 ele próprio já leva a Pacotes.
-                onRequestMore={
-                  modoPronto && !isRecorrencia && !pedido && data.credits > 0 ? () => navigate("/app/pacotes") : undefined
-                }
-              />
-            ) : !modoPronto ? (
-              <SkeletonCard height={150} />
-            ) : (
-              <ComoFunciona recorrencia={isRecorrencia} pedidoEnviadoEm={pedido?.createdAt ?? null} pedidoNome={pedidoNome} />
-            )}
-          </div>
-
           {data.suggestion?.suggestedStartTime && (
-            // Um botão só, na largura toda: com "Aceitar" e "Ver detalhes" lado a lado (sem quebra
+            // Acima do saldo: quando existe, a sugestão é a decisão da tela — o professor está
+            // esperando a resposta. Antes vinha depois do cartão de saldo (dourado, 56px), que
+            // continuava sendo a primeira coisa lida.
+            // Um botão só por linha, na largura toda: com "Aceitar" e "Ver detalhes" lado a lado (sem quebra
             // de linha), os dois não cabiam em celulares de 360px e um saía do cartão. "Detalhes"
             // vira link no canto; o ícone saiu pra devolver largura e altura ao cartão.
             <section
@@ -214,8 +210,37 @@ export default function StudentHome() {
               >
                 {accept.isPending ? "Confirmando…" : "Aceitar horário"}
               </Button>
+              <Button
+                variant="ghost"
+                className="w-full h-11 mt-2 text-muted-foreground"
+                onClick={() => setConfirmDecline(true)}
+                disabled={decline.isPending}
+              >
+                Escolher outro horário
+              </Button>
             </section>
           )}
+
+          <div className="mb-4 animate-bb-up">
+            {!semPacote ? (
+              <ActivePackageCard
+                pkg={pacoteMostrado}
+                credits={data.credits}
+                saldo={saldo}
+                audience="student"
+                // Só no autosserviço, sem pedido já em espera (duplicaria) e quando o botão principal
+                // ainda é "Agendar aula" — com crédito 0 ele próprio já leva a Pacotes.
+                onRequestMore={
+                  modoPronto && !isRecorrencia && !pedido && data.credits > 0 ? () => navigate("/app/pacotes") : undefined
+                }
+              />
+            ) : !modoPronto ? (
+              <SkeletonCard height={150} />
+            ) : (
+              <ComoFunciona recorrencia={isRecorrencia} pedidoEnviadoEm={pedido?.createdAt ?? null} pedidoNome={pedidoNome} />
+            )}
+          </div>
+
 
           {/* O título só aparece se houver algo embaixo dele (aula marcada ou o bloco "nenhuma aula"). */}
           {!semPacote && (data.nextBooking || isRecorrencia || data.credits > 0) && (
@@ -302,6 +327,19 @@ export default function StudentHome() {
           <PWAInstallBanner className="mt-6 mb-0" />
 
           <BoxingProfileHomeCard />
+
+          <ConfirmDialog
+            open={confirmDecline}
+            onOpenChange={setConfirmDecline}
+            title="RECUSAR ESTE HORÁRIO?"
+            description={
+              data.suggestion?.suggestedStartTime
+                ? `O horário sugerido (${formatDate(data.suggestion.suggestedStartTime)} · ${formatTime(data.suggestion.suggestedStartTime)}) será recusado e você escolhe outro em seguida.`
+                : ""
+            }
+            confirmLabel="Recusar e escolher outro"
+            onConfirm={() => data.suggestion && decline.mutate(data.suggestion)}
+          />
         </>
       )}
     </div>
