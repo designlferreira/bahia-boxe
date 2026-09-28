@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Calendar, ChevronRight, Hourglass } from "lucide-react";
+import { Calendar, Check, ChevronRight, Hourglass } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
@@ -78,6 +79,10 @@ export default function StudentHome() {
   // tido pacote. Cada caso tem sua própria frase — "Seu pacote acabou" pra todos era falso em dois
   // dos três.
   const pedido = !isRecorrencia ? (data?.pendingRequest ?? null) : null;
+  // Aluno sem pacote e sem aula marcada (recém-convidado, ou esperando o professor gerar a
+  // recorrência): no lugar de um "0" cinza + "Nenhum pacote ativo" + "Nenhuma aula agendada" — três
+  // jeitos de dizer "nada" —, a Home explica o caminho até a primeira aula.
+  const semPacote = !!data && !data.package && !data.nextBooking;
   const pedidoNome = pedido?.kind === "package" ? "pacote" : "aula avulsa";
   const cta = !data
     ? null
@@ -148,7 +153,13 @@ export default function StudentHome() {
       {data && (
         <>
           <div className="mb-4 animate-bb-up">
-            <ActivePackageCard pkg={data.package} credits={data.credits} saldo={saldo} audience="student" />
+            {!semPacote ? (
+              <ActivePackageCard pkg={data.package} credits={data.credits} saldo={saldo} audience="student" />
+            ) : !modoPronto ? (
+              <SkeletonCard height={150} />
+            ) : (
+              <ComoFunciona recorrencia={isRecorrencia} pedidoEnviadoEm={pedido?.createdAt ?? null} pedidoNome={pedidoNome} />
+            )}
           </div>
 
           {data.suggestion?.suggestedStartTime && (
@@ -187,8 +198,8 @@ export default function StudentHome() {
             </section>
           )}
 
-          <h2 className="section-title mt-2 mb-3">Próxima aula</h2>
-          {data.nextBooking ? (
+          {!semPacote && <h2 className="section-title mt-2 mb-3">Próxima aula</h2>}
+          {semPacote ? null : data.nextBooking ? (
             <button
               type="button"
               onClick={() => navigate(`/app/aula/${data.nextBooking!.id}`)}
@@ -246,9 +257,10 @@ export default function StudentHome() {
                 <Calendar className="h-[19px] w-[19px]" aria-hidden />
                 {cta.label}
               </Button>
-              <div className="text-center text-sm text-muted-foreground mt-3">{cta.hint}</div>
+              {/* Sem pacote, o "Como funciona" logo acima já explica o que acontece depois. */}
+              {!semPacote && <div className="text-center text-sm text-muted-foreground mt-3">{cta.hint}</div>}
             </>
-          ) : pedido ? (
+          ) : pedido && !semPacote ? (
             // Sem aulas e com pedido em espera: não há nada a fazer além de aguardar, então não há
             // botão — um "Solicitar" aqui convidaria a pedir de novo o que já foi pedido.
             <div role="status" className="flex gap-3 items-start p-4 rounded-2xl bg-amber/10 border border-amber/30">
@@ -269,5 +281,87 @@ export default function StudentHome() {
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * "Como funciona" — ocupa o lugar do cartão de saldo enquanto o aluno não tem pacote. Mostra em
+ * qual passo ele está (pedido enviado = passo 2 em andamento), em vez de só listar os passos.
+ */
+function ComoFunciona({
+  recorrencia,
+  pedidoEnviadoEm,
+  pedidoNome,
+}: {
+  recorrencia: boolean;
+  pedidoEnviadoEm: string | null;
+  pedidoNome: string;
+}) {
+  if (recorrencia) {
+    return (
+      <section aria-label="Sua agenda" className="rounded-2xl border border-border bg-card p-4">
+        <h2 className="text-lg font-semibold text-foreground">Seu professor está montando sua agenda</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Ele define seus dias fixos e gera as aulas do pacote. Assim que isso acontecer, elas aparecem aqui —
+          você não precisa agendar nada.
+        </p>
+      </section>
+    );
+  }
+
+  const passos: { titulo: string; detalhe?: string; estado: "feito" | "atual" | "depois" }[] = [
+    {
+      titulo: pedidoEnviadoEm ? `Pedido de ${pedidoNome} enviado` : "Escolha um pacote de aulas",
+      detalhe: pedidoEnviadoEm ? `Em ${formatDateShort(pedidoEnviadoEm)}` : undefined,
+      estado: pedidoEnviadoEm ? "feito" : "atual",
+    },
+    {
+      titulo: "Seu professor aprova e libera as aulas",
+      detalhe: pedidoEnviadoEm ? "Aguardando o professor" : undefined,
+      estado: pedidoEnviadoEm ? "atual" : "depois",
+    },
+    { titulo: "Agende o dia e o horário que preferir", estado: "depois" },
+  ];
+
+  return (
+    <section aria-label="Como funciona" className="rounded-2xl border border-border bg-card p-4">
+      <h2 className="text-lg font-semibold text-foreground">Suas aulas começam em 3 passos</h2>
+      <ol className="mt-4 flex flex-col gap-3">
+        {passos.map((p, i) => (
+          <li
+            key={p.titulo}
+            className="flex gap-3 items-start"
+            aria-current={p.estado === "atual" ? "step" : undefined}
+          >
+            <span
+              aria-hidden
+              className={cn(
+                "h-7 w-7 shrink-0 rounded-full flex items-center justify-center text-sm font-semibold border",
+                p.estado === "feito" && "border-transparent bg-secondary text-foreground",
+                p.estado === "atual" && (pedidoEnviadoEm ? "border-amber text-amber" : "border-foreground text-foreground"),
+                p.estado === "depois" && "border-border text-muted-foreground",
+              )}
+            >
+              {p.estado === "feito" ? <Check className="h-4 w-4" /> : i + 1}
+            </span>
+            <div className="pt-0.5">
+              <div
+                className={cn(
+                  "text-[15px]",
+                  p.estado === "depois" ? "text-muted-foreground" : "font-semibold text-foreground",
+                )}
+              >
+                {p.titulo}
+              </div>
+              {p.detalhe && (
+                <div className={cn("text-sm", p.estado === "atual" ? "text-amber" : "text-muted-foreground")}>
+                  {p.detalhe}
+                </div>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
