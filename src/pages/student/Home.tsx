@@ -126,8 +126,13 @@ export default function StudentHome() {
       <PWAInstallBanner />
 
       {isLoading && (
+        // Mesmo formato da tela pronta (cartão de saldo, rótulo, próxima aula, botão) — antes era só
+        // o cartão, e o resto "pulava" pra dentro quando os dados chegavam.
         <div role="status" aria-label="Carregando seu painel">
-          <SkeletonCard height={168} className="mb-4" />
+          <SkeletonCard height={150} className="mb-4" />
+          <SkeletonCard height={20} className="w-28 mt-2 mb-3" />
+          <SkeletonCard height={88} className="mb-6" />
+          <SkeletonCard height={56} />
         </div>
       )}
       {isError && <ErrorState title="Não foi possível carregar seu painel" onRetry={() => refetch()} />}

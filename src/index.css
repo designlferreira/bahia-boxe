@@ -96,8 +96,13 @@
     @apply w-full rounded-xl border border-border bg-input px-3.5 text-base text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors;
   }
 
+  /* O app é desenhado pro celular. Em tablet/computador o conteúdo parava de ter forma — cartões e
+     o botão principal esticavam de ponta a ponta. O padding lateral cresce pra centralizar uma
+     coluna de no máximo 30rem, mas a área de rolagem continua da largura toda (a roda do mouse
+     funciona em qualquer ponto da tela). No celular, max() cai no 1.25rem de sempre. */
   .page-container {
-    @apply flex-1 overflow-y-auto px-5 pt-14 pb-28 animate-bb-in;
+    @apply flex-1 overflow-y-auto pt-14 pb-28 animate-bb-in;
+    padding-inline: max(1.25rem, calc((100% - 30rem) / 2));
   }
 
   .page-title {
