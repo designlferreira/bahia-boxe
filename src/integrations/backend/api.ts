@@ -1728,7 +1728,7 @@ async function deriveNotifications(userId: string): Promise<AppNotification[]> {
         userId,
         kind: "system",
         title: r.status === "approved" ? "Pedido aprovado" : "Pedido recusado",
-        description: r.status === "approved" ? "Seus créditos já estão disponíveis." : "Fale com seu professor para entender o motivo.",
+        description: r.status === "approved" ? "Suas aulas já estão disponíveis para agendar." : "Fale com seu professor para entender o motivo.",
         createdAt: r.decided_at ?? r.created_at,
         read: false,
         entity: { type: "purchase_requests" },

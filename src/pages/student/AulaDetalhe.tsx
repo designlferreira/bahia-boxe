@@ -43,7 +43,7 @@ export default function StudentAulaDetalhe() {
       queryClient.invalidateQueries({ queryKey: ["student-home"] });
       queryClient.invalidateQueries({ queryKey: ["student-history"] });
       navigate("/app/home");
-      toast.warning("Aula cancelada · crédito devolvido");
+      toast.warning("Aula cancelada · a aula voltou para o seu pacote");
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível cancelar a aula."),
   });

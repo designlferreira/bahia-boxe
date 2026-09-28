@@ -32,8 +32,8 @@ const SCHEDULE_BOOKING_ERRORS: Record<string, string> = {
   slot_not_available: "Esse horário não está mais disponível.",
   slot_not_for_student: "Esse horário não é do seu professor.",
   slot_already_booked: "Esse horário acabou de ser ocupado. Escolha outro.",
-  no_active_package_or_no_credits: "Você não tem créditos disponíveis no momento.",
-  no_credits_left_for_future_bookings: "Seus créditos já estão todos reservados em outras aulas.",
+  no_active_package_or_no_credits: "Você não tem aulas restantes no momento. Peça um pacote para agendar.",
+  no_credits_left_for_future_bookings: "Todas as suas aulas restantes já estão agendadas.",
 };
 
 function scheduleBookingErrorMessage(err: unknown) {

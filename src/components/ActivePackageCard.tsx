@@ -82,7 +82,7 @@ export function ActivePackageCard({ pkg, credits, saldo, hideAlert, audience = "
   // Autosserviço: `credits` soma TODOS os pacotes ativos (inclusive trial) e já desconta as
   // reservas futuras; o que sobra entre "restantes no pacote" e `credits` é o que está agendado —
   // por isso o clamp. Recorrência: toda aula restante já nasce marcada, então "agendada" não
-  // distingue nada ali — só feitas x restantes.
+  // distingue nada ali — só usadas x restantes.
   const total = saldo ? saldo.total : (pkg?.totalClasses ?? 0);
   const used = saldo ? saldo.consumidas : (pkg?.usedClasses ?? 0);
   const remaining = Math.max(0, total - used);
@@ -96,13 +96,14 @@ export function ActivePackageCard({ pkg, credits, saldo, hideAlert, audience = "
   // Só existe o que renovar quando existe pacote; aula experimental não se "renova".
   const showLowAlert = !hideAlert && tone === "low" && pkg?.origin !== "trial";
 
-  const unit =
-    pkg || saldo
-      ? plural(headline, "aula restante", "aulas restantes")
-      : plural(headline, "aula disponível", "aulas disponíveis");
+  // Uma palavra só pro mesmo número, com ou sem pacote, nos dois fluxos — antes alternava entre
+  // "restantes" e "disponíveis" e o aluno podia achar que eram coisas diferentes.
+  const unit = plural(headline, "aula restante", "aulas restantes");
 
   const summary = [
-    saldo ? `${used} de ${total} ${plural(total, "feita", "feitas")}` : `${used} de ${total} ${plural(total, "usada", "usadas")}`,
+    // "usadas" nos dois fluxos. Na recorrência era "feitas", o que além de inconsistente era impreciso:
+    // `consumidas` inclui falta que consumiu crédito, e uma falta não é uma aula "feita".
+    `${used} de ${total} ${plural(total, "usada", "usadas")}`,
     booked > 0 ? `${booked} ${plural(booked, "agendada", "agendadas")}` : null,
     // Só vale dizer "para agendar" quando há as duas coisas; sem agendadas, o número grande já diz.
     booked > 0 && free > 0 ? `${free} para agendar` : null,
@@ -162,7 +163,12 @@ export function ActivePackageCard({ pkg, credits, saldo, hideAlert, audience = "
             {saldo && saldo.aRepor > 0 && (
               <span className="text-amber">
                 {" "}
-                · {saldo.aRepor} aguardando reposição
+                ·{" "}
+                {audience === "student"
+                  ? // "Reposição" é vocabulário de quem gerencia; pro aluno, o que importa é que
+                    // há aula a remarcar e que isso passa pelo professor.
+                    `${saldo.aRepor} para remarcar com o professor`
+                  : `${saldo.aRepor} aguardando reposição`}
               </span>
             )}
           </p>
