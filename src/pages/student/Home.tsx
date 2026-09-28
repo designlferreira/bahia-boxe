@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -12,9 +11,8 @@ import { SkeletonCard } from "@/components/SkeletonCard";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
 import { Badge } from "@/components/ui/badge";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
-import { SlotTakenError, acceptSuggestion, declineSuggestion, getModoAgendamentoEfetivo, getStudentAdminId, getStudentHome } from "@/integrations/backend/api";
+import { SlotTakenError, acceptSuggestion, declineSuggestion, restoreSuggestion, getModoAgendamentoEfetivo, getStudentAdminId, getStudentHome } from "@/integrations/backend/api";
 import type { Booking } from "@/integrations/backend/types";
 import { getStatusConfig } from "@/lib/bookingStatus";
 import { formatDayNumber, formatMonthShort, formatDate, formatDateShort, formatTime, formatRelativeDay } from "@/lib/dateUtils";
@@ -47,13 +45,32 @@ export default function StudentHome() {
         : toast.error(err instanceof Error ? err.message : "Não foi possível aceitar o novo horário."),
   });
 
-  const [confirmDecline, setConfirmDecline] = useState(false);
+  // Recusar não pede confirmação: vira um aviso com "Desfazer" (o guia de escrita prefere desfazer
+  // a confirmar quando a volta é segura). A confirmação vermelha "RECUSAR ESTE HORÁRIO?" assustava
+  // quem só queria ver outras opções. O aviso acompanha o aluno até Agendar, então dá pra voltar
+  // atrás de lá mesmo.
   const decline = useMutation({
     mutationFn: (suggestion: Booking) => declineSuggestion(suggestion.id),
-    onSuccess: () => {
+    onSuccess: (_r, suggestion) => {
       queryClient.invalidateQueries({ queryKey: ["student-home"] });
       queryClient.invalidateQueries({ queryKey: ["student-history"] });
       navigate("/app/agendar");
+      toast("Horário sugerido recusado", {
+        description: "Escolha outro horário abaixo.",
+        duration: 10000,
+        action: {
+          label: "Desfazer",
+          onClick: () =>
+            restoreSuggestion(suggestion.id, suggestion.suggestedStartTime!, suggestion.suggestedEndTime!)
+              .then(() => {
+                queryClient.invalidateQueries({ queryKey: ["student-home"] });
+                queryClient.invalidateQueries({ queryKey: ["student-history"] });
+                navigate("/app/home");
+                toast.success("Sugestão de horário de volta");
+              })
+              .catch((err) => toast.error(err instanceof Error ? err.message : "Não foi possível desfazer.")),
+        },
+      });
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível recusar o horário."),
   });
@@ -213,7 +230,7 @@ export default function StudentHome() {
               <Button
                 variant="ghost"
                 className="w-full h-11 mt-2 text-muted-foreground"
-                onClick={() => setConfirmDecline(true)}
+                onClick={() => decline.mutate(data.suggestion!)}
                 disabled={decline.isPending}
               >
                 Escolher outro horário
@@ -328,19 +345,6 @@ export default function StudentHome() {
           <PWAInstallBanner className="mt-6 mb-0" />
 
           <BoxingProfileHomeCard />
-
-          <ConfirmDialog
-            open={confirmDecline}
-            onOpenChange={setConfirmDecline}
-            title="RECUSAR ESTE HORÁRIO?"
-            description={
-              data.suggestion?.suggestedStartTime
-                ? `O horário sugerido (${formatDate(data.suggestion.suggestedStartTime)} · ${formatTime(data.suggestion.suggestedStartTime)}) será recusado e você escolhe outro em seguida.`
-                : ""
-            }
-            confirmLabel="Recusar e escolher outro"
-            onConfirm={() => data.suggestion && decline.mutate(data.suggestion)}
-          />
         </>
       )}
     </div>

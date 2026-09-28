@@ -526,6 +526,26 @@ export async function declineSuggestion(bookingId: string) {
   if (!data) throw new Error("Essa sugestão não está mais disponível.");
 }
 
+/**
+ * Desfaz `declineSuggestion`: devolve a sugestão exatamente como estava. Só age sobre a aula que
+ * continua `rejected` (nada aconteceu com ela desde a recusa). Se o horário sugerido tiver sido
+ * ocupado nesse meio-tempo, a sugestão volta mesmo assim — quem barra a colisão é o aceite.
+ */
+export async function restoreSuggestion(bookingId: string, suggestedStart: string, suggestedEnd: string) {
+  const { data, error } = await client()
+    .from("bookings")
+    .update({
+      status: "rejected_with_suggestion",
+      suggested_start_time: suggestedStart,
+      suggested_end_time: suggestedEnd,
+    })
+    .eq("id", bookingId)
+    .eq("status", "rejected")
+    .select("id")
+    .maybeSingle();
+  if (error || !data) throw new Error("Não foi possível desfazer. A sugestão não está mais disponível.");
+}
+
 // ---------------------------------------------------------------------------
 // student · histórico / detalhe
 // ---------------------------------------------------------------------------
