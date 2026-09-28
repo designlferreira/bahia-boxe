@@ -386,51 +386,90 @@ function aulaDe(studentId: string, studentName: string, days: number, hour: numb
   };
 }
 
+/** Aula de hoje a N minutos de agora (negativo = já passou) — o destaque "em 40 min" depende disso. */
+function aulaEm(studentId: string, studentName: string, minutos: number, status: Booking["status"]) {
+  const start = new Date(Date.now() + minutos * 60_000);
+  start.setSeconds(0, 0);
+  const end = new Date(start.getTime() + 60 * 60_000);
+  return {
+    ...booking(0, status, { id: `h-${studentId}-${minutos}`, studentId, startTime: start.toISOString(), endTime: end.toISOString() }),
+    studentName,
+  };
+}
+
+const RISCO = [
+  { student: aluno("s6", "Helena Costa"), motivo: "Sem aulas no pacote", grave: true },
+  { student: aluno("s7", "Igor Nascimento"), motivo: "Restam 2 aulas no pacote · 2 faltas seguidas", grave: false },
+  { student: aluno("s9", "Karina Duarte"), motivo: "Resta 1 aula no pacote", grave: false },
+  { student: aluno("s10", "Leonardo Prado"), motivo: "2 faltas seguidas", grave: false },
+];
+
 const DASH_CASES: { title: string; note: string; data: unknown }[] = [
   {
     title: "Dia movimentado",
-    note: "2 pedidos (1 remarcação), 1 aula sem confirmar, 2 alunos em risco",
+    note: "2 pedidos (1 remarcação), 2 aulas sem registro, 1 pedido de aulas, próxima em 40 min",
     data: {
-      kpiToday: 5,
       activeStudents: 12,
+      today: [
+        aulaEm("s1", "Ana Beatriz Souza", -300, "completed"),
+        aulaEm("s3", "Diego Martins", -180, "no_show"),
+        aulaEm("s8", "Julia Pereira", -90, "scheduled"),
+        aulaEm("s4", "Fernanda Rocha", 40, "scheduled"),
+        aulaEm("s5", "Gustavo Alves", 100, "scheduled"),
+        aulaEm("s11", "Marina Costa", 160, "pending_confirmation"),
+      ],
+      nextAfterToday: aulaDe("s1", "Ana Beatriz Souza", 1, 7, "scheduled"),
       pending: [
-        aulaDe("s1", "Ana Beatriz Souza", 1, 7, "pending_confirmation"),
+        { ...aulaDe("s1", "Ana Beatriz Souza", 1, 7, "pending_confirmation"), antecessorInicio: null },
         { ...aulaDe("s2", "Carlos Henrique Lima", 2, 18, "pending_confirmation", { replacementForBookingId: "orig-1" }), antecessorInicio: at(1, 19) },
       ],
-      awaitingConfirmation: [aulaDe("s3", "Diego Martins", -1, 19, "scheduled")],
-      upcoming: [
-        aulaDe("s4", "Fernanda Rocha", 0, 17, "scheduled"),
-        aulaDe("s5", "Gustavo Alves", 0, 18, "scheduled"),
-        aulaDe("s1", "Ana Beatriz Souza", 1, 7, "pending_confirmation"),
-      ],
-      atRisk: [
-        { student: aluno("s6", "Helena Costa"), motivo: "Sem aulas no pacote", grave: true },
-        { student: aluno("s7", "Igor Nascimento"), motivo: "Restam 2 aulas no pacote · 2 faltas seguidas", grave: false },
-        { student: aluno("s9", "Karina Duarte"), motivo: "Resta 1 aula no pacote", grave: false },
-        { student: aluno("s10", "Leonardo Prado"), motivo: "2 faltas seguidas", grave: false },
-      ],
+      awaitingConfirmation: [aulaDe("s3", "Diego Martins", -1, 19, "scheduled"), aulaEm("s8", "Julia Pereira", -90, "scheduled")],
+      purchaseRequests: 1,
+      atRisk: RISCO,
+      primeirosPassos: null,
     },
   },
   {
-    title: "Dia calmo",
-    note: "nada pendente, 3 próximas aulas",
+    title: "Fim do dia",
+    note: "todas as aulas de hoje registradas; mostra a próxima",
     data: {
-      kpiToday: 2,
       activeStudents: 8,
+      today: [aulaEm("s1", "Ana Beatriz Souza", -240, "completed"), aulaEm("s4", "Fernanda Rocha", -120, "completed")],
+      nextAfterToday: aulaDe("s8", "Julia Pereira", 1, 7, "scheduled"),
       pending: [],
       awaitingConfirmation: [],
-      upcoming: [
-        aulaDe("s4", "Fernanda Rocha", 0, 17, "scheduled"),
-        aulaDe("s5", "Gustavo Alves", 0, 18, "scheduled"),
-        aulaDe("s8", "Julia Pereira", 1, 7, "scheduled"),
-      ],
+      purchaseRequests: 0,
+      atRisk: RISCO.slice(1, 2),
+      primeirosPassos: null,
+    },
+  },
+  {
+    title: "Dia livre",
+    note: "nenhuma aula hoje, nada pendente",
+    data: {
+      activeStudents: 8,
+      today: [],
+      nextAfterToday: aulaDe("s8", "Julia Pereira", 3, 7, "scheduled"),
+      pending: [],
+      awaitingConfirmation: [],
+      purchaseRequests: 0,
       atRisk: [],
+      primeirosPassos: null,
     },
   },
   {
     title: "Professor começando",
-    note: "nenhum aluno ainda",
-    data: { kpiToday: 0, activeStudents: 0, pending: [], awaitingConfirmation: [], upcoming: [], atRisk: [] },
+    note: "nenhum aluno; já publicou horários",
+    data: {
+      activeStudents: 0,
+      today: [],
+      nextAfterToday: null,
+      pending: [],
+      awaitingConfirmation: [],
+      purchaseRequests: 0,
+      atRisk: [],
+      primeirosPassos: { horarios: true, pacotes: false, whatsapp: false },
+    },
   },
 ];
 

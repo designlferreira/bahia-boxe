@@ -707,28 +707,39 @@ export async function reconcileBookingStatuses() {
   if (error) throw new Error(error.message);
 }
 
+/** Primeiros passos de um professor que ainda não tem aluno (painel, "Comece por aqui"). */
+export interface PrimeirosPassos {
+  horarios: boolean;
+  pacotes: boolean;
+  whatsapp: boolean;
+}
+
 export async function getAdminDashboard(adminId: string) {
   const nowIso = new Date().toISOString();
   const { startIso, endIso } = dayBoundsUtcIso(new Date());
 
-  const [students, todayRes, pendingRes, upcomingRes, awaitingRes] = await Promise.all([
+  const [students, todayRes, pendingRes, nextRes, awaitingRes, pedidosRes] = await Promise.all([
     adminStudents(adminId),
+    // A agenda de HOJE inteira (inclusive o que já passou), sem o que não vai acontecer: cancelada,
+    // remarcada (a sucessora é que vale) e recusada.
     client()
       .from("bookings")
-      .select("id", { count: "exact", head: true })
+      .select("*")
       .eq("admin_id", adminId)
-      .neq("status", "cancelled")
+      .not("status", "in", "(cancelled,rescheduled,rejected,rejected_with_suggestion)")
       .gte("start_time", startIso)
-      .lt("start_time", endIso),
+      .lt("start_time", endIso)
+      .order("start_time", { ascending: true }),
     client().from("bookings").select("*").eq("admin_id", adminId).eq("status", "pending_confirmation").order("start_time"),
+    // Próxima aula depois de hoje — pro "Dia livre" e pro fim do dia ("Próxima aula: amanhã…").
     client()
       .from("bookings")
       .select("*")
       .eq("admin_id", adminId)
       .in("status", ACTIVE_STATUSES)
-      .gt("start_time", nowIso)
+      .gte("start_time", endIso)
       .order("start_time", { ascending: true })
-      .limit(3),
+      .limit(1),
     // scheduled + horário já passou: não vira "completed" sozinha (ver reconcileBookingStatuses
     // acima) — fica visível aqui até o professor confirmar o que aconteceu.
     client()
@@ -738,27 +749,56 @@ export async function getAdminDashboard(adminId: string) {
       .eq("status", "scheduled")
       .lt("end_time", nowIso)
       .order("start_time", { ascending: true }),
+    client()
+      .from("purchase_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("admin_id", adminId)
+      .eq("status", "pending"),
   ]);
+  if (todayRes.error) throw new Error(todayRes.error.message);
   if (pendingRes.error) throw new Error(pendingRes.error.message);
-  if (upcomingRes.error) throw new Error(upcomingRes.error.message);
+  if (nextRes.error) throw new Error(nextRes.error.message);
   if (awaitingRes.error) throw new Error(awaitingRes.error.message);
+  if (pedidosRes.error) throw new Error(pedidosRes.error.message);
 
   const byId = new Map(students.map((s) => [s.id, s]));
   const nameOf = (studentId: string) => byId.get(studentId)?.name ?? "Aluno";
-  const atRisk = await alunosEmRisco(students);
-  const antesPendentes = await antecessores((pendingRes.data ?? []).map((r) => r.replacement_for_booking_id));
+  const comNome = (r: any) => ({ ...mapBooking(r), studentName: nameOf(r.student_id) });
+  const [atRisk, antesPendentes, primeirosPassos] = await Promise.all([
+    alunosEmRisco(students),
+    antecessores((pendingRes.data ?? []).map((r) => r.replacement_for_booking_id)),
+    students.length === 0 ? getPrimeirosPassos(adminId) : Promise.resolve(null),
+  ]);
 
   return {
-    kpiToday: todayRes.count ?? 0,
     activeStudents: students.length,
+    today: (todayRes.data ?? []).map(comNome),
+    nextAfterToday: nextRes.data?.[0] ? comNome(nextRes.data[0]) : null,
     pending: (pendingRes.data ?? []).map((r) => ({
-      ...mapBooking(r),
-      studentName: nameOf(r.student_id),
+      ...comNome(r),
       antecessorInicio: r.replacement_for_booking_id ? (antesPendentes.get(r.replacement_for_booking_id)?.inicio ?? null) : null,
     })),
-    upcoming: (upcomingRes.data ?? []).map((r) => ({ ...mapBooking(r), studentName: nameOf(r.student_id) })),
-    awaitingConfirmation: (awaitingRes.data ?? []).map((r) => ({ ...mapBooking(r), studentName: nameOf(r.student_id) })),
+    awaitingConfirmation: (awaitingRes.data ?? []).map(comNome),
+    purchaseRequests: pedidosRes.count ?? 0,
     atRisk,
+    /** Só quando o professor ainda não tem aluno. */
+    primeirosPassos,
+  };
+}
+
+/** Três checagens baratas (count sem trazer linha) pro "Comece por aqui". */
+async function getPrimeirosPassos(adminId: string): Promise<PrimeirosPassos> {
+  const [slotsRes, templatesRes, settings] = await Promise.all([
+    client().from("availability_slots").select("id", { count: "exact", head: true }).eq("admin_id", adminId).eq("is_active", true),
+    client().from("package_templates").select("id", { count: "exact", head: true }).eq("admin_id", adminId).eq("is_active", true),
+    getAdminSettings(adminId),
+  ]);
+  if (slotsRes.error) throw new Error(slotsRes.error.message);
+  if (templatesRes.error) throw new Error(templatesRes.error.message);
+  return {
+    horarios: (slotsRes.count ?? 0) > 0,
+    pacotes: (templatesRes.count ?? 0) > 0,
+    whatsapp: !!settings?.whatsapp,
   };
 }
 
