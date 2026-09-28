@@ -53,7 +53,7 @@ export function StudentBottomNav() {
           }
         >
           <Icon className="h-[21px] w-[21px]" strokeWidth={2} aria-hidden />
-          <span className="text-[11.5px] font-semibold">{label}</span>
+          <span className="text-xs font-semibold">{label}</span>
         </NavLink>
       ))}
     </nav>

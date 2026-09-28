@@ -109,7 +109,7 @@ export function BoxingProfileHomeCard() {
       <button
         type="button"
         onClick={open}
-        className="mt-6 w-full text-left card-dark p-4 flex gap-4 items-center active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="mt-6 w-full text-left card-dark p-4 flex gap-4 items-center active:scale-[0.98] active:bg-secondary transition-[transform,background-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <div className="h-11 w-11 rounded-xl bg-secondary flex items-center justify-center shrink-0">
           <Target className="h-5 w-5 text-foreground/85" aria-hidden />
@@ -131,7 +131,7 @@ export function BoxingProfileHomeCard() {
       type="button"
       onClick={open}
       aria-label={`Seu perfil de boxe: ${label}${coachUnseen ? ". Seu professor te avaliou" : ""}. Ver perfil`}
-      className="mt-6 w-full text-left card-dark p-4 active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="mt-6 w-full text-left card-dark p-4 active:scale-[0.98] active:bg-secondary transition-[transform,background-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div className="flex gap-4 items-center">
         <div className="h-11 w-11 rounded-xl bg-secondary flex items-center justify-center shrink-0">

@@ -81,7 +81,11 @@ export default function StudentHome() {
   const pedidoNome = pedido?.kind === "package" ? "pacote" : "aula avulsa";
   const cta = !data
     ? null
-    : isRecorrencia
+    : isRecorrencia && !data.nextBooking && !data.package
+      ? // Recorrência sem pacote e sem aula: "Ver minhas aulas" levaria a uma lista vazia. O bloco
+        // "Nenhuma aula agendada" logo acima já explica que o professor vai marcar.
+        null
+      : isRecorrencia
       ? {
           to: "/app/historico",
           label: "Ver minhas aulas",
@@ -95,7 +99,7 @@ export default function StudentHome() {
             label: "Agendar aula",
             hint: pedido
               ? `Seu pedido de ${pedidoNome} está com o professor`
-              : "Escolha dia e horário em 2 toques",
+              : "Escolha o dia e o horário da sua aula",
           }
         : pedido
           ? null
@@ -191,7 +195,7 @@ export default function StudentHome() {
               type="button"
               onClick={() => navigate(`/app/aula/${data.nextBooking!.id}`)}
               aria-label={`${formatDate(data.nextBooking.startTime)}, ${formatTime(data.nextBooking.startTime)}, ${getStatusConfig(data.nextBooking.status).label}. Ver detalhes`}
-              className="w-full text-left card-dark p-4 flex gap-4 items-center mb-6 active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="w-full text-left card-dark p-4 flex gap-4 items-center mb-6 active:scale-[0.98] active:bg-secondary transition-[transform,background-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <div aria-hidden className="w-[54px] text-center border-r border-border pr-3">
                 <div className="font-display text-3xl leading-none text-foreground">
