@@ -459,16 +459,19 @@ export async function scheduleBooking(slotId: string) {
 }
 
 /** Students may cancel their own scheduled class up to 6h before it starts (RLS enforces it). */
+/**
+ * O aluno cancela a própria aula por RPC (0034). Antes era UPDATE direto, que a policy do aluno só
+ * deixava passar em aula `scheduled`: cancelar uma aula ainda PENDENTE (agendada no autosserviço,
+ * sem aprovação) afetava 0 linhas e o app culpava o prazo de 6 horas.
+ */
 export async function cancelBooking(bookingId: string) {
-  const { data, error } = await client()
-    .from("bookings")
-    .update({ status: "cancelled" })
-    .eq("id", bookingId)
-    .select()
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("Só é possível cancelar até 6 horas antes do início da aula.");
-  return mapBooking(data);
+  const { error } = await client().rpc("cancelar_minha_aula", { p_booking_id: bookingId });
+  if (!error) return;
+  const m = error.message ?? "";
+  if (m.includes("too_late")) throw new Error("Só é possível cancelar até 6 horas antes do início da aula.");
+  if (m.includes("already_started")) throw new Error("Esta aula já começou.");
+  if (m.includes("not_cancelable")) throw new Error("Esta aula não pode mais ser cancelada.");
+  throw new Error("Não foi possível cancelar a aula. Tente de novo em instantes.");
 }
 
 /**
