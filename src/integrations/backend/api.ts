@@ -552,14 +552,65 @@ export async function getStudentBookingHistory(
  * The professor's name is not readable from `profiles` by a student (RLS), so it comes from the
  * `booking_history_app` view, which joins it server-side. Falls back to the plain row.
  */
+/**
+ * Mesmo arranjo de `getAdminBookingDetail`: a aula vem da TABELA (a view `booking_history_app` é
+ * anterior às colunas de recorrência — ler a aula dali devolvia `pacoteId`/`replacementForBookingId`
+ * nulos, e a tela não sabia que era aula de recorrência nem pedido de remarcação). Da view só o nome
+ * do professor, que ela resolve server-side (o aluno não lê `profiles` do professor).
+ */
 export async function getBookingDetail(bookingId: string): Promise<{ booking: Booking; adminName: string | null } | undefined> {
-  const viewRes = await client().from("booking_history_app").select("*").eq("id", bookingId).maybeSingle();
-  if (!viewRes.error && viewRes.data) {
-    return { booking: mapBooking(viewRes.data), adminName: viewRes.data.admin_name ?? null };
-  }
-  const { data, error } = await client().from("bookings").select("*").eq("id", bookingId).maybeSingle();
+  const [viewRes, rowRes] = await Promise.all([
+    client().from("booking_history_app").select("admin_name").eq("id", bookingId).maybeSingle(),
+    client().from("bookings").select("*").eq("id", bookingId).maybeSingle(),
+  ]);
+  if (rowRes.error) throw new Error(rowRes.error.message);
+  if (!rowRes.data) return undefined;
+  return { booking: mapBooking(rowRes.data), adminName: viewRes.data?.admin_name ?? null };
+}
+
+// ---------------------------------------------------------------------------
+// student · pedido de remarcação (0033)
+// ---------------------------------------------------------------------------
+
+function remarcacaoError(message: string | undefined, fallback: string): Error {
+  const m = message ?? "";
+  if (m.includes("slot_taken")) return new SlotTakenError();
+  if (m.includes("too_late")) return new Error("Só dá para pedir outro horário até 24 horas antes da aula.");
+  if (m.includes("request_already_pending")) return new Error("Você já tem um pedido de remarcação esperando o professor.");
+  if (m.includes("invalid_time")) return new Error("Escolha uma hora cheia entre 6h e 22h, com pelo menos 24 horas de antecedência.");
+  if (m.includes("request_not_pending")) return new Error("Esse pedido não está mais pendente.");
+  if (m.includes("original_not_scheduled")) return new Error("A aula original mudou nesse meio-tempo e não pode mais ser remarcada.");
+  if (m.includes("not_recurrence") || m.includes("not_scheduled")) return new Error("Esta aula não pode ser remarcada por aqui.");
+  return new Error(fallback);
+}
+
+/** Horas cheias livres do professor no dia (yyyy-MM-dd, horário de São Paulo), pra remarcar `bookingId`. */
+export async function getHorariosLivresRemarcacao(bookingId: string, dia: string): Promise<string[]> {
+  const { data, error } = await client().rpc("horarios_livres_remarcacao", { p_booking_id: bookingId, p_dia: dia });
+  if (error) throw remarcacaoError(error.message, "Não foi possível carregar os horários.");
+  return ((data ?? []) as { inicio: string }[]).map((r) => r.inicio);
+}
+
+export async function pedirRemarcacao(bookingId: string, novoInicio: string) {
+  const { error } = await client().rpc("pedir_remarcacao", { p_booking_id: bookingId, p_novo_inicio: novoInicio });
+  if (error) throw remarcacaoError(error.message, "Não foi possível enviar o pedido.");
+}
+
+export async function cancelarPedidoRemarcacao(pedidoId: string) {
+  const { error } = await client().rpc("cancelar_pedido_remarcacao", { p_pedido_id: pedidoId });
+  if (error) throw remarcacaoError(error.message, "Não foi possível cancelar o pedido.");
+}
+
+/** Pedido de remarcação pendente desta aula (no máximo um — regra da 0033), ou null. */
+export async function getPedidoRemarcacaoPendente(bookingId: string): Promise<Booking | null> {
+  const { data, error } = await client()
+    .from("bookings")
+    .select("*")
+    .eq("replacement_for_booking_id", bookingId)
+    .eq("status", "pending_confirmation")
+    .maybeSingle();
   if (error) throw new Error(error.message);
-  return data ? { booking: mapBooking(data), adminName: null } : undefined;
+  return data ? mapBooking(data) : null;
 }
 
 /** Mesma view, do lado do professor: já traz o nome do aluno resolvido. */
@@ -777,7 +828,18 @@ export interface TimelineEntry {
  * moveu a aula) ou `no_show`/`cancelled` (o aluno perdeu a aula e esta é a reposição). Antes disso
  * a tela chamava as duas de "Reposição", porque só olhava `is_replacement`.
  */
-export type VinculoAula = "remarcacao" | "reposicao";
+/**
+ * `pedido_remarcacao` (0033): o antecessor ainda está `scheduled` — só acontece quando o aluno pediu
+ * pra remarcar e o professor ainda não decidiu (um sucessor "normal" só nasce depois de a original
+ * virar rescheduled/no_show/cancelled).
+ */
+export type VinculoAula = "remarcacao" | "reposicao" | "pedido_remarcacao";
+
+export const VINCULO_LABEL: Record<VinculoAula, string> = {
+  remarcacao: "Remarcada",
+  reposicao: "Reposição",
+  pedido_remarcacao: "Pedido de remarcação",
+};
 
 /**
  * Resolve o vínculo de várias aulas de uma vez, indexado pelo id do ANTECESSOR. Uma consulta só
@@ -790,7 +852,8 @@ async function vinculoPorAntecessor(antecessorIds: (string | null | undefined)[]
   if (ids.length === 0) return out;
   const { data, error } = await client().from("bookings").select("id, status").in("id", ids);
   if (error) throw new Error(error.message);
-  for (const r of data ?? []) out.set(r.id, r.status === "rescheduled" ? "remarcacao" : "reposicao");
+  for (const r of data ?? [])
+    out.set(r.id, r.status === "rescheduled" ? "remarcacao" : r.status === "scheduled" ? "pedido_remarcacao" : "reposicao");
   return out;
 }
 
@@ -844,7 +907,28 @@ export async function getAdminAgendaForDay(adminId: string, date: Date): Promise
     });
 }
 
+/**
+ * Um pendente com antecessor é um PEDIDO DE REMARCAÇÃO do aluno (0033), não um agendamento novo.
+ * Aprovar/recusar precisa passar pela RPC: só mudar o status deixaria a aula original E a nova
+ * agendadas ao mesmo tempo (aprovar), ou o pedido recusado pendurado na cadeia e o saldo errado
+ * (recusar).
+ */
+async function isPedidoRemarcacao(bookingId: string): Promise<boolean> {
+  const { data, error } = await client()
+    .from("bookings")
+    .select("status, replacement_for_booking_id")
+    .eq("id", bookingId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.status === "pending_confirmation" && !!data.replacement_for_booking_id;
+}
+
 export async function approveBooking(bookingId: string) {
+  if (await isPedidoRemarcacao(bookingId)) {
+    const { error } = await client().rpc("aprovar_remarcacao", { p_pedido_id: bookingId });
+    if (error) throw remarcacaoError(error.message, "Não foi possível aprovar a remarcação.");
+    return;
+  }
   const { data, error } = await client()
     .from("bookings")
     .update({ status: "scheduled" })
@@ -856,6 +940,13 @@ export async function approveBooking(bookingId: string) {
 }
 
 export async function rejectBooking(bookingId: string, note: string, suggestedStart?: string | null, suggestedEnd?: string | null) {
+  if (await isPedidoRemarcacao(bookingId)) {
+    // Num pedido de remarcação não cabe "sugerir outro horário": a aula original continua valendo
+    // e o aluno pode pedir outro. A sugestão, se vier, é ignorada; a observação vai junto.
+    const { error } = await client().rpc("recusar_remarcacao", { p_pedido_id: bookingId, p_nota: note || null });
+    if (error) throw remarcacaoError(error.message, "Não foi possível recusar a remarcação.");
+    return;
+  }
   const withSuggestion = !!(suggestedStart && suggestedEnd);
   const { data, error } = await client()
     .from("bookings")

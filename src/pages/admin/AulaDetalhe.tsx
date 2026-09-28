@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { getStatusConfig, isAwaitingConfirmation } from "@/lib/bookingStatus";
 import { formatDate, formatTime } from "@/lib/dateUtils";
 import { useLessonActions } from "@/hooks/useLessonActions";
-import { getAdminBookingDetail } from "@/integrations/backend/api";
+import { getAdminBookingDetail, VINCULO_LABEL } from "@/integrations/backend/api";
 
 export default function AdminAulaDetalhe() {
   const { id } = useParams<{ id: string }>();
@@ -69,7 +69,7 @@ export default function AdminAulaDetalhe() {
           </Badge>
           {vinculo && (
             <Badge className="bg-secondary text-muted-foreground flex items-center gap-1">
-              <Repeat className="h-3 w-3" /> {vinculo === "remarcacao" ? "Remarcada" : "Reposição"}
+              <Repeat className="h-3 w-3" /> {VINCULO_LABEL[vinculo]}
             </Badge>
           )}
           {remarcacoes > 0 && (

@@ -113,7 +113,10 @@ export default function AdminDashboard() {
                           {formatDateTime(b.startTime)} – {formatTime(b.endTime)}
                         </div>
                       </div>
-                      <Badge className="bg-amber/20 text-amber">Pendente</Badge>
+                      {/* Pendente com antecessor = o aluno pediu pra remarcar uma aula (0033). */}
+                      <Badge className="bg-amber/20 text-amber">
+                        {b.replacementForBookingId ? "Pedido de remarcação" : "Pendente"}
+                      </Badge>
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" className="flex-1" onClick={() => approve.mutate(b.id)}>

@@ -19,6 +19,7 @@ import {
   getAwaitingConfirmationBookings,
   rejectBooking,
   type TimelineEntry,
+  VINCULO_LABEL,
 } from "@/integrations/backend/api";
 
 const DAY_COUNT = 7;
@@ -252,7 +253,7 @@ export default function AdminAgenda() {
                             {entry.studentName}
                             {entry.vinculo && (
                               <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
-                                {entry.vinculo === "remarcacao" ? "Remarcada" : "Reposição"}
+                                {VINCULO_LABEL[entry.vinculo]}
                               </span>
                             )}
                           </div>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowDown, Clock3, MapPin, Repeat } from "lucide-react";
+import { ArrowDown, CalendarClock, Clock3, MapPin, Repeat } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { ErrorState } from "@/components/ErrorState";
@@ -13,7 +13,17 @@ import { Button } from "@/components/ui/button";
 import { getStatusConfig } from "@/lib/bookingStatus";
 import { formatDateTime, formatTime, formatDate } from "@/lib/dateUtils";
 import { arrivalMessage, equipmentItems, formatAddress, hasAddress, mapsUrl } from "@/lib/classGuidelines";
-import { SlotTakenError, acceptSuggestion, cancelBooking, getBookingDetail, getClassGuidelinesForBooking } from "@/integrations/backend/api";
+import {
+  SlotTakenError,
+  acceptSuggestion,
+  cancelBooking,
+  cancelarPedidoRemarcacao,
+  getBookingDetail,
+  getClassGuidelinesForBooking,
+  getPedidoRemarcacaoPendente,
+  getWhatsappDoProfessor,
+} from "@/integrations/backend/api";
+import { RemarcacaoSheet } from "@/components/RemarcacaoSheet";
 
 export default function StudentAulaDetalhe() {
   const { id } = useParams<{ id: string }>();
@@ -37,13 +47,48 @@ export default function StudentAulaDetalhe() {
     enabled: !!booking,
   });
 
+  // ---- Pedido de remarcação pelo aluno de recorrência (0033) ----
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const isRecorrencia = !!booking?.pacoteId;
+  // Esta aula É um pedido (pendente e ligada a uma aula original ainda agendada).
+  const isPedido = booking?.status === "pending_confirmation" && !!booking.replacementForBookingId;
+  const { data: pedidoPendente } = useQuery({
+    queryKey: ["pedido-remarcacao", id],
+    queryFn: () => getPedidoRemarcacaoPendente(id!),
+    enabled: !!booking && booking.status === "scheduled" && isRecorrencia,
+  });
+  const faltaMaisDe24h = !!booking && new Date(booking.startTime).getTime() - Date.now() >= 24 * 60 * 60 * 1000;
+  const { data: whatsapp } = useQuery({
+    queryKey: ["whatsapp-professor", booking?.adminId],
+    queryFn: () => getWhatsappDoProfessor(booking!.adminId),
+    enabled: !!booking && isRecorrencia && !faltaMaisDe24h,
+    staleTime: 60 * 60 * 1000,
+  });
+  const invalidateAulas = () => {
+    queryClient.invalidateQueries({ queryKey: ["student-home"] });
+    queryClient.invalidateQueries({ queryKey: ["student-history"] });
+    queryClient.invalidateQueries({ queryKey: ["pedido-remarcacao", id] });
+    queryClient.invalidateQueries({ queryKey: ["booking", id] });
+  };
+  const cancelarPedido = useMutation({
+    mutationFn: (pedidoId: string) => cancelarPedidoRemarcacao(pedidoId),
+    onSuccess: () => {
+      invalidateAulas();
+      toast("Pedido cancelado · sua aula continua no horário original");
+      if (isPedido) navigate("/app/home");
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível cancelar o pedido."),
+  });
+
   const cancel = useMutation({
     mutationFn: () => cancelBooking(id!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["student-home"] });
       queryClient.invalidateQueries({ queryKey: ["student-history"] });
       navigate("/app/home");
-      toast.warning("Aula cancelada · a aula voltou para o seu pacote");
+      // Na recorrência, cancelar pode contar como aula usada (depende da regra do pacote) — não
+      // prometer que "voltou para o pacote".
+      toast.warning(isRecorrencia ? "Aula cancelada" : "Aula cancelada · a aula voltou para o seu pacote");
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível cancelar a aula."),
   });
@@ -220,17 +265,102 @@ export default function StudentAulaDetalhe() {
         </div>
       )}
 
-      {cancelable && (
+      {isPedido && (
+        <div className="rounded-2xl p-4 bg-amber/10 border border-amber/30 mb-3.5">
+          <div className="text-[15px] font-semibold text-amber">Pedido de remarcação</div>
+          <div className="text-sm text-muted-foreground mt-1">
+            Seu professor ainda vai aprovar este horário. Até lá, a aula continua no horário original.
+          </div>
+          <Button
+            variant="secondary"
+            className="w-full mt-3"
+            onClick={() => cancelarPedido.mutate(booking.id)}
+            disabled={cancelarPedido.isPending}
+          >
+            Cancelar pedido
+          </Button>
+        </div>
+      )}
+
+      {pedidoPendente && (
+        <div className="rounded-2xl p-4 bg-amber/10 border border-amber/30 mb-3.5">
+          <div className="text-[15px] font-semibold text-amber">Você pediu outro horário</div>
+          <div className="text-base font-semibold text-foreground mt-1 first-letter:uppercase">
+            {formatDate(pedidoPendente.startTime)} · {formatTime(pedidoPendente.startTime)}
+          </div>
+          <div className="text-sm text-muted-foreground mt-0.5">Aguardando o professor</div>
+          <Button
+            variant="secondary"
+            className="w-full mt-3"
+            onClick={() => cancelarPedido.mutate(pedidoPendente.id)}
+            disabled={cancelarPedido.isPending}
+          >
+            Cancelar pedido
+          </Button>
+        </div>
+      )}
+
+      {booking.status === "scheduled" && isRecorrencia && !pedidoPendente && (
+        faltaMaisDe24h ? (
+          <Button variant="secondary" size="lg" className="w-full mb-3" onClick={() => setPickerOpen(true)}>
+            <CalendarClock className="h-5 w-5" aria-hidden />
+            Pedir outro horário
+          </Button>
+        ) : (
+          <div className="text-sm text-muted-foreground mb-3">
+            Faltam menos de 24 horas para esta aula. Para mudar o horário, fale com o professor
+            {whatsapp ? (
+              <>
+                {" "}
+                <a
+                  href={`https://wa.me/${whatsapp}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-11 items-center font-semibold text-foreground underline underline-offset-4"
+                >
+                  pelo WhatsApp
+                </a>
+              </>
+            ) : (
+              "."
+            )}
+          </div>
+        )
+      )}
+
+      {cancelable && !isPedido && (
         <Button variant="destructive" size="lg" className="w-full" onClick={() => setConfirmCancel(true)}>
           Cancelar aula
         </Button>
+      )}
+
+      {booking.status === "scheduled" && isRecorrencia && (
+        <RemarcacaoSheet
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          bookingId={booking.id}
+          onDone={() => {
+            setPickerOpen(false);
+            invalidateAulas();
+            toast.success("Pedido enviado · seu professor vai responder");
+          }}
+          onError={(err) =>
+            err instanceof SlotTakenError
+              ? toast.error("Esse horário acabou de ser ocupado. Escolha outro.")
+              : toast.error(err instanceof Error ? err.message : "Não foi possível enviar o pedido.")
+          }
+        />
       )}
 
       <ConfirmDialog
         open={confirmCancel}
         onOpenChange={setConfirmCancel}
         title="CANCELAR AULA"
-        description={`A aula de ${formatDate(booking.startTime)} será cancelada e o crédito volta para o seu pacote.`}
+        description={
+          isRecorrencia
+            ? `A aula de ${formatDate(booking.startTime)} será cancelada. Se quiser só mudar o horário, use "Pedir outro horário".`
+            : `A aula de ${formatDate(booking.startTime)} será cancelada e a aula volta para o seu pacote.`
+        }
         confirmLabel="Cancelar aula"
         onConfirm={() => cancel.mutate()}
       />

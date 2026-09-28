@@ -16,6 +16,9 @@ import { AuthContext } from "@/context/AuthContext";
 import StudentHome from "@/pages/student/Home";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
+import { RemarcacaoSheet } from "@/components/RemarcacaoSheet";
+import { formatInTimeZone } from "date-fns-tz";
+import { TIMEZONE } from "@/lib/dateUtils";
 import { DIMENSIONS, FIGHTER_PROFILES, SCORING_VERSION, type FighterProfileKey } from "@/lib/boxingProfile";
 import type { AppNotification, BoxingProfileAssessment } from "@/integrations/backend/types";
 import type { Booking, PackageRecord, Profile, PurchaseRequest, SaldoPacote } from "@/integrations/backend/types";
@@ -342,6 +345,29 @@ const CARD_CASES: { title: string; note: string; props: Parameters<typeof Active
   },
 ];
 
+/** Painel de remarcação com horários inventados (dia 3 da lista sem nenhum livre). */
+function AmostraRemarcacao() {
+  const [open, setOpen] = useState(false);
+  const [client] = useState(() => {
+    const qc = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
+    for (let i = 1; i <= 21; i++) {
+      const d = addDays(new Date(), i);
+      const key = formatInTimeZone(d, TIMEZONE, "yyyy-MM-dd");
+      const horas = i === 3 ? [] : [7, 8, 12, 17, 18, 20].map((h) => new Date(`${key}T${String(h).padStart(2, "0")}:00:00-03:00`).toISOString());
+      qc.setQueryData(["horarios-livres-remarcacao", "amostra-aula", key], horas);
+    }
+    return qc;
+  });
+  return (
+    <QueryClientProvider client={client}>
+      <button type="button" className="rounded-xl border border-border px-4 h-11" onClick={() => setOpen(true)}>
+        Abrir "Pedir outro horário"
+      </button>
+      <RemarcacaoSheet open={open} onOpenChange={setOpen} bookingId="amostra-aula" onDone={() => setOpen(false)} onError={() => {}} />
+    </QueryClientProvider>
+  );
+}
+
 export default function Amostras() {
   return (
     <BrowserRouter>
@@ -361,6 +387,11 @@ export default function Amostras() {
               </Seeded>
             </Frame>
           ))}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Pedido de remarcação (aluno)</h2>
+        <div className="mb-12">
+          <AmostraRemarcacao />
         </div>
 
         <h2 className="text-lg font-semibold mb-4">Perfil de Boxe na Home</h2>
