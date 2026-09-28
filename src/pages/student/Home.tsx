@@ -8,6 +8,7 @@ import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
+import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { acceptSuggestion, getModoAgendamentoEfetivo, getStudentAdminId, getStudentHome } from "@/integrations/backend/api";
@@ -261,6 +262,8 @@ export default function StudentHome() {
               </div>
             </div>
           ) : null}
+
+          <BoxingProfileHomeCard />
         </>
       )}
     </div>

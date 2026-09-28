@@ -15,6 +15,9 @@ import { addDays, subDays } from "date-fns";
 import { AuthContext } from "@/context/AuthContext";
 import StudentHome from "@/pages/student/Home";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
+import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
+import { DIMENSIONS, FIGHTER_PROFILES, SCORING_VERSION, type FighterProfileKey } from "@/lib/boxingProfile";
+import type { AppNotification, BoxingProfileAssessment } from "@/integrations/backend/types";
 import type { Booking, PackageRecord, Profile, PurchaseRequest, SaldoPacote } from "@/integrations/backend/types";
 
 const PROFILE: Profile = {
@@ -176,7 +179,17 @@ const HOME_CASES: { title: string; note: string; modo: Modo; data: HomeData }[] 
   },
 ];
 
-function Seeded({ data, modo, children }: { data: HomeData; modo: Modo; children: ReactNode }) {
+function Seeded({
+  data,
+  modo,
+  extra = [],
+  children,
+}: {
+  data: HomeData;
+  modo: Modo;
+  extra?: [unknown[], unknown][];
+  children: ReactNode;
+}) {
   const [client] = useState(() => {
     const qc = new QueryClient({
       defaultOptions: {
@@ -192,6 +205,9 @@ function Seeded({ data, modo, children }: { data: HomeData; modo: Modo; children
     qc.setQueryData(["student-admin-id", PROFILE.id], ADMIN_ID);
     qc.setQueryData(["modo-agendamento-efetivo", ADMIN_ID], modo);
     qc.setQueryData(["notifications", PROFILE.id], []);
+    qc.setQueryData(["my-student-id", PROFILE.id], "amostra-student");
+    qc.setQueryData(["boxing-profile-history", "amostra-student"], []);
+    for (const [key, value] of extra) qc.setQueryData(key, value);
     return qc;
   });
   return (
@@ -222,6 +238,76 @@ function Frame({ title, note, children }: { title: string; note: string; childre
     </figure>
   );
 }
+
+function assessment(
+  id: string,
+  type: "self" | "coach",
+  primary: FighterProfileKey,
+  secondary: FighterProfileKey,
+): BoxingProfileAssessment {
+  const profileScores = Object.fromEntries(
+    FIGHTER_PROFILES.map((p) => [p, p === primary ? 82 : p === secondary ? 70 : 45]),
+  ) as Record<FighterProfileKey, number>;
+  const dimensionScores = Object.fromEntries(DIMENSIONS.map((d) => [d, 60])) as BoxingProfileAssessment["dimensionScores"];
+  return {
+    id,
+    assessmentType: type,
+    assessedBy: type === "coach" ? ADMIN_ID : null,
+    completedAt: at(-3, 10),
+    createdAt: at(-3, 10),
+    primaryProfile: primary,
+    secondaryProfile: secondary,
+    dimensionScores,
+    profileScores,
+    assessmentLength: "full",
+    scoringVersion: SCORING_VERSION,
+    answers: {},
+    questionnaireVersion: "amostra",
+    wingspanIndexUsed: null,
+  };
+}
+
+const SELF = assessment("av-self", "self", "pressure_fighter", "puncher");
+const COACH = assessment("av-coach", "coach", "counterpuncher", "boxer_puncher");
+const coachNotice = (read: boolean): AppNotification[] => [
+  {
+    id: `boxing-profile:${COACH.id}`,
+    userId: PROFILE.id,
+    kind: "system",
+    title: "Seu professor te avaliou",
+    description: "",
+    createdAt: at(-1, 10),
+    read,
+    entity: { type: "boxing_profile" },
+  },
+];
+
+const PROFILE_CASES: { title: string; note: string; extra: [unknown[], unknown][] }[] = [
+  { title: "Nunca se avaliou", note: "convite pro questionário", extra: [] },
+  {
+    title: "Só o aluno",
+    note: "autoavaliação",
+    extra: [[["boxing-profile-history", "amostra-student"], [SELF]]],
+  },
+  {
+    title: "Só o professor, não visto",
+    note: "leitura do professor + aviso",
+    extra: [
+      [["boxing-profile-history", "amostra-student"], [COACH]],
+      [["notifications", PROFILE.id], coachNotice(false)],
+    ],
+  },
+  {
+    title: "Os dois, combinado",
+    note: "aviso já visto",
+    extra: [
+      [["boxing-profile-history", "amostra-student"], [SELF, COACH]],
+      [["boxing-profile-assessment", SELF.id], SELF],
+      [["boxing-profile-assessment", COACH.id], COACH],
+      [["notifications", PROFILE.id], coachNotice(true)],
+    ],
+  },
+];
 
 const CARD_CASES: { title: string; note: string; props: Parameters<typeof ActivePackageCard>[0] }[] = [
   { title: "Admin · compra", note: "professor vê o selo de origem", props: { pkg: pkg(10, 3), credits: 5 } },
@@ -261,6 +347,19 @@ export default function Amostras() {
               <Seeded data={c.data} modo={c.modo}>
                 <StudentHome />
               </Seeded>
+            </Frame>
+          ))}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Perfil de Boxe na Home</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {PROFILE_CASES.map((c) => (
+            <Frame key={c.title} title={c.title} note={c.note}>
+              <div className="px-4 pb-4">
+                <Seeded data={base} modo="autosservico" extra={c.extra}>
+                  <BoxingProfileHomeCard />
+                </Seeded>
+              </div>
             </Frame>
           ))}
         </div>
