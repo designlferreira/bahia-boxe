@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Calendar, ChevronRight, Clock3, Hourglass } from "lucide-react";
+import { Calendar, ChevronRight, Hourglass } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
@@ -97,6 +97,9 @@ export default function StudentHome() {
         ? {
             to: "/app/agendar",
             label: "Agendar aula",
+            // Com uma sugestão de horário esperando resposta, ELA é a decisão da tela — o
+            // "Agendar" vermelho competia com ela e caía pra baixo da barra de navegação.
+            quiet: !!data.suggestion?.suggestedStartTime,
             hint: pedido
               ? `Seu pedido de ${pedidoNome} está com o professor`
               : "Escolha o dia e o horário da sua aula",
@@ -149,43 +152,38 @@ export default function StudentHome() {
           </div>
 
           {data.suggestion?.suggestedStartTime && (
+            // Um botão só, na largura toda: com "Aceitar" e "Ver detalhes" lado a lado (sem quebra
+            // de linha), os dois não cabiam em celulares de 360px e um saía do cartão. "Detalhes"
+            // vira link no canto; o ícone saiu pra devolver largura e altura ao cartão.
             <section
               aria-label="Horário sugerido pelo professor"
               className="p-4 rounded-2xl bg-amber/10 border border-amber/30 mb-4"
             >
-              <div className="flex gap-3 items-start">
-                <div className="h-10 w-10 rounded-xl bg-amber/15 flex items-center justify-center shrink-0">
-                  <Clock3 className="h-[18px] w-[18px] text-amber" aria-hidden />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[15px] font-semibold text-amber">Seu professor sugeriu outro horário</div>
-                  <div className="text-base font-semibold text-foreground mt-1 first-letter:uppercase">
-                    {formatDate(data.suggestion.suggestedStartTime)} · {formatTime(data.suggestion.suggestedStartTime)}
-                  </div>
-                  <div className="text-sm text-muted-foreground mt-0.5">
-                    No lugar de {formatDate(data.suggestion.startTime)} · {formatTime(data.suggestion.startTime)}
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-3 mt-4">
-                <Button
-                  // Âmbar, não vermelho nem dourado: é a cor de "pendente, decida" do spec (§12.1) —
-                  // e o botão vermelho principal continua logo abaixo, não dá pra ter dois.
-                  className="flex-1 h-11 border-amber bg-amber text-amber-foreground hover:border-amber hover:brightness-110"
-                  variant="secondary"
-                  onClick={() => accept.mutate(data.suggestion!)}
-                  disabled={accept.isPending}
-                >
-                  {accept.isPending ? "Confirmando…" : "Aceitar horário"}
-                </Button>
-                <Button
-                  className="flex-1 h-11"
-                  variant="secondary"
+              <div className="flex items-start justify-between gap-2">
+                <div className="text-[15px] font-semibold text-amber pt-0.5">Seu professor sugeriu outro horário</div>
+                <button
+                  type="button"
                   onClick={() => navigate(`/app/aula/${data.suggestion!.id}`)}
+                  className="shrink-0 -mt-2.5 -mr-2 min-h-11 px-2 text-sm text-muted-foreground underline underline-offset-4 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  Ver detalhes
-                </Button>
+                  Detalhes
+                </button>
               </div>
+              <div className="text-base font-semibold text-foreground first-letter:uppercase">
+                {formatDate(data.suggestion.suggestedStartTime)} · {formatTime(data.suggestion.suggestedStartTime)}
+              </div>
+              <div className="text-sm text-muted-foreground mt-0.5">
+                No lugar de {formatDateShort(data.suggestion.startTime)} · {formatTime(data.suggestion.startTime)}
+              </div>
+              <Button
+                // Âmbar, não vermelho nem dourado: é a cor de "pendente, decida" do spec (§12.1).
+                className="w-full h-12 mt-4 border-amber bg-amber text-amber-foreground hover:border-amber hover:brightness-110"
+                variant="secondary"
+                onClick={() => accept.mutate(data.suggestion!)}
+                disabled={accept.isPending}
+              >
+                {accept.isPending ? "Confirmando…" : "Aceitar horário"}
+              </Button>
             </section>
           )}
 
