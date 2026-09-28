@@ -12,7 +12,7 @@ import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { acceptSuggestion, getModoAgendamentoEfetivo, getStudentAdminId, getStudentHome } from "@/integrations/backend/api";
+import { SlotTakenError, acceptSuggestion, getModoAgendamentoEfetivo, getStudentAdminId, getStudentHome } from "@/integrations/backend/api";
 import type { Booking } from "@/integrations/backend/types";
 import { getStatusConfig } from "@/lib/bookingStatus";
 import { formatDayNumber, formatMonthShort, formatDate, formatDateShort, formatTime, formatWeekdayLong } from "@/lib/dateUtils";
@@ -39,7 +39,10 @@ export default function StudentHome() {
         `Aula confirmada: ${formatDate(suggestion.suggestedStartTime!)} · ${formatTime(suggestion.suggestedStartTime!)}`,
       );
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível aceitar o novo horário."),
+    onError: (err) =>
+      err instanceof SlotTakenError
+        ? toast.error(err.message, { action: { label: "Ver horários", onClick: () => navigate("/app/agendar") } })
+        : toast.error(err instanceof Error ? err.message : "Não foi possível aceitar o novo horário."),
   });
 
   const { data: adminId, isError: adminIdError } = useQuery({

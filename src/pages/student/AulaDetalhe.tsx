@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { getStatusConfig } from "@/lib/bookingStatus";
 import { formatDateTime, formatTime, formatDate } from "@/lib/dateUtils";
 import { arrivalMessage, equipmentItems, formatAddress, hasAddress, mapsUrl } from "@/lib/classGuidelines";
-import { acceptSuggestion, cancelBooking, getBookingDetail, getClassGuidelinesForBooking } from "@/integrations/backend/api";
+import { SlotTakenError, acceptSuggestion, cancelBooking, getBookingDetail, getClassGuidelinesForBooking } from "@/integrations/backend/api";
 
 export default function StudentAulaDetalhe() {
   const { id } = useParams<{ id: string }>();
@@ -56,7 +56,10 @@ export default function StudentAulaDetalhe() {
       navigate("/app/home");
       toast.success(`Horário confirmado para ${formatDateTime(booking!.suggestedStartTime!)}`);
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível aceitar o novo horário."),
+    onError: (err) =>
+      err instanceof SlotTakenError
+        ? toast.error(err.message, { action: { label: "Ver horários", onClick: () => navigate("/app/agendar") } })
+        : toast.error(err instanceof Error ? err.message : "Não foi possível aceitar o novo horário."),
   });
 
   if (isLoading) {

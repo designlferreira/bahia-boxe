@@ -470,6 +470,17 @@ export async function cancelBooking(bookingId: string) {
   return mapBooking(data);
 }
 
+/**
+ * O horário que o aluno tentou pegar foi ocupado por outra aula nesse meio-tempo. Separado de um
+ * erro genérico pra tela poder oferecer "ver outros horários" em vez de só avisar.
+ */
+export class SlotTakenError extends Error {
+  constructor() {
+    super("Esse horário acabou de ser ocupado. Escolha outro horário.");
+    this.name = "SlotTakenError";
+  }
+}
+
 export async function acceptSuggestion(bookingId: string) {
   const { data: current, error: readErr } = await client()
     .from("bookings")
@@ -489,8 +500,12 @@ export async function acceptSuggestion(bookingId: string) {
     .eq("id", bookingId)
     .select()
     .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("Esse horário não está mais disponível. Escolha outro.");
+  // Update direto na tabela (não passa por RPC): a colisão com outra aula do professor vem da
+  // exclusion constraint da 0028 como erro cru do Postgres, em inglês ("conflicting key value
+  // violates exclusion constraint..."), que ia parar no toast do aluno. 23P01 = exclusion_violation.
+  if (error?.code === "23P01") throw new SlotTakenError();
+  if (error) throw new Error("Não foi possível aceitar o novo horário. Tente de novo em instantes.");
+  if (!data) throw new SlotTakenError();
   return mapBooking(data);
 }
 
