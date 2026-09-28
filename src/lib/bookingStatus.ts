@@ -26,12 +26,12 @@ export interface StatusConfig {
 }
 
 const STATUS_MAP: Record<BookingStatus, StatusConfig> = {
-  scheduled: { label: "Agendada", badgeClass: "bg-primary/20 text-primary", icon: Calendar },
+  scheduled: { label: "Agendada", badgeClass: "bg-primary/20 text-[hsl(var(--red-text))]", icon: Calendar },
   completed: { label: "Concluída", badgeClass: "bg-accent/20 text-accent", icon: CheckCircle },
   cancelled: { label: "Cancelada", badgeClass: "bg-muted text-muted-foreground", icon: XCircle },
-  no_show: { label: "Faltou", badgeClass: "bg-destructive/20 text-destructive", icon: AlertTriangle },
+  no_show: { label: "Faltou", badgeClass: "bg-destructive/20 text-[hsl(var(--red-text))]", icon: AlertTriangle },
   pending_confirmation: { label: "Pendente", badgeClass: "bg-amber/20 text-amber", icon: Clock },
-  rejected: { label: "Rejeitada", badgeClass: "bg-destructive/20 text-destructive", icon: XCircle },
+  rejected: { label: "Rejeitada", badgeClass: "bg-destructive/20 text-[hsl(var(--red-text))]", icon: XCircle },
   rejected_with_suggestion: {
     label: "Sugestão enviada",
     badgeClass: "bg-amber/20 text-amber",

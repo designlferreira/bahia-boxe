@@ -79,12 +79,12 @@ export function NotificationBell({ userId }: NotificationBellProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="Notificações"
+        aria-label={unread > 0 ? `Notificações, ${unread} não ${unread === 1 ? "lida" : "lidas"}` : "Notificações"}
         className="relative h-11 w-11 rounded-[13px] bg-secondary border border-border flex items-center justify-center active:scale-95 transition-transform"
       >
-        <Bell className="h-[18px] w-[18px] text-foreground/90" />
+        <Bell className="h-[18px] w-[18px] text-foreground/90" aria-hidden />
         {unread > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 min-w-[19px] h-[19px] px-1 rounded-full bg-primary text-primary-foreground text-[10.5px] font-bold flex items-center justify-center border-2 border-background">
+          <span aria-hidden className="absolute -top-1.5 -right-1.5 min-w-[19px] h-[19px] px-1 rounded-full bg-primary text-primary-foreground text-[10.5px] font-bold flex items-center justify-center border-2 border-background">
             {unread}
           </span>
         )}

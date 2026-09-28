@@ -27,6 +27,9 @@
        on top), not enough for small text set directly in the color (WCAG AA needs 4.5:1 under
        18px). Used for the active bottom-nav label/icon, which is exactly that case. */
     --nav-active: 0 85% 68%;
+    /* Mesmo problema, em selos: vermelho puro sobre fundo vermelho/20 dá ~3:1 ("Agendada",
+       "Faltou"). Este tom dá 5,3–5,7:1 sobre esses fundos. */
+    --red-text: 0 85% 72%;
 
     --gradient-hero: linear-gradient(135deg, hsl(0 72% 51%), hsl(0 72% 35%));
     --gradient-gold: linear-gradient(135deg, hsl(45 93% 58%), hsl(35 93% 45%));
@@ -93,16 +96,36 @@
   }
 }
 
-/* Quem pediu ao sistema "reduzir movimento" (acessibilidade do celular/computador) não vê nenhuma
-   animação do app: entradas, brilhos, skeleton e pulsos param no estado final. Vale pra todas as
-   telas de uma vez, em vez de cada componente lembrar de checar. */
+/* Quem pediu ao sistema "reduzir movimento" não vê nada se deslocando: as entradas (que sobem e
+   escalam) viram um esmaecimento curto — a tela ainda mostra que mudou, só sem o movimento — e o
+   que se mexe sem informar nada (pulso, brilho do skeleton, barra crescendo) para no estado final.
+   Transições de cor/opacidade continuam: são resposta ao toque, não movimento. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  .page-container,
+  .animate-bb-in,
+  .animate-bb-up,
+  .animate-bb-toast {
+    animation: bb-fade 0.2s ease-out both !important;
+  }
+  .animate-bb-pulse,
+  .animate-bb-shimmer,
+  .animate-bb-bar {
+    animation: none !important;
+  }
+  .active\:scale-95:active,
+  .active\:scale-\[0\.98\]:active {
+    transform: none !important;
+  }
+  html {
     scroll-behavior: auto !important;
+  }
+}
+
+@keyframes bb-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }

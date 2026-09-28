@@ -44,16 +44,15 @@ export function StudentBottomNav() {
         <NavLink
           key={to}
           to={to}
-          aria-label={label}
           className={({ isActive }) =>
             cn(
               "flex-1 h-[52px] flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform",
-              isActive ? "text-[hsl(var(--nav-active))]" : "text-muted-foreground/70",
+              isActive ? "text-[hsl(var(--nav-active))]" : "text-muted-foreground",
             )
           }
         >
-          <Icon className="h-[21px] w-[21px]" strokeWidth={2} />
-          <span className="text-[10.5px] font-semibold">{label}</span>
+          <Icon className="h-[21px] w-[21px]" strokeWidth={2} aria-hidden />
+          <span className="text-[11.5px] font-semibold">{label}</span>
         </NavLink>
       ))}
     </nav>

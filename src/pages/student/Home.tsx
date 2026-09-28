@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getModoAgendamentoEfetivo, getStudentAdminId, getStudentHome } from "@/integrations/backend/api";
 import { getStatusConfig } from "@/lib/bookingStatus";
-import { formatDayNumber, formatMonthShort, formatDateTime, formatDateShort } from "@/lib/dateUtils";
+import { formatDayNumber, formatMonthShort, formatDate, formatDateShort, formatTime, formatWeekdayLong } from "@/lib/dateUtils";
 
 export default function StudentHome() {
   const { profile } = useAuth();
@@ -101,7 +101,11 @@ export default function StudentHome() {
 
       <PWAInstallBanner />
 
-      {isLoading && <SkeletonCard height={168} className="mb-3.5" />}
+      {isLoading && (
+        <div role="status" aria-label="Carregando seu painel">
+          <SkeletonCard height={168} className="mb-3.5" />
+        </div>
+      )}
       {isError && <ErrorState title="Não foi possível carregar seu painel" onRetry={() => refetch()} />}
 
       {data && (
@@ -117,47 +121,49 @@ export default function StudentHome() {
               className="w-full text-left flex gap-3 items-center p-3.5 rounded-2xl bg-amber/10 border border-amber/30 mb-3.5 active:scale-[0.98] transition-transform"
             >
               <div className="h-[38px] w-[38px] rounded-xl bg-amber/15 flex items-center justify-center shrink-0">
-                <Clock3 className="h-[18px] w-[18px] text-amber" />
+                <Clock3 className="h-[18px] w-[18px] text-amber" aria-hidden />
               </div>
               <div className="flex-1">
-                <div className="text-sm font-semibold text-amber">Novo horário sugerido</div>
-                <div className="text-[12.5px] text-muted-foreground">
-                  {formatDateTime(data.suggestion.suggestedStartTime ?? data.suggestion.startTime)}
+                <div className="text-[15px] font-semibold text-amber">Novo horário sugerido</div>
+                <div className="text-sm text-muted-foreground first-letter:uppercase">
+                  {formatDate(data.suggestion.suggestedStartTime ?? data.suggestion.startTime)} ·{" "}
+                  {formatTime(data.suggestion.suggestedStartTime ?? data.suggestion.startTime)}
                 </div>
               </div>
-              <ChevronRight className="h-[18px] w-[18px] text-muted-foreground" />
+              <ChevronRight className="h-[18px] w-[18px] text-muted-foreground" aria-hidden />
             </button>
           )}
 
-          <div className="font-display text-[19px] tracking-wide text-foreground my-1 mb-2.5">PRÓXIMA AULA</div>
+          <h2 className="font-display text-[19px] tracking-wide text-foreground mt-1 mb-2.5">PRÓXIMA AULA</h2>
           {data.nextBooking ? (
             <button
               type="button"
               onClick={() => navigate(`/app/aula/${data.nextBooking!.id}`)}
+              aria-label={`${formatDate(data.nextBooking.startTime)}, ${formatTime(data.nextBooking.startTime)}, ${getStatusConfig(data.nextBooking.status).label}. Ver detalhes`}
               className="w-full text-left card-dark p-4 flex gap-3.5 items-center mb-5 active:scale-[0.98] transition-transform"
             >
-              <div className="w-[54px] text-center border-r border-border pr-3">
+              <div aria-hidden className="w-[54px] text-center border-r border-border pr-3">
                 <div className="font-display text-3xl leading-none text-foreground">
                   {formatDayNumber(data.nextBooking.startTime)}
                 </div>
-                <div className="text-[11px] uppercase text-muted-foreground tracking-wide">
+                <div className="text-xs uppercase text-muted-foreground tracking-wide">
                   {formatMonthShort(data.nextBooking.startTime)}
                 </div>
               </div>
               <div className="flex-1">
-                <div className="text-[15px] font-semibold text-foreground mb-1">
-                  {formatDateTime(data.nextBooking.startTime)}
+                <div className="text-base font-semibold text-foreground mb-1">
+                  {formatWeekdayLong(data.nextBooking.startTime)} · {formatTime(data.nextBooking.startTime)}
                 </div>
                 <Badge className={getStatusConfig(data.nextBooking.status).badgeClass}>
                   {getStatusConfig(data.nextBooking.status).label}
                 </Badge>
               </div>
-              <ChevronRight className="h-[18px] w-[18px] text-muted-foreground" />
+              <ChevronRight className="h-[18px] w-[18px] text-muted-foreground" aria-hidden />
             </button>
           ) : (
             <div className="rounded-2xl border border-dashed border-border p-6 text-center mb-5">
-              <div className="text-sm text-foreground/80 mb-1">Nenhuma aula agendada</div>
-              <div className="text-[12.5px] text-muted-foreground">
+              <div className="text-[15px] text-foreground/85 mb-1">Nenhuma aula agendada</div>
+              <div className="text-sm text-muted-foreground">
                 {!modoPronto
                   ? " "
                   : isRecorrencia
@@ -183,10 +189,10 @@ export default function StudentHome() {
                 className="w-full h-[58px]"
                 onClick={() => navigate(cta.to)}
               >
-                <Calendar className="h-[19px] w-[19px]" />
+                <Calendar className="h-[19px] w-[19px]" aria-hidden />
                 {cta.label}
               </Button>
-              <div className="text-center text-xs text-muted-foreground mt-2.5">{cta.hint}</div>
+              <div className="text-center text-sm text-muted-foreground mt-2.5">{cta.hint}</div>
             </>
           ) : pedido ? (
             // Sem aulas e com pedido em espera: não há nada a fazer além de aguardar, então não há
