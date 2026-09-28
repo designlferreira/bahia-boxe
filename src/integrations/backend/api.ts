@@ -1224,22 +1224,50 @@ export async function getPurchaseRequests(adminId: string) {
   const rows = data ?? [];
 
   const templateIds = Array.from(new Set(rows.map((r) => r.template_id).filter(Boolean)));
-  const [students, templatesRes] = await Promise.all([
+  const studentIds = Array.from(new Set(rows.map((r) => r.student_id)));
+  const [students, templatesRes, activePkgsRes] = await Promise.all([
     adminStudents(adminId),
     templateIds.length
       ? client().from("package_templates").select("*").in("id", templateIds)
       : Promise.resolve({ data: [], error: null } as const),
+    // Pacotes ativos de quem pediu — pra avisar o professor do que a aprovação encerra.
+    studentIds.length
+      ? client().from("packages").select("*").in("student_id", studentIds).eq("status", "active")
+      : Promise.resolve({ data: [], error: null } as const),
   ]);
   if (templatesRes.error) throw new Error(templatesRes.error.message);
+  if (activePkgsRes.error) throw new Error(activePkgsRes.error.message);
+
+  // O que `approve_purchase_request` (função do banco, lida via pg_get_functiondef em 2026-09-28)
+  // encerra ao aprovar:
+  //   - pedido de PACOTE -> assign_package_from_template -> fecha os pacotes ativos NÃO-trial;
+  //   - pedido de AULA AVULSA -> `update packages set status='finished' where status='active'`,
+  //     sem filtro de origem: fecha TODOS, inclusive a aula experimental.
+  // As aulas já agendadas não se perdem (a conclusão debita do pacote novo pela busca "mais antigo
+  // ativo com vaga"); o que se perde é o que sobrava pra agendar. Aqui só se conta total − usadas
+  // de cada pacote que seria fechado.
+  const activeByStudent = new Map<string, PackageRecord[]>();
+  for (const row of activePkgsRes.data ?? []) {
+    const p = mapPackage(row);
+    activeByStudent.set(p.studentId, [...(activeByStudent.get(p.studentId) ?? []), p]);
+  }
 
   const nameOf = new Map(students.map((s) => [s.id, s.name]));
   const templates = new Map((templatesRes.data ?? []).map((t) => [t.id, mapTemplate(t)]));
 
-  return rows.map((r) => ({
-    request: mapRequest(r),
-    studentName: nameOf.get(r.student_id) ?? "Aluno",
-    template: r.template_id ? (templates.get(r.template_id) ?? null) : null,
-  }));
+  return rows.map((r) => {
+    const request = mapRequest(r);
+    const closed = (activeByStudent.get(r.student_id) ?? []).filter(
+      (p) => request.kind !== "package" || p.origin !== "trial",
+    );
+    return {
+      request,
+      studentName: nameOf.get(r.student_id) ?? "Aluno",
+      template: r.template_id ? (templates.get(r.template_id) ?? null) : null,
+      /** Aulas que o aluno ainda tinha pra usar e que a aprovação encerra. 0 = aprovar não tira nada. */
+      classesLostOnApprove: closed.reduce((acc, p) => acc + Math.max(0, p.totalClasses - p.usedClasses), 0),
+    };
+  });
 }
 
 export async function approvePurchaseRequest(requestId: string) {
