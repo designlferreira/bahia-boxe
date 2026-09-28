@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
@@ -13,6 +13,7 @@ import { getStatusConfig } from "@/lib/bookingStatus";
 import { cn } from "@/lib/utils";
 import { CheckCircle2, ChevronDown, ChevronRight, Circle } from "lucide-react";
 import { usePendingActions } from "@/hooks/usePendingActions";
+import { useLessonActions } from "@/hooks/useLessonActions";
 import type { Booking } from "@/integrations/backend/types";
 
 type AulaComNome = Booking & { studentName: string };
@@ -60,11 +61,14 @@ export default function AdminDashboard() {
   });
 
   // Aprovar/recusar: mesmo hook da Agenda (trava durante o envio, desfazer, remarcação com de -> para).
-  const pendentes = usePendingActions(profile?.id ?? "", () => {
+  const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
     queryClient.invalidateQueries({ queryKey: ["admin-agenda"] });
     queryClient.invalidateQueries({ queryKey: ["awaiting-confirmation-bookings"] });
-  });
+  };
+  const pendentes = usePendingActions(profile?.id ?? "", invalidate);
+  // Aconteceu/Faltou: o mesmo hook da Agenda e do detalhe da aula (confirmação + desfazer no aviso).
+  const aulas = useLessonActions(invalidate);
 
   if (!profile) return null;
 
@@ -97,6 +101,7 @@ export default function AdminDashboard() {
             awaiting={data.awaitingConfirmation}
             purchaseRequests={data.purchaseRequests}
             pendentes={pendentes}
+            aulas={aulas}
           />
 
           {semAlunos && data.primeirosPassos ? (
@@ -152,6 +157,7 @@ export default function AdminDashboard() {
       )}
 
       {pendentes.dialogs}
+      {aulas.dialogs}
     </div>
   );
 }
@@ -168,26 +174,29 @@ function ResolverAgora({
   awaiting,
   purchaseRequests,
   pendentes,
+  aulas,
 }: {
   pending: Pendente[];
   awaiting: AulaComNome[];
   purchaseRequests: number;
   pendentes: ReturnType<typeof usePendingActions>;
+  aulas: ReturnType<typeof useLessonActions>;
 }) {
   const navigate = useNavigate();
-  // Recolhido por padrão: aberto, cada pedido ocupa ~130px e a agenda do dia (o destaque) ia pra
-  // baixo da dobra justo no dia mais cheio.
-  const [aberto, setAberto] = useState(false);
   if (pending.length === 0 && awaiting.length === 0 && purchaseRequests === 0) return null;
 
   const remarcacoes = pending.filter((b) => b.antecessorInicio).length;
   const novos = pending.length - remarcacoes;
-  const resumo =
+  const resumoPedidos =
     pending.length === 1
       ? `${pending[0].studentName.split(" ")[0]} · ${quando(pending[0].startTime)}`
       : [remarcacoes && plural(remarcacoes, "remarcação", "remarcações"), novos && plural(novos, "novo horário", "novos horários")]
           .filter(Boolean)
           .join(" · ");
+  const resumoSemRegistro =
+    awaiting.length === 1
+      ? `${awaiting[0].studentName.split(" ")[0]} · ${quando(awaiting[0].startTime)}`
+      : "Diga se aconteceram ou se o aluno faltou";
 
   return (
     <section aria-labelledby="resolver" className="rounded-[20px] bg-card border border-amber/40 px-4 pt-3.5 pb-1 mb-4 animate-bb-up">
@@ -196,123 +205,165 @@ function ResolverAgora({
       </h2>
 
       {pending.length > 0 && (
-        <button
-          type="button"
-          aria-expanded={aberto}
-          aria-controls="pedidos-pendentes"
-          onClick={() => setAberto((v) => !v)}
-          className="w-full text-left min-h-11 py-3 flex items-center gap-3 active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
-        >
-          <div className="flex-1 min-w-0">
-            <div className="text-[15px] font-semibold text-foreground">
-              {plural(pending.length, "pedido de horário", "pedidos de horário")}
-            </div>
-            <div className="text-sm text-muted-foreground">{resumo}</div>
-          </div>
-          <ChevronDown
-            className={cn("h-[18px] w-[18px] text-muted-foreground shrink-0 transition-transform", aberto && "rotate-180")}
-            aria-hidden
-          />
-        </button>
-      )}
-
-      <div id="pedidos-pendentes" hidden={!aberto}>
-        {pending.map((b) => (
-          <div key={b.id} className="py-3 border-t border-border">
-            <div className="flex justify-between items-start gap-3 mb-2.5">
-              <div className="min-w-0">
-                <div className="text-[15px] font-semibold text-foreground">{b.studentName}</div>
-                {b.antecessorInicio ? (
+        <Grupo id="pedidos-pendentes" titulo={plural(pending.length, "pedido de horário", "pedidos de horário")} resumo={resumoPedidos}>
+          {pending.map((b) => (
+            <ItemResolver
+              key={b.id}
+              nome={b.studentName}
+              etiqueta={b.antecessorInicio ? "Remarcação" : "Novo horário"}
+              horario={
+                b.antecessorInicio ? (
                   // Pedido de remarcação: de onde pra onde — sem isso o professor precisava lembrar qual
                   // aula estava sendo movida.
-                  <div className="text-sm text-muted-foreground mt-0.5">
+                  <>
                     <span className="line-through">{formatDateTime(b.antecessorInicio)}</span>
                     <span aria-hidden> → </span>
                     <span className="sr-only">para</span>
                     <span className="text-foreground">{formatDateTime(b.startTime)}</span>
-                  </div>
+                  </>
                 ) : (
-                  <div className="text-sm text-muted-foreground mt-0.5">
-                    {formatDateTime(b.startTime)} – {formatTime(b.endTime)}
-                  </div>
-                )}
-              </div>
-              <span className="shrink-0 text-xs text-amber pt-1">{b.antecessorInicio ? "Remarcação" : "Novo horário"}</span>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                className="flex-1"
-                onClick={() => pendentes.requestApprove(b)}
-                disabled={pendentes.isBusy(b.id)}
-                aria-label={`Aprovar ${b.studentName}, ${formatDateTime(b.startTime)}`}
-              >
-                Aprovar
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="flex-1"
-                onClick={() => pendentes.requestReject(b)}
-                disabled={pendentes.isBusy(b.id)}
-                aria-label={`Recusar ${b.studentName}, ${formatDateTime(b.startTime)}`}
-              >
-                Recusar
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
+                  `${formatDateTime(b.startTime)} – ${formatTime(b.endTime)}`
+                )
+              }
+              quando={formatDateTime(b.startTime)}
+              busy={pendentes.isBusy(b.id)}
+              primario={{ label: "Aprovar", onClick: () => pendentes.requestApprove(b) }}
+              secundario={{ label: "Recusar", onClick: () => pendentes.requestReject(b) }}
+            />
+          ))}
+        </Grupo>
+      )}
 
       {awaiting.length > 0 && (
-        <LinhaResolver
-          // Leva pra data da pendência mais ANTIGA (já vem ordenada por start_time) — é a que tem mais
-          // chance de ser esquecida; a Agenda lê esse state pra abrir direto na semana/dia certos.
-          onClick={() => navigate("/admin/agenda", { state: { date: awaiting[0].startTime } })}
+        <Grupo
+          id="aulas-sem-registro"
           titulo={plural(awaiting.length, "aula sem registro", "aulas sem registro")}
-          detalhe={`Diga se aconteceu ou se o aluno faltou · ${quando(awaiting[0].startTime)}`}
-          primeira={pending.length === 0}
-        />
+          resumo={resumoSemRegistro}
+          borda={pending.length > 0}
+        >
+          {/* Já vem da mais antiga pra mais nova — a mais antiga é a que mais corre risco de ser esquecida. */}
+          {awaiting.map((b) => (
+            <ItemResolver
+              key={b.id}
+              nome={b.studentName}
+              horario={quando(b.startTime)}
+              quando={quando(b.startTime)}
+              busy={aulas.isBusy(b.id)}
+              primario={{ label: "Aconteceu", onClick: () => aulas.openComplete(b, b.studentName) }}
+              secundario={{ label: "Faltou", onClick: () => aulas.openNoShow(b, b.studentName) }}
+            />
+          ))}
+        </Grupo>
       )}
 
       {purchaseRequests > 0 && (
-        <LinhaResolver
+        <button
+          type="button"
           onClick={() => navigate("/admin/solicitacoes")}
-          titulo={plural(purchaseRequests, "pedido de aulas", "pedidos de aulas")}
-          detalhe="Aprovar libera as aulas para o aluno"
-          primeira={pending.length === 0 && awaiting.length === 0}
-        />
+          className={cn(
+            "w-full text-left min-h-11 py-3 flex items-center gap-3 active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md",
+            (pending.length > 0 || awaiting.length > 0) && "border-t border-border rounded-none",
+          )}
+        >
+          <div className="flex-1 min-w-0">
+            <div className="text-[15px] font-semibold text-foreground">
+              {plural(purchaseRequests, "pedido de aulas", "pedidos de aulas")}
+            </div>
+            <div className="text-sm text-muted-foreground">Aprovar libera as aulas para o aluno</div>
+          </div>
+          <ChevronRight className="h-[18px] w-[18px] text-muted-foreground shrink-0" aria-hidden />
+        </button>
       )}
     </section>
   );
 }
 
-function LinhaResolver({
-  onClick,
+/**
+ * Uma linha que se abre no próprio painel. Recolhida por padrão: aberta, cada item ocupa ~130px e a
+ * agenda do dia (o destaque) ia pra baixo da dobra justo no dia mais cheio.
+ */
+function Grupo({
+  id,
   titulo,
-  detalhe,
-  primeira,
+  resumo,
+  borda = false,
+  children,
 }: {
-  onClick: () => void;
+  id: string;
   titulo: string;
-  detalhe: string;
-  primeira: boolean;
+  resumo: string;
+  borda?: boolean;
+  children: ReactNode;
+}) {
+  const [aberto, setAberto] = useState(false);
+  return (
+    <div className={cn(borda && "border-t border-border")}>
+      <button
+        type="button"
+        aria-expanded={aberto}
+        aria-controls={id}
+        onClick={() => setAberto((v) => !v)}
+        className="w-full text-left min-h-11 py-3 flex items-center gap-3 active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+      >
+        <div className="flex-1 min-w-0">
+          <div className="text-[15px] font-semibold text-foreground">{titulo}</div>
+          <div className="text-sm text-muted-foreground">{resumo}</div>
+        </div>
+        <ChevronDown
+          className={cn("h-[18px] w-[18px] text-muted-foreground shrink-0 transition-transform", aberto && "rotate-180")}
+          aria-hidden
+        />
+      </button>
+      <div id={id} hidden={!aberto}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ItemResolver({
+  nome,
+  etiqueta,
+  horario,
+  quando,
+  busy,
+  primario,
+  secundario,
+}: {
+  nome: string;
+  etiqueta?: string;
+  horario: ReactNode;
+  /** Pro nome acessível dos botões ("Aprovar: Ana, terça 07:00") — senão são N botões "Aprovar" iguais. */
+  quando: string;
+  busy: boolean;
+  primario: { label: string; onClick: () => void };
+  secundario: { label: string; onClick: () => void };
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "w-full text-left min-h-11 py-3 flex items-center gap-3 active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md",
-        !primeira && "border-t border-border rounded-none",
-      )}
-    >
-      <div className="flex-1 min-w-0">
-        <div className="text-[15px] font-semibold text-foreground">{titulo}</div>
-        <div className="text-sm text-muted-foreground">{detalhe}</div>
+    <div className="py-3 border-t border-border">
+      <div className="flex justify-between items-start gap-3 mb-2.5">
+        <div className="min-w-0">
+          <div className="text-[15px] font-semibold text-foreground">{nome}</div>
+          <div className="text-sm text-muted-foreground mt-0.5">{horario}</div>
+        </div>
+        {etiqueta && <span className="shrink-0 text-xs text-amber pt-1">{etiqueta}</span>}
       </div>
-      <ChevronRight className="h-[18px] w-[18px] text-muted-foreground shrink-0" aria-hidden />
-    </button>
+      <div className="flex gap-2">
+        <Button size="sm" className="flex-1" onClick={primario.onClick} disabled={busy} aria-label={`${primario.label}: ${nome}, ${quando}`}>
+          {primario.label}
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="flex-1"
+          onClick={secundario.onClick}
+          disabled={busy}
+          aria-label={`${secundario.label}: ${nome}, ${quando}`}
+        >
+          {secundario.label}
+        </Button>
+      </div>
+    </div>
   );
 }
 
