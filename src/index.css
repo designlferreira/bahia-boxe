@@ -92,3 +92,17 @@
     -webkit-mask-image: linear-gradient(to right, black 0, black calc(100% - 28px), transparent 100%);
   }
 }
+
+/* Quem pediu ao sistema "reduzir movimento" (acessibilidade do celular/computador) não vê nenhuma
+   animação do app: entradas, brilhos, skeleton e pulsos param no estado final. Vale pra todas as
+   telas de uma vez, em vez de cada componente lembrar de checar. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

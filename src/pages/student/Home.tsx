@@ -114,7 +114,7 @@ export default function StudentHome() {
             <button
               type="button"
               onClick={() => navigate(`/app/aula/${data.suggestion!.id}`)}
-              className="w-full text-left flex gap-3 items-center p-3.5 rounded-2xl bg-amber/10 border border-amber/30 mb-3.5 active:scale-[0.98] transition-transform animate-bb-up"
+              className="w-full text-left flex gap-3 items-center p-3.5 rounded-2xl bg-amber/10 border border-amber/30 mb-3.5 active:scale-[0.98] transition-transform"
             >
               <div className="h-[38px] w-[38px] rounded-xl bg-amber/15 flex items-center justify-center shrink-0">
                 <Clock3 className="h-[18px] w-[18px] text-amber" />
@@ -134,7 +134,7 @@ export default function StudentHome() {
             <button
               type="button"
               onClick={() => navigate(`/app/aula/${data.nextBooking!.id}`)}
-              className="w-full text-left card-dark p-4 flex gap-3.5 items-center mb-5 active:scale-[0.98] transition-transform animate-bb-up"
+              className="w-full text-left card-dark p-4 flex gap-3.5 items-center mb-5 active:scale-[0.98] transition-transform"
             >
               <div className="w-[54px] text-center border-r border-border pr-3">
                 <div className="font-display text-3xl leading-none text-foreground">
@@ -173,7 +173,16 @@ export default function StudentHome() {
             <SkeletonCard height={58} />
           ) : cta ? (
             <>
-              <Button size="lg" className="w-full h-[58px] animate-bb-pulse" onClick={() => navigate(cta.to)}>
+              {/* Sem pulso: um brilho pulsando pra sempre dizia "urgente" a cada visita, até pra
+                  "Ver minhas aulas", e disputava atenção com o saldo — que é o dado principal da
+                  tela. Na recorrência o botão é secundário: a aula já está marcada logo acima, o
+                  botão só leva à lista. */}
+              <Button
+                size="lg"
+                variant={isRecorrencia ? "secondary" : "default"}
+                className="w-full h-[58px]"
+                onClick={() => navigate(cta.to)}
+              >
                 <Calendar className="h-[19px] w-[19px]" />
                 {cta.label}
               </Button>
