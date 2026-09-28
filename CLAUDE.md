@@ -44,6 +44,32 @@ Portanto:
 
 ---
 
+## Fluxo de branches
+
+- Trabalhe sempre na branch "dev". Antes de começar qualquer tarefa, confirme
+  com "git branch" que está nela.
+- Nunca faça commit, push ou merge direto na "main".
+- Só faça merge de "dev" para "main" quando o Lucas disser explicitamente que
+  aprovou.
+- Depois de cada push na "dev", avise que o preview da Vercel foi atualizado
+  para eu testar.
+
+**Link de preview a usar SEMPRE: o alias fixo da branch, não a URL do
+deployment.** `list_deployments` devolve uma URL nova a cada push (ex.:
+`bahia-boxe-6sn8ictxj-...`) — passar essa URL de novo faz o usuário testar um
+build congelado no commit anterior, não o mais recente (aconteceu de
+verdade em 2026-09-28: o professor testou um fix que não apareceu porque a
+URL passada era do push anterior ao fix). O alias que sempre aponta pro
+deploy mais recente da branch é
+`bahia-boxe-git-dev-designlferreiras-projects.vercel.app` (formato Vercel:
+`<projeto>-git-<branch>-<team>.vercel.app`, obtido com
+`list_deployment_aliases` sobre o deployment mais recente, não com
+`list_deployments` sozinho). Se ainda assim a mudança não aparecer depois de
+usar o alias certo, aí sim considerar cache do service worker (gotcha
+acima) — nessa ordem, não na ordem inversa.
+
+---
+
 ## Domínio: agendamento
 
 Existem DOIS fluxos de agendamento coexistindo, selecionados pela flag

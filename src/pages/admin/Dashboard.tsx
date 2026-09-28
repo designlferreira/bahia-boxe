@@ -165,7 +165,7 @@ export default function AdminDashboard() {
                   <div className="flex-1">
                     <div className="text-[14.5px] font-semibold text-foreground">{b.studentName}</div>
                     <div className="text-xs text-muted-foreground">
-                      {formatTime(b.startTime)} – {formatTime(b.endTime)}
+                      {formatDateTime(b.startTime)} – {formatTime(b.endTime)}
                     </div>
                   </div>
                   <Badge className={cfg.badgeClass}>{cfg.label}</Badge>
