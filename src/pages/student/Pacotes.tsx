@@ -97,7 +97,7 @@ export default function StudentPacotes() {
         </div>
       )}
 
-      <div className="font-display text-[19px] tracking-wide text-foreground mb-2.5">SOLICITAR</div>
+      <h2 className="section-title mb-3">Solicitar</h2>
 
       {isLoading && <SkeletonList count={3} height={90} />}
 

@@ -160,7 +160,7 @@ export default function AdminAlunoDetalhe() {
         </div>
       </button>
 
-      <div className="font-display text-lg tracking-wide text-foreground mb-2.5">ÚLTIMAS AULAS</div>
+      <h2 className="section-title mb-3">Últimas aulas</h2>
       <div className="flex flex-col gap-2.5">
         {history.length === 0 && <div className="text-[13px] text-muted-foreground">Nenhuma aula registrada.</div>}
         {history.map((h) => {

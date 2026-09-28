@@ -107,7 +107,7 @@ export default function StudentPerfilLutador() {
           pra comparar ainda) em vez de escondê-la atrás de um botão. */}
       {!isLoading && !isError && !latest && latestCoach && (
         <>
-          <BoxingProfileScoresSummary assessment={latestCoach} heroLabel="Leitura do seu professor" radarHeading="RADAR" />
+          <BoxingProfileScoresSummary assessment={latestCoach} heroLabel="Leitura do seu professor" radarHeading="Radar" />
           <BoxingProfilePartialNotice text="Por enquanto, este resultado usa só a avaliação do seu professor. Assim que você fizer sua autoavaliação, o combinado passa a considerar as duas leituras." />
           <Button className="w-full" onClick={goToQuestionnaire}>
             <Sparkles className="h-4 w-4 mr-1.5" /> Descobrir meu perfil

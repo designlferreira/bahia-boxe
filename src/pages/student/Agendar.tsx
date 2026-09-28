@@ -149,7 +149,7 @@ export default function StudentAgendar() {
         })}
       </div>
 
-      <div className="font-display text-lg tracking-wide text-foreground my-2 mb-2.5">HORÁRIOS LIVRES</div>
+      <h2 className="section-title mt-2 mb-3">Horários livres</h2>
 
       {(isLoading || !adminId) && (
         <div className="grid grid-cols-2 gap-2.5">

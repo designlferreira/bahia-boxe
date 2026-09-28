@@ -179,7 +179,7 @@ export default function StudentHome() {
             </section>
           )}
 
-          <h2 className="font-display text-[19px] tracking-wide text-foreground mt-2 mb-3">PRÓXIMA AULA</h2>
+          <h2 className="section-title mt-2 mb-3">Próxima aula</h2>
           {data.nextBooking ? (
             <button
               type="button"

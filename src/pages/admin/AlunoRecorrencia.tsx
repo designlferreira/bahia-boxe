@@ -278,7 +278,7 @@ export default function AdminAlunoRecorrencia() {
       </div>
 
       <div className="flex items-center justify-between mb-2.5">
-        <div className="font-display text-lg tracking-wide text-foreground">DIAS FIXOS</div>
+        <h2 className="section-title">Dias fixos</h2>
         <Button variant="secondary" size="sm" onClick={() => setAddOpen(true)}>
           <Plus className="h-4 w-4" />
           Adicionar
@@ -319,7 +319,7 @@ export default function AdminAlunoRecorrencia() {
       </div>
 
       <div className="card-dark p-4">
-        <div className="font-display text-base tracking-wide text-foreground mb-1">GERAR PACOTE</div>
+        <h2 className="section-title mb-1">Gerar pacote</h2>
         <div className="text-[12.5px] text-muted-foreground mb-3">
           Materializa aulas concretas na agenda a partir dos dias fixos ativos
           {activasCount > 0 ? ` (${activasCount} ativo${activasCount > 1 ? "s" : ""})` : ""}.

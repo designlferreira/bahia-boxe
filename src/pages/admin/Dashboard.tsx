@@ -142,7 +142,7 @@ export default function AdminDashboard() {
           </div>
 
           <div className="flex justify-between items-baseline mb-2.5">
-            <div className="font-display text-[19px] tracking-wide text-foreground">PRÓXIMAS AULAS</div>
+            <h2 className="section-title">Próximas aulas</h2>
             <button
               type="button"
               onClick={() => navigate("/admin/agenda")}
@@ -174,7 +174,7 @@ export default function AdminDashboard() {
             })}
           </div>
 
-          <div className="font-display text-[19px] tracking-wide text-foreground mb-2.5">ALUNOS EM RISCO</div>
+          <h2 className="section-title mb-3">Alunos em risco</h2>
           <div className="flex flex-col gap-2.5">
             {data.atRisk.length === 0 && (
               <div className="text-[13px] text-muted-foreground">Nenhum aluno em risco no momento.</div>

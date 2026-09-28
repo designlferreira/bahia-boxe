@@ -140,8 +140,10 @@ export function ActivePackageCard({ pkg, credits, saldo, hideAlert, audience = "
                     key={i}
                     className={cn(
                       "h-2.5 flex-1 rounded-full",
+                      // Usada: apagada, mas visível (~3:1 sobre o card). Antes era bg-secondary, ~1,2:1 —
+                      // sumia, e o medidor dependia só da frase pequena.
                       i < used
-                        ? "bg-secondary"
+                        ? "bg-muted-foreground/60"
                         : i < used + booked
                           ? cn("border-2 bg-transparent", t.booked)
                           : t.fill,

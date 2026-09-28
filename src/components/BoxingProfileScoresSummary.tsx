@@ -25,7 +25,7 @@ export function BoxingProfileScoresSummary({
   assessment,
   heroLabel = "Perfil predominante",
   description,
-  radarHeading = "SEU RADAR",
+  radarHeading = "Seu radar",
 }: BoxingProfileScoresSummaryProps) {
   const { primaryProfile, secondaryProfile, dimensionScores, profileScores, assessmentLength, scoringVersion } = assessment;
   const isOldFormula = scoringVersion !== SCORING_VERSION;
@@ -82,7 +82,7 @@ export function BoxingProfileScoresSummary({
         </div>
       </div>
 
-      <div className="font-display text-lg tracking-wide text-foreground mb-3">{radarHeading}</div>
+      <h2 className="section-title mb-3">{radarHeading}</h2>
       <div className="card-dark p-4 mb-3.5 flex justify-center">
         <BoxingRadarChart scores={dimensionScores} />
       </div>

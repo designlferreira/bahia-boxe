@@ -26,7 +26,9 @@ export interface StatusConfig {
 }
 
 const STATUS_MAP: Record<BookingStatus, StatusConfig> = {
-  scheduled: { label: "Agendada", badgeClass: "bg-primary/20 text-[hsl(var(--red-text))]", icon: Calendar },
+  // Neutro: "agendada" é o estado calmo, está tudo certo. Vermelho (spec §12.1) fica pra ação e
+  // urgência — aqui ele dividia a cor com "Faltou"/"Rejeitada" e com o botão principal.
+  scheduled: { label: "Agendada", badgeClass: "bg-foreground/10 text-foreground", icon: Calendar },
   completed: { label: "Concluída", badgeClass: "bg-accent/20 text-accent", icon: CheckCircle },
   cancelled: { label: "Cancelada", badgeClass: "bg-muted text-muted-foreground", icon: XCircle },
   no_show: { label: "Faltou", badgeClass: "bg-destructive/20 text-[hsl(var(--red-text))]", icon: AlertTriangle },
