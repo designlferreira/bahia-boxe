@@ -82,7 +82,14 @@ export default function StudentHome() {
         : pedido
           ? null
           : data.nextBooking
-          ? { to: "/app/pacotes", label: "Solicitar mais aulas", hint: "Suas aulas restantes já estão agendadas" }
+          ? {
+              to: "/app/pacotes",
+              label: "Solicitar mais aulas",
+              hint: "Suas aulas restantes já estão agendadas",
+              // Nada urgente aqui: o aluno tem aulas marcadas. Vermelho transformaria o pedido de
+              // mais aulas em alarme.
+              quiet: true,
+            }
           : data.package
             ? { to: "/app/pacotes", label: "Solicitar novo pacote", hint: "As aulas do seu pacote acabaram" }
             : { to: "/app/pacotes", label: "Solicitar pacote", hint: "Escolha um pacote e seu professor libera as aulas" };
@@ -170,7 +177,8 @@ export default function StudentHome() {
                     ? "Seu professor ainda não marcou suas próximas aulas."
                     : data.credits > 0
                       ? "Escolha um horário livre do professor."
-                      : "Quando tiver aulas disponíveis, é só escolher um horário."}
+                      : // Sem aulas, o cartão e o botão logo abaixo já dizem isso e o que fazer.
+                        null}
               </div>
             </div>
           )}
@@ -185,7 +193,7 @@ export default function StudentHome() {
                   botão só leva à lista. */}
               <Button
                 size="lg"
-                variant={isRecorrencia ? "secondary" : "default"}
+                variant={isRecorrencia || ("quiet" in cta && cta.quiet) ? "secondary" : "default"}
                 className="w-full h-14"
                 onClick={() => navigate(cta.to)}
               >

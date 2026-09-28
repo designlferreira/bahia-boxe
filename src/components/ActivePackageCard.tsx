@@ -66,47 +66,46 @@ function plural(n: number, one: string, many: string) {
  * (a duplicação em `Home.tsx`, achada em teste em 2026-09-08, era exatamente essa: uma versão
  * própria, nunca migrada pra cá quando este componente foi criado).
  *
- * Quando `saldo` existe (pacote de recorrência), "crédito disponível"
- * (`available_credits_for_student`) não faz sentido — ver CLAUDE.md — então o headline vira
- * `saldo.restantes` ("aulas restantes"), não `credits`. Pra qualquer outra origem: `credits`,
- * "aulas para agendar".
+ * O número grande responde "quantas aulas me restam no pacote" (total − usadas), nos dois fluxos.
+ * Antes, no autosserviço, ele mostrava `credits` — restantes MENOS as já agendadas —, então um
+ * aluno com 2 aulas restantes e as 2 marcadas via um "0" cinza, lido como "acabou", com duas
+ * aulas no calendário. "Quantas ainda posso agendar" desceu pra frase-resumo e pras marquinhas.
+ * Na recorrência a fonte é `saldo` (`saldo_pacotes`, a autoridade — CLAUDE.md decisão 4), nunca
+ * o `used_classes` materializado.
  *
  * O card carrega o próprio estado (dourado com saldo, âmbar com 2 ou menos, neutro no zero) — o
  * número e a cor dizem a situação de relance, sem precisar de um alerta separado pra isso.
  * As marquinhas mostram o pacote aula a aula: usada (apagada), já agendada (contorno) e livre
- * (cheia) — antes era uma barra que crescia com as USADAS ao lado de um número que mostrava as
- * RESTANTES, duas leituras opostas no mesmo card.
+ * (cheia).
  */
 export function ActivePackageCard({ pkg, credits, saldo, hideAlert, audience = "admin" }: ActivePackageCardProps) {
-  const headline = saldo ? saldo.restantes : credits;
-  const tone: Tone = headline <= 0 ? "empty" : pkg && headline <= 2 ? "low" : "ok";
-  const t = TONE[tone];
-  // Sem pacote, "0" também é `<= 2` — o alerta dizia "restam poucas aulas, considere renovar" pra
-  // quem nunca teve pacote. Só existe o que renovar quando existe pacote.
-  // Aula experimental não se "renova" — o alerta de renovação não se aplica a ela.
-  const showLowAlert = !hideAlert && tone === "low" && pkg?.origin !== "trial";
-
-  // Sem pacote, "para agendar" prometeria uma ação que um aluno em recorrência nunca faz — o card
-  // não sabe o modo do professor, então usa a palavra que vale nos dois.
-  const unit = saldo
-    ? plural(headline, "aula restante", "aulas restantes")
-    : !pkg
-      ? plural(headline, "aula disponível", "aulas disponíveis")
-      : plural(headline, "aula para agendar", "aulas para agendar");
-
-  // Recorrência: toda aula restante já nasce marcada, então "agendada" não distingue nada ali —
-  // só usadas x restantes. Autosserviço: `credits` já desconta as reservas futuras; o que sobra
-  // entre "restantes no pacote" e `credits` é o que está agendado. `credits` soma TODOS os pacotes
-  // ativos (inclusive trial), por isso o clamp.
+  // Autosserviço: `credits` soma TODOS os pacotes ativos (inclusive trial) e já desconta as
+  // reservas futuras; o que sobra entre "restantes no pacote" e `credits` é o que está agendado —
+  // por isso o clamp. Recorrência: toda aula restante já nasce marcada, então "agendada" não
+  // distingue nada ali — só feitas x restantes.
   const total = saldo ? saldo.total : (pkg?.totalClasses ?? 0);
   const used = saldo ? saldo.consumidas : (pkg?.usedClasses ?? 0);
   const remaining = Math.max(0, total - used);
   const free = saldo ? remaining : Math.min(Math.max(credits, 0), remaining);
   const booked = remaining - free;
 
+  // Sem pacote não há "restantes" — mostra o crédito solto que houver (normalmente 0).
+  const headline = pkg || saldo ? remaining : Math.max(credits, 0);
+  const tone: Tone = headline <= 0 ? "empty" : pkg && headline <= 2 ? "low" : "ok";
+  const t = TONE[tone];
+  // Só existe o que renovar quando existe pacote; aula experimental não se "renova".
+  const showLowAlert = !hideAlert && tone === "low" && pkg?.origin !== "trial";
+
+  const unit =
+    pkg || saldo
+      ? plural(headline, "aula restante", "aulas restantes")
+      : plural(headline, "aula disponível", "aulas disponíveis");
+
   const summary = [
     saldo ? `${used} de ${total} ${plural(total, "feita", "feitas")}` : `${used} de ${total} ${plural(total, "usada", "usadas")}`,
-    booked > 0 ? `${booked} já ${plural(booked, "agendada", "agendadas")}` : null,
+    booked > 0 ? `${booked} ${plural(booked, "agendada", "agendadas")}` : null,
+    // Só vale dizer "para agendar" quando há as duas coisas; sem agendadas, o número grande já diz.
+    booked > 0 && free > 0 ? `${free} para agendar` : null,
   ]
     .filter(Boolean)
     .join(" · ");
