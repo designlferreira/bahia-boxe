@@ -121,7 +121,8 @@ export function ActivePackageCard({
     ? plural(headline, "aula experimental", "aulas experimentais")
     : plural(headline, "aula restante", "aulas restantes");
 
-  const summary = [
+  // Professor: o razão completo (usadas · agendadas · para agendar) — é informação de gestão.
+  const adminSummary = [
     // "usadas" nos dois fluxos. Na recorrência era "feitas", o que além de inconsistente era impreciso:
     // `consumidas` inclui falta que consumiu crédito, e uma falta não é uma aula "feita".
     `${used} de ${total} ${plural(total, "usada", "usadas")}`,
@@ -131,6 +132,22 @@ export function ActivePackageCard({
   ]
     .filter(Boolean)
     .join(" · ");
+
+  // Aluno: uma resposta só. Com "7 aulas restantes" em cima, "3 de 10 usadas · 1 agendada · 6 para
+  // agendar" embaixo obrigava a conciliar dois números de "quanto sobra" (7 e 6). O aluno só
+  // precisa saber o que ainda dá pra agendar — e só quando isso é diferente do número grande.
+  const studentSummary = isTrial
+    ? headline > 0
+      ? "Cortesia pra você conhecer o treino. Agende quando quiser."
+      : null
+    : pkg?.status === "finished"
+      ? `Pacote de ${total} ${plural(total, "aula", "aulas")} concluído`
+      : booked > 0 && free > 0
+        ? `${free} ${plural(free, "livre", "livres")} para agendar · ${booked} já ${plural(booked, "agendada", "agendadas")}`
+        : booked > 0
+          ? plural(booked, "Já está agendada", "Todas já estão agendadas")
+          : null;
+  const summary = audience === "student" ? studentSummary : adminSummary;
 
   return (
     <section
@@ -182,13 +199,10 @@ export function ActivePackageCard({
             )}
           </div>
           <p className="text-sm text-muted-foreground">
-            {isTrial && audience === "student" && headline > 0
-              ? "Cortesia pra você conhecer o treino. Agende quando quiser."
-              : summary}
+            {summary}
             {saldo && saldo.aRepor > 0 && (
               <span className="text-amber">
-                {" "}
-                ·{" "}
+                {summary ? " · " : ""}
                 {audience === "student"
                   ? // "Reposição" é vocabulário de quem gerencia; pro aluno, o que importa é que
                     // há aula a remarcar e que isso passa pelo professor.

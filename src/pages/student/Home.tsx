@@ -108,11 +108,9 @@ export default function StudentHome() {
             // Com uma sugestão de horário esperando resposta, ELA é a decisão da tela — o
             // "Agendar" vermelho competia com ela e caía pra baixo da barra de navegação.
             quiet: !!data.suggestion?.suggestedStartTime,
-            hint: pedido
-              ? `Seu pedido de ${pedidoNome} está com o professor`
-              : pacoteMostrado?.origin === "trial"
-                ? "Escolha o dia e o horário da sua aula experimental"
-                : "Escolha o dia e o horário da sua aula",
+            // Dica só quando acrescenta algo. "Escolha o dia e o horário da sua aula" repetia o
+            // próprio botão.
+            hint: pedido ? `Seu pedido de ${pedidoNome} está com o professor` : null,
           }
         : pedido
           ? null
@@ -126,7 +124,8 @@ export default function StudentHome() {
               quiet: true,
             }
           : pacoteMostrado
-            ? { to: "/app/pacotes", label: "Solicitar novo pacote", hint: "As aulas do seu pacote acabaram" }
+            ? // O cartão logo acima já diz "0 aulas restantes · Pacote concluído".
+              { to: "/app/pacotes", label: "Solicitar novo pacote", hint: null }
             : { to: "/app/pacotes", label: "Solicitar pacote", hint: "Escolha um pacote e seu professor libera as aulas" };
 
   return (
@@ -213,7 +212,10 @@ export default function StudentHome() {
             </section>
           )}
 
-          {!semPacote && <h2 className="section-title mt-2 mb-3">Próxima aula</h2>}
+          {/* O título só aparece se houver algo embaixo dele (aula marcada ou o bloco "nenhuma aula"). */}
+          {!semPacote && (data.nextBooking || isRecorrencia || data.credits > 0) && (
+            <h2 className="section-title mt-2 mb-3">Próxima aula</h2>
+          )}
           {semPacote ? null : data.nextBooking ? (
             <button
               type="button"
@@ -240,19 +242,16 @@ export default function StudentHome() {
               <ChevronRight className="h-[18px] w-[18px] text-muted-foreground" aria-hidden />
             </button>
           ) : (
-            <div className="rounded-2xl border border-dashed border-border p-6 text-center mb-6">
-              <div className="text-[15px] text-foreground/85 mb-1">Nenhuma aula agendada</div>
-              <div className="text-sm text-muted-foreground">
-                {!modoPronto
-                  ? " "
-                  : isRecorrencia
-                    ? "Seu professor ainda não marcou suas próximas aulas."
-                    : data.credits > 0
-                      ? "Escolha um horário livre do professor."
-                      : // Sem aulas, o cartão e o botão logo abaixo já dizem isso e o que fazer.
-                        null}
+            // Só aparece quando diz algo que o resto da tela não diz: sem aulas pra agendar (crédito 0)
+            // o cartão e o botão já contam a história, e o bloco vazio era a terceira repetição.
+            (isRecorrencia || data.credits > 0) && (
+              <div className="rounded-2xl border border-dashed border-border p-5 text-center mb-6">
+                <div className="text-[15px] text-foreground/85">Nenhuma aula agendada</div>
+                {isRecorrencia && (
+                  <div className="text-sm text-muted-foreground mt-1">Seu professor ainda não marcou suas próximas aulas.</div>
+                )}
               </div>
-            </div>
+            )
           )}
 
           {!modoPronto ? (
@@ -273,7 +272,7 @@ export default function StudentHome() {
                 {cta.label}
               </Button>
               {/* Sem pacote, o "Como funciona" logo acima já explica o que acontece depois. */}
-              {!semPacote && <div className="text-center text-sm text-muted-foreground mt-3">{cta.hint}</div>}
+              {!semPacote && cta.hint && <div className="text-center text-sm text-muted-foreground mt-3">{cta.hint}</div>}
             </>
           ) : pedido && !semPacote ? (
             // Sem aulas e com pedido em espera: não há nada a fazer além de aguardar, então não há
