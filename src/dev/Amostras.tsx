@@ -92,6 +92,7 @@ const PEDIDO: PurchaseRequest = {
 
 interface HomeData {
   package: PackageRecord | null;
+  lastPackage: PackageRecord | null;
   credits: number;
   recorrenciaSaldo: SaldoPacote | null;
   nextBooking: Booking | null;
@@ -101,6 +102,7 @@ interface HomeData {
 
 const base: HomeData = {
   package: null,
+  lastPackage: null,
   credits: 0,
   recorrenciaSaldo: null,
   nextBooking: null,
@@ -131,9 +133,12 @@ const HOME_CASES: { title: string; note: string; modo: Modo; data: HomeData }[] 
   },
   {
     title: "Pacote acabou",
-    note: "pacote ativo sem nenhuma aula restante",
+    // Como no banco real: usar a última aula muda o pacote pra `finished`, então não há pacote
+    // ativo — só o último, encerrado. (A versão antiga desta amostra usava um pacote ATIVO com 0
+    // aulas, o que nunca acontece, e escondeu um bug.)
+    note: "pacote encerrado (status finished)",
     modo: "autosservico",
-    data: { ...base, package: pkg(4, 4), credits: 0 },
+    data: { ...base, lastPackage: pkg(4, 4, { status: "finished" }), credits: 0 },
   },
   {
     title: "Sem pacote",

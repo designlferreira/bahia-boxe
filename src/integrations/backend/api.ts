@@ -340,11 +340,30 @@ export async function getStudentHome(profileId: string) {
   // pra esse aluno é "aulas restantes no pacote", vindo de saldo_pacotes (decisão 4 — única
   // autoridade), não do materializado used_classes. `recorrenciaSaldo` fica null pra qualquer
   // outra origem — `credits` continua exatamente como sempre foi, intocado.
+  // Sem pacote ativo, o aluno pode estar num de dois lugares bem diferentes: nunca teve pacote
+  // (recém-convidado) ou o pacote acabou — quando a última aula é usada, o banco muda o status pra
+  // `finished` (0001:498) e `activePackageForStudentRow` passa a devolver null. Sem distinguir os
+  // dois, a Home mostrava "Suas aulas começam em 3 passos" pra aluno veterano. Trial não conta:
+  // quem só usou a aula experimental ainda precisa do primeiro pacote.
+  let lastPackage: PackageRecord | null = null;
+  if (!pkg) {
+    const { data: lastRows, error: lastErr } = await client()
+      .from("packages")
+      .select("*")
+      .eq("student_id", studentId)
+      .neq("origin", "trial")
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (lastErr) throw new Error(lastErr.message);
+    lastPackage = lastRows?.[0] ? mapPackage(lastRows[0]) : null;
+  }
+
   const isRecorrenciaPkg = pkg?.origin === "recurrence" && pkg.status === "active";
   const recorrenciaSaldo = isRecorrenciaPkg ? await getSaldoPacote(pkg!.id) : null;
 
   return {
     package: pkg,
+    lastPackage,
     credits,
     recorrenciaSaldo,
     nextBooking: upcoming ? mapBooking(upcoming) : null,

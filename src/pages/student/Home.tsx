@@ -82,7 +82,10 @@ export default function StudentHome() {
   // Aluno sem pacote e sem aula marcada (recém-convidado, ou esperando o professor gerar a
   // recorrência): no lugar de um "0" cinza + "Nenhum pacote ativo" + "Nenhuma aula agendada" — três
   // jeitos de dizer "nada" —, a Home explica o caminho até a primeira aula.
-  const semPacote = !!data && !data.package && !data.nextBooking;
+  // "Sem pacote" = nunca teve um (pago). Quem já teve e acabou vê o cartão do último pacote, em
+  // zero, com "Solicitar novo pacote" — não as boas-vindas de aluno novo.
+  const pacoteMostrado = data ? (data.package ?? data.lastPackage) : null;
+  const semPacote = !!data && !pacoteMostrado && !data.nextBooking;
   const pedidoNome = pedido?.kind === "package" ? "pacote" : "aula avulsa";
   const cta = !data
     ? null
@@ -120,7 +123,7 @@ export default function StudentHome() {
               // mais aulas em alarme.
               quiet: true,
             }
-          : data.package
+          : pacoteMostrado
             ? { to: "/app/pacotes", label: "Solicitar novo pacote", hint: "As aulas do seu pacote acabaram" }
             : { to: "/app/pacotes", label: "Solicitar pacote", hint: "Escolha um pacote e seu professor libera as aulas" };
 
@@ -154,7 +157,7 @@ export default function StudentHome() {
         <>
           <div className="mb-4 animate-bb-up">
             {!semPacote ? (
-              <ActivePackageCard pkg={data.package} credits={data.credits} saldo={saldo} audience="student" />
+              <ActivePackageCard pkg={pacoteMostrado} credits={data.credits} saldo={saldo} audience="student" />
             ) : !modoPronto ? (
               <SkeletonCard height={150} />
             ) : (

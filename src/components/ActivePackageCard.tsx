@@ -85,7 +85,9 @@ export function ActivePackageCard({ pkg, credits, saldo, hideAlert, audience = "
   // distingue nada ali — só usadas x restantes.
   const total = saldo ? saldo.total : (pkg?.totalClasses ?? 0);
   const used = saldo ? saldo.consumidas : (pkg?.usedClasses ?? 0);
-  const remaining = Math.max(0, total - used);
+  // Pacote encerrado não tem aula restante, mesmo que `used < total` (o professor pode ter
+  // removido o pacote antes do fim) — o que sobrou não está mais disponível.
+  const remaining = pkg?.status === "finished" ? 0 : Math.max(0, total - used);
   const free = saldo ? remaining : Math.min(Math.max(credits, 0), remaining);
   const booked = remaining - free;
 
