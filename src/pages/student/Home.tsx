@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Calendar, ChevronRight, Clock3 } from "lucide-react";
+import { Calendar, ChevronRight, Clock3, Hourglass } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getModoAgendamentoEfetivo, getStudentAdminId, getStudentHome } from "@/integrations/backend/api";
 import { getStatusConfig } from "@/lib/bookingStatus";
-import { formatDayNumber, formatMonthShort, formatDateTime } from "@/lib/dateUtils";
+import { formatDayNumber, formatMonthShort, formatDateTime, formatDateShort } from "@/lib/dateUtils";
 
 export default function StudentHome() {
   const { profile } = useAuth();
@@ -59,13 +59,23 @@ export default function StudentHome() {
   // dizer "acabou": pode ser que tudo o que resta já esteja marcado, ou que o aluno nunca tenha
   // tido pacote. Cada caso tem sua própria frase — "Seu pacote acabou" pra todos era falso em dois
   // dos três.
+  const pedido = !isRecorrencia ? (data?.pendingRequest ?? null) : null;
+  const pedidoNome = pedido?.kind === "package" ? "pacote" : "aula avulsa";
   const cta = !data
     ? null
     : isRecorrencia
       ? { to: "/app/historico", label: "Ver minhas aulas", hint: "Suas aulas já estão marcadas pelo professor" }
       : data.credits > 0
-        ? { to: "/app/agendar", label: "Agendar aula", hint: "Escolha dia e horário em 2 toques" }
-        : data.nextBooking
+        ? {
+            to: "/app/agendar",
+            label: "Agendar aula",
+            hint: pedido
+              ? `Seu pedido de ${pedidoNome} está com o professor`
+              : "Escolha dia e horário em 2 toques",
+          }
+        : pedido
+          ? null
+          : data.nextBooking
           ? { to: "/app/pacotes", label: "Solicitar mais aulas", hint: "Suas aulas restantes já estão agendadas" }
           : data.package
             ? { to: "/app/pacotes", label: "Solicitar novo pacote", hint: "As aulas do seu pacote acabaram" }
@@ -153,7 +163,9 @@ export default function StudentHome() {
             </div>
           )}
 
-          {modoPronto && cta ? (
+          {!modoPronto ? (
+            <SkeletonCard height={58} />
+          ) : cta ? (
             <>
               <Button size="lg" className="w-full h-[58px] animate-bb-pulse" onClick={() => navigate(cta.to)}>
                 <Calendar className="h-[19px] w-[19px]" />
@@ -161,9 +173,22 @@ export default function StudentHome() {
               </Button>
               <div className="text-center text-xs text-muted-foreground mt-2.5">{cta.hint}</div>
             </>
-          ) : (
-            <SkeletonCard height={58} />
-          )}
+          ) : pedido ? (
+            // Sem aulas e com pedido em espera: não há nada a fazer além de aguardar, então não há
+            // botão — um "Solicitar" aqui convidaria a pedir de novo o que já foi pedido.
+            <div role="status" className="flex gap-3 items-start p-4 rounded-2xl bg-amber/10 border border-amber/30">
+              <Hourglass className="h-5 w-5 text-amber shrink-0 mt-0.5" aria-hidden />
+              <div>
+                <div className="text-[15px] font-semibold text-foreground">
+                  Pedido de {pedidoNome} enviado
+                </div>
+                <div className="text-sm text-muted-foreground mt-0.5">
+                  Assim que o professor aprovar, suas aulas aparecem aqui. Enviado em{" "}
+                  {formatDateShort(pedido.createdAt)}.
+                </div>
+              </div>
+            </div>
+          ) : null}
         </>
       )}
     </div>

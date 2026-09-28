@@ -66,6 +66,9 @@ export default function StudentPacotes() {
       t.totalClasses > 1 ? requestPackage(t.id) : requestSingleClass(`Pedido a partir de "${t.name}"`),
     onSuccess: (_r, t) => {
       queryClient.invalidateQueries({ queryKey: ["purchase-requests"] });
+      // A Home mostra o pedido em espera no lugar do "solicitar" — sem invalidar, ela continuaria
+      // pedindo pra solicitar o que o aluno acabou de solicitar.
+      queryClient.invalidateQueries({ queryKey: ["student-home"] });
       toast.success(`Pedido de ${t.name.toLowerCase()} enviado`);
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível enviar o pedido."),

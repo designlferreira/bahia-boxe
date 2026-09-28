@@ -293,7 +293,7 @@ export async function creditsAvailableFor(studentId: string): Promise<number> {
 export async function getStudentHome(profileId: string) {
   const studentId = await studentIdForProfile(profileId);
   const nowIso = new Date().toISOString();
-  const [pkg, credits, upcomingRes, suggestionRes] = await Promise.all([
+  const [pkg, credits, upcomingRes, suggestionRes, pendingRequestRes] = await Promise.all([
     activePackageForStudentRow(studentId),
     creditsAvailableFor(studentId),
     client()
@@ -311,9 +311,21 @@ export async function getStudentHome(profileId: string) {
       .eq("status", "rejected_with_suggestion")
       .order("start_time", { ascending: false })
       .limit(1),
+    // Pedido de pacote/aula ainda sem decisão do professor. Sem isso, logo depois de pedir o aluno
+    // voltava pra Home e lia de novo "suas aulas acabaram, solicite" — como se o pedido não
+    // tivesse ido. O mais recente basta: a Home só precisa saber que existe um em espera.
+    client()
+      .from("purchase_requests")
+      .select("*")
+      .eq("student_id", studentId)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(1),
   ]);
   if (upcomingRes.error) throw new Error(upcomingRes.error.message);
   if (suggestionRes.error) throw new Error(suggestionRes.error.message);
+  if (pendingRequestRes.error) throw new Error(pendingRequestRes.error.message);
+  const pendingRequest = (pendingRequestRes.data ?? [])[0];
   const upcoming = (upcomingRes.data ?? [])[0];
   const suggestion = (suggestionRes.data ?? [])[0];
 
@@ -332,6 +344,7 @@ export async function getStudentHome(profileId: string) {
     recorrenciaSaldo,
     nextBooking: upcoming ? mapBooking(upcoming) : null,
     suggestion: suggestion ? mapBooking(suggestion) : null,
+    pendingRequest: pendingRequest ? mapRequest(pendingRequest) : null,
   };
 }
 
