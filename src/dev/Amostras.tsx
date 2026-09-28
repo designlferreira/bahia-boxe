@@ -395,7 +395,7 @@ const DASH_CASES: { title: string; note: string; data: unknown }[] = [
       activeStudents: 12,
       pending: [
         aulaDe("s1", "Ana Beatriz Souza", 1, 7, "pending_confirmation"),
-        aulaDe("s2", "Carlos Henrique Lima", 2, 18, "pending_confirmation", { replacementForBookingId: "orig-1" }),
+        { ...aulaDe("s2", "Carlos Henrique Lima", 2, 18, "pending_confirmation", { replacementForBookingId: "orig-1" }), antecessorInicio: at(1, 19) },
       ],
       awaitingConfirmation: [aulaDe("s3", "Diego Martins", -1, 19, "scheduled")],
       upcoming: [

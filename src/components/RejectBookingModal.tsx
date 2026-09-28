@@ -20,6 +20,14 @@ interface RejectBookingModalProps {
   studentName: string;
   timeLabel: string;
   onConfirm: (note: string, suggestedStart: Date | null, suggestedEnd: Date | null) => void;
+  /**
+   * Pedido de remarcação do aluno (0033): não cabe sugerir outro horário — a aula original
+   * continua valendo e o aluno pode pedir outro. Sem esta flag a tela oferecia a sugestão, a API a
+   * ignorava e o aviso dizia "Recusado com sugestão de horário", o que era falso.
+   */
+  remarcacao?: boolean;
+  /** Horário da aula original, pra dizer qual aula continua valendo. */
+  originalLabel?: string | null;
 }
 
 /** Recusa com teacher_note + horário sugerido opcional. */
@@ -30,6 +38,8 @@ export function RejectBookingModal({
   studentName,
   timeLabel,
   onConfirm,
+  remarcacao = false,
+  originalLabel,
 }: RejectBookingModalProps) {
   const [note, setNote] = useState("");
   const [selected, setSelected] = useState<SuggestOption | null>(null);
@@ -42,6 +52,7 @@ export function RejectBookingModal({
       setOptions(null);
       return;
     }
+    if (remarcacao) return;
     let cancelled = false;
     (async () => {
       const found: SuggestOption[] = [];
@@ -56,7 +67,7 @@ export function RejectBookingModal({
     return () => {
       cancelled = true;
     };
-  }, [open, adminId]);
+  }, [open, adminId, remarcacao]);
 
   function handleConfirm() {
     if (!selected) {
@@ -74,9 +85,15 @@ export function RejectBookingModal({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent>
-        <SheetTitle>RECUSAR AGENDAMENTO</SheetTitle>
-        <div className="text-[13px] text-muted-foreground mb-3.5">
-          {studentName} · {timeLabel}
+        <SheetTitle>{remarcacao ? "RECUSAR REMARCAÇÃO" : "RECUSAR AGENDAMENTO"}</SheetTitle>
+        <div className="text-sm text-muted-foreground mb-3.5">
+          {studentName} · {remarcacao ? `pediu ${timeLabel}` : timeLabel}
+          {remarcacao && (
+            <div className="mt-1">
+              {originalLabel ? `A aula de ${originalLabel} continua valendo.` : "A aula original continua valendo."} O aluno
+              pode pedir outro horário.
+            </div>
+          )}
         </div>
         <Textarea
           value={note}
@@ -84,6 +101,8 @@ export function RejectBookingModal({
           placeholder="Observação para o aluno (opcional)"
           className="h-[82px] mb-3.5"
         />
+        {!remarcacao && (
+          <>
         <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">
           Sugerir outro horário
         </div>
@@ -115,6 +134,8 @@ export function RejectBookingModal({
             );
           })}
         </div>
+          </>
+        )}
         <div className="flex gap-2.5">
           <Button variant="secondary" size="lg" className="flex-1" onClick={() => onOpenChange(false)}>
             Voltar

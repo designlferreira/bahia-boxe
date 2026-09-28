@@ -1,28 +1,21 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/SkeletonCard";
-import { RejectBookingModal } from "@/components/RejectBookingModal";
 import { Button } from "@/components/ui/button";
 import { formatDate, formatDateTime, formatTime } from "@/lib/dateUtils";
-import { approveBooking, getAdminDashboard, rejectBooking } from "@/integrations/backend/api";
+import { getAdminDashboard } from "@/integrations/backend/api";
 import { getStatusConfig } from "@/lib/bookingStatus";
 import { Badge } from "@/components/ui/badge";
 import { ChevronRight, Clock3 } from "lucide-react";
-
-function errorMessage(err: unknown, fallback: string) {
-  return err instanceof Error ? err.message : fallback;
-}
+import { usePendingActions } from "@/hooks/usePendingActions";
 
 export default function AdminDashboard() {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [rejectTarget, setRejectTarget] = useState<{ id: string; student: string; time: string } | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["admin-dashboard", profile?.id],
@@ -30,24 +23,11 @@ export default function AdminDashboard() {
     enabled: !!profile,
   });
 
-  const approve = useMutation({
-    mutationFn: (id: string) => approveBooking(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
-      toast.success("Aula aprovada");
-    },
-    onError: (err) => toast.error(errorMessage(err, "Não foi possível aprovar o agendamento.")),
-  });
-
-  const reject = useMutation({
-    mutationFn: ({ id, note, start, end }: { id: string; note: string; start: Date | null; end: Date | null }) =>
-      rejectBooking(id, note, start?.toISOString() ?? null, end?.toISOString() ?? null),
-    onSuccess: (_r, vars) => {
-      queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
-      setRejectTarget(null);
-      toast.warning(vars.start ? "Recusado com sugestão de horário" : "Agendamento recusado");
-    },
-    onError: (err) => toast.error(errorMessage(err, "Não foi possível recusar o agendamento.")),
+  // Aprovar/recusar: mesmo hook da Agenda (trava durante o envio, desfazer, remarcação com de -> para).
+  const pendentes = usePendingActions(profile?.id ?? "", () => {
+    queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-agenda"] });
+    queryClient.invalidateQueries({ queryKey: ["awaiting-confirmation-bookings"] });
   });
 
   if (!profile) return null;
@@ -109,9 +89,20 @@ export default function AdminDashboard() {
                     <div className="flex justify-between items-center mb-2.5">
                       <div>
                         <div className="text-[14.5px] font-semibold text-foreground">{b.studentName}</div>
-                        <div className="text-[12.5px] text-muted-foreground mt-0.5">
-                          {formatDateTime(b.startTime)} – {formatTime(b.endTime)}
-                        </div>
+                        {b.antecessorInicio ? (
+                          // Pedido de remarcação: de onde pra onde — sem isso o professor precisava
+                          // lembrar qual aula estava sendo movida.
+                          <div className="text-sm text-muted-foreground mt-0.5">
+                            <span className="line-through">{formatDateTime(b.antecessorInicio)}</span>
+                            <span aria-hidden> → </span>
+                            <span className="sr-only">para</span>
+                            <span className="text-foreground">{formatDateTime(b.startTime)}</span>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-muted-foreground mt-0.5">
+                            {formatDateTime(b.startTime)} – {formatTime(b.endTime)}
+                          </div>
+                        )}
                       </div>
                       {/* Pendente com antecessor = o aluno pediu pra remarcar uma aula (0033). */}
                       <Badge className="bg-amber/20 text-amber">
@@ -119,16 +110,22 @@ export default function AdminDashboard() {
                       </Badge>
                     </div>
                     <div className="flex gap-2">
-                      <Button size="sm" className="flex-1" onClick={() => approve.mutate(b.id)}>
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => pendentes.requestApprove(b)}
+                        disabled={pendentes.isBusy(b.id)}
+                        aria-label={`Aprovar ${b.studentName}, ${formatDateTime(b.startTime)}`}
+                      >
                         Aprovar
                       </Button>
                       <Button
                         variant="secondary"
                         size="sm"
                         className="flex-1"
-                        onClick={() =>
-                          setRejectTarget({ id: b.id, student: b.studentName, time: `${formatTime(b.startTime)} – ${formatTime(b.endTime)}` })
-                        }
+                        onClick={() => pendentes.requestReject(b)}
+                        disabled={pendentes.isBusy(b.id)}
+                        aria-label={`Recusar ${b.studentName}, ${formatDateTime(b.startTime)}`}
                       >
                         Recusar
                       </Button>
@@ -217,16 +214,7 @@ export default function AdminDashboard() {
         </>
       )}
 
-      {rejectTarget && (
-        <RejectBookingModal
-          open={!!rejectTarget}
-          onOpenChange={(o) => !o && setRejectTarget(null)}
-          adminId={profile.id}
-          studentName={rejectTarget.student}
-          timeLabel={rejectTarget.time}
-          onConfirm={(note, start, end) => reject.mutate({ id: rejectTarget.id, note, start, end })}
-        />
-      )}
+      {pendentes.dialogs}
     </div>
   );
 }

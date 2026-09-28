@@ -746,11 +746,16 @@ export async function getAdminDashboard(adminId: string) {
   const byId = new Map(students.map((s) => [s.id, s]));
   const nameOf = (studentId: string) => byId.get(studentId)?.name ?? "Aluno";
   const atRisk = await alunosEmRisco(students);
+  const antesPendentes = await antecessores((pendingRes.data ?? []).map((r) => r.replacement_for_booking_id));
 
   return {
     kpiToday: todayRes.count ?? 0,
     activeStudents: students.length,
-    pending: (pendingRes.data ?? []).map((r) => ({ ...mapBooking(r), studentName: nameOf(r.student_id) })),
+    pending: (pendingRes.data ?? []).map((r) => ({
+      ...mapBooking(r),
+      studentName: nameOf(r.student_id),
+      antecessorInicio: r.replacement_for_booking_id ? (antesPendentes.get(r.replacement_for_booking_id)?.inicio ?? null) : null,
+    })),
     upcoming: (upcomingRes.data ?? []).map((r) => ({ ...mapBooking(r), studentName: nameOf(r.student_id) })),
     awaitingConfirmation: (awaitingRes.data ?? []).map((r) => ({ ...mapBooking(r), studentName: nameOf(r.student_id) })),
     atRisk,
@@ -911,6 +916,8 @@ export interface TimelineEntry {
   studentName?: string;
   /** Só quando a aula tem antecessor — ver `vinculoPorAntecessor`. */
   vinculo?: VinculoAula | null;
+  /** Horário da aula original — mostrado num pedido de remarcação ("de ... para ..."). */
+  antecessorInicio?: string | null;
 }
 
 /**
@@ -937,15 +944,25 @@ export const VINCULO_LABEL: Record<VinculoAula, string> = {
  * para a tela inteira — nunca uma por linha. O antecessor quase nunca está no conjunto já
  * carregado (remarcar é justamente mover a aula para outro dia), então ele precisa ser buscado.
  */
-async function vinculoPorAntecessor(antecessorIds: (string | null | undefined)[]): Promise<Map<string, VinculoAula>> {
+async function antecessores(
+  antecessorIds: (string | null | undefined)[],
+): Promise<Map<string, { vinculo: VinculoAula; inicio: string }>> {
   const ids = Array.from(new Set(antecessorIds.filter((id): id is string => !!id)));
-  const out = new Map<string, VinculoAula>();
+  const out = new Map<string, { vinculo: VinculoAula; inicio: string }>();
   if (ids.length === 0) return out;
-  const { data, error } = await client().from("bookings").select("id, status").in("id", ids);
+  const { data, error } = await client().from("bookings").select("id, status, start_time").in("id", ids);
   if (error) throw new Error(error.message);
   for (const r of data ?? [])
-    out.set(r.id, r.status === "rescheduled" ? "remarcacao" : r.status === "scheduled" ? "pedido_remarcacao" : "reposicao");
+    out.set(r.id, {
+      vinculo: r.status === "rescheduled" ? "remarcacao" : r.status === "scheduled" ? "pedido_remarcacao" : "reposicao",
+      inicio: r.start_time,
+    });
   return out;
+}
+
+async function vinculoPorAntecessor(antecessorIds: (string | null | undefined)[]): Promise<Map<string, VinculoAula>> {
+  const full = await antecessores(antecessorIds);
+  return new Map(Array.from(full, ([id, v]) => [id, v.vinculo]));
 }
 
 export async function getAdminAgendaForDay(adminId: string, date: Date): Promise<TimelineEntry[]> {
@@ -975,7 +992,7 @@ export async function getAdminAgendaForDay(adminId: string, date: Date): Promise
 
   const nameOf = new Map(students.map((s) => [s.id, s.name]));
   const bookings = bookingsRes.data ?? [];
-  const vinculos = await vinculoPorAntecessor(bookings.map((b) => b.replacement_for_booking_id));
+  const antes = await antecessores(bookings.map((b) => b.replacement_for_booking_id));
 
   const hours = new Set<number>();
   for (const s of slotsRes.data ?? []) hours.add(brtHour(s.start_time));
@@ -992,7 +1009,10 @@ export async function getAdminAgendaForDay(adminId: string, date: Date): Promise
         booking: mapBooking(booking),
         studentName: nameOf.get(booking.student_id) ?? "Aluno",
         vinculo: booking.replacement_for_booking_id
-          ? (vinculos.get(booking.replacement_for_booking_id) ?? "reposicao")
+          ? (antes.get(booking.replacement_for_booking_id)?.vinculo ?? "reposicao")
+          : null,
+        antecessorInicio: booking.replacement_for_booking_id
+          ? (antes.get(booking.replacement_for_booking_id)?.inicio ?? null)
           : null,
       };
     });
@@ -1028,6 +1048,22 @@ export async function approveBooking(bookingId: string) {
     .single();
   if (error) throw new Error(error.message);
   return mapBooking(data);
+}
+
+/**
+ * Desfaz a aprovação de um agendamento comum (não de remarcação): volta a aula a "aguardando
+ * aprovação". Só age se ela continuar `scheduled` e sem antecessor.
+ */
+export async function devolverParaPendente(bookingId: string) {
+  const { data, error } = await client()
+    .from("bookings")
+    .update({ status: "pending_confirmation" })
+    .eq("id", bookingId)
+    .eq("status", "scheduled")
+    .is("replacement_for_booking_id", null)
+    .select("id")
+    .maybeSingle();
+  if (error || !data) throw new Error("Não foi possível desfazer. A aula já mudou.");
 }
 
 export async function rejectBooking(bookingId: string, note: string, suggestedStart?: string | null, suggestedEnd?: string | null) {

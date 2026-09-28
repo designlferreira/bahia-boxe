@@ -1,23 +1,20 @@
 import { useState } from "react";
 import { addDays, isSameDay } from "date-fns";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { ErrorState } from "@/components/ErrorState";
-import { RejectBookingModal } from "@/components/RejectBookingModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatDate, formatDayNumber, formatWeekdayLong, formatWeekdayShort, isoDateOnly } from "@/lib/dateUtils";
 import { getStatusConfig, isAwaitingConfirmation } from "@/lib/bookingStatus";
 import { useLessonActions } from "@/hooks/useLessonActions";
+import { usePendingActions, type PendenteAlvo } from "@/hooks/usePendingActions";
 import {
-  approveBooking,
   getAdminAgendaForDay,
   getAwaitingConfirmationBookings,
-  rejectBooking,
   type TimelineEntry,
   VINCULO_LABEL,
 } from "@/integrations/backend/api";
@@ -29,10 +26,6 @@ const DAY_COUNT = 7;
  *  com navegação livre"). */
 interface AgendaNavState {
   date?: string;
-}
-
-function errorMessage(err: unknown, fallback: string) {
-  return err instanceof Error ? err.message : fallback;
 }
 
 function dotClassFor(entry: TimelineEntry) {
@@ -68,7 +61,6 @@ export default function AdminAgenda() {
     return target ? new Date(target) : new Date();
   });
   const [selectedDate, setSelectedDate] = useState<Date>(weekStart);
-  const [rejectTarget, setRejectTarget] = useState<{ id: string; student: string; time: string } | null>(null);
 
   const days = Array.from({ length: DAY_COUNT }, (_, i) => addDays(weekStart, i));
 
@@ -111,25 +103,8 @@ export default function AdminAgenda() {
 
   const actions = useLessonActions(invalidate);
 
-  const approve = useMutation({
-    mutationFn: (entry: TimelineEntry) => approveBooking(entry.booking!.id),
-    onSuccess: (_r, entry) => {
-      invalidate();
-      toast.success(`Aula de ${entry.studentName?.split(" ")[0]} aprovada`);
-    },
-    onError: (err) => toast.error(errorMessage(err, "Não foi possível aprovar o agendamento.")),
-  });
-
-  const reject = useMutation({
-    mutationFn: ({ id, note, start, end }: { id: string; note: string; start: Date | null; end: Date | null }) =>
-      rejectBooking(id, note, start?.toISOString() ?? null, end?.toISOString() ?? null),
-    onSuccess: (_r, vars) => {
-      invalidate();
-      setRejectTarget(null);
-      toast.warning(vars.start ? "Recusado com sugestão de horário" : "Agendamento recusado");
-    },
-    onError: (err) => toast.error(errorMessage(err, "Não foi possível recusar o agendamento.")),
-  });
+  // Aprovar/recusar: mesmo hook do Painel (trava durante o envio, desfazer, remarcação com de -> para).
+  const pendentes = usePendingActions(profile?.id ?? "", invalidate);
 
   if (!profile) return null;
 
@@ -268,20 +243,22 @@ export default function AdminAgenda() {
 
                       {booking?.status === "pending_confirmation" && (
                         <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                          <Button size="sm" className="flex-1 h-10" onClick={() => approve.mutate(entry)} disabled={approve.isPending}>
+                          <Button
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => pendentes.requestApprove(alvoDe(entry))}
+                            disabled={pendentes.isBusy(booking.id)}
+                            aria-label={`Aprovar ${entry.studentName}, ${entry.hour}`}
+                          >
                             Aprovar
                           </Button>
                           <Button
                             variant="secondary"
                             size="sm"
-                            className="flex-1 h-10"
-                            onClick={() =>
-                              setRejectTarget({
-                                id: booking.id,
-                                student: entry.studentName!,
-                                time: `${entry.hour} – ${String((parseInt(entry.hour, 10) + 1) % 24).padStart(2, "0")}:00`,
-                              })
-                            }
+                            className="flex-1"
+                            onClick={() => pendentes.requestReject(alvoDe(entry))}
+                            disabled={pendentes.isBusy(booking.id)}
+                            aria-label={`Recusar ${entry.studentName}, ${entry.hour}`}
                           >
                             Recusar
                           </Button>
@@ -351,18 +328,19 @@ export default function AdminAgenda() {
         </div>
       )}
 
-      {rejectTarget && (
-        <RejectBookingModal
-          open={!!rejectTarget}
-          onOpenChange={(o) => !o && setRejectTarget(null)}
-          adminId={profile.id}
-          studentName={rejectTarget.student}
-          timeLabel={rejectTarget.time}
-          onConfirm={(note, start, end) => reject.mutate({ id: rejectTarget.id, note, start, end })}
-        />
-      )}
+      {pendentes.dialogs}
 
       {actions.dialogs}
     </div>
   );
+}
+
+function alvoDe(entry: TimelineEntry): PendenteAlvo {
+  return {
+    id: entry.booking!.id,
+    studentName: entry.studentName ?? "Aluno",
+    startTime: entry.booking!.startTime,
+    endTime: entry.booking!.endTime,
+    antecessorInicio: entry.antecessorInicio ?? null,
+  };
 }
