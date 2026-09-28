@@ -1,6 +1,6 @@
 import { addDays, addWeeks, format } from "date-fns";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
-import { TIMEZONE } from "@/lib/dateUtils";
+import { TIMEZONE, formatDate, formatTime } from "@/lib/dateUtils";
 import { supabase } from "@/integrations/supabase/client";
 import type {
   AdminSettings,
@@ -1648,7 +1648,56 @@ async function deriveNotifications(userId: string): Promise<AppNotification[]> {
         .order("completed_at", { ascending: false })
         .limit(20),
     ]);
+    // Uma aula `scheduled` com antecessor não é "confirmada" do nada: ou o professor remarcou
+    // (antecessor `rescheduled`) ou marcou uma reposição (antecessor `no_show`/`cancelled`) — mesmo
+    // discriminador de `vinculoPorAntecessor` (CLAUDE.md, decisão 2). Sem isso, remarcar gerava um
+    // "Aula confirmada · Seu horário está garantido" e o aluno não ficava sabendo que o horário
+    // MUDOU. Antecessores buscados numa consulta só — podem estar fora da janela de 40 acima.
+    const predecessorIds = Array.from(
+      new Set(
+        (bookingsRes.data ?? [])
+          .filter((b) => b.status === "scheduled" && b.start_time > nowIso && b.replacement_for_booking_id)
+          .map((b) => b.replacement_for_booking_id as string),
+      ),
+    );
+    const predecessors = new Map<string, { status: string; start_time: string }>();
+    if (predecessorIds.length) {
+      const { data: predRows } = await client()
+        .from("bookings")
+        .select("id, status, start_time")
+        .in("id", predecessorIds);
+      for (const r of predRows ?? []) predecessors.set(r.id, { status: r.status, start_time: r.start_time });
+    }
+    const when = (iso: string) => `${formatDate(iso)} · ${formatTime(iso)}`;
+
     for (const b of bookingsRes.data ?? []) {
+      const pred = b.replacement_for_booking_id ? predecessors.get(b.replacement_for_booking_id) : undefined;
+      if (b.status === "scheduled" && b.start_time > nowIso && pred?.status === "rescheduled") {
+        items.push({
+          id: `booking:${b.id}:rescheduled`,
+          userId,
+          kind: "confirm",
+          title: "Aula remarcada",
+          description: `De ${when(pred.start_time)} para ${when(b.start_time)}.`,
+          createdAt: b.created_at,
+          read: false,
+          entity: { type: "booking", id: b.id },
+        });
+        continue;
+      }
+      if (b.status === "scheduled" && b.start_time > nowIso && pred) {
+        items.push({
+          id: `booking:${b.id}:replacement`,
+          userId,
+          kind: "confirm",
+          title: "Reposição marcada",
+          description: `Sua aula de reposição é ${when(b.start_time)}.`,
+          createdAt: b.created_at,
+          read: false,
+          entity: { type: "booking", id: b.id },
+        });
+        continue;
+      }
       if (b.status === "rejected" || b.status === "rejected_with_suggestion") {
         items.push({
           id: `booking:${b.id}:${b.status}`,
