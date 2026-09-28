@@ -46,6 +46,18 @@ Portanto:
 
 ## Fluxo de branches
 
+**O Lucas não é dev.** Nunca assumir que ele sabe quando/como rodar um
+comando local. Toda vez que uma tarefa exigir uma ação na máquina dele (`git
+pull`, `git push`, `npm install`, `npm run dev`, copiar `.env`, etc.), dar o
+passo a passo explícito e completo — qual comando, em qual pasta, o que
+esperar de resultado — nunca só dizer "dá um pull" ou "roda o install" sem o
+comando pronto pra copiar. Isso importa ainda mais depois que ele configurar
+a cópia local (worktree em `C:\Users\lfluc\Projetos\BahiaBoxe` +
+`BahiaBoxe-main`, orientação dada em 2026-09-28, adoção ainda não
+confirmada): a partir daí existem duas origens possíveis de mudança — esta
+sessão e a máquina dele — e é ele quem decide quando sincronizar uma com a
+outra, mas só decide bem se o comando exato vier junto.
+
 - Trabalhe sempre na branch "dev". Antes de começar qualquer tarefa, confirme
   com "git branch" que está nela.
 - Nunca faça commit, push ou merge direto na "main".
