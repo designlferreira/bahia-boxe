@@ -38,7 +38,9 @@ interface ActivePackageCardProps {
  */
 export function ActivePackageCard({ pkg, credits, saldo, hideAlert }: ActivePackageCardProps) {
   const headline = saldo ? saldo.restantes : credits;
-  const lowCredits = saldo ? saldo.restantes <= 2 : credits <= 2;
+  // Sem pacote, "0 créditos" também é `<= 2` — o alerta dizia "restam poucas aulas, considere
+  // renovar" pra quem nunca teve pacote. Só existe o que renovar quando existe pacote.
+  const lowCredits = !!pkg && (saldo ? saldo.restantes <= 2 : credits <= 2);
 
   return (
     <div className="rounded-[20px] p-[18px] bg-[linear-gradient(150deg,#1F1B0C,#171717_60%)] border border-[#35301A]">

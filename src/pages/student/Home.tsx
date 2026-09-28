@@ -23,7 +23,7 @@ export default function StudentHome() {
     enabled: !!profile,
   });
 
-  const { data: adminId } = useQuery({
+  const { data: adminId, isError: adminIdError } = useQuery({
     queryKey: ["student-admin-id", profile?.id],
     queryFn: () => getStudentAdminId(profile!.id),
     enabled: !!profile,
@@ -36,13 +36,17 @@ export default function StudentHome() {
   // `recorrenciaSaldo` (existe saldo de recorrência NESTE pacote): um professor que ativa
   // RECORRENCIA mas cujo aluno ainda segura um pacote `purchase` antigo veria "Agendar aula" —
   // errado, porque `Agendar.tsx` já redireciona esse aluno pra fora mesmo assim.
-  const { data: modoEfetivo } = useQuery({
+  const { data: modoEfetivo, isError: modoError } = useQuery({
     queryKey: ["modo-agendamento-efetivo", adminId],
     queryFn: () => getModoAgendamentoEfetivo(adminId!),
     enabled: !!adminId,
     staleTime: Infinity,
   });
   const isRecorrencia = modoEfetivo === "recorrencia";
+  // Sem esperar o modo, o botão nascia "Agendar aula" e virava "Ver minhas aulas" um instante
+  // depois, na frente do aluno. Se uma das duas consultas falhar, cai no autosserviço (default
+  // efetivo de `modo_agendamento_efetivo`) em vez de esconder o botão pra sempre.
+  const modoPronto = modoEfetivo !== undefined || adminIdError || modoError;
 
   if (!profile) return null;
 
@@ -50,6 +54,22 @@ export default function StudentHome() {
   // (mostra saldo.restantes em vez de credits quando `saldo` existe) — isso aqui é só o dado que o
   // card precisa, não decide mais navegação.
   const saldo = data?.recorrenciaSaldo ?? null;
+
+  // `credits` = aulas dos pacotes ativos MENOS as já reservadas no futuro, então "0" não quer
+  // dizer "acabou": pode ser que tudo o que resta já esteja marcado, ou que o aluno nunca tenha
+  // tido pacote. Cada caso tem sua própria frase — "Seu pacote acabou" pra todos era falso em dois
+  // dos três.
+  const cta = !data
+    ? null
+    : isRecorrencia
+      ? { to: "/app/historico", label: "Ver minhas aulas", hint: "Suas aulas já estão marcadas pelo professor" }
+      : data.credits > 0
+        ? { to: "/app/agendar", label: "Agendar aula", hint: "Escolha dia e horário em 2 toques" }
+        : data.nextBooking
+          ? { to: "/app/pacotes", label: "Solicitar mais aulas", hint: "Suas aulas restantes já estão agendadas" }
+          : data.package
+            ? { to: "/app/pacotes", label: "Solicitar novo pacote", hint: "As aulas do seu pacote acabaram" }
+            : { to: "/app/pacotes", label: "Solicitar pacote", hint: "Escolha um pacote e seu professor libera as aulas" };
 
   return (
     <div className="page-container">
@@ -121,25 +141,29 @@ export default function StudentHome() {
           ) : (
             <div className="rounded-2xl border border-dashed border-border p-6 text-center mb-5">
               <div className="text-sm text-foreground/80 mb-1">Nenhuma aula agendada</div>
-              <div className="text-[12.5px] text-muted-foreground">Escolha um horário livre do professor.</div>
+              <div className="text-[12.5px] text-muted-foreground">
+                {!modoPronto
+                  ? " "
+                  : isRecorrencia
+                    ? "Seu professor ainda não marcou suas próximas aulas."
+                    : data.credits > 0
+                      ? "Escolha um horário livre do professor."
+                      : "Quando tiver aulas disponíveis, é só escolher um horário."}
+              </div>
             </div>
           )}
 
-          <Button
-            size="lg"
-            className="w-full h-[58px] animate-bb-pulse"
-            onClick={() => navigate(isRecorrencia ? "/app/historico" : data.credits === 0 ? "/app/pacotes" : "/app/agendar")}
-          >
-            <Calendar className="h-[19px] w-[19px]" />
-            {isRecorrencia ? "Ver minhas aulas" : data.credits === 0 ? "Solicitar pacote" : "Agendar aula"}
-          </Button>
-          <div className="text-center text-xs text-muted-foreground mt-2.5">
-            {isRecorrencia
-              ? "Suas aulas já estão marcadas pelo professor"
-              : data.credits === 0
-                ? "Seu pacote acabou — peça a renovação"
-                : "Escolha dia e horário em 2 toques"}
-          </div>
+          {modoPronto && cta ? (
+            <>
+              <Button size="lg" className="w-full h-[58px] animate-bb-pulse" onClick={() => navigate(cta.to)}>
+                <Calendar className="h-[19px] w-[19px]" />
+                {cta.label}
+              </Button>
+              <div className="text-center text-xs text-muted-foreground mt-2.5">{cta.hint}</div>
+            </>
+          ) : (
+            <SkeletonCard height={58} />
+          )}
         </>
       )}
     </div>
