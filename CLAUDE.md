@@ -2221,6 +2221,86 @@ Nada disso chegou a ser commitado — toda a implementação (Story B incluso) f
 tree antes de qualquer commit, sem impacto em produção. Nenhuma migration foi criada em nenhum
 momento (a feature era 100% front-end desde o plano original).
 
+### Home do aluno: rodadas de crítica de design, sugestão de horário e segurança de `bookings` (2026-09-28)
+
+Sessão de design da Home do aluno (`src/pages/student/Home.tsx`) com o skill `/impeccable`: 6
+críticas (nota 23 → 25 → 25 → 27 → 26 → 27 de 40), cada achado corrigido em um commit próprio na
+`dev`, um passo por vez, com push só depois do ok do Lucas. Relatórios em `.impeccable/critique/`
+(um por rodada); contexto de produto em `PRODUCT.md` (raiz). Não repetir aqui o que os commits já
+contam — só o que é decisão, fato do banco ou armadilha.
+
+**Página de amostras `/dev/amostras` (`src/dev/Amostras.tsx`).** Renderiza a Home real em ~10
+situações com dados inventados, sem login e sem Supabase (QueryClient pré-preenchido + perfil falso
+via `AuthContext`, exportado só pra isso). Só existe em `npm run dev`: `main.tsx` a importa atrás
+de `import.meta.env.DEV` — conferido que não entra no build. É o jeito de revisar UI sem credencial.
+**Armadilha já paga:** amostra precisa imitar o que o banco produz de verdade. Uma amostra "pacote
+ativo com 0 aulas" (estado que o banco nunca gera — usar a última aula muda o pacote pra
+`finished`, 0001:498) escondeu uma regressão: aluno veterano com pacote terminado via as
+boas-vindas de aluno novo. Corrigido com `lastPackage` em `getStudentHome`.
+
+**Decisões do Lucas nesta sessão (não reabrir sem ele):**
+- Cartão de saldo: número grande = **aulas restantes no pacote** (total − usadas), não "créditos
+  para agendar". Pro aluno, a frase de baixo só diz o que ainda dá pra agendar.
+- Arquétipos do Perfil de Boxe: nome em inglês **com tradução em português embaixo**
+  (`FIGHTER_PROFILE_GLOSS_PT`, traduções sugeridas pelo Claude, aceitas sem ajuste).
+- Um verbo só pro aluno pedir aulas: **"Pedir"**. Link "Pedir mais aulas" no alerta de poucas aulas,
+  mesmo antes de acabar — o professor é avisado na aprovação (ver abaixo).
+- Recusar sugestão de horário **registra a recusa** (aula fica `rejected`) e tem "Desfazer".
+- Brilho vermelho dos botões primários mantido: é identidade definida no spec.
+- **Adiado, sem decisão:** canal pro aluno falar com o professor a partir da Home.
+
+**Fato do banco: `approve_purchase_request`** (lida via `pg_get_functiondef` — não está nas
+migrations deste repo). Aprovar um pedido **encerra o pacote ativo do aluno**:
+- pedido de pacote → `assign_package_from_template` → fecha os ativos **não-trial**;
+- pedido de **aula avulsa** → `update packages set status='finished' where status='active'`,
+  **sem filtro de origem: fecha também a aula experimental**, e insere um pacote de 1 aula sem
+  passar por `_create_package`.
+As aulas já agendadas não se perdem (a conclusão debita do pacote novo pela busca "mais antigo
+ativo com vaga"); o que se perde é o que sobrava pra agendar. `Pedidos.tsx` agora mostra quantas
+aulas o aluno perderia e pede confirmação antes de aprovar (`classesLostOnApprove`).
+**Em aberto, decisão do Lucas:** se a aula avulsa deveria mesmo encerrar a experimental.
+
+**Fato do banco: o que o aluno pode alterar em `bookings`** (`pg_policies`,
+`information_schema.column_privileges`, lidos em 2026-09-28). Única policy de UPDATE do aluno,
+`bookings_student_update`: USING = aula dele, `status = 'scheduled'`, início ≥ 6h; WITH CHECK =
+status novo `scheduled`/`cancelled` e, se não for cancelamento, horário igual a um
+`availability_slot` publicado. O grant de UPDATE pra `authenticated` cobre **todas** as colunas.
+Dois problemas saíram disso:
+1. **Aceitar/recusar sugestão nunca funcionaram** pro aluno: eram UPDATE direto numa aula
+   `rejected_with_suggestion`, fora do USING — 0 linhas afetadas, sem erro, e o app mostrava uma
+   mensagem enganosa. (A spec original listava essa tela como débito; ela foi construída sem
+   nunca ter passado pela RLS.)
+2. **Furo de crédito:** o aluno podia cancelar gravando `cancelado_por = 'professor'` (nunca
+   consome na recorrência), mover a aula de horário sem aprovação, ou mexer em
+   `pacote_id`/`cadeia_id`/`teacher_note` — tudo pelo cliente, fora do app.
+
+**Migration 0030 (`0030_sugestao_rpcs_e_guarda_update_aluno.sql`) — APLICADA e VERIFICADA
+(2026-09-28), 8/8 OK em `supabase/verify_0030_sugestao_e_guarda.sql`** (transação com rollback,
+testa como aluno e como professor trocando `role` e `request.jwt.claims`):
+- RPCs `aceitar_sugestao` / `recusar_sugestao` / `desfazer_recusa_sugestao`, `security definer`,
+  com checagem de posse e de estado. Aceitar exige aula disponível
+  (`available_credits_for_student`) e traduz a colisão da 0028 em `slot_taken`. Recusar guarda o
+  horário sugerido nas colunas `suggested_*` (a aula fica `rejected` com elas preenchidas), então
+  desfazer não recebe horário do cliente.
+- Trigger `_guarda_update_booking_pelo_cliente` (BEFORE UPDATE): quando a escrita vem direto do
+  cliente (`current_user` ∈ `authenticated`/`anon`) e quem escreve **não** é o professor dono da
+  aula, só aceita cancelar (`scheduled` → `cancelled`, sem mexer em outra coluna) e **carimba
+  `cancelado_por = 'aluno'`**. RPCs passam direto porque, em `security definer`, `current_user` é
+  o dono da função.
+- **Consequência de crédito, deliberada:** cancelamento pelo aluno deixa de gravar NULL. No
+  autosserviço não muda nada (quem manda é o ledger); na recorrência, cancelar passa a consumir
+  crédito se `falta_consome_credito` — que é a regra documentada em "Crédito — regra única". O NULL
+  anterior caía no `else 0` da whitelist da 0013 (fail-open). **Se o aluno de recorrência deveria
+  poder cancelar é a decisão da Etapa 8 — continua em aberto; a 0030 manteve o comportamento de
+  permitir.**
+- Os dois triggers antigos de `bookings` (`trg_validate_booking_status_time`,
+  `trg_prevent_future_completed`) não estão neste repo e não foram lidos; o script de verificação
+  passou por eles sem erro nas transições usadas.
+
+**Lição pra próxima sessão:** toda escrita do aluno em `bookings` que não seja cancelar precisa ir
+por RPC. Um UPDATE direto novo do lado do aluno vai ser barrado pela guarda da 0030 (erro
+`not_allowed`) — isso é intencional, não um bug a contornar abrindo a guarda.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
