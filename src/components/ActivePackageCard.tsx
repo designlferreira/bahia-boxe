@@ -29,6 +29,12 @@ interface ActivePackageCardProps {
    * útil pro professor, ruído pro aluno, que no lugar dele vê o nome do pacote.
    */
   audience?: "admin" | "student";
+  /**
+   * Quando existe, o alerta de poucas aulas ganha o link "Pedir mais aulas". Quem chama decide:
+   * só faz sentido pro aluno que pede pacote sozinho (autosserviço) — na recorrência quem gera o
+   * pacote é o professor, e o professor não pede pacote pra si.
+   */
+  onRequestMore?: () => void;
 }
 
 type Tone = "ok" | "low" | "empty";
@@ -78,7 +84,14 @@ function plural(n: number, one: string, many: string) {
  * As marquinhas mostram o pacote aula a aula: usada (apagada), já agendada (contorno) e livre
  * (cheia).
  */
-export function ActivePackageCard({ pkg, credits, saldo, hideAlert, audience = "admin" }: ActivePackageCardProps) {
+export function ActivePackageCard({
+  pkg,
+  credits,
+  saldo,
+  hideAlert,
+  audience = "admin",
+  onRequestMore,
+}: ActivePackageCardProps) {
   // Autosserviço: `credits` soma TODOS os pacotes ativos (inclusive trial) e já desconta as
   // reservas futuras; o que sobra entre "restantes no pacote" e `credits` é o que está agendado —
   // por isso o clamp. Recorrência: toda aula restante já nasce marcada, então "agendada" não
@@ -180,10 +193,27 @@ export function ActivePackageCard({ pkg, credits, saldo, hideAlert, audience = "
       )}
 
       {showLowAlert && (
-        <p className="mt-3 flex gap-2 items-center text-sm text-amber">
-          <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
-          {saldo ? "Restam poucas aulas no pacote atual." : "Restam poucas aulas — considere renovar o pacote."}
-        </p>
+        <div className="mt-3 flex gap-2 items-center justify-between text-sm text-amber">
+          <p className="flex gap-2 items-center">
+            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+            {onRequestMore
+              ? "Restam poucas aulas."
+              : saldo
+                ? "Restam poucas aulas no pacote atual."
+                : "Restam poucas aulas — considere renovar o pacote."}
+          </p>
+          {onRequestMore && (
+            // Antes o alerta mandava "renovar" sem caminho nenhum: o aluno não tem aba de Pacotes,
+            // e o botão principal só levava lá com zero aulas.
+            <button
+              type="button"
+              onClick={onRequestMore}
+              className="shrink-0 -my-2.5 -mr-2 min-h-11 px-2 font-semibold underline underline-offset-4 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Pedir mais aulas
+            </button>
+          )}
+        </div>
       )}
     </section>
   );

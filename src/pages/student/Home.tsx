@@ -157,7 +157,17 @@ export default function StudentHome() {
         <>
           <div className="mb-4 animate-bb-up">
             {!semPacote ? (
-              <ActivePackageCard pkg={pacoteMostrado} credits={data.credits} saldo={saldo} audience="student" />
+              <ActivePackageCard
+                pkg={pacoteMostrado}
+                credits={data.credits}
+                saldo={saldo}
+                audience="student"
+                // Só no autosserviço, sem pedido já em espera (duplicaria) e quando o botão principal
+                // ainda é "Agendar aula" — com crédito 0 ele próprio já leva a Pacotes.
+                onRequestMore={
+                  modoPronto && !isRecorrencia && !pedido && data.credits > 0 ? () => navigate("/app/pacotes") : undefined
+                }
+              />
             ) : !modoPronto ? (
               <SkeletonCard height={150} />
             ) : (
