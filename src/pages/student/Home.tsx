@@ -101,7 +101,7 @@ export default function StudentHome() {
       {data && (
         <>
           <div className="mb-3.5 animate-bb-up">
-            <ActivePackageCard pkg={data.package} credits={data.credits} saldo={saldo} />
+            <ActivePackageCard pkg={data.package} credits={data.credits} saldo={saldo} audience="student" />
           </div>
 
           {data.suggestion && (
