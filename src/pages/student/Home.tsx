@@ -110,7 +110,9 @@ export default function StudentHome() {
             quiet: !!data.suggestion?.suggestedStartTime,
             hint: pedido
               ? `Seu pedido de ${pedidoNome} está com o professor`
-              : "Escolha o dia e o horário da sua aula",
+              : pacoteMostrado?.origin === "trial"
+                ? "Escolha o dia e o horário da sua aula experimental"
+                : "Escolha o dia e o horário da sua aula",
           }
         : pedido
           ? null

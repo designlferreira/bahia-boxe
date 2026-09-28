@@ -106,14 +106,20 @@ export function ActivePackageCard({
 
   // Sem pacote não há "restantes" — mostra o crédito solto que houver (normalmente 0).
   const headline = pkg || saldo ? remaining : Math.max(credits, 0);
-  const tone: Tone = headline <= 0 ? "empty" : pkg && headline <= 2 ? "low" : "ok";
+  // Aula experimental é presente de boas-vindas, não "pacote acabando": fica no dourado (crédito),
+  // nunca no âmbar de "poucas aulas" — que pegava toda experimental, já que 1 é <= 2. É a primeira
+  // tela de quase todo aluno novo (`grant_trial_credit`).
+  const isTrial = pkg?.origin === "trial";
+  const tone: Tone = headline <= 0 ? "empty" : pkg && !isTrial && headline <= 2 ? "low" : "ok";
   const t = TONE[tone];
   // Só existe o que renovar quando existe pacote; aula experimental não se "renova".
   const showLowAlert = !hideAlert && tone === "low" && pkg?.origin !== "trial";
 
   // Uma palavra só pro mesmo número, com ou sem pacote, nos dois fluxos — antes alternava entre
   // "restantes" e "disponíveis" e o aluno podia achar que eram coisas diferentes.
-  const unit = plural(headline, "aula restante", "aulas restantes");
+  const unit = isTrial
+    ? plural(headline, "aula experimental", "aulas experimentais")
+    : plural(headline, "aula restante", "aulas restantes");
 
   const summary = [
     // "usadas" nos dois fluxos. Na recorrência era "feitas", o que além de inconsistente era impreciso:
@@ -136,7 +142,9 @@ export function ActivePackageCard({
           <span className={cn("font-display text-[56px] leading-[0.85] tabular-nums", t.number)}>{headline}</span>
           <span className="text-[15px] font-medium text-foreground/85">{unit}</span>
         </p>
+        {/* Na experimental o aluno já lê "aula experimental" ao lado do número — o nome seria repetição. */}
         {pkg &&
+          !(isTrial && audience === "student") &&
           (audience === "admin" ? (
             <Badge className="bg-accent/15 text-accent shrink-0">{ORIGIN_LABEL[pkg.origin]}</Badge>
           ) : (
@@ -174,7 +182,9 @@ export function ActivePackageCard({
             )}
           </div>
           <p className="text-sm text-muted-foreground">
-            {summary}
+            {isTrial && audience === "student" && headline > 0
+              ? "Cortesia pra você conhecer o treino. Agende quando quiser."
+              : summary}
             {saldo && saldo.aRepor > 0 && (
               <span className="text-amber">
                 {" "}

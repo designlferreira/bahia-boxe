@@ -147,6 +147,12 @@ const HOME_CASES: { title: string; note: string; modo: Modo; data: HomeData }[] 
     data: base,
   },
   {
+    title: "Aula experimental",
+    note: "aluno novo com a aula de cortesia",
+    modo: "autosservico",
+    data: { ...base, package: pkg(1, 0, { origin: "trial", templateName: "Aula experimental" }), credits: 1 },
+  },
+  {
     title: "Pedido enviado",
     note: "sem aulas, pedido de pacote aguardando o professor",
     modo: "autosservico",
