@@ -112,8 +112,12 @@ export function ActivePackageCard({
   const isTrial = pkg?.origin === "trial";
   const tone: Tone = headline <= 0 ? "empty" : pkg && !isTrial && headline <= 2 ? "low" : "ok";
   const t = TONE[tone];
-  // Só existe o que renovar quando existe pacote; aula experimental não se "renova".
-  const showLowAlert = !hideAlert && tone === "low" && pkg?.origin !== "trial";
+  // Só existe o que renovar quando existe pacote; aula experimental não se "renova". Pro aluno, o
+  // alerta só aparece quando leva a algum lugar (link "Pedir mais aulas") ou é recorrência (aviso
+  // de que o pacote gerado pelo professor está no fim). Quando o botão principal da Home já é o
+  // pedido, o tom âmbar do cartão basta — o alerta seria a terceira vez dizendo a mesma coisa.
+  const showLowAlert =
+    !hideAlert && tone === "low" && !isTrial && (audience === "admin" || !!onRequestMore || !!saldo);
 
   // Uma palavra só pro mesmo número, com ou sem pacote, nos dois fluxos — antes alternava entre
   // "restantes" e "disponíveis" e o aluno podia achar que eram coisas diferentes.
@@ -224,7 +228,8 @@ export function ActivePackageCard({
               ? "Restam poucas aulas."
               : saldo
                 ? "Restam poucas aulas no pacote atual."
-                : "Restam poucas aulas — considere renovar o pacote."}
+                : // Só o professor chega aqui (ver showLowAlert).
+                  "Restam poucas aulas — considere renovar o pacote."}
           </p>
           {onRequestMore && (
             // Antes o alerta mandava "renovar" sem caminho nenhum: o aluno não tem aba de Pacotes,

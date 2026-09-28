@@ -83,7 +83,7 @@ export default function StudentHome() {
   // recorrência): no lugar de um "0" cinza + "Nenhum pacote ativo" + "Nenhuma aula agendada" — três
   // jeitos de dizer "nada" —, a Home explica o caminho até a primeira aula.
   // "Sem pacote" = nunca teve um (pago). Quem já teve e acabou vê o cartão do último pacote, em
-  // zero, com "Solicitar novo pacote" — não as boas-vindas de aluno novo.
+  // zero, com "Pedir mais aulas" — não as boas-vindas de aluno novo.
   const pacoteMostrado = data ? (data.package ?? data.lastPackage) : null;
   const semPacote = !!data && !pacoteMostrado && !data.nextBooking;
   const pedidoNome = pedido?.kind === "package" ? "pacote" : "aula avulsa";
@@ -117,16 +117,19 @@ export default function StudentHome() {
           : data.nextBooking
           ? {
               to: "/app/pacotes",
-              label: "Solicitar mais aulas",
-              hint: "Suas aulas restantes já estão agendadas",
+              // Um verbo só pra "pedir aulas" em toda a tela do aluno ("Pedir"), antes eram cinco
+              // ("renovar", "Pedir mais aulas", "Solicitar mais aulas/novo pacote/pacote"). Sem dica:
+              // o cartão logo acima já diz "Todas já estão agendadas".
+              label: "Pedir mais aulas",
+              hint: null,
               // Nada urgente aqui: o aluno tem aulas marcadas. Vermelho transformaria o pedido de
               // mais aulas em alarme.
               quiet: true,
             }
           : pacoteMostrado
             ? // O cartão logo acima já diz "0 aulas restantes · Pacote concluído".
-              { to: "/app/pacotes", label: "Solicitar novo pacote", hint: null }
-            : { to: "/app/pacotes", label: "Solicitar pacote", hint: "Escolha um pacote e seu professor libera as aulas" };
+              { to: "/app/pacotes", label: "Pedir mais aulas", hint: null }
+            : { to: "/app/pacotes", label: "Pedir pacote", hint: "Escolha um pacote e seu professor libera as aulas" };
 
   return (
     <div className="page-container">
@@ -275,7 +278,7 @@ export default function StudentHome() {
             </>
           ) : pedido && !semPacote ? (
             // Sem aulas e com pedido em espera: não há nada a fazer além de aguardar, então não há
-            // botão — um "Solicitar" aqui convidaria a pedir de novo o que já foi pedido.
+            // botão — um "Pedir" aqui convidaria a pedir de novo o que já foi pedido.
             <div role="status" className="flex gap-3 items-start p-4 rounded-2xl bg-amber/10 border border-amber/30">
               <Hourglass className="h-5 w-5 text-amber shrink-0 mt-0.5" aria-hidden />
               <div>

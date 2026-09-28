@@ -51,7 +51,7 @@ export default function StudentPacotes() {
   useEffect(() => {
     if (modoEfetivo === "recorrencia") {
       navigate("/app/historico", { replace: true });
-      toast("Seu professor gerencia sua agenda por recorrência — fale com ele para renovar seu pacote.");
+      toast("Seu professor gerencia sua agenda por recorrência — fale com ele para pedir mais aulas.");
     }
   }, [modoEfetivo, navigate]);
 
@@ -97,7 +97,7 @@ export default function StudentPacotes() {
         </div>
       )}
 
-      <h2 className="section-title mb-3">Solicitar</h2>
+      <h2 className="section-title mb-3">Pedir mais aulas</h2>
 
       {isLoading && <SkeletonList count={3} height={90} />}
 
