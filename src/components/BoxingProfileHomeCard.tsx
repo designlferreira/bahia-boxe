@@ -1,9 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight, Target } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { SkeletonCard } from "@/components/SkeletonCard";
-import { FIGHTER_PROFILE_LABELS, type FighterProfileKey } from "@/lib/boxingProfile";
+import { FIGHTER_PROFILE_GLOSS_PT, FIGHTER_PROFILE_LABELS, type FighterProfileKey } from "@/lib/boxingProfile";
+import { cn } from "@/lib/utils";
 import { combineAssessments } from "@/lib/boxingProfile/combined";
 import {
   getBoxingProfileAssessment,
@@ -104,48 +105,48 @@ export function BoxingProfileHomeCard() {
 
   const open = () => navigate("/app/perfil-lutador");
 
+  // Mais leve que os outros cartões da Home (só contorno, sem fundo, sombra nem ícone): é uma
+  // informação de identidade, secundária ao saldo e à próxima aula — antes, em tela estreita, ele
+  // ficava MAIS alto que o cartão da próxima aula.
+  const cardClass =
+    "mt-6 w-full text-left rounded-2xl border border-border p-4 active:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
   if (!primary) {
     return (
-      <button
-        type="button"
-        onClick={open}
-        className="mt-6 w-full text-left card-dark p-4 flex gap-4 items-center active:scale-[0.98] active:bg-secondary transition-[transform,background-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <div className="h-11 w-11 rounded-xl bg-secondary flex items-center justify-center shrink-0">
-          <Target className="h-5 w-5 text-foreground/85" aria-hidden />
-        </div>
+      <button type="button" onClick={open} className={cn(cardClass, "flex gap-3 items-center")}>
         <div className="flex-1 min-w-0">
           <div className="text-[15px] font-semibold text-foreground">Descubra seu estilo de lutador</div>
-          <div className="text-sm text-muted-foreground mt-0.5">Responda o questionário rápido, 14 perguntas.</div>
+          <div className="text-sm text-muted-foreground mt-0.5">Questionário rápido, 14 perguntas</div>
         </div>
-        <ChevronRight className="h-[18px] w-[18px] text-muted-foreground" aria-hidden />
+        <ChevronRight className="h-[18px] w-[18px] text-muted-foreground shrink-0" aria-hidden />
       </button>
     );
   }
 
-  const label = FIGHTER_PROFILE_LABELS[primary];
-  const secondaryLabel = secondary && secondary !== primary ? FIGHTER_PROFILE_LABELS[secondary] : null;
+  // Nome curto em inglês (a parte antes da barra — "Pressure Fighter / Swarmer" -> "Pressure
+  // Fighter") + tradução embaixo. O nome completo continua na tela do Perfil de Boxe.
+  const label = FIGHTER_PROFILE_LABELS[primary].split(" / ")[0];
+  const gloss = FIGHTER_PROFILE_GLOSS_PT[primary];
+  const secondaryGloss = secondary && secondary !== primary ? FIGHTER_PROFILE_GLOSS_PT[secondary] : null;
 
   return (
     <button
       type="button"
       onClick={open}
-      aria-label={`Seu perfil de boxe: ${label}${coachUnseen ? ". Seu professor te avaliou" : ""}. Ver perfil`}
-      className="mt-6 w-full text-left card-dark p-4 active:scale-[0.98] active:bg-secondary transition-[transform,background-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      aria-label={`Seu perfil de boxe: ${label}, ${gloss}${coachUnseen ? ". Seu professor te avaliou" : ""}. Ver perfil`}
+      className={cardClass}
     >
-      <div className="flex gap-4 items-center">
-        <div className="h-11 w-11 rounded-xl bg-secondary flex items-center justify-center shrink-0">
-          <Target className="h-5 w-5 text-foreground/85" aria-hidden />
-        </div>
+      <div className="flex gap-3 items-center">
         <div className="flex-1 min-w-0">
           <div className="text-sm text-muted-foreground">
             {source === "coach" ? "Seu estilo, na leitura do seu professor" : "Seu estilo de lutador"}
           </div>
           {/* Nome do arquétipo é o "número grande" deste cartão — por isso Bebas. */}
-          <div className="font-display text-2xl leading-tight tracking-wide text-foreground uppercase">{label}</div>
-          {secondaryLabel && (
-            <div className="text-sm text-muted-foreground">com traços de {secondaryLabel}</div>
-          )}
+          <div className="font-display text-[22px] leading-tight tracking-wide text-foreground uppercase">{label}</div>
+          <div className="text-sm text-muted-foreground">
+            {gloss}
+            {secondaryGloss && `, com traços de ${secondaryGloss}`}
+          </div>
         </div>
         <ChevronRight className="h-[18px] w-[18px] text-muted-foreground shrink-0" aria-hidden />
       </div>

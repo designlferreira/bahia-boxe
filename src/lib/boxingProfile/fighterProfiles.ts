@@ -20,6 +20,20 @@ export const FIGHTER_PROFILE_LABELS: Record<FighterProfileKey, string> = {
   pressure_boxer: "Pressure Boxer / Aggressive Boxer",
 };
 
+/**
+ * Tradução curta em português, mostrada EMBAIXO do nome em inglês — o nome original continua
+ * sendo o termo do boxe (é o que o professor fala no treino); a tradução só ajuda quem não o
+ * conhece. Decisão do Lucas (2026-09-28): "manter inglês + tradução embaixo".
+ */
+export const FIGHTER_PROFILE_GLOSS_PT: Record<FighterProfileKey, string> = {
+  out_boxer: "boxeador de distância",
+  pressure_fighter: "lutador de pressão",
+  puncher: "lutador de potência",
+  counterpuncher: "contragolpeador",
+  boxer_puncher: "boxeador completo",
+  pressure_boxer: "boxeador de pressão",
+};
+
 /** Texto do resultado — sempre em enquadramento de tendência/autopercepção, nunca de capacidade objetiva. */
 export const FIGHTER_PROFILE_DESCRIPTIONS: Record<FighterProfileKey, string> = {
   out_boxer:
