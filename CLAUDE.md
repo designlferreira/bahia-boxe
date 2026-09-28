@@ -2247,7 +2247,7 @@ boas-vindas de aluno novo. Corrigido com `lastPackage` em `getStudentHome`.
   mesmo antes de acabar — o professor é avisado na aprovação (ver abaixo).
 - Recusar sugestão de horário **registra a recusa** (aula fica `rejected`) e tem "Desfazer".
 - Brilho vermelho dos botões primários mantido: é identidade definida no spec.
-- **Adiado, sem decisão:** canal pro aluno falar com o professor a partir da Home.
+- Canal do aluno com o professor: **WhatsApp**, guardado por professor (0032, ver abaixo).
 
 **Fato do banco: `approve_purchase_request`** (lida via `pg_get_functiondef` — não está nas
 migrations deste repo). Aprovar um pedido **encerra o pacote ativo do aluno**:
@@ -2258,7 +2258,7 @@ migrations deste repo). Aprovar um pedido **encerra o pacote ativo do aluno**:
 As aulas já agendadas não se perdem (a conclusão debita do pacote novo pela busca "mais antigo
 ativo com vaga"); o que se perde é o que sobrava pra agendar. `Pedidos.tsx` agora mostra quantas
 aulas o aluno perderia e pede confirmação antes de aprovar (`classesLostOnApprove`).
-**Em aberto, decisão do Lucas:** se a aula avulsa deveria mesmo encerrar a experimental.
+**Decidido pelo Lucas e corrigido na 0031:** aprovar aula avulsa **não** encerra a aula experimental (ver abaixo).
 
 **Fato do banco: o que o aluno pode alterar em `bookings`** (`pg_policies`,
 `information_schema.column_privileges`, lidos em 2026-09-28). Única policy de UPDATE do aluno,
@@ -2297,9 +2297,59 @@ testa como aluno e como professor trocando `role` e `request.jwt.claims`):
   `trg_prevent_future_completed`) não estão neste repo e não foram lidos; o script de verificação
   passou por eles sem erro nas transições usadas.
 
-**Lição pra próxima sessão:** toda escrita do aluno em `bookings` que não seja cancelar precisa ir
-por RPC. Um UPDATE direto novo do lado do aluno vai ser barrado pela guarda da 0030 (erro
-`not_allowed`) — isso é intencional, não um bug a contornar abrindo a guarda.
+**Lição pra próxima sessão:** toda escrita do aluno em `bookings` precisa ir por RPC — desde a
+0034 inclusive cancelar. Um UPDATE direto novo do lado do aluno vai ser barrado pela guarda da 0030
+(erro `not_allowed`) — isso é intencional, não um bug a contornar abrindo a guarda.
+
+**Migrations 0031–0034 (2026-09-28) — todas APLICADAS e VERIFICADAS por script com rollback.**
+Mesmo formato da 0030: arquivo em `supabase/migrations/`, script `supabase/verify_00NN_*.sql` que
+testa como aluno e como professor trocando `role`/`request.jwt.claims`. **Atenção ao aplicar:**
+duas vezes nesta sessão o script de verificação foi rodado antes da migration (erro "function ...
+does not exist"); a migration fica em `supabase/migrations/`, o script direto em `supabase/`.
+
+- **0031 — aula avulsa preserva a experimental.** Decisão do Lucas. `approve_purchase_request` (corpo
+  copiado do banco) passa o ramo de aula avulsa por `_create_package(..., 'purchase', 'single')`, o
+  caminho único da decisão 6, que fecha só os ativos não-trial. A linha criada é a mesma de antes.
+  `Pedidos.tsx` deixa de contar a experimental como aula perdida. Verify: 4/4 OK.
+- **0032 — WhatsApp do professor.** Decisão do Lucas: o canal do aluno com o professor é o WhatsApp,
+  **por professor** (produto multi-professor, cada um com a própria marca — nunca fixo no código).
+  `profiles.whatsapp` (só dígitos, CHECK 10–15), RPC `whatsapp_do_professor` no padrão de
+  `modo_agendamento_efetivo` (o aluno não lê `profiles` do professor), preenchido com
+  +55 11 94703-4983 só porque havia um único professor sem número. Editável em Configurações
+  (`src/lib/whatsapp.ts` normaliza). Aparece na Home do aluno como "Falar com o professor" (link
+  wa.me com o primeiro nome do aluno, sem citar marca) e no detalhe da aula quando faltam < 24h.
+  Sem número cadastrado, nada aparece.
+- **0033 — aluno de recorrência pede remarcação.** Decisões do Lucas: pode pedir pra **qualquer**
+  hora cheia livre do professor entre **06h e 22h** (São Paulo), **todos os dias**, com **24h** de
+  antecedência (da aula e do horário novo); o pedido fica **pendente até o professor aprovar**; **um
+  pedido pendente por aula**; o aluno **pode cancelar o próprio pedido**.
+  - O pedido é uma linha nova `pending_confirmation` ligada à original (replacement_for_booking_id,
+    cadeia_id e pacote_id herdados) — reserva o horário na constraint da 0028. A original segue
+    `scheduled` até a decisão.
+  - `aprovar_remarcacao` = o que `reagendar_aula` faz (original -> `rescheduled`, pedido ->
+    `scheduled`, ressincroniza `used_classes`).
+  - **Recusar ou cancelar o pedido tira ele da cadeia** (replacement_for_booking_id = null,
+    cadeia_id = o próprio id, pacote_id = null). Obrigatório: ligado, ele viraria o terminal da
+    cadeia e `calcular_saldo_pacote` aplicaria a regra de crédito ao pedido, não à aula real.
+  - Funções auxiliares (`_desligar_pedido_da_cadeia`, `_original_para_remarcacao`,
+    `_inicio_hora_sp`) com REVOKE, como `_create_package` — `_desligar_...` não checa quem chama.
+  - No app: `approveBooking`/`rejectBooking` reconhecem "pendente com antecessor" e chamam as RPCs
+    (só mudar o status deixaria a original e a nova agendadas juntas). Numa recusa de remarcação a
+    sugestão de horário é ignorada. `VinculoAula` ganhou `pedido_remarcacao` ("Pedido de remarcação").
+  - O detalhe da aula do aluno (`getBookingDetail`) passou a ler a aula da TABELA: a view
+    `booking_history_app` não expõe `pacote_id`/`replacement_for_booking_id`.
+  - Verify: 11/11 OK.
+- **0034 — o aluno cancela a própria aula por RPC.** Bug anterior à sessão: a policy do aluno só
+  alcança `scheduled`, então cancelar uma aula **pendente** (autosserviço, antes da aprovação)
+  nunca funcionou e o app culpava o prazo de 6h. `cancelar_minha_aula`: pendente cancela até o
+  início; agendada até 6h antes; grava `cancelado_por = 'aluno'`; na recorrência ressincroniza o
+  pacote; se for pedido de remarcação, desiste do pedido. Verify: 3 OK + 1 AVISO (o caso "< 6h" não
+  montou a aula de teste porque o horário real estava ocupado).
+
+**Etapa 8, parcialmente decidida:** o aluno de recorrência **pode pedir remarcação** (0033) e
+**continua podendo cancelar** (comportamento de sempre, agora pela 0034, consumindo crédito se o
+pacote tiver `falta_consome_credito`). O `aviso_ausencia` original da Etapa 8 não foi implementado
+nem rediscutido.
 
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
