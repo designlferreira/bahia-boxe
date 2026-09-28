@@ -309,7 +309,12 @@ export async function getStudentHome(profileId: string) {
       .select("*")
       .eq("student_id", studentId)
       .eq("status", "rejected_with_suggestion")
-      .order("start_time", { ascending: false })
+      // Só sugestões que ainda podem ser aceitas: com horário sugerido e no futuro. Sem isso, a
+      // última sugestão já vencida ficava na Home pra sempre, levando a uma aula que não dá mais
+      // pra aceitar. A mais próxima primeiro — é a que o aluno precisa decidir antes.
+      .not("suggested_start_time", "is", null)
+      .gt("suggested_start_time", nowIso)
+      .order("suggested_start_time", { ascending: true })
       .limit(1),
     // Pedido de pacote/aula ainda sem decisão do professor. Sem isso, logo depois de pedir o aluno
     // voltava pra Home e lia de novo "suas aulas acabaram, solicite" — como se o pedido não

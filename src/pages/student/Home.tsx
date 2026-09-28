@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Calendar, ChevronRight, Clock3, Hourglass } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -9,18 +10,34 @@ import { SkeletonCard } from "@/components/SkeletonCard";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getModoAgendamentoEfetivo, getStudentAdminId, getStudentHome } from "@/integrations/backend/api";
+import { acceptSuggestion, getModoAgendamentoEfetivo, getStudentAdminId, getStudentHome } from "@/integrations/backend/api";
+import type { Booking } from "@/integrations/backend/types";
 import { getStatusConfig } from "@/lib/bookingStatus";
 import { formatDayNumber, formatMonthShort, formatDate, formatDateShort, formatTime, formatWeekdayLong } from "@/lib/dateUtils";
 
 export default function StudentHome() {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["student-home", profile?.id],
     queryFn: () => getStudentHome(profile!.id),
     enabled: !!profile,
+  });
+
+  // Aceitar a sugestão direto da Home (spec §12.2 item 3), sem o desvio pela tela da aula — mesma
+  // função e mesmas invalidações que `student/AulaDetalhe.tsx` já usa.
+  const accept = useMutation({
+    mutationFn: (suggestion: Booking) => acceptSuggestion(suggestion.id),
+    onSuccess: (_r, suggestion) => {
+      queryClient.invalidateQueries({ queryKey: ["student-home"] });
+      queryClient.invalidateQueries({ queryKey: ["student-history"] });
+      toast.success(
+        `Aula confirmada: ${formatDate(suggestion.suggestedStartTime!)} · ${formatTime(suggestion.suggestedStartTime!)}`,
+      );
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível aceitar o novo horário."),
   });
 
   const { data: adminId, isError: adminIdError } = useQuery({
@@ -121,24 +138,45 @@ export default function StudentHome() {
             <ActivePackageCard pkg={data.package} credits={data.credits} saldo={saldo} audience="student" />
           </div>
 
-          {data.suggestion && (
-            <button
-              type="button"
-              onClick={() => navigate(`/app/aula/${data.suggestion!.id}`)}
-              className="w-full text-left flex gap-3 items-center p-4 rounded-2xl bg-amber/10 border border-amber/30 mb-4 active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          {data.suggestion?.suggestedStartTime && (
+            <section
+              aria-label="Horário sugerido pelo professor"
+              className="p-4 rounded-2xl bg-amber/10 border border-amber/30 mb-4"
             >
-              <div className="h-[38px] w-[38px] rounded-xl bg-amber/15 flex items-center justify-center shrink-0">
-                <Clock3 className="h-[18px] w-[18px] text-amber" aria-hidden />
-              </div>
-              <div className="flex-1">
-                <div className="text-[15px] font-semibold text-amber">Novo horário sugerido</div>
-                <div className="text-sm text-muted-foreground first-letter:uppercase">
-                  {formatDate(data.suggestion.suggestedStartTime ?? data.suggestion.startTime)} ·{" "}
-                  {formatTime(data.suggestion.suggestedStartTime ?? data.suggestion.startTime)}
+              <div className="flex gap-3 items-start">
+                <div className="h-10 w-10 rounded-xl bg-amber/15 flex items-center justify-center shrink-0">
+                  <Clock3 className="h-[18px] w-[18px] text-amber" aria-hidden />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[15px] font-semibold text-amber">Seu professor sugeriu outro horário</div>
+                  <div className="text-base font-semibold text-foreground mt-1 first-letter:uppercase">
+                    {formatDate(data.suggestion.suggestedStartTime)} · {formatTime(data.suggestion.suggestedStartTime)}
+                  </div>
+                  <div className="text-sm text-muted-foreground mt-0.5">
+                    No lugar de {formatDate(data.suggestion.startTime)} · {formatTime(data.suggestion.startTime)}
+                  </div>
                 </div>
               </div>
-              <ChevronRight className="h-[18px] w-[18px] text-muted-foreground" aria-hidden />
-            </button>
+              <div className="flex gap-3 mt-4">
+                <Button
+                  // Âmbar, não vermelho nem dourado: é a cor de "pendente, decida" do spec (§12.1) —
+                  // e o botão vermelho principal continua logo abaixo, não dá pra ter dois.
+                  className="flex-1 h-11 border-amber bg-amber text-amber-foreground hover:border-amber hover:brightness-110"
+                  variant="secondary"
+                  onClick={() => accept.mutate(data.suggestion!)}
+                  disabled={accept.isPending}
+                >
+                  {accept.isPending ? "Confirmando…" : "Aceitar horário"}
+                </Button>
+                <Button
+                  className="flex-1 h-11"
+                  variant="secondary"
+                  onClick={() => navigate(`/app/aula/${data.suggestion!.id}`)}
+                >
+                  Ver detalhes
+                </Button>
+              </div>
+            </section>
           )}
 
           <h2 className="font-display text-[19px] tracking-wide text-foreground mt-2 mb-3">PRÓXIMA AULA</h2>
