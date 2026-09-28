@@ -64,7 +64,13 @@ export default function StudentHome() {
   const cta = !data
     ? null
     : isRecorrencia
-      ? { to: "/app/historico", label: "Ver minhas aulas", hint: "Suas aulas já estão marcadas pelo professor" }
+      ? {
+          to: "/app/historico",
+          label: "Ver minhas aulas",
+          hint: data.nextBooking
+            ? "Suas aulas já estão marcadas pelo professor"
+            : "Seu professor marca as aulas por você",
+        }
       : data.credits > 0
         ? {
             to: "/app/agendar",

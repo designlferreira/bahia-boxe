@@ -10,7 +10,9 @@ interface AuthContextValue {
   refreshProfile: () => void;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+// Exportado só pra página de amostras de desenvolvimento (`src/dev/Amostras.tsx`) injetar um
+// perfil falso sem passar pelo login. O app de verdade sempre usa `AuthProvider`.
+export const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);

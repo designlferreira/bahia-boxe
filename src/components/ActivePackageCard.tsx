@@ -83,11 +83,16 @@ export function ActivePackageCard({ pkg, credits, saldo, hideAlert, audience = "
   const t = TONE[tone];
   // Sem pacote, "0" também é `<= 2` — o alerta dizia "restam poucas aulas, considere renovar" pra
   // quem nunca teve pacote. Só existe o que renovar quando existe pacote.
-  const showLowAlert = !hideAlert && tone === "low";
+  // Aula experimental não se "renova" — o alerta de renovação não se aplica a ela.
+  const showLowAlert = !hideAlert && tone === "low" && pkg?.origin !== "trial";
 
+  // Sem pacote, "para agendar" prometeria uma ação que um aluno em recorrência nunca faz — o card
+  // não sabe o modo do professor, então usa a palavra que vale nos dois.
   const unit = saldo
     ? plural(headline, "aula restante", "aulas restantes")
-    : plural(headline, "aula para agendar", "aulas para agendar");
+    : !pkg
+      ? plural(headline, "aula disponível", "aulas disponíveis")
+      : plural(headline, "aula para agendar", "aulas para agendar");
 
   // Recorrência: toda aula restante já nasce marcada, então "agendada" não distingue nada ali —
   // só usadas x restantes. Autosserviço: `credits` já desconta as reservas futuras; o que sobra

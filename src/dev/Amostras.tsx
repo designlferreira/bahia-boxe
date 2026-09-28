@@ -1,0 +1,281 @@
+/**
+ * Página de amostras — SÓ EM DESENVOLVIMENTO (`npm run dev`, rota /dev/amostras).
+ *
+ * Renderiza telas e componentes reais com dados inventados, pra revisar o visual de cada situação
+ * sem login e sem banco. Nada aqui fala com o Supabase: cada amostra tem seu próprio QueryClient já
+ * preenchido com o resultado das consultas, e um perfil falso injetado direto no AuthContext.
+ *
+ * Fica fora do build de produção: `main.tsx` só importa este arquivo atrás de
+ * `import.meta.env.DEV`, que o Vite troca por `false` no build e elimina o import junto.
+ */
+import { useState, type ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter } from "react-router-dom";
+import { addDays, subDays } from "date-fns";
+import { AuthContext } from "@/context/AuthContext";
+import StudentHome from "@/pages/student/Home";
+import { ActivePackageCard } from "@/components/ActivePackageCard";
+import type { Booking, PackageRecord, Profile, PurchaseRequest, SaldoPacote } from "@/integrations/backend/types";
+
+const PROFILE: Profile = {
+  id: "amostra-aluno",
+  name: "Maria Oliveira",
+  role: "student",
+  email: "amostra@exemplo.invalid",
+  createdAt: new Date().toISOString(),
+};
+const ADMIN_ID = "amostra-professor";
+
+function at(days: number, hour: number) {
+  const d = days >= 0 ? addDays(new Date(), days) : subDays(new Date(), -days);
+  d.setHours(hour, 0, 0, 0);
+  return d.toISOString();
+}
+
+function pkg(total: number, used: number, extra: Partial<PackageRecord> = {}): PackageRecord {
+  return {
+    id: `pkg-${total}-${used}`,
+    studentId: "amostra-student",
+    totalClasses: total,
+    usedClasses: used,
+    status: "active",
+    kind: "package",
+    origin: "purchase",
+    templateName: `Pacote ${total} aulas`,
+    createdAt: at(-20, 10),
+    ...extra,
+  };
+}
+
+function booking(days: number, status: Booking["status"] = "scheduled", extra: Partial<Booking> = {}): Booking {
+  return {
+    id: `bk-${days}-${status}`,
+    studentId: "amostra-student",
+    adminId: ADMIN_ID,
+    startTime: at(days, 19),
+    endTime: at(days, 20),
+    status,
+    slotId: null,
+    billingKind: "package",
+    isReplacement: false,
+    replacementForBookingId: null,
+    ...extra,
+  };
+}
+
+function saldo(total: number, consumidas: number, aRepor = 0): SaldoPacote {
+  return {
+    pacoteId: "pkg-rec",
+    studentId: "amostra-student",
+    recorrenciaId: "rec-1",
+    total,
+    consumidas,
+    restantes: total - consumidas,
+    aRepor,
+  };
+}
+
+const PEDIDO: PurchaseRequest = {
+  id: "pedido-1",
+  studentId: "amostra-student",
+  adminId: ADMIN_ID,
+  kind: "package",
+  templateId: "tpl-1",
+  status: "pending",
+  notes: null,
+  createdAt: at(-1, 15),
+  decidedAt: null,
+};
+
+interface HomeData {
+  package: PackageRecord | null;
+  credits: number;
+  recorrenciaSaldo: SaldoPacote | null;
+  nextBooking: Booking | null;
+  suggestion: Booking | null;
+  pendingRequest: PurchaseRequest | null;
+}
+
+const base: HomeData = {
+  package: null,
+  credits: 0,
+  recorrenciaSaldo: null,
+  nextBooking: null,
+  suggestion: null,
+  pendingRequest: null,
+};
+
+type Modo = "autosservico" | "recorrencia";
+
+const HOME_CASES: { title: string; note: string; modo: Modo; data: HomeData }[] = [
+  {
+    title: "Saldo bom",
+    note: "10 aulas, 3 usadas, 1 agendada — 6 livres",
+    modo: "autosservico",
+    data: { ...base, package: pkg(10, 3), credits: 6, nextBooking: booking(2) },
+  },
+  {
+    title: "Poucas aulas",
+    note: "2 livres, nenhuma agendada",
+    modo: "autosservico",
+    data: { ...base, package: pkg(8, 6), credits: 2 },
+  },
+  {
+    title: "Tudo agendado",
+    note: "2 restantes, as 2 já marcadas (crédito 0)",
+    modo: "autosservico",
+    data: { ...base, package: pkg(8, 6), credits: 0, nextBooking: booking(1, "pending_confirmation") },
+  },
+  {
+    title: "Pacote acabou",
+    note: "pacote ativo sem nenhuma aula restante",
+    modo: "autosservico",
+    data: { ...base, package: pkg(4, 4), credits: 0 },
+  },
+  {
+    title: "Sem pacote",
+    note: "aluno recém-convidado, nunca teve pacote",
+    modo: "autosservico",
+    data: base,
+  },
+  {
+    title: "Pedido enviado",
+    note: "sem aulas, pedido de pacote aguardando o professor",
+    modo: "autosservico",
+    data: { ...base, pendingRequest: PEDIDO },
+  },
+  {
+    title: "Sugestão de horário",
+    note: "professor recusou e sugeriu outro horário",
+    modo: "autosservico",
+    data: {
+      ...base,
+      package: pkg(10, 2),
+      credits: 7,
+      nextBooking: booking(3),
+      suggestion: booking(4, "rejected_with_suggestion", { id: "sug", suggestedStartTime: at(5, 18) }),
+    },
+  },
+  {
+    title: "Recorrência",
+    note: "12 aulas geradas pelo professor, 4 feitas, 1 a repor",
+    modo: "recorrencia",
+    data: {
+      ...base,
+      package: pkg(12, 4, { origin: "recurrence", templateName: "Seg e Qua · 19h" }),
+      credits: 0,
+      recorrenciaSaldo: saldo(12, 4, 1),
+      nextBooking: booking(1),
+    },
+  },
+  {
+    title: "Recorrência sem aulas",
+    note: "professor ainda não gerou o pacote",
+    modo: "recorrencia",
+    data: base,
+  },
+];
+
+function Seeded({ data, modo, children }: { data: HomeData; modo: Modo; children: ReactNode }) {
+  const [client] = useState(() => {
+    const qc = new QueryClient({
+      defaultOptions: {
+        queries: {
+          staleTime: Infinity,
+          retry: false,
+          // Qualquer consulta que não foi pré-preenchida abaixo falha aqui, sem sair pra rede.
+          queryFn: () => Promise.reject(new Error("amostra: consulta não simulada")),
+        },
+      },
+    });
+    qc.setQueryData(["student-home", PROFILE.id], data);
+    qc.setQueryData(["student-admin-id", PROFILE.id], ADMIN_ID);
+    qc.setQueryData(["modo-agendamento-efetivo", ADMIN_ID], modo);
+    qc.setQueryData(["notifications", PROFILE.id], []);
+    return qc;
+  });
+  return (
+    <QueryClientProvider client={client}>
+      <AuthContext.Provider
+        value={{
+          profile: PROFILE,
+          loading: false,
+          signIn: () => Promise.reject(new Error("amostra")),
+          signOut: async () => {},
+          refreshProfile: () => {},
+        }}
+      >
+        {children}
+      </AuthContext.Provider>
+    </QueryClientProvider>
+  );
+}
+
+function Frame({ title, note, children }: { title: string; note: string; children: ReactNode }) {
+  return (
+    <figure className="w-[375px] shrink-0">
+      <figcaption className="mb-2 px-1">
+        <div className="text-sm font-semibold text-foreground">{title}</div>
+        <div className="text-xs text-muted-foreground">{note}</div>
+      </figcaption>
+      <div className="rounded-3xl border border-border bg-background overflow-hidden">{children}</div>
+    </figure>
+  );
+}
+
+const CARD_CASES: { title: string; note: string; props: Parameters<typeof ActivePackageCard>[0] }[] = [
+  { title: "Admin · compra", note: "professor vê o selo de origem", props: { pkg: pkg(10, 3), credits: 5 } },
+  {
+    title: "Admin · recorrência",
+    note: "com aulas a repor",
+    props: { pkg: pkg(12, 4, { origin: "recurrence" }), credits: 0, saldo: saldo(12, 4, 2) },
+  },
+  { title: "Admin · pacote grande", note: "40 aulas — vira barra", props: { pkg: pkg(40, 12), credits: 25 } },
+  { title: "Admin · experimental", note: "1 aula de cortesia", props: { pkg: pkg(1, 0, { origin: "trial" }), credits: 1 } },
+  { title: "Aluno · 1 aula", note: "singular", props: { pkg: pkg(5, 4), credits: 1, audience: "student" } },
+  {
+    title: "Aluno · nome longo",
+    note: "nome do pacote que não cabe",
+    props: {
+      pkg: pkg(10, 1, { templateName: "Pacote Trimestral Premium com Avaliação" }),
+      credits: 9,
+      audience: "student",
+    },
+  },
+];
+
+export default function Amostras() {
+  return (
+    <BrowserRouter>
+      <div className="min-h-screen bg-background text-foreground p-6">
+        <h1 className="font-display text-3xl tracking-wide uppercase mb-1">Amostras</h1>
+        <p className="text-sm text-muted-foreground mb-8 max-w-prose">
+          Só existe em desenvolvimento. Dados inventados, sem login e sem banco. Os botões navegam, mas
+          as telas de destino não têm dados simulados.
+        </p>
+
+        <h2 className="text-lg font-semibold mb-4">Home do aluno</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {HOME_CASES.map((c) => (
+            <Frame key={c.title} title={c.title} note={c.note}>
+              <Seeded data={c.data} modo={c.modo}>
+                <StudentHome />
+              </Seeded>
+            </Frame>
+          ))}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Cartão de saldo</h2>
+        <div className="flex flex-wrap gap-6">
+          {CARD_CASES.map((c) => (
+            <Frame key={c.title} title={c.title} note={c.note}>
+              <div className="p-4">
+                <ActivePackageCard {...c.props} />
+              </div>
+            </Frame>
+          ))}
+        </div>
+      </div>
+    </BrowserRouter>
+  );
+}
