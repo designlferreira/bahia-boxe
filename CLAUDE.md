@@ -51,12 +51,20 @@ comando local. Toda vez que uma tarefa exigir uma ação na máquina dele (`git
 pull`, `git push`, `npm install`, `npm run dev`, copiar `.env`, etc.), dar o
 passo a passo explícito e completo — qual comando, em qual pasta, o que
 esperar de resultado — nunca só dizer "dá um pull" ou "roda o install" sem o
-comando pronto pra copiar. Isso importa ainda mais depois que ele configurar
-a cópia local (worktree em `C:\Users\lfluc\Projetos\BahiaBoxe` +
-`BahiaBoxe-main`, orientação dada em 2026-09-28, adoção ainda não
-confirmada): a partir daí existem duas origens possíveis de mudança — esta
-sessão e a máquina dele — e é ele quem decide quando sincronizar uma com a
-outra, mas só decide bem se o comando exato vier junto.
+comando pronto pra copiar.
+
+**Cópia local CONCLUÍDA (2026-09-28).** Duas pastas, um `.git` compartilhado
+via worktree:
+- `C:\Users\lfluc\Projetos\BahiaBoxe` — branch `dev`, com `.env` configurado
+  (projeto Supabase `jduthhmobwxhqamiepax`) e `npm run dev` já testado
+  rodando em `http://localhost:5173/`. É aqui que o trabalho local acontece.
+- `C:\Users\lfluc\Projetos\BahiaBoxe-main` — branch `main`, sem servidor
+  local, só para consulta/comparação.
+
+A partir de agora existem DUAS origens possíveis de mudança — esta sessão e
+a máquina do Lucas — e ele é quem decide quando sincronizar uma com a outra,
+mas só decide bem se o comando exato (`git pull`/`git push`, em qual das
+duas pastas) vier junto, seguindo a regra acima.
 
 - Trabalhe sempre na branch "dev". Antes de começar qualquer tarefa, confirme
   com "git branch" que está nela.
