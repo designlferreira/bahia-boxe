@@ -193,9 +193,9 @@ export default function AdminAulaDetalhe() {
               Remarcar
             </Button>
             <Button
-              variant="secondary"
+              variant="destructive"
               size="lg"
-              className="flex-1 !border-destructive/35 !text-destructive"
+              className="flex-1"
               disabled={actions.isBusy(booking.id)}
               onClick={() => actions.openCancelar(booking, studentName)}
             >

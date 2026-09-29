@@ -53,7 +53,7 @@ export function CancelLessonSheet({
           >
             <div className="text-[15px] font-semibold text-foreground">Eu cancelei</div>
             <div className="text-[12.5px] text-muted-foreground mt-0.5">
-              O crédito do aluno é preservado — cancelamento pelo professor nunca consome aula.
+              O aluno não perde a aula — cancelamento pelo professor nunca desconta.
             </div>
           </button>
 

@@ -204,7 +204,7 @@ export function useLessonActions(onChanged: () => void) {
     onSuccess: () => {
       after();
       setReplacementTarget(null);
-      toast.success("Marcada como reposição — sem cobrar crédito novo");
+      toast.success("Marcada como reposição — não desconta outra aula");
     },
     onError: (err) => toast.error(errorMessage(err, "Não foi possível marcar como reposição.")),
   });
@@ -228,7 +228,7 @@ export function useLessonActions(onChanged: () => void) {
       setCancelarTarget(null);
       toast.warning(
         vars.canceladoPor === "professor"
-          ? "Aula cancelada — crédito do aluno preservado."
+          ? "Aula cancelada — o aluno não perde a aula."
           : "Aula cancelada pelo aluno.",
       );
     },
