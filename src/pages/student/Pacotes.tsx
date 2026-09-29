@@ -177,14 +177,22 @@ export default function StudentPacotes() {
       <div className="flex flex-col gap-2.5">
         {templates?.map((t) => (
           <div key={t.id} className="card-dark p-4 flex items-center gap-3">
-            <div className="flex-1">
-              <div className="text-[15px] font-semibold text-foreground">{t.name}</div>
-              <div className="text-[12.5px] text-muted-foreground mt-0.5">{t.description}</div>
+            <div className="flex-1 min-w-0">
+              {/* Nome e descrição têm limite: um texto longo do professor fazia o cartão passar de 400px de altura. */}
+              <div className="text-[15px] font-semibold text-foreground leading-snug line-clamp-2 break-words">{t.name}</div>
+              {t.description && <div className="text-[12.5px] text-muted-foreground mt-0.5 line-clamp-3 break-words">{t.description}</div>}
               {t.validityDays ? (
                 // Só informativo: o pacote não vence sozinho (não há data de expiração no banco).
                 <div className="text-[12.5px] text-muted-foreground mt-0.5">Sugestão: use em até {t.validityDays} dias</div>
               ) : null}
-              <div className="text-base text-accent font-semibold mt-1.5">{formatPriceLabel(t.priceCents)}</div>
+              {/* "Preço a combinar" é ausência de preço, não um preço: neutro, não dourado grande (que parecia um valor). */}
+              <div
+                className={
+                  t.priceCents === null ? "text-[13px] text-muted-foreground mt-1.5" : "text-base text-accent font-semibold mt-1.5"
+                }
+              >
+                {formatPriceLabel(t.priceCents)}
+              </div>
             </div>
             <Button
               variant="secondary"
@@ -193,6 +201,8 @@ export default function StudentPacotes() {
               onClick={() => setEscolhido(t)}
               // Desativado enquanto há pedido em espera (e enquanto a Home ainda não chegou: sem ela não dá para saber).
               disabled={request.isPending || !home || !!pedido}
+              // Sem isso o leitor de tela ouvia "Pedir, Pedir, Pedir" sem saber qual modelo (o nome fica num <div> irmão).
+              aria-label={`Pedir ${t.name}`}
               aria-describedby={pedido ? "pedido-motivo" : undefined}
             >
               Pedir
