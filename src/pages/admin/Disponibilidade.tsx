@@ -238,7 +238,7 @@ export default function AdminDisponibilidade() {
             // Dia sem horários: uma linha só. Sem interruptor (não há o que ligar) e sem o quadro tracejado repetido.
             <div key={day.weekday} className="card-dark px-[15px] py-2.5 flex items-center gap-3">
               <div className="flex-1">
-                <div className="text-[15px] font-semibold text-muted-foreground">{day.name}</div>
+                <h2 className="text-[15px] font-semibold text-muted-foreground">{day.name}</h2>
                 <div className="text-xs text-muted-foreground mt-0.5">Sem horários — alunos não agendam neste dia</div>
               </div>
               <button
@@ -248,7 +248,7 @@ export default function AdminDisponibilidade() {
                   setEditor({ weekday: day.weekday, dayName: day.name, interval: null, start: "06:00", end: "09:00" });
                   setEditorError(null);
                 }}
-                className={`h-11 w-11 shrink-0 rounded-[10px] border border-border bg-secondary flex items-center justify-center active:scale-95 ${FOCO}`}
+                className={`h-11 w-11 shrink-0 rounded-[10px] border border-muted-foreground/70 bg-secondary flex items-center justify-center active:scale-95 ${FOCO}`}
               >
                 <Plus className="h-4 w-4 text-foreground/85" aria-hidden />
               </button>
@@ -257,9 +257,9 @@ export default function AdminDisponibilidade() {
             <div key={day.weekday} className="card-dark p-[15px]">
               <div className="flex items-center gap-3 mb-3">
                 <div className="flex-1">
-                  <div className={cn("text-[15px] font-semibold", day.active ? "text-foreground" : "text-muted-foreground")}>
+                  <h2 className={cn("text-[15px] font-semibold", day.active ? "text-foreground" : "text-muted-foreground")}>
                     {day.name}
-                  </div>
+                  </h2>
                   <div className="text-xs text-muted-foreground mt-0.5">
                     {day.slots.length === 0
                       ? day.active
@@ -271,7 +271,7 @@ export default function AdminDisponibilidade() {
                   </div>
                 </div>
                 <Switch
-                  aria-label="Alternar disponibilidade do dia"
+                  aria-label={`Receber agendamentos na ${day.name.toLowerCase()}`}
                   checked={day.active}
                   onCheckedChange={(checked) => {
                     const booked = day.slots.reduce((n, s) => n + s.bookedCount, 0);
@@ -285,16 +285,16 @@ export default function AdminDisponibilidade() {
               </div>
 
               {day.slots.length > 0 && (
-                <div className={cn("flex flex-col gap-2 mb-2.5", !day.active && "opacity-50")}>
+                <div className="flex flex-col gap-2 mb-2.5">
                   {day.slots.map((slot) => {
                     const booked = slot.bookedCount;
                     return (
                       <div key={slot.key} className="flex items-center gap-2.5 p-2.5 rounded-[13px] bg-[#141414] border border-[#262626]">
                         <div className="flex-1">
-                          <div className="text-[14.5px] font-semibold text-foreground">
+                          <div className={cn("text-[14.5px] font-semibold text-foreground", !day.active && "opacity-60")}>
                             {slot.startTime} – {slot.endTime}
                           </div>
-                          <div className={cn("text-[11.5px] mt-0.5", booked > 0 ? "text-amber" : "text-muted-foreground")}>
+                          <div className={cn("text-xs mt-0.5", day.active && booked > 0 ? "text-amber" : "text-muted-foreground")}>
                             {!day.active
                               ? "Pausado enquanto o dia está desativado"
                               : booked > 0
@@ -304,26 +304,26 @@ export default function AdminDisponibilidade() {
                         </div>
                         <button
                           type="button"
-                          aria-label="Editar horário"
+                          aria-label={`Editar horário de ${day.name.toLowerCase()}, ${slot.startTime} às ${slot.endTime}`}
                           onClick={() => {
                             setEditor({ weekday: day.weekday, dayName: day.name, interval: slot, start: slot.startTime, end: slot.endTime });
                             setEditorError(null);
                           }}
-                          className="h-11 w-11 rounded-[10px] border border-[#333] bg-secondary flex items-center justify-center active:scale-95"
+                          className={`h-11 w-11 rounded-[10px] border border-muted-foreground/70 bg-secondary flex items-center justify-center active:scale-95 ${FOCO}`}
                         >
-                          <Pencil className="h-[15px] w-[15px] text-foreground/80" />
+                          <Pencil className="h-[15px] w-[15px] text-foreground/80" aria-hidden />
                         </button>
                         <button
                           type="button"
-                          aria-label="Remover horário"
+                          aria-label={`Remover horário de ${day.name.toLowerCase()}, ${slot.startTime} às ${slot.endTime}`}
                           onClick={() =>
                             booked > 0
                               ? setConfirmDelete({ slot, dayName: day.name, booked })
                               : deleteSlot.mutate(slot)
                           }
-                          className="h-11 w-11 rounded-[10px] border border-destructive/35 bg-destructive/10 flex items-center justify-center active:scale-95"
+                          className={`h-11 w-11 rounded-[10px] border border-destructive/70 bg-destructive/10 flex items-center justify-center active:scale-95 ${FOCO}`}
                         >
-                          <Trash2 className="h-[15px] w-[15px] text-destructive" />
+                          <Trash2 className="h-[15px] w-[15px] text-[hsl(var(--red-text))]" aria-hidden />
                         </button>
                       </div>
                     );
@@ -339,7 +339,7 @@ export default function AdminDisponibilidade() {
                   setEditorError(null);
                 }}
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="h-4 w-4" aria-hidden />
                 Adicionar horário
               </Button>
             </div>
