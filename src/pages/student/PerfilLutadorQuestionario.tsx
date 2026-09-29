@@ -36,6 +36,8 @@ export default function StudentPerfilLutadorQuestionario() {
       <div className="page-container">
         <PageHeader title="PERFIL DE BOXE" back />
         <BoxingProfileLengthChoice
+          voz="self"
+          onOpenDadosFisicos={() => navigate("/app/minha-conta/perfil")}
           onChoose={setLength}
           questionCount={{ short: getQuestions("self", "short").length, full: getQuestions("self", "full").length }}
         />

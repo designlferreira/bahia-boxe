@@ -40,6 +40,7 @@ export default function AdminAlunoPerfilBoxeQuestionario() {
 
       {!length ? (
         <BoxingProfileLengthChoice
+          voz="coach"
           onChoose={setLength}
           questionCount={{ short: getQuestions("coach", "short").length, full: getQuestions("coach", "full").length }}
         />
