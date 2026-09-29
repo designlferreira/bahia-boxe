@@ -290,6 +290,7 @@ export default function AdminAgenda() {
           {data.map((entry) => {
             const booking = entry.booking;
             const awaiting = !entry.free && booking!.status === "scheduled" && isAwaitingConfirmation(booking!.status, booking!.endTime);
+            const temAcao = awaiting || booking?.status === "pending_confirmation";
 
             return (
               <div key={entry.hour} className="flex gap-3 min-h-[74px]">
@@ -324,7 +325,10 @@ export default function AdminAgenda() {
                       <button
                         type="button"
                         onClick={() => navigate(`/admin/aula/${booking!.id}`)}
-                        className="w-full min-h-11 text-left flex justify-between items-start gap-2 mb-2 rounded-md active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className={cn(
+                          "w-full min-h-11 text-left flex justify-between items-start gap-2 rounded-md active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          temAcao && "mb-2",
+                        )}
                       >
                         <div className="min-w-0">
                           <div className="text-[14.5px] font-semibold text-foreground break-words">{entry.studentName}</div>
@@ -351,7 +355,10 @@ export default function AdminAgenda() {
                             </div>
                           )}
                         </div>
-                        <StatusBadge status={booking!.status} semRegistro={awaiting} className="shrink-0" />
+                        <span className="flex items-center gap-1 shrink-0">
+                          <StatusBadge status={booking!.status} semRegistro={awaiting} />
+                          {!temAcao && <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden />}
+                        </span>
                         <span className="sr-only">. Ver detalhes</span>
                       </button>
 
@@ -380,71 +387,33 @@ export default function AdminAgenda() {
                         </div>
                       )}
 
-                      {booking?.status === "scheduled" && (
-                        <div className="flex flex-col gap-2">
-                          {awaiting && (
-                            <div className="flex gap-2">
-                              <Button
-                                variant="soft"
-                                size="sm"
-                                className="flex-1"
-                                disabled={actions.isBusy(booking.id)}
-                                onClick={() => actions.openComplete(booking, entry.studentName ?? "Aluno")}
-                                aria-label={`Aconteceu: ${entry.studentName}, ${entry.hour}`}
-                              >
-                                Aconteceu
-                              </Button>
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                className="flex-1"
-                                disabled={actions.isBusy(booking.id)}
-                                onClick={() => actions.openNoShow(booking, entry.studentName ?? "Aluno")}
-                                aria-label={`Faltou: ${entry.studentName}, ${entry.hour}`}
-                              >
-                                Faltou
-                              </Button>
-                            </div>
-                          )}
-                          {/* Aula que já passou: a única pergunta é "aconteceu ou faltou?" (decisão do
-                              Lucas, 2026-09-28). Remarcar/Cancelar/reposição continuam no detalhe, a um
-                              toque no nome — no cartão viravam uma parede de 5 botões. */}
-                          {!awaiting && (
-                            <>
-                              <div className="flex gap-2">
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  className="flex-1"
-                                  disabled={actions.isBusy(booking.id)}
-                                  onClick={() => actions.openReagendar(booking, entry.studentName ?? "Aluno")}
-                                  aria-label={`Remarcar: ${entry.studentName}, ${entry.hour}`}
-                                >
-                                  Remarcar
-                                </Button>
-                                <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  className="flex-1"
-                                  disabled={actions.isBusy(booking.id)}
-                                  onClick={() => actions.openCancelar(booking, entry.studentName ?? "Aluno")}
-                                  aria-label={`Cancelar: ${entry.studentName}, ${entry.hour}`}
-                                >
-                                  Cancelar
-                                </Button>
-                              </div>
-                              {!booking.isReplacement && (
-                                <button
-                                  type="button"
-                                  onClick={() => actions.openReplacement(booking, entry.studentName ?? "Aluno")}
-                                  aria-label={`Marcar como reposição: ${entry.studentName}, ${entry.hour}`}
-                                  className="self-start text-[13px] text-muted-foreground underline underline-offset-2 min-h-11 flex items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                >
-                                  Marcar como reposição
-                                </button>
-                              )}
-                            </>
-                          )}
+                      {/* Botões no cartão SÓ quando a aula pede ação (decisão do Lucas, 2026-09-28):
+                          pedido pendente (Aprovar/Recusar) e aula passada sem registro
+                          (Aconteceu/Faltou). Aula futura só mostra — Remarcar, Cancelar e reposição
+                          ficam no detalhe, a um toque no nome; no cartão viravam uma coluna de botões
+                          vermelhos no estado mais comum da agenda. */}
+                      {awaiting && (
+                        <div className="flex gap-2">
+                          <Button
+                            variant="soft"
+                            size="sm"
+                            className="flex-1"
+                            disabled={actions.isBusy(booking!.id)}
+                            onClick={() => actions.openComplete(booking!, entry.studentName ?? "Aluno")}
+                            aria-label={`Aconteceu: ${entry.studentName}, ${entry.hour}`}
+                          >
+                            Aconteceu
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="flex-1"
+                            disabled={actions.isBusy(booking!.id)}
+                            onClick={() => actions.openNoShow(booking!, entry.studentName ?? "Aluno")}
+                            aria-label={`Faltou: ${entry.studentName}, ${entry.hour}`}
+                          >
+                            Faltou
+                          </Button>
                         </div>
                       )}
                     </div>
