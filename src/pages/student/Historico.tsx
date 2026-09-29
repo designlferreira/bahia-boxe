@@ -7,9 +7,9 @@ import { BookingCard } from "@/components/BookingCard";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/SkeletonCard";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatQuando } from "@/lib/dateUtils";
-import { isAwaitingConfirmation } from "@/lib/bookingStatus";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatDate, formatQuando, formatRelativeDay, formatTime } from "@/lib/dateUtils";
+import { getStatusConfig, isAwaitingConfirmation } from "@/lib/bookingStatus";
 import { PageHeader } from "@/components/PageHeader";
 import {
   getModoAgendamentoEfetivo,
@@ -69,21 +69,27 @@ export default function StudentHistorico() {
     <div className="page-container">
       <PageHeader title="MINHAS AULAS" subtitle={subtitle} />
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="mb-4">
-        <TabsList>
+      {/* Anuncia o resultado ao trocar de aba (leitor de tela não vê a lista mudar). */}
+      <p role="status" className="sr-only">
+        {!isLoading && !isError && data ? `${tab === "proximas" ? "Próximas" : "Anteriores"}: ${n} ${n === 1 ? "aula" : "aulas"}` : ""}
+      </p>
+
+      <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
+        <TabsList aria-label="Filtrar aulas" className="mb-4">
           <TabsTrigger value="proximas">Próximas</TabsTrigger>
           <TabsTrigger value="anteriores">Anteriores</TabsTrigger>
         </TabsList>
-      </Tabs>
 
+        {/* O painel da aba: liga as abas à lista (antes as abas apontavam para um painel que não existia). */}
+        <TabsContent value={tab}>
       {isError && <ErrorState onRetry={() => refetch()} />}
       {isLoading && !isError && <SkeletonList count={4} />}
 
       {!isLoading && !isError && data && data.length > 0 && (
-        <div className="flex flex-col gap-2.5">
+        <ul aria-label={tab === "proximas" ? "Próximas aulas" : "Aulas anteriores"} className="flex flex-col gap-2.5">
           {data.map((b, i) => (
+            <li key={b.id}>
             <BookingCard
-              key={b.id}
               // A pergunta que traz o aluno aqui é "quando é a próxima?": a primeira de Próximas se destaca das demais.
               destaque={
                 tab === "proximas" && i === 0
@@ -98,10 +104,19 @@ export default function StudentHistorico() {
               status={b.status}
               semRegistro={isAwaitingConfirmation(b.status, b.endTime)}
               agora={b.status === "scheduled" && new Date(b.startTime).getTime() <= Date.now() && new Date(b.endTime).getTime() > Date.now()}
+              // Nome falado completo (o cartão só mostra "Amanhã, 19:00"): dia por extenso, horário e estado.
+              ariaLabel={`${formatRelativeDay(b.startTime) === "Hoje" || formatRelativeDay(b.startTime) === "Amanhã" ? formatRelativeDay(b.startTime) + ", " : ""}${formatDate(b.startTime)}, ${formatTime(b.startTime)} às ${formatTime(b.endTime)}, ${
+                isAwaitingConfirmation(b.status, b.endTime)
+                  ? "Aguardando registro"
+                  : b.status === "scheduled" && new Date(b.startTime).getTime() <= Date.now() && new Date(b.endTime).getTime() > Date.now()
+                    ? "Acontecendo agora"
+                    : getStatusConfig(b.status, "student").label
+              }. Ver detalhes`}
               onClick={() => navigate(`/app/aula/${b.id}`)}
             />
+            </li>
           ))}
-        </div>
+        </ul>
       )}
 
       {!isLoading && !isError && data && data.length === 0 && (
@@ -134,6 +149,8 @@ export default function StudentHistorico() {
           />
         )
       )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

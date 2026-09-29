@@ -19,7 +19,7 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex-1 h-11 rounded-xl border border-border bg-secondary text-[13px] font-semibold text-muted-foreground transition-all duration-200 active:scale-95 data-[state=active]:bg-primary data-[state=active]:border-primary data-[state=active]:text-primary-foreground",
+      "flex-1 h-11 rounded-xl border border-border bg-secondary text-[13px] font-semibold text-muted-foreground transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=active]:bg-primary data-[state=active]:border-primary data-[state=active]:text-primary-foreground",
       className,
     )}
     {...props}
@@ -27,6 +27,16 @@ const TabsTrigger = React.forwardRef<
 ));
 TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
 
-const TabsContent = TabsPrimitive.Content;
+const TabsContent = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Content
+    ref={ref}
+    className={cn("rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", className)}
+    {...props}
+  />
+));
+TabsContent.displayName = TabsPrimitive.Content.displayName;
 
 export { Tabs, TabsList, TabsTrigger, TabsContent };

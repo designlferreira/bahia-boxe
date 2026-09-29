@@ -14,6 +14,8 @@ interface BookingCardProps {
   highlight?: boolean;
   /** Rótulo de destaque ("Próxima aula"): o cartão ganha o tom dourado, título maior e o rótulo acima. */
   destaque?: string;
+  /** Nome falado do cartão (leitor de tela): sem ele o cartão só fala o texto que mostra. */
+  ariaLabel?: string;
   /** Aula agendada cujo horário já passou (o professor ainda não registrou) / em andamento — ver StatusBadge. */
   semRegistro?: boolean;
   agora?: boolean;
@@ -30,6 +32,7 @@ export function BookingCard({
   actions,
   highlight,
   destaque,
+  ariaLabel,
   semRegistro,
   agora,
 }: BookingCardProps) {
@@ -40,8 +43,9 @@ export function BookingCard({
     <Wrapper
       type={onClick ? "button" : undefined}
       onClick={onClick}
+      aria-label={ariaLabel && destaque === "Próxima aula" ? `${destaque}. ${ariaLabel}` : ariaLabel}
       className={cn(
-        "w-full text-left card-dark p-3.5 flex items-center gap-3 transition-all duration-200",
+        "w-full text-left card-dark p-3.5 flex items-center gap-3 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         onClick && "active:scale-[0.985] cursor-pointer hover:border-muted-foreground/40",
         highlight && "border-amber/35",
         destaque && "border-accent/40 bg-[linear-gradient(150deg,hsl(var(--accent)/0.09),hsl(var(--card))_60%)] p-4",
@@ -62,7 +66,7 @@ export function BookingCard({
         <StatusBadge status={status} audience="student" semRegistro={semRegistro} agora={agora} className="mt-1.5" />
         {actions && <div className="flex gap-2 mt-3">{actions}</div>}
       </div>
-      {onClick && !actions && <ChevronRight className="h-[18px] w-[18px] text-muted-foreground shrink-0" />}
+      {onClick && !actions && <ChevronRight className="h-[18px] w-[18px] text-muted-foreground shrink-0" aria-hidden />}
     </Wrapper>
   );
 }
