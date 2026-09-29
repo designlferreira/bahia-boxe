@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { countPendenciasDoProfessor } from "@/integrations/backend/api";
 import { useAuth } from "@/context/AuthContext";
 import { BottomNavItem } from "@/components/BottomNavItem";
+import { BottomNavShell } from "@/components/BottomNavShell";
 
 /**
  * Cinco abas (eram seis, com "Pedidos"): com seis, cada aba tinha 49-58px e o rótulo era de 9,5px. "Pedidos" saiu da barra — o Painel
@@ -23,12 +24,7 @@ export function AdminBottomNav() {
   const count = data ?? 0;
 
   return (
-    <nav
-      aria-label="Navegação principal"
-      className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-1 border-t border-border bg-background/92 pt-2.5 pb-[22px] backdrop-blur-xl"
-      // Mesma coluna centralizada do `.page-container`: no tablet as abas não se espalham.
-      style={{ height: 84, paddingInline: "max(0.875rem, calc((100% - 30rem) / 2))" }}
-    >
+    <BottomNavShell>
       <BottomNavItem to="/admin/dashboard" label="Painel" icon={LayoutDashboard} prefixos={["/admin/solicitacoes"]}>
         {count > 0 && (
           <>
@@ -52,6 +48,6 @@ export function AdminBottomNav() {
         icon={UserRound}
         prefixos={["/admin/pacotes", "/admin/disponibilidade", "/admin/orientacoes", "/admin/perfil-alunos", "/admin/configuracoes"]}
       />
-    </nav>
+    </BottomNavShell>
   );
 }
