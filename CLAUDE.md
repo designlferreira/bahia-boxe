@@ -3615,6 +3615,25 @@ Um passo na `dev`, testado pelo Lucas (com poucos alunos: o teste dele foi de "n
 
 **Não feito (registrado, não pedido):** paginar/virtualizar a lista de Alunos (só vale acima de alguns milhares); Agenda com centenas de aulas no mesmo dia (mostra uma por hora, já limitada); `getAdminStudents` e afins ainda baixam TODOS os alunos de uma vez.
 
+### Auditoria técnica e `optimize` (2026-09-30) — sem migration nova
+
+**Auditoria por amostragem (`/impeccable audit`, só leitura): 15/20 (Bom)** — Acessibilidade 3, Desempenho 2, Responsivo 3, Temas 3, Integridade 4. O detector do skill varreu `src` e devolveu vazio. Sem medição em aparelho real nem leitor de tela.
+Achados que NÃO foram tratados e seguem abertos (registrados, não pedidos):
+- **[P2] Ícone do app só em SVG:** `public/` tem só `favicon.svg`, declarado no manifest como 192/512; sem `apple-touch-icon`. No iPhone o ícone da tela inicial sai como captura da página. Precisa gerar PNGs (192, 512, maskable, 180 Apple).
+- **[P3] 7 cores fixas no código:** `App.tsx` (toast: `#1E1E1E`/`#343434`/`#262626`), degradê `#1F1B0C`/`#171717` em `BoxingProfileComparisonView.tsx` e `BoxingProfileScoresSummary.tsx`, mais `ui/sheet.tsx` e `Disponibilidade.tsx`. Não quebra nada; trocar por variáveis de cor se o tema mudar.
+- **[P3] Dois textos de 11px** em `GuardInfoDialog.tsx` (únicos abaixo de 12px que sobraram).
+
+**`optimize` — feito, testado pelo Lucas e verificado no navegador com o app real ligado a um Supabase falso (login abriu, a tela "criar conta" carregou o pedaço sob demanda, zero pedidos ao Google Fonts):**
+- **Telas sob demanda:** todas as rotas e os dois layouts usam `React.lazy` em `App.tsx`. Antes, um único `index-*.js` de **995 kB (276 kB comprimido)** carregava as ~40 telas de uma vez. Agora o primeiro arquivo tem **165 kB**; as telas viram arquivos de 0,1 a 27 kB.
+  **Toda tela nova entra como `lazy` em `App.tsx`; não importar página de forma estática lá.**
+- **`Suspense` em dois níveis, de propósito:** um dentro de cada layout (`StudentLayout`/`AdminLayout`, com `CarregandoTela`), para a barra de baixo não sumir enquanto a tela chega; e um externo em `AppRoutes` (com `TelaDeAbertura`) só para o que fica FORA dos layouts (login, cadastro, 404) e para os próprios layouts.
+- **Bibliotecas em arquivos próprios** (`build.rollupOptions.output.manualChunks` em `vite.config.ts`: `react`, `supabase`, `query`, `datas`): um deploy só do código do app não invalida o cache delas. **O total da primeira abertura NÃO caiu** (~620 kB de JS, quase igual aos 613 kB de antes da separação): o ganho é por tela e de cache, não do total inicial.
+- **Fontes hospedadas no app** (`@fontsource/bebas-neue` e `@fontsource-variable/inter`, só o subconjunto `latin`, que cobre o português): `@font-face` próprio em `src/index.css` apontando para `node_modules/@fontsource/.../files/*.woff2`; a família do corpo é **`"Inter Variable"`** (em `tailwind.config.ts`, com "Inter" e a fonte do sistema de reserva). As duas linhas do Google Fonts saíram do `index.html`.
+  `workbox.globPatterns` inclui `woff2`: o service worker passa a guardar as fontes (antes só 6 arquivos do próprio app, e os títulos caíam numa fonte comum no app instalado sem internet). Precache: 109 entradas, ~1,1 MB.
+- **Ainda pesado:** `@supabase/supabase-js` sozinho tem **220 kB** (traz realtime, storage e functions que o app não usa). Reduzir exigiria trocar o cliente por partes menores dele: mudança maior, não feita.
+
+**Não conferido:** tempo de carregamento real em rede lenta/aparelho de entrada (só o tamanho dos arquivos foi medido); as fontes offline no app instalado em aparelho real; o cache do service worker depois de um deploy novo (`autoUpdate`: ver o gotcha do topo deste arquivo).
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa

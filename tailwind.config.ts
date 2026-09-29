@@ -7,7 +7,7 @@ export default {
     extend: {
       fontFamily: {
         display: ["'Bebas Neue'", "sans-serif"],
-        sans: ["Inter", "system-ui", "sans-serif"],
+        sans: ["'Inter Variable'", "Inter", "system-ui", "sans-serif"],
       },
       colors: {
         background: "hsl(var(--background))",
