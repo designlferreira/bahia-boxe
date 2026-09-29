@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { addDays } from "date-fns";
+import { fromZonedTime } from "date-fns-tz";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -8,7 +9,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { formatDateShort, formatDayNumber, formatRelativeDay, formatWeekdayLong, formatWeekdayShort, isoDateOnly } from "@/lib/dateUtils";
+import { TIMEZONE, formatDateShort, formatDayNumber, formatRelativeDay, formatWeekdayLong, formatWeekdayShort, isoDateOnly } from "@/lib/dateUtils";
 import {
   getAvailableSlotsForDays,
   getModoAgendamentoEfetivo,
@@ -111,7 +112,9 @@ export default function StudentAgendar() {
     onSuccess: (_r, quando) => {
       queryClient.invalidateQueries({ queryKey: ["student-home"] });
       queryClient.invalidateQueries({ queryKey: ["student-history"] });
-      navigate("/app/home");
+      // Leva o instante da aula para a Home: se ela for a próxima, o cartão "acende" uma vez (liga a ação ao resultado).
+      const agendadaEm = selected ? fromZonedTime(`${isoDateOnly(selectedDate)}T${selected.time}:00`, TIMEZONE).getTime() : null;
+      navigate("/app/home", { state: { agendadaEm } });
       toast.success(`Aula agendada · ${quando}`);
     },
     onError: (err) => {

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useSaidaSuave } from "@/hooks/useSaidaSuave";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
@@ -189,6 +190,10 @@ function ResolverAgora({
   /** Último item em que o professor agiu: quando ele sumir da lista, o foco vai pro vizinho. */
   const ultimo = useRef<{ grupo: string; id: string; posicao: number } | null>(null);
   const idsVisiveis = [...pending, ...awaiting].map((b) => b.id).join(",");
+  // Item resolvido não some de uma vez: fica ~220 ms, inerte, esmaecendo e fechando o espaço (ver `useSaidaSuave`). O foco e o resto da lógica
+  // seguem olhando as listas REAIS (`pending`/`awaiting`); só o desenho usa estas.
+  const pendingV = useSaidaSuave(pending, (b) => b.id);
+  const awaitingV = useSaidaSuave(awaiting, (b) => b.id);
 
   // Resolver um item desmonta a linha (e o grupo, se era o último) — sem isto o foco caía no
   // começo da página e o leitor de tela perdia o lugar. Vai pro próximo item do mesmo grupo; senão,
@@ -236,10 +241,11 @@ function ResolverAgora({
 
       {pending.length > 0 && (
         <Grupo id="pedidos-pendentes" titulo={plural(pending.length, "pedido de horário", "pedidos de horário")} resumo={resumoPedidos}>
-          {pending.map((b) => (
+          {pendingV.map(({ item: b, saindo }) => (
             <ItemResolver
               key={b.id}
               itemId={b.id}
+              saindo={saindo}
               nome={b.studentName}
               etiqueta={b.antecessorInicio ? "Remarcação" : "Novo horário"}
               horario={
@@ -302,10 +308,11 @@ function ResolverAgora({
             </div>
           )}
           {/* Já vem da mais antiga pra mais nova — a mais antiga é a que mais corre risco de ser esquecida. */}
-          {awaiting.map((b) => (
+          {awaitingV.map(({ item: b, saindo }) => (
             <ItemResolver
               key={b.id}
               itemId={b.id}
+              saindo={saindo}
               nome={b.studentName}
               horario={quando(b.startTime)}
               quando={quando(b.startTime)}
@@ -468,6 +475,7 @@ function Grupo({
 
 function ItemResolver({
   itemId,
+  saindo = false,
   nome,
   etiqueta,
   horario,
@@ -477,6 +485,8 @@ function ItemResolver({
   secundario,
 }: {
   itemId: string;
+  /** Já resolvido e a caminho de sair: animação de saída, sem foco e escondido do leitor de tela (a ação já foi feita). */
+  saindo?: boolean;
   nome: string;
   etiqueta?: string;
   horario: ReactNode;
@@ -487,7 +497,16 @@ function ItemResolver({
   secundario: { label: string; onClick: () => void };
 }) {
   return (
-    <div data-item-id={itemId} className="py-3 border-t border-border rounded-md transition-shadow">
+    // Grade de uma linha: ao sair a linha vai de 1fr a 0fr (`animate-bb-sai`), o conteúdo esmaece e o espaço fecha sem saltar.
+    <div
+      data-item-id={itemId}
+      // React 18 não tem o tipo `inert`; o atributo em si funciona (o navegador ignora foco e cliques no item que está saindo).
+      {...({ inert: saindo ? "" : undefined } as Record<string, string | undefined>)}
+      aria-hidden={saindo || undefined}
+      className={saindo ? "grid border-t border-border animate-bb-sai" : "grid border-t border-border"}
+    >
+      <div className={saindo ? "min-h-0 overflow-hidden" : "min-h-0"}>
+    <div className="py-3 rounded-md">
       <div className="flex justify-between items-start gap-3 mb-2.5">
         <div className="min-w-0">
           <div className="text-[15px] font-semibold text-foreground">{nome}</div>
@@ -503,7 +522,7 @@ function ItemResolver({
           onClick={primario.onClick}
           disabled={busy}
           aria-busy={busy}
-          data-primario
+          data-primario={saindo ? undefined : true}
           aria-label={`${primario.label}: ${nome}, ${quando}`}
         >
           {primario.label}
@@ -519,6 +538,8 @@ function ItemResolver({
         >
           {secundario.label}
         </Button>
+      </div>
+    </div>
       </div>
     </div>
   );

@@ -92,6 +92,23 @@ export default {
         "bb-spin": {
           to: { transform: "rotate(360deg)" },
         },
+        // Aula recém-agendada "acende" na Home: um contorno dourado que aparece e some uma vez. Só sombra, nada se desloca.
+        "bb-acende": {
+          "0%": { boxShadow: "0 0 0 0 hsl(var(--accent) / 0), 0 0 0 0 hsl(var(--accent) / 0)" },
+          "30%": { boxShadow: "0 0 0 2px hsl(var(--accent) / 0.85), 0 0 22px 0 hsl(var(--accent) / 0.28)" },
+          "100%": { boxShadow: "0 0 0 0 hsl(var(--accent) / 0), 0 0 0 0 hsl(var(--accent) / 0)" },
+        },
+        // Item resolvido sai: esmaece e a linha (grid 1fr -> 0fr) fecha o espaço, em vez de sumir de uma vez e puxar a lista.
+        "bb-sai": {
+          from: { opacity: "1", gridTemplateRows: "1fr" },
+          to: { opacity: "0", gridTemplateRows: "0fr" },
+        },
+        // Selo de status que acabou de mudar: pequena pulsada de escala.
+        "bb-pop": {
+          "0%": { opacity: "0.55", transform: "scale(0.86)" },
+          "60%": { opacity: "1", transform: "scale(1.08)" },
+          "100%": { opacity: "1", transform: "none" },
+        },
       },
       animation: {
         "bb-in": "bb-in .35s ease both",
@@ -102,6 +119,9 @@ export default {
         "bb-toast": "bb-toast .3s cubic-bezier(.22,1,.36,1) both",
         "dialog-in": "dialog-in .18s ease both",
         "bb-spin": "bb-spin 4s linear infinite",
+        "bb-acende": "bb-acende 1.6s ease-out .4s 1",
+        "bb-sai": "bb-sai .22s cubic-bezier(.4,0,1,1) forwards",
+        "bb-pop": "bb-pop .38s cubic-bezier(.16,1,.3,1) both",
       },
     },
   },
