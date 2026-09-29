@@ -838,6 +838,8 @@ function historicoAmostra() {
     n("Julia Pereira", 0, 6, "scheduled"),
     n("Ana Beatriz Souza", -1, 18, "completed"),
     n("Diego Martins", -1, 19, "no_show"),
+    n("Helena Costa", -1, 7, "scheduled"),
+    n("Karina Duarte", -3, 18, "scheduled"),
     n("Marina Costa", -2, 7, "completed", { isReplacement: true }),
     n("Carlos Henrique Lima", -3, 19, "cancelled"),
     n("Igor Nascimento", -4, 12, "rescheduled"),
@@ -1184,7 +1186,13 @@ export default function Amostras() {
                 // (uma busca, um chip) é preenchida assim que entra no cache.
                 const norm = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
                 const filtrar = (busca: string, status: string) =>
-                  lista.filter((e) => (status === "todas" || e.booking.status === status) && (!norm(busca) || norm(e.studentName).includes(norm(busca))));
+                  lista.filter((e) => {
+                    const acabou = new Date(e.booking.endTime).getTime() < Date.now();
+                    const okStatus =
+                      status === "todas" ||
+                      (status === "sem_registro" ? e.booking.status === "scheduled" && acabou : status === "scheduled" ? e.booking.status === "scheduled" && !acabou : e.booking.status === status);
+                    return okStatus && (!norm(busca) || norm(e.studentName).includes(norm(busca)));
+                  });
                 // Consulta paginada: `pages` guarda { items, hasMore } (a amostra não pagina: "Ver mais" chamaria a consulta real).
                 const POR_PAGINA = 100;
                 qc.getQueryCache().subscribe((ev) => {

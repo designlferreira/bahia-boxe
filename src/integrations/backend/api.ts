@@ -1624,7 +1624,12 @@ export async function getAdminBookingHistoryPage(
     if (ids.length === 0) return { items: [], hasMore: false };
     query = query.in("student_id", ids);
   }
-  if (statusFilter !== "todas") query = query.eq("status", statusFilter);
+  // "Sem registro" = agendada que já terminou (o professor ainda não disse se aconteceu); "Agendadas" = as que ainda vão
+  // acontecer (ou estão acontecendo). Antes "Agendadas" misturava as duas.
+  const agora = new Date().toISOString();
+  if (statusFilter === "sem_registro") query = query.eq("status", "scheduled").lt("end_time", agora);
+  else if (statusFilter === "scheduled") query = query.eq("status", "scheduled").gte("end_time", agora);
+  else if (statusFilter !== "todas") query = query.eq("status", statusFilter);
 
   const from = page * HISTORICO_PAGINA;
   const { data, error } = await query.order("start_time", { ascending: false }).range(from, from + HISTORICO_PAGINA);

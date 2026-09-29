@@ -11,10 +11,12 @@ import { Button } from "@/components/ui/button";
 import { getAdminBookingHistoryPage } from "@/integrations/backend/api";
 import { CalendarX } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
+import { isAwaitingConfirmation } from "@/lib/bookingStatus";
 import { Badge } from "@/components/ui/badge";
 
 const FILTERS = [
   { value: "todas", label: "Todas" },
+  { value: "sem_registro", label: "Sem registro" },
   { value: "completed", label: "Concluídas" },
   { value: "no_show", label: "Faltas" },
   { value: "cancelled", label: "Canceladas" },
@@ -75,7 +77,11 @@ export default function AdminHistorico() {
                     <div className="text-[12.5px] text-muted-foreground mt-0.5">{formatDateTime(booking.startTime)}</div>
                   </div>
                   {booking.isReplacement && <Badge className="bg-secondary text-muted-foreground">Reposição</Badge>}
-                  <StatusBadge status={booking.status} />
+                  <StatusBadge
+                    status={booking.status}
+                    semRegistro={isAwaitingConfirmation(booking.status, booking.endTime)}
+                    agora={booking.status === "scheduled" && new Date(booking.startTime).getTime() <= Date.now() && new Date(booking.endTime).getTime() > Date.now()}
+                  />
                 </div>
               </button>
             );
