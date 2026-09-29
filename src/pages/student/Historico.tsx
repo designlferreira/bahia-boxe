@@ -10,7 +10,13 @@ import { SkeletonList } from "@/components/SkeletonCard";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatQuando } from "@/lib/dateUtils";
 import { isAwaitingConfirmation } from "@/lib/bookingStatus";
-import { getStudentBookingHistory } from "@/integrations/backend/api";
+import { PageHeader } from "@/components/PageHeader";
+import {
+  getModoAgendamentoEfetivo,
+  getStudentAdminId,
+  getStudentBookingHistory,
+  getWhatsappDoProfessor,
+} from "@/integrations/backend/api";
 
 type Tab = "proximas" | "anteriores";
 
@@ -25,10 +31,43 @@ export default function StudentHistorico() {
     enabled: !!profile,
   });
 
+  // O vazio depende de quem marca as aulas: no autosserviço o aluno agenda; na Recorrência quem marca é o professor
+  // (a rota de agendar redireciona), então o botão certo ali é falar com ele — mesmas consultas da Home/Minha conta.
+  const { data: adminId } = useQuery({
+    queryKey: ["student-admin-id", profile?.id],
+    queryFn: () => getStudentAdminId(profile!.id),
+    enabled: !!profile,
+    staleTime: Infinity,
+  });
+  const { data: modo } = useQuery({
+    queryKey: ["modo-agendamento-efetivo", adminId],
+    queryFn: () => getModoAgendamentoEfetivo(adminId!),
+    enabled: !!adminId,
+    staleTime: Infinity,
+  });
+  const { data: whatsapp } = useQuery({
+    queryKey: ["whatsapp-professor", adminId],
+    queryFn: () => getWhatsappDoProfessor(adminId!),
+    enabled: !!adminId,
+    staleTime: 60 * 60 * 1000,
+  });
+
+  const n = data?.length ?? 0;
+  // "Histórico completo do seu pacote" era falso (a lista traz aulas de todos os pacotes) e nem fazia sentido em Próximas.
+  const subtitle =
+    !data || isError
+      ? undefined
+      : tab === "proximas"
+        ? n === 0
+          ? undefined
+          : `${n} ${n === 1 ? "aula marcada" : "aulas marcadas"}`
+        : n === 0
+          ? undefined
+          : "As mais recentes primeiro";
+
   return (
     <div className="page-container">
-      <h1 className="font-display text-3xl tracking-wide text-foreground leading-none mb-1">MINHAS AULAS</h1>
-      <div className="text-[12.5px] text-muted-foreground mb-4">Histórico completo do seu pacote</div>
+      <PageHeader title="MINHAS AULAS" subtitle={subtitle} />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="mb-4">
         <TabsList>
@@ -58,13 +97,34 @@ export default function StudentHistorico() {
       )}
 
       {!isLoading && !isError && data && data.length === 0 && (
-        <EmptyState
-          icon={CalendarClock}
-          title="Nada por aqui"
-          description="Você ainda não tem aulas neste filtro."
-          ctaLabel="Agendar aula"
-          onCta={() => navigate("/app/agendar")}
-        />
+        tab === "anteriores" ? (
+          <EmptyState
+            icon={CalendarClock}
+            title="Nenhuma aula anterior ainda"
+            description="Depois da sua primeira aula, ela aparece aqui."
+          />
+        ) : modo === "recorrencia" ? (
+          <EmptyState
+            icon={CalendarClock}
+            title="Nenhuma aula marcada"
+            description="Seu professor marca as suas aulas. Quando ele marcar, elas aparecem aqui."
+            ctaLabel={whatsapp ? "Falar com o professor" : undefined}
+            ctaVariant="secondary"
+            onCta={
+              whatsapp
+                ? () => window.open(`https://wa.me/${whatsapp}?text=${encodeURIComponent(`Olá! Aqui é ${profile?.name.split(" ")[0] ?? ""}.`)}`, "_blank", "noopener")
+                : undefined
+            }
+          />
+        ) : (
+          <EmptyState
+            icon={CalendarClock}
+            title="Nenhuma aula marcada"
+            description="Escolha um dia e um horário para a sua próxima aula."
+            ctaLabel={modo === "autosservico" ? "Agendar aula" : undefined}
+            onCta={modo === "autosservico" ? () => navigate("/app/agendar") : undefined}
+          />
+        )
       )}
     </div>
   );

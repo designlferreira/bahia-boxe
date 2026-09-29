@@ -1282,6 +1282,11 @@ export default function Amostras() {
               <StudentHistorico />
             </Seeded>
           </Frame>
+          <Frame title="Minhas aulas · Recorrência sem aulas" note="professor em Recorrência ainda não marcou: o botão é falar com ele">
+            <Seeded data={base} modo="recorrencia" extra={historicoAluno([], [])}>
+              <StudentHistorico />
+            </Seeded>
+          </Frame>
         </div>
 
         <h2 className="text-lg font-semibold mb-4">Histórico (professor)</h2>
