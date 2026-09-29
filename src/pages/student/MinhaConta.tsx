@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight, KeyRound, MessageCircle, Package, Ruler, Trophy, UserRound } from "lucide-react";
+import { ChevronRight, KeyRound, LogOut, MessageCircle, Package, Ruler, Trophy, UserRound } from "lucide-react";
 import { formatInTimeZone } from "date-fns-tz";
 import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/context/AuthContext";
@@ -87,7 +87,15 @@ export default function StudentMinhaConta() {
 
       <PWAInstallBanner placement="settings" />
 
-      <Button variant="destructive" size="lg" className="w-full" onClick={() => setConfirmLogout(true)}>
+      {/* Sair é uma ação rara: discreta (sem preenchimento), no fim da tela. Antes era o botão vermelho de
+          largura total, o elemento mais forte da tela — o vermelho fica para a ação principal de cada tela. */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="w-full mt-2 text-[hsl(var(--red-text))] hover:text-[hsl(var(--red-text))]"
+        onClick={() => setConfirmLogout(true)}
+      >
+        <LogOut className="h-4 w-4" aria-hidden />
         Sair da conta
       </Button>
 
