@@ -3133,6 +3133,45 @@ ou "alterada" sem a chamada real ter dado certo.** Ao implementar, a falha de ve
 contato público); "Esqueci a senha" como bloco do próprio Login; entrar direto depois de redefinir (foi oferecido e recusado); a mensagem do link expirado
 distinguir "expirado" de "já usado"; amostras de "erro de rede" e "reenviar aguardando" com o servidor.
 
+### Orientações da aula (professor): rodada de crítica (2026-09-29) — sem migration nova
+
+`src/pages/admin/OrientacoesAula.tsx` (rota `/admin/orientacoes`, aberta pelo cartão em Configurações): crítica **17/40**, relatório em
+`.impeccable/critique/*orientacoesaula*`. Seis passos na `dev`, testados pelo Lucas. Na página de amostras ("Orientações da aula (professor)":
+preenchidas, vazias e erro — a galeria não tinha amostra desta tela). O que o professor preenche é o que o ALUNO vê no detalhe da aula.
+
+**ERRO REAL corrigido (P0, perda de dados — o MESMO padrão de "Meus dados físicos"):** a tela só tratava `isLoading`; com a consulta FALHANDO o
+formulário abria VAZIO e "Salvar orientações" fazia `upsert` de tudo em branco por cima do endereço, equipamento e recado que os alunos veem (o cartão
+"Onde será" e "Leve para esta aula" sumiriam para todos, sem aviso). Agora, sem resposta do servidor (`isSuccess`) não há formulário: `ErrorState`
+"O que você já salvou não foi alterado… Tentar novamente". **`data === null` (nunca salvou) é resposta válida e mostra o formulário vazio.** Regra
+geral do projeto: **toda tela que salva por `upsert` o que veio de uma consulta precisa distinguir "falhou" de "vazio".**
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Antecedência sem valor padrão:** antes "15 min" já vinha marcado e era GRAVADO sem o professor escolher (o aluno passava a ver "chegue 15 minutos
+  antes" que ninguém decidiu). Agora começa sem nenhuma; tocar de novo na marcada desmarca; a frase muda ("O aluno vê: …" / "Nenhuma marcada: o aluno não
+  vê aviso…"). **Não dá para distinguir** um "15" que o professor escolheu de um "15" gravado como padrão antes desta rodada: fica como está salvo.
+- **Prévia "Como o aluno vai ver" no fim da tela**, com avisos âmbar do que o aluno NÃO verá: sem rua não há local (nem mapa) — só avisa quando há outros campos
+  de endereço; luvas/bandagem só aparecem com pelo menos um tamanho/comprimento marcado (antes o professor marcava "Obrigatório", esquecia o tamanho e o aluno
+  simplesmente não via as luvas). **`src/components/OrientacoesDaAula.tsx` é o componente ÚNICO** dessas orientações, usado na prévia E no detalhe da aula do
+  aluno (`student/AulaDetalhe.tsx`) — a prévia nunca diverge da realidade. **Não voltar a duplicar** os blocos "Onde será"/chegada/"Leve para esta aula"/"Orientações".
+- **Salvar só quando mudou** (comparado por valor: sem espaços nas pontas, listas ordenadas), com o motivo escrito ("Nenhuma alteração para salvar.") e, depois de
+  salvar, "Salvo às HH:MM. Os alunos já veem estas orientações."; erro de salvar em português (antes o texto cru do banco); aviso ao sair pela seta de voltar
+  (`onBack`) e por `beforeunload`. **Limite conhecido: as abas de baixo do app não são interceptadas** (`BrowserRouter`, sem `useBlocker`).
+
+**O que mudou / armadilhas:**
+- **REGRA DOS HOOKS (bug meu, achado no passo 5):** o `useEffect` do aviso de saída tinha ficado DEPOIS dos `return` antecipados de erro/esqueleto. Isso muda
+  a quantidade de hooks entre o esqueleto e a tela pronta e o React lança "Rendered more hooks than during the previous render" — a galeria não mostrava (os
+  dados já vêm prontos). Está corrigido (hooks acima dos `return`, com comentário no código). **Ao pôr hooks numa tela com esqueleto/erro, fique ACIMA dos returns.**
+- **CEP:** máscara `00000-000`; avisos ("O CEP tem 8 números.", "CEP não encontrado. Preencha o endereço à mão.", falha de rede); "buscando…" 12px; depois de achar,
+  o foco vai ao Número. **Não sobrescreve mais o digitado:** a busca só preenche campos VAZIOS ou que ela mesma preencheu antes e o professor não editou
+  (`veioDoCep`). Número aceita "S/N" (`inputMode="text"`, 10 caracteres); Estado 2 letras maiúsculas.
+- Rótulos de todos os campos ligados (`useId`; antes nenhum tinha nome), textareas com `aria-label` e limite (200/500). Botões de escolha: grupos nomeados
+  (`radiogroup` para Não recomendado/Recomendado/Obrigatório; `aria-pressed` para antecedência, tamanhos e proteções), 44px, contorno `muted-foreground/60`,
+  marcado em `--red-text`, foco visível; a antecedência quebra em duas linhas em vez de rolar (escondia "20 min" e "30 min").
+
+**Deixado para depois (registrado, não pedido):** "Salvar" automático por campo; separar endereço/equipamento/recado em telas ou salvamentos independentes;
+"Não recomendado" renomear para "Não pedir"; "outra" vira "12oz ou outra" na tela do aluno; `mapsUrl` sem CEP; atualização funcional (`setEquipment(prev => …)`)
+para dois toques no mesmo instante (não reproduzível por uma pessoa); o cartão em Configurações não cita os "recados".
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
