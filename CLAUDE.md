@@ -2990,6 +2990,38 @@ estilo do lutador (Perfil de Boxe) no cartão; ordenar por aulas restantes; abri
 "Remarcada" pela cor e dizer quem cancelou (pesa no crédito); agrupar por mês; resumo "seg e qua, 19h" para o aluno de recorrência;
 explicar "Aguardando o professor"/"Remarcada" ao aluno.
 
+### Pacotes (aluno): rodada de crítica (2026-09-29) — sem migration nova
+
+`src/pages/student/Pacotes.tsx` (rota `/app/pacotes`, "Meu pacote" em Minha conta; **só no autosserviço**, em Recorrência redireciona): crítica
+**16/40** (a mais baixa das rodadas — envolve dinheiro), relatório em `.impeccable/critique/*student-pacotes*`. Seis passos na `dev`,
+testados pelo Lucas. Na página de amostras ("Pacotes (aluno)": com pacote ativo, sem pacote, pedido em análise, sem modelos e erro).
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Com pedido pendente, TODOS os "Pedir" ficam desativados, com o motivo escrito** ("Você já tem um pedido com o professor. Espere a resposta
+  para pedir outro.") e um cartão âmbar no topo ("Pedido de pacote enviado · <modelo>", "Enviado em …. Aguardando o professor responder.").
+  A tela já recebia o pedido (`home.pendingRequest`, o mesmo da Home) e o ignorava: o aluno podia pedir de novo, e **cada pedido aprovado
+  encerra o pacote atual**. Também ficam desativados enquanto a Home não chegou (sem ela não dá para saber se há pedido).
+- **Pedir tem janela de confirmação:** tocar em "Pedir" só ESCOLHE o modelo; quem envia é "Enviar pedido". A janela diz o modelo e o preço,
+  que **o professor combina o pagamento e libera as aulas**, e — se o aluno tem pacote não experimental com aulas SEM data — que **liberar o
+  novo pacote encerra o atual e essas aulas deixam de valer (as já marcadas continuam)**; a aula experimental não é afetada (0031).
+  Aviso de sucesso: "Pedido enviado: <modelo>. O professor vai responder."
+- **Cartão de pacote = `ActivePackageCard` (`audience="student"`, `hideAlert`)**, o mesmo da Home; usa `home.package ?? home.lastPackage`
+  (pacote esgotado mostra "0 aulas restantes · Pacote de N aulas concluído", sem o selo "Ativo" que dizia "8 de 8 usadas"). **Não voltar a
+  desenhar um cartão próprio aqui** (era a terceira cópia; ver "Unificação do card de pacote").
+
+**O que mudou / armadilhas:**
+- **Erro e vazio:** falha nas consultas → `ErrorState` "Tentar novamente" (modelos e Home; sem a Home os botões ficariam desativados para
+  sempre); sem modelos → "Seu professor ainda não cadastrou pacotes" com "Falar com o professor" (WhatsApp, só se houver número).
+- Botões com `aria-label="Pedir <modelo>"`; "Preço a combinar" em cinza (é ausência de preço, não um preço dourado); nome com `line-clamp-2` e
+  descrição com `line-clamp-3` (**a descrição longa aparece cortada e a janela de confirmação não a mostra**); lista é `<ul aria-label="Modelos
+  de pacote">`; o conteúdo só aparece depois de saber o modo (`aguardandoModo`, esqueleto) para não piscar antes do redirecionamento em
+  Recorrência; espaço reservado (`SkeletonCard`) enquanto o pacote carrega.
+- O aviso de "desde <data>" do cartão antigo saiu (o cartão padrão não o mostra).
+
+**Deixado para depois (registrado, não pedido):** cancelar o próprio pedido pendente (hoje o aluno só espera); campo de recado ao professor no pedido
+(a RPC já tem `notes`; hoje vai "Pedido a partir de …" na aula avulsa); mostrar a descrição completa na janela de confirmação; "R$/aula" para
+comparar modelos; "Pedir de novo o mesmo pacote"; "Sugestão: use em até N dias" pode ser confundido com validade (segue só informativo).
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
