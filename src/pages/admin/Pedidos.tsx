@@ -19,6 +19,7 @@ import {
   rejectPurchaseRequest,
   restorePurchaseRequest,
 } from "@/integrations/backend/api";
+import { mensagemDeErro } from "@/lib/erros";
 
 export default function AdminPedidos() {
   const { profile } = useAuth();
@@ -54,7 +55,7 @@ export default function AdminPedidos() {
       invalidar();
       toast.success(`Pedido de ${student.split(" ")[0]} aprovado · aulas liberadas`);
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível aprovar o pedido."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível aprovar o pedido.")),
   });
 
   const reject = useMutation({
@@ -68,11 +69,11 @@ export default function AdminPedidos() {
           onClick: () =>
             restorePurchaseRequest(id)
               .then(invalidar)
-              .catch((err) => toast.error(err instanceof Error ? err.message : "Não foi possível desfazer.")),
+              .catch((err) => toast.error(mensagemDeErro(err, "Não foi possível desfazer."))),
         },
       });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível recusar o pedido."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível recusar o pedido.")),
   });
 
   // Só o cartão que está sendo decidido trava (antes `approve.isPending` travava TODOS os "Aprovar",

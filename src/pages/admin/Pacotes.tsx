@@ -25,6 +25,7 @@ import {
   updatePackageTemplate,
 } from "@/integrations/backend/api";
 import type { PackageTemplate } from "@/integrations/backend/types";
+import { mensagemDeErro } from "@/lib/erros";
 
 const empty = { name: "", description: "", totalClasses: 10, priceCents: null as number | null, validityDays: null as number | null };
 
@@ -114,7 +115,7 @@ export default function AdminPacotes() {
       toast.success(editing ? "Modelo atualizado" : "Modelo criado");
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Não foi possível salvar o modelo.");
+      toast.error(mensagemDeErro(err, "Não foi possível salvar o modelo."));
     },
   });
 
@@ -132,14 +133,14 @@ export default function AdminPacotes() {
               invalidate();
               toast.success("Modelo de volta");
             } catch (err) {
-              toast.error(err instanceof Error ? err.message : "Não foi possível desfazer. Crie o modelo de novo.");
+              toast.error(mensagemDeErro(err, "Não foi possível desfazer. Crie o modelo de novo."));
             }
           },
         },
       });
     },
     // Antes uma falha aqui não mostrava nada: o professor achava que tinha removido.
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível remover o modelo."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível remover o modelo.")),
   });
 
   // O botão desativado diz por quê (antes só ficava apagado).

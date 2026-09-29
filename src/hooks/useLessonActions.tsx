@@ -19,11 +19,12 @@ import {
 import type { RegraDeConsumo } from "@/integrations/backend/api";
 import type { Booking } from "@/integrations/backend/types";
 import { formatDateTime } from "@/lib/dateUtils";
+import { mensagemDeErro } from "@/lib/erros";
 
 const UNDO_TOAST_MS = 9000;
 
 function errorMessage(err: unknown, fallback: string) {
-  return err instanceof Error ? err.message : fallback;
+  return mensagemDeErro(err, fallback);
 }
 
 interface Target {

@@ -19,6 +19,7 @@ import {
   updateWhatsapp,
 } from "@/integrations/backend/api";
 import type { ModoAgendamento } from "@/integrations/backend/types";
+import { mensagemDeErro } from "@/lib/erros";
 
 const FOCO = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
@@ -65,7 +66,7 @@ export default function AdminConfiguracoes() {
       toast(value ? "Falta agora desconta uma aula" : "Falta não desconta mais a aula");
     },
     // Antes uma falha de gravação sumia em silêncio (só o WhatsApp avisava) e o switch voltava sozinho.
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível salvar. Tente de novo."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível salvar. Tente de novo.")),
   });
 
   const toggleModo = useMutation({
@@ -74,7 +75,7 @@ export default function AdminConfiguracoes() {
       queryClient.invalidateQueries({ queryKey: key });
       toast(value === "recorrencia" ? "Modo Recorrência ativado" : "Modo Autosserviço ativado");
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível trocar o modo. Tente de novo."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível trocar o modo. Tente de novo.")),
   });
 
   // WhatsApp que os alunos usam pra falar com o professor (0032).
@@ -92,7 +93,7 @@ export default function AdminConfiguracoes() {
       queryClient.invalidateQueries({ queryKey: key });
       toast.success(whatsappNormalizado ? "WhatsApp salvo" : "WhatsApp removido");
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível salvar."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível salvar.")),
   });
 
   return (

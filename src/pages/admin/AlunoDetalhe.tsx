@@ -25,6 +25,7 @@ import {
   removeActivePackage,
 } from "@/integrations/backend/api";
 import { StatusBadge } from "@/components/StatusBadge";
+import { mensagemDeErro } from "@/lib/erros";
 
 /** Uma aula do aluno: toca e abre o detalhe da aula (antes a lista era só texto). */
 function LinhaAula({ booking, onOpen }: { booking: Booking; onOpen: () => void }) {
@@ -107,7 +108,7 @@ export default function AdminAlunoDetalhe() {
       const t = templates?.find((x) => x.id === templateId);
       toast.success(`Pacote atribuído a ${data?.student.name.split(" ")[0]}${t ? ` · ${t.name}` : ""}`);
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível atribuir o pacote."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível atribuir o pacote.")),
   });
 
   const remove = useMutation({
@@ -116,7 +117,7 @@ export default function AdminAlunoDetalhe() {
       invalidate();
       toast.warning("Pacote encerrado");
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível encerrar o pacote."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível encerrar o pacote.")),
   });
 
   if (isLoading) {
