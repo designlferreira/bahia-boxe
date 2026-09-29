@@ -81,9 +81,17 @@ export default function StudentHistorico() {
 
       {!isLoading && !isError && data && data.length > 0 && (
         <div className="flex flex-col gap-2.5">
-          {data.map((b) => (
+          {data.map((b, i) => (
             <BookingCard
               key={b.id}
+              // A pergunta que traz o aluno aqui é "quando é a próxima?": a primeira de Próximas se destaca das demais.
+              destaque={
+                tab === "proximas" && i === 0
+                  ? b.status === "scheduled" && new Date(b.startTime).getTime() <= Date.now()
+                    ? "Acontecendo agora"
+                    : "Próxima aula"
+                  : undefined
+              }
               // "Amanhã, 19:00" / "Quarta-feira, 30 set · 19:00": responde "quando é?" sem o aluno calcular o dia da semana
               // (antes: "30" + "set" com o mês em 10,5px e só "19:00 – 20:00"). A hora final fica no detalhe.
               title={formatQuando(b.startTime)}

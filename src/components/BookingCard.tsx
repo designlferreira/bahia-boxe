@@ -12,6 +12,8 @@ interface BookingCardProps {
   onClick?: () => void;
   actions?: ReactNode;
   highlight?: boolean;
+  /** Rótulo de destaque ("Próxima aula"): o cartão ganha o tom dourado, título maior e o rótulo acima. */
+  destaque?: string;
   /** Aula agendada cujo horário já passou (o professor ainda não registrou) / em andamento — ver StatusBadge. */
   semRegistro?: boolean;
   agora?: boolean;
@@ -27,6 +29,7 @@ export function BookingCard({
   onClick,
   actions,
   highlight,
+  destaque,
   semRegistro,
   agora,
 }: BookingCardProps) {
@@ -41,6 +44,7 @@ export function BookingCard({
         "w-full text-left card-dark p-3.5 flex items-center gap-3 transition-all duration-200",
         onClick && "active:scale-[0.985] cursor-pointer hover:border-muted-foreground/40",
         highlight && "border-amber/35",
+        destaque && "border-accent/40 bg-[linear-gradient(150deg,hsl(var(--accent)/0.09),hsl(var(--card))_60%)] p-4",
       )}
     >
       {dayNumber && (
@@ -52,7 +56,8 @@ export function BookingCard({
         </div>
       )}
       <div className="flex-1 min-w-0">
-        <div className="text-[14.5px] font-semibold text-foreground leading-snug line-clamp-2 break-words">{title}</div>
+        {destaque && <div className="text-xs font-semibold uppercase tracking-wide text-accent mb-1">{destaque}</div>}
+        <div className={cn("font-semibold text-foreground leading-snug line-clamp-2 break-words", destaque ? "text-[17px]" : "text-[14.5px]")}>{title}</div>
         {subtitle && <div className="text-xs text-muted-foreground mt-0.5">{subtitle}</div>}
         <StatusBadge status={status} audience="student" semRegistro={semRegistro} agora={agora} className="mt-1.5" />
         {actions && <div className="flex gap-2 mt-3">{actions}</div>}
