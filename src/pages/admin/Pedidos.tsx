@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatPriceLabel } from "@/lib/packageUtils";
 import { relativeTime } from "@/lib/dateUtils";
+import { useSaidaSuave } from "@/hooks/useSaidaSuave";
 import {
   approvePurchaseRequest,
   getPedidosDecididos,
@@ -36,6 +37,8 @@ export default function AdminPedidos() {
     enabled: !!profile,
   });
 
+  // Pedido decidido sai esmaecendo em vez de sumir de uma vez. Hook antes de qualquer retorno antecipado.
+  const pedidosV = useSaidaSuave(data ?? [], (p) => p.request.id);
   const { data: decididos } = useQuery({
     queryKey: ["purchase-requests-decididos", profile?.id],
     queryFn: () => getPedidosDecididos(profile!.id),
@@ -90,9 +93,19 @@ export default function AdminPedidos() {
       {isLoading && !isError && <SkeletonList count={2} height={118} />}
 
       {!isLoading && !isError && data && data.length > 0 && (
-        <div className="flex flex-col gap-2.5">
-          {data.map(({ request, studentName, template, classesLostOnApprove, recorrenciaRestantes, aulasRestantes }) => (
-            <div key={request.id} className="card-dark p-[15px]">
+        <div className="flex flex-col">
+          {/* Pedido decidido não some de uma vez: esmaece e fecha o espaço (ver `useSaidaSuave`). O espaço entre cartões é
+              padding do próprio item (`pb-2.5`), não `gap`, para fechar junto com ele. */}
+          {pedidosV.map(({ item: { request, studentName, template, classesLostOnApprove, recorrenciaRestantes, aulasRestantes }, saindo }) => (
+            <div
+              key={request.id}
+              {...({ inert: saindo ? "" : undefined } as Record<string, string | undefined>)}
+              aria-hidden={saindo || undefined}
+              className={saindo ? "grid animate-bb-sai" : "grid"}
+            >
+            <div className={saindo ? "min-h-0 overflow-hidden" : "min-h-0"}>
+            <div className="pb-2.5">
+            <div className="card-dark p-[15px]">
               <div className="flex items-center gap-2.5 mb-3">
                 <div className="flex-1">
                   <div className="text-[15px] font-semibold text-foreground">{studentName}</div>
@@ -168,6 +181,9 @@ export default function AdminPedidos() {
                   {reject.isPending && reject.variables?.id === request.id ? "Recusando…" : "Recusar"}
                 </Button>
               </div>
+            </div>
+            </div>
+            </div>
             </div>
           ))}
         </div>
