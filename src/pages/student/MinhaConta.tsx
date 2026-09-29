@@ -6,6 +6,8 @@ import { formatInTimeZone } from "date-fns-tz";
 import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/context/AuthContext";
 import { Avatar } from "@/components/ui/avatar";
+import { PageHeader } from "@/components/PageHeader";
+import { SkeletonCard } from "@/components/SkeletonCard";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
@@ -42,12 +44,22 @@ export default function StudentMinhaConta() {
     staleTime: 60 * 60 * 1000,
   });
 
-  if (!profile) return null;
-  const initials = profile.name.split(" ").map((n) => n[0]).slice(0, 2).join("");
+  // Antes `return null` deixava a tela em branco, sem título, enquanto o perfil não chegava.
+  if (!profile) {
+    return (
+      <div className="page-container">
+        <PageHeader title="MINHA CONTA" />
+        <SkeletonCard height={90} className="mb-4" />
+        <SkeletonCard height={200} />
+      </div>
+    );
+  }
+  // `filter(Boolean)`: nome com espaço duplo ou no fim não pula uma inicial.
+  const initials = profile.name.split(" ").filter(Boolean).map((n) => n[0]).slice(0, 2).join("").toUpperCase();
 
   return (
     <div className="page-container">
-      <h1 className="font-display text-3xl tracking-wide text-foreground mb-4">MINHA CONTA</h1>
+      <PageHeader title="MINHA CONTA" />
 
       <div className="card-dark p-4 flex items-center gap-3.5 mb-4">
         <Avatar initials={initials} size="md" />
@@ -128,8 +140,8 @@ function AccountRow({
   href?: string;
   last?: boolean;
 }) {
-  const cls = `min-h-[52px] px-4 py-2 flex items-center gap-2.5 text-left text-[14.5px] text-foreground hover:bg-secondary transition-colors ${
-    last ? "" : "border-b border-[#232323]"
+  const cls = `min-h-[52px] px-4 py-2 flex items-center gap-2.5 text-left text-[14.5px] text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${
+    last ? "" : "border-b border-border"
   }`;
   const conteudo = (
     <>

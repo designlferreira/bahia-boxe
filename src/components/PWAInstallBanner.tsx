@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Smartphone } from "lucide-react";
+import { Share, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -70,6 +70,29 @@ export function PWAInstallBanner({ placement = "optional", className }: PWAInsta
       subscribers.delete(setDeferred);
     };
   }, []);
+
+  // iPhone/Safari não dispara `beforeinstallprompt`: sem isto o aluno nunca via como instalar. Só na Minha conta
+  // (onde ele procura de propósito) e só se o app ainda não estiver instalado.
+  const isIOS = typeof navigator !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const instalado = typeof navigator !== "undefined" && (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  if (!deferred && placement === "settings" && isIOS && !instalado) {
+    return (
+      <section aria-label="Instalar o aplicativo" className={cn("rounded-2xl border border-border bg-card p-4 mb-4", className)}>
+        <div className="flex items-start gap-3">
+          <div className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+            <Smartphone className="h-[18px] w-[18px] text-foreground/85" aria-hidden />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[15px] font-semibold text-foreground">Instale o Bahia Boxe no iPhone</div>
+            <div className="text-sm text-muted-foreground mt-0.5">
+              Toque em <Share className="inline h-3.5 w-3.5 -mt-0.5" aria-hidden /> <strong className="text-foreground">Compartilhar</strong> e depois em{" "}
+              <strong className="text-foreground">Adicionar à Tela de Início</strong>.
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   if (!deferred || hidden) return null;
 
