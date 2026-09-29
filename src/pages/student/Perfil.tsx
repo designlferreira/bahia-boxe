@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ChevronRight, HelpCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
+import { ErrorState } from "@/components/ErrorState";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { GuardInfoDialog } from "@/components/GuardInfoDialog";
 import { Input } from "@/components/ui/input";
@@ -34,14 +35,14 @@ export default function StudentPerfil() {
   const [guardInfoOpen, setGuardInfoOpen] = useState<Guard | null>(null);
   const loadedRef = useRef(false);
 
-  const { data: studentId } = useQuery({
+  const { data: studentId, isError: erroId, refetch: recarregarId } = useQuery({
     queryKey: ["my-student-id", profile?.id],
     queryFn: () => studentIdForProfile(profile!.id),
     enabled: !!profile,
     staleTime: Infinity,
   });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError: erroDados, refetch: recarregarDados } = useQuery({
     queryKey: ["student-profile", studentId],
     queryFn: () => getStudentProfile(studentId!),
     enabled: !!studentId,
@@ -79,11 +80,29 @@ export default function StudentPerfil() {
     onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível salvar."),
   });
 
-  if (isLoading) {
+  if (isLoading || (!data && !erroId && !erroDados)) {
     return (
       <div className="page-container">
         <PageHeader title="MEUS DADOS FÍSICOS" back />
         <SkeletonCard height={280} />
+      </div>
+    );
+  }
+
+  // Antes, se a consulta falhava o formulário abria VAZIO como se o aluno nunca tivesse preenchido nada — e o "Salvar" gravava tudo em
+  // branco por cima dos dados verdadeiros. Sem os dados carregados a tela não mostra formulário nenhum.
+  if (erroId || erroDados) {
+    return (
+      <div className="page-container">
+        <PageHeader title="MEUS DADOS FÍSICOS" back />
+        <ErrorState
+          title="Não foi possível carregar seus dados"
+          description="Seus dados não foram alterados. Verifique sua conexão e tente novamente."
+          onRetry={() => {
+            if (erroId) recarregarId();
+            if (erroDados) recarregarDados();
+          }}
+        />
       </div>
     );
   }
@@ -238,7 +257,7 @@ export default function StudentPerfil() {
         </div>
       </div>
 
-      <Button size="lg" className="w-full" onClick={() => save.mutate()} disabled={save.isPending || !studentId}>
+      <Button size="lg" className="w-full" onClick={() => save.mutate()} disabled={save.isPending || !studentId || !data}>
         {save.isPending ? "Salvando…" : "Salvar"}
       </Button>
 
