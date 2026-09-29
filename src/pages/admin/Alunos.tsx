@@ -71,16 +71,16 @@ export default function AdminAlunos() {
 
       {!isLoading && !isError && data && data.length > 0 && (
         <div className="flex flex-col gap-2.5">
-          {data.map(({ student, credits, package: pkg }) => {
+          {data.map(({ student, restantes, package: pkg }) => {
             const emRisco = motivoPorAluno.get(student.id);
             return (
             <button
               key={student.id}
               type="button"
               onClick={() => navigate(`/admin/alunos/${student.id}`)}
-              className="w-full text-left card-dark p-3.5 flex items-center gap-3 active:scale-[0.985] transition-transform hover:border-muted-foreground/40"
+              className="w-full text-left card-dark p-3.5 flex items-center gap-3 active:scale-[0.985] transition-transform hover:border-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <div className="h-[42px] w-[42px] rounded-full bg-secondary flex items-center justify-center text-sm font-semibold text-foreground/80 shrink-0">
+              <div aria-hidden className="h-[42px] w-[42px] rounded-full bg-secondary flex items-center justify-center text-sm font-semibold text-foreground/80 shrink-0">
                 {student.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
               </div>
               <div className="flex-1 min-w-0">
@@ -93,13 +93,19 @@ export default function AdminAlunos() {
                   </div>
                 )}
               </div>
-              <div className="text-right shrink-0">
-                <div className={`font-display text-2xl leading-none ${credits === 0 ? "text-destructive" : credits <= 2 ? "text-amber" : "text-accent"}`}>
-                  {credits}
+              {restantes !== null && (
+                <div className="text-right shrink-0">
+                  <div
+                    className={`font-display text-2xl leading-none ${
+                      restantes === 0 ? "text-[hsl(var(--red-text))]" : restantes <= 2 ? "text-amber" : "text-foreground"
+                    }`}
+                  >
+                    {restantes}
+                  </div>
+                  <div className="text-xs text-muted-foreground">{restantes === 1 ? "restante" : "restantes"}</div>
                 </div>
-                <div className="text-[10.5px] uppercase tracking-wide text-muted-foreground">créditos</div>
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              )}
+              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
             </button>
             );
           })}

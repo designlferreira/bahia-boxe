@@ -53,9 +53,9 @@ triggers. The client never inserts into `profiles`/`students` directly.
   `(total − used)` across every `active` package (a student can have a
   `trial`-origin package and a `purchase`/`admin_grant`-origin package active
   at once) minus reservations, computed by a single canonical function,
-  `available_credits_for_student` — `creditsAvailableFor()` / the batched
-  `creditsByStudent()` call it (or replicate its exact formula) rather than
-  reimplementing the arithmetic.
+  `available_credits_for_student` — `creditsAvailableFor()` calls it rather
+  than reimplementing the arithmetic. (The professor's student list shows
+  remaining classes per package instead — `getAdminStudents`.)
 - **A trial credit is a package**, not a special case: `origin = 'trial'`,
   `kind = 'single'`, exactly one per student ever (enforced by a partial
   unique index on `packages`, not just app convention), granted by an

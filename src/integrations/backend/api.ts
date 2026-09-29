@@ -905,39 +905,6 @@ async function alunosEmRisco(students: StudentRecord[]): Promise<AlunoEmRisco[]>
   return out.sort((a, b) => Number(b.grave) - Number(a.grave) || a.student.name.localeCompare(b.student.name));
 }
 
-/**
- * Versão em lote da mesma fórmula canônica, para listas de alunos (evita N chamadas de RPC). Um
- * aluno pode ter mais de um pacote `active` simultâneo agora (trial + pago) — soma o restante de
- * todos antes de descontar as reservas futuras, em vez de pegar "o" pacote.
- */
-async function creditsByStudent(studentIds: string[]): Promise<Record<string, number>> {
-  if (studentIds.length === 0) return {};
-  const [pkgRes, bookingRes] = await Promise.all([
-    client().from("packages").select("student_id, total_classes, used_classes").in("student_id", studentIds).eq("status", "active"),
-    client()
-      .from("bookings")
-      .select("student_id")
-      .in("student_id", studentIds)
-      .in("status", ACTIVE_STATUSES)
-      .gt("start_time", new Date().toISOString()),
-  ]);
-  if (pkgRes.error) throw new Error(pkgRes.error.message);
-  if (bookingRes.error) throw new Error(bookingRes.error.message);
-
-  const future: Record<string, number> = {};
-  for (const b of bookingRes.data ?? []) future[b.student_id] = (future[b.student_id] ?? 0) + 1;
-
-  const remaining: Record<string, number> = {};
-  for (const id of studentIds) remaining[id] = 0;
-  for (const p of pkgRes.data ?? []) {
-    remaining[p.student_id] = (remaining[p.student_id] ?? 0) + (p.total_classes - p.used_classes);
-  }
-
-  const out: Record<string, number> = {};
-  for (const id of studentIds) out[id] = Math.max(0, (remaining[id] ?? 0) - (future[id] ?? 0));
-  return out;
-}
-
 // ---------------------------------------------------------------------------
 // admin · agenda (timeline)
 // ---------------------------------------------------------------------------
@@ -1245,25 +1212,48 @@ export async function getAlunosEmRisco(adminId: string): Promise<AlunoEmRisco[]>
   return alunosEmRisco(await adminStudents(adminId));
 }
 
+/**
+ * Lista de alunos do professor. O número de cada aluno é AULAS RESTANTES nos pacotes ativos (total −
+ * usadas), não "créditos para agendar": essa conta desconta as aulas já marcadas, e na recorrência
+ * todas as restantes nascem marcadas — todo aluno de recorrência aparecia com 0 em vermelho (mesmo
+ * problema já corrigido no cartão do aluno e em "Alunos em risco"). Pacote de recorrência lê
+ * `saldo_pacotes` (a autoridade, decisão 4), não o `used_classes` materializado.
+ */
 export async function getAdminStudents(adminId: string, search: string) {
   const students = await adminStudents(adminId);
   const ids = students.map((s) => s.id);
-  const [credits, pkgRes] = await Promise.all([
-    creditsByStudent(ids),
-    ids.length
-      ? client().from("packages").select("*").in("student_id", ids).eq("status", "active")
-      : Promise.resolve({ data: [], error: null } as const),
-  ]);
+  const pkgRes = ids.length
+    ? await client().from("packages").select("*").in("student_id", ids).eq("status", "active")
+    : ({ data: [], error: null } as const);
   if (pkgRes.error) throw new Error(pkgRes.error.message);
+  const pkgs = pkgRes.data ?? [];
 
+  const recIds = pkgs.filter((p) => p.origin === "recurrence").map((p) => p.id as string);
+  const saldoRes = recIds.length
+    ? await client().from("saldo_pacotes").select("pacote_id, consumidas, restantes").in("pacote_id", recIds)
+    : { data: [], error: null };
+  if (saldoRes.error) throw new Error(saldoRes.error.message);
+  const saldo = new Map((saldoRes.data ?? []).map((r) => [r.pacote_id as string, r as { consumidas: number; restantes: number }]));
+
+  const restantes = new Map<string, number>();
   const pkgByStudent = new Map<string, PackageRecord>();
-  for (const row of pkgRes.data ?? []) pkgByStudent.set(row.student_id, mapPackage(row));
+  for (const row of pkgs) {
+    const s = row.origin === "recurrence" ? saldo.get(row.id) : undefined;
+    const r = s ? s.restantes : Math.max(0, row.total_classes - row.used_classes);
+    restantes.set(row.student_id, (restantes.get(row.student_id) ?? 0) + r);
+    // O pacote que aparece no subtítulo: o pago/recorrência antes da experimental (os dois podem
+    // estar ativos juntos). Na recorrência, "usadas" vem do saldo, não da cópia materializada.
+    const pkg = { ...mapPackage(row), usedClasses: s ? s.consumidas : row.used_classes };
+    const atual = pkgByStudent.get(row.student_id);
+    if (!atual || atual.origin === "trial") pkgByStudent.set(row.student_id, pkg);
+  }
 
   const q = search.trim().toLowerCase();
   return students
     .map((student) => ({
       student,
-      credits: credits[student.id] ?? 0,
+      /** null = sem pacote ativo. */
+      restantes: restantes.has(student.id) ? restantes.get(student.id)! : null,
       package: pkgByStudent.get(student.id) ?? null,
     }))
     .filter((e) => !q || e.student.name.toLowerCase().includes(q));
