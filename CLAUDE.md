@@ -3713,7 +3713,34 @@ O movimento que já existia (entrada de tela `bb-in`, `bb-up`, `bb-toast`, `bb-p
 
 **Não conferido:** desempenho em aparelho de entrada (a saída anima `grid-template-rows`, que é layout; são poucos itens e 220 ms, mas não foi medido); leitor de tela com a saída do item.
 
-**Deixado para depois (registrado, não pedido):** a mesma saída suave na Agenda e em Pedidos; "Todas aconteceram" com saída em cascata; transição entre telas (hoje só há o fade de entrada); aula avulsa/pacote pedido também "acender" na Home.
+**Deixado para depois (registrado, não pedido):** ~~a mesma saída suave na Agenda e em Pedidos~~ FEITO (seção abaixo); "Todas aconteceram" com saída em cascata; ~~transição entre telas~~ FEITO (seção abaixo); aula avulsa/pacote pedido também "acender" na Home.
+
+### Movimento, parte 2: saída suave na Agenda e em Pedidos, e transição entre telas (2026-09-30) — sem migration nova
+
+Dois passos na `dev`, testados pelo Lucas (o segundo, no celular, era sobre o JEITO do movimento). Continuação da seção "Movimento (`animate`)" acima; as mesmas regras de "reduzir movimento" valem.
+
+**Passo 1 — saída suave na Agenda e em Pedidos.**
+- **`src/components/FechaAoSair.tsx`:** o mesmo esmaecer + fechar o espaço (`animate-bb-sai`, `SAIDA_MS = 220`) de `useSaidaSuave`, mas para UM bloco que aparece e some. Quando `aberto` vira falso o bloco fica ~220 ms, INERTE (`inert`, `aria-hidden`) e mostrando o ÚLTIMO conteúdo que teve aberto; a estrutura é a mesma aberto ou saindo (o conteúdo não é recriado na troca).
+  Na **Agenda** (`Agenda.tsx`) envolve os dois blocos de botões do cartão (Aprovar/Recusar e Aconteceu/Faltou): o cartão encolhe sem puxar a linha do tempo. O selo de status do cartão também usa `EstaloAoMudar`, como o detalhe da aula.
+  **Recusar na Agenda NÃO anima a saída:** o cartão dá lugar a "Horário livre", que é uma troca de conteúdo, não uma saída.
+- **Pedidos** (`Pedidos.tsx`): a lista usa `useSaidaSuave`; cada cartão vira uma grade de uma linha (`grid` > `min-h-0` > `pb-2.5` > `card-dark`). **O espaço entre cartões é `padding-bottom` do próprio item, NÃO `gap`**, para fechar junto com ele (com `gap` sobraria um salto de 10 px no fim).
+  Limite conhecido, igual ao do Painel: quando o ÚLTIMO pedido some, a lista inteira dá lugar ao "Nenhum pedido pendente" de uma vez, sem a saída.
+- `inert` não existe nos tipos do React 18: passado por espalhamento (`{...({ inert: saindo ? "" : undefined } as Record<string, string | undefined>)}`), em `FechaAoSair`, `Pedidos` e `ItemResolver`. Na Agenda o `booking` dentro do `FechaAoSair` já não está estreitado: usa `booking!.id`.
+- Verificado na galeria alterando os dados: nas duas telas o item que sai fica com `bb-sai`, `inert` e (Agenda) os dois botões dentro, e é removido depois de ~0,5 s; o selo estalou uma vez na Agenda.
+
+**Passo 2 — transição direcional entre telas (`TransicaoDeTela` + `src/lib/direcaoDeNavegacao.ts`, com testes).** Antes toda tela entrava com o mesmo `bb-in` (fade com subida de 14 px). Agora a ENTRADA depende do tipo de navegação (`useNavigationType`):
+- **`avancar`** (abrir uma tela mais funda: detalhe, formulário, Configurações): entra pela DIREITA, `bb-avanca`, 18 px + esmaecer, 0,28 s;
+- **`voltar`** (POP: seta de voltar do app, botão do navegador, `navigate(-1)`): entra pela ESQUERDA, `bb-recua`;
+- **`aba`** (trocar de aba da barra de baixo, ou chegar numa aba vinda de fora): só esmaecer (`bb-fade`, 0,16 s), sem movimento — as abas são irmãs, dar direção seria enganar. As abas estão na lista `ABAS` de `direcaoDeNavegacao.ts`.
+  **Tela nova que vira aba da barra de baixo = uma linha nessa lista** (senão entra como "avancar");
+- primeira tela e mesmo caminho: `null`, fica o `bb-in` de sempre.
+O componente põe `data-nav` no `<html>` e o CSS (`index.css`, regras `html[data-nav="…"] .page-container`) escolhe a animação. **É `useLayoutEffect` de propósito:** o atributo precisa estar posto antes de a tela nova ser desenhada.
+Só a ENTRADA é direcional: a tela antiga NÃO anima a saída (sem biblioteca o React a desmonta na hora; animar a saída exigiria View Transitions, que o `react-router` 6.28 só suporta com roteador de dados, e o app usa `BrowserRouter`).
+`html[data-nav] { overflow-x: clip }` impede a barra de rolagem horizontal enquanto a tela desliza (testado em 390 px: `scrollLeft` fica em 0). Telas de entrada (login, criar conta) não usam `.page-container`, então não ganham a animação direcional. Com "reduzir movimento" a regra `!important` de sempre em `.page-container` vence e tudo vira esmaecimento.
+
+**Não conferido:** o TEMPO e a sensação (o painel do navegador desta sessão congela animações; ficou para o teste do Lucas no celular); aparelho de entrada; leitor de tela com a saída dos itens.
+
+**Deixado para depois (registrado, não pedido):** animar a saída da tela antiga (View Transitions, exigiria trocar o roteador); "Todas aconteceram" com saída em cascata.
 
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
