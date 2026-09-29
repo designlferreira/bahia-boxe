@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronLeft, X } from "lucide-react";
+import { Check, ChevronLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { cn } from "@/lib/utils";
@@ -34,6 +34,13 @@ function clearDraft(key: string) {
     /* idem */
   }
 }
+
+// Opção marcada: antes o texto era o vermelho de destaque (`text-primary`) sobre vermelho translúcido — 3,5:1 num texto de 14px — e a
+// desmarcada tinha contorno de 1,5:1. Agora: texto normal + ✓ (não depende só de cor), contorno legível e anel de foco por teclado.
+const OPCAO_BASE =
+  "relative flex gap-3 min-h-[56px] px-4 rounded-2xl border transition-all active:scale-[0.99] has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring";
+const OPCAO_ON = "bg-primary/15 border-primary";
+const OPCAO_OFF = "bg-secondary border-muted-foreground/50";
 
 interface BoxingProfileQuestionnaireProps {
   /** QUESTIONS (voz do aluno) ou COACH_QUESTIONS (voz do professor) — mesmos 32 ids, texto diferente. */
@@ -134,9 +141,9 @@ export function BoxingProfileQuestionnaire({
           type="button"
           onClick={goBack}
           aria-label="Voltar"
-          className="h-11 w-11 shrink-0 rounded-xl bg-secondary border border-border flex items-center justify-center active:scale-95 transition-transform"
+          className="h-11 w-11 shrink-0 rounded-xl bg-secondary border border-muted-foreground/50 flex items-center justify-center active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <ChevronLeft className="h-[18px] w-[18px] text-foreground" />
+          <ChevronLeft className="h-[18px] w-[18px] text-foreground" aria-hidden />
         </button>
         <div className="flex-1">
           <div className="text-[12px] text-muted-foreground mb-1.5" aria-live="polite">
@@ -159,9 +166,9 @@ export function BoxingProfileQuestionnaire({
           type="button"
           onClick={() => setConfirmExit(true)}
           aria-label="Sair do questionário"
-          className="h-11 w-11 shrink-0 rounded-xl bg-secondary border border-border flex items-center justify-center active:scale-95 transition-transform"
+          className="h-11 w-11 shrink-0 rounded-xl bg-secondary border border-muted-foreground/50 flex items-center justify-center active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <X className="h-[18px] w-[18px] text-muted-foreground" />
+          <X className="h-[18px] w-[18px] text-muted-foreground" aria-hidden />
         </button>
       </div>
 
@@ -173,13 +180,7 @@ export function BoxingProfileQuestionnaire({
             {LIKERT_OPTIONS.map((opt) => {
               const checked = answers[question.id] === opt.value;
               return (
-                <label
-                  key={opt.value}
-                  className={cn(
-                    "flex items-center gap-3 min-h-[56px] px-4 rounded-2xl border transition-all active:scale-[0.99]",
-                    checked ? "bg-primary/15 border-primary" : "bg-secondary border-border",
-                  )}
-                >
+                <label key={opt.value} className={cn(OPCAO_BASE, "items-center", checked ? OPCAO_ON : OPCAO_OFF)}>
                   <input
                     type="radio"
                     name={question.id}
@@ -188,7 +189,10 @@ export function BoxingProfileQuestionnaire({
                     onChange={() => setAnswers((a) => ({ ...a, [question.id]: opt.value }))}
                     className="h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
                   />
-                  <span className={cn("text-[14.5px] font-medium", checked ? "text-primary" : "text-foreground/85")}>{opt.label}</span>
+                  <span className={cn("flex-1 text-[14.5px]", checked ? "font-semibold text-foreground" : "font-medium text-foreground/85")}>
+                    {opt.label}
+                  </span>
+                  {checked && <Check className="h-4 w-4 shrink-0 text-[hsl(var(--red-text))]" strokeWidth={3} aria-hidden />}
                 </label>
               );
             })}
@@ -200,13 +204,7 @@ export function BoxingProfileQuestionnaire({
             {question.options.map((opt) => {
               const checked = answers[question.id] === opt.value;
               return (
-                <label
-                  key={opt.value}
-                  className={cn(
-                    "flex items-start gap-3 min-h-[56px] px-4 py-3 rounded-2xl border transition-all active:scale-[0.99]",
-                    checked ? "bg-primary/15 border-primary" : "bg-secondary border-border",
-                  )}
-                >
+                <label key={opt.value} className={cn(OPCAO_BASE, "items-start py-3", checked ? OPCAO_ON : OPCAO_OFF)}>
                   <input
                     type="radio"
                     name={question.id}
@@ -215,9 +213,10 @@ export function BoxingProfileQuestionnaire({
                     onChange={() => setAnswers((a) => ({ ...a, [question.id]: opt.value }))}
                     className="h-5 w-5 shrink-0 mt-0.5 accent-[hsl(var(--primary))]"
                   />
-                  <span className={cn("text-[14px] leading-snug", checked ? "text-primary font-medium" : "text-foreground/85")}>
+                  <span className={cn("flex-1 text-[14px] leading-snug", checked ? "text-foreground font-semibold" : "text-foreground/85")}>
                     {opt.label}
                   </span>
+                  {checked && <Check className="h-4 w-4 shrink-0 mt-0.5 text-[hsl(var(--red-text))]" strokeWidth={3} aria-hidden />}
                 </label>
               );
             })}
