@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { PasswordRule } from "@/components/PasswordRule";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ export default function AlterarSenha({ backTo, amostra }: { backTo: string; amos
   const navigate = useNavigate();
   const currentRef = useRef<HTMLInputElement>(null);
   const [show, setShow] = useState(false);
-  const [current, setCurrent] = useState(amostra ? SENHA_DE_AMOSTRA : "");
+  const [current, setCurrent] = useState(amostra ? "SenhaAtual1" : "");
   const [next, setNext] = useState(amostra ? SENHA_DE_AMOSTRA : "");
   const [confirm, setConfirm] = useState(amostra ? SENHA_DE_AMOSTRA : "");
   const [loading, setLoading] = useState(false);
@@ -34,6 +35,14 @@ export default function AlterarSenha({ backTo, amostra }: { backTo: string; amos
     if (done && !amostra) tituloSucessoRef.current?.focus();
   }, [done, amostra]);
 
+  // O foco volta DEPOIS do envio terminar: durante ele os campos estão desativados (`fieldset disabled`) e não aceitam foco.
+  const botaoRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (loading || amostra) return;
+    if (errorCurrent) currentRef.current?.focus();
+    else if (errorGeral) botaoRef.current?.focus();
+  }, [loading, errorCurrent, errorGeral, amostra]);
+
   function limparErros() {
     setErrorCurrent(null);
     setErrorGeral(null);
@@ -43,7 +52,31 @@ export default function AlterarSenha({ backTo, amostra }: { backTo: string; amos
   const ruleNum = /\d/.test(next);
   const ruleUp = /[A-Z]/.test(next);
   const mismatch = confirm.length > 0 && confirm !== next;
-  const canSubmit = current.length > 0 && ruleLen && ruleNum && ruleUp && next === confirm;
+  const igualAtual = current.length > 0 && next === current;
+  const canSubmit = current.length > 0 && ruleLen && ruleNum && ruleUp && next === confirm && !igualAtual;
+  // Por que o botão está apagado (o primeiro motivo pendente), em texto: só a opacidade não diz o que falta.
+  const motivo =
+    loading || canSubmit
+      ? null
+      : current.length === 0
+        ? "Digite sua senha atual."
+        : !(ruleLen && ruleNum && ruleUp)
+          ? "A nova senha ainda não segue todas as regras."
+          : igualAtual
+            ? "Escolha uma senha diferente da atual."
+            : "As duas senhas precisam ser iguais.";
+
+  // Campos preenchidos e ainda não enviados: sair pela seta de voltar pede confirmação e fechar/recarregar a aba pergunta.
+  // (As abas de baixo do app não dá para interceptar: BrowserRouter, sem `useBlocker`.)
+  const [ajudaAtual, setAjudaAtual] = useState(false);
+  const [confirmarSaida, setConfirmarSaida] = useState(false);
+  const mudou = !done && !amostra && (current.length > 0 || next.length > 0 || confirm.length > 0);
+  useEffect(() => {
+    if (!mudou) return;
+    const aviso = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", aviso);
+    return () => window.removeEventListener("beforeunload", aviso);
+  }, [mudou]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -56,7 +89,6 @@ export default function AlterarSenha({ backTo, amostra }: { backTo: string; amos
     } catch (err) {
       if (err instanceof AuthError && err.code === "senha_atual_incorreta") {
         setErrorCurrent(err.message);
-        currentRef.current?.focus();
       } else {
         setErrorGeral(err instanceof AuthError ? err.message : "Não foi possível alterar a senha. Tente novamente.");
       }
@@ -67,12 +99,14 @@ export default function AlterarSenha({ backTo, amostra }: { backTo: string; amos
 
   return (
     <div className="page-container">
-      <PageHeader title="ALTERAR SENHA" back />
+      <PageHeader title="ALTERAR SENHA" back onBack={() => (mudou ? setConfirmarSaida(true) : navigate(-1))} />
 
       {!done ? (
         // O <form> envolve os CAMPOS: antes só envolvia o botão, e o Enter num campo não enviava (nem o "Ir" do teclado do celular),
         // e o gerenciador de senhas não reconhecia o formulário.
         <form onSubmit={handleSubmit} noValidate className="card-dark p-[18px]">
+         {/* Durante o envio os campos não podem mudar (`fieldset disabled`). */}
+         <fieldset disabled={loading} className="min-w-0 border-0 p-0 m-0">
           <div className="flex justify-between items-center mb-1.5">
             <Label htmlFor="current" className="mb-0">
               Senha atual
@@ -109,6 +143,23 @@ export default function AlterarSenha({ backTo, amostra }: { backTo: string; amos
             <div id="current-error" role="alert" className="text-[12.5px] text-[hsl(var(--red-text))] mt-2 mb-3.5">
               {errorCurrent}
             </div>
+          )}
+          {/* Quem chega sem lembrar a senha atual não tinha saída. O caminho existe (Recuperar senha), mas exige sair da conta:
+              a tela explica e NÃO desloga sozinha. */}
+          <button
+            type="button"
+            onClick={() => setAjudaAtual((v) => !v)}
+            aria-expanded={ajudaAtual}
+            aria-controls="ajuda-senha-atual"
+            className="-mt-2 mb-2 min-h-11 rounded-md text-[13px] text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Não lembro minha senha atual
+          </button>
+          {ajudaAtual && (
+            <p id="ajuda-senha-atual" className="rounded-xl bg-secondary p-3.5 text-[13px] leading-relaxed text-foreground mb-3.5">
+              Saia da conta e, na tela de entrada, toque em “Esqueceu a senha? Recuperar”. Você recebe um link por e-mail para criar uma
+              nova senha.
+            </p>
           )}
 
           <Label htmlFor="next">Nova senha</Label>
@@ -161,9 +212,22 @@ export default function AlterarSenha({ backTo, amostra }: { backTo: string; amos
             </div>
           )}
 
-          <Button type="submit" size="lg" className="w-full mt-4" disabled={!canSubmit || loading}>
+          <Button
+            ref={botaoRef}
+            type="submit"
+            size="lg"
+            className="w-full mt-4"
+            disabled={!canSubmit || loading}
+            aria-describedby={motivo ? "motivo-envio" : undefined}
+          >
             {loading ? "Salvando…" : "Alterar senha"}
           </Button>
+          {motivo && (
+            <p id="motivo-envio" className="text-center text-[13px] text-muted-foreground mt-2.5">
+              {motivo}
+            </p>
+          )}
+         </fieldset>
         </form>
       ) : (
         <div role="status" className="card-dark border-accent/30 p-7 text-center animate-bb-up">
@@ -186,6 +250,16 @@ export default function AlterarSenha({ backTo, amostra }: { backTo: string; amos
           </Button>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmarSaida}
+        onOpenChange={setConfirmarSaida}
+        title="SAIR SEM ALTERAR?"
+        description="Você começou a preencher e ainda não alterou a senha. Se sair agora, o que digitou será descartado."
+        confirmLabel="Sair sem alterar"
+        cancelLabel="Continuar aqui"
+        onConfirm={() => navigate(-1)}
+      />
     </div>
   );
 }
