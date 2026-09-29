@@ -286,7 +286,7 @@ function historicoAluno(proximas: Booking[], anteriores: Booking[]): [unknown[],
  * Questionário do Perfil de Boxe já em andamento: grava um RASCUNHO no localStorage antes de montar (o componente retoma na primeira
  * pergunta sem resposta). `ate` = quantas perguntas já respondidas; `todas` = respondeu todas (abre na última, com "Concluir").
  */
-function AmostraQuestionario({ voz, ate, todas, chave }: { voz: "self" | "coach"; ate: number; todas?: boolean; chave: string }) {
+function AmostraQuestionario({ voz, ate, todas, chave, resumo }: { voz: "self" | "coach"; ate: number; todas?: boolean; chave: string; resumo?: boolean }) {
   const questions = getQuestions(voz, "short");
   const draftKey = `amostra.q.${chave}`;
   const [pronto] = useState(() => {
@@ -318,6 +318,7 @@ function AmostraQuestionario({ voz, ate, todas, chave }: { voz: "self" | "coach"
             }
           />
         }
+        resumoInicial={resumo}
         questions={questions}
         draftKey={draftKey}
         onSubmit={() => Promise.reject(new Error("amostra"))}
@@ -1495,6 +1496,11 @@ export default function Amostras() {
           <Frame title="Aluno · última pergunta" note="tudo respondido: abre na última, com Concluir">
             <Seeded data={base} modo="autosservico">
               <AmostraQuestionario voz="self" ate={0} todas chave="self-todas" />
+            </Seeded>
+          </Frame>
+          <Frame title="Aluno · resumo final" note="conferir as respostas antes de enviar (toque numa para mudá-la)">
+            <Seeded data={base} modo="autosservico">
+              <AmostraQuestionario voz="self" ate={0} todas resumo chave="self-resumo" />
             </Seeded>
           </Frame>
           <Frame title="Professor · escolha da versão" note="primeira tela, na voz de quem avalia o aluno">

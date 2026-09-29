@@ -72,6 +72,8 @@ interface BoxingProfileQuestionnaireProps {
   exitDescription?: string;
   /** Cabeçalho acima da barra do questionário (ver `BoxingProfileHeading`). */
   heading?: ReactNode;
+  /** Só para a página de amostras de desenvolvimento: abre já na tela de resumo. */
+  resumoInicial?: boolean;
 }
 
 /**
@@ -88,10 +90,16 @@ export function BoxingProfileQuestionnaire({
   onExit,
   exitDescription = "Suas respostas ficam salvas neste dispositivo — você pode continuar de onde parou depois.",
   heading,
+  resumoInicial,
 }: BoxingProfileQuestionnaireProps) {
   const [answers, setAnswers] = useState<Answers>({});
   const [index, setIndex] = useState(0);
   const [confirmExit, setConfirmExit] = useState(false);
+  // Tela final de conferência ("Você respondeu N de N"): antes "Concluir" na última pergunta ENVIAVA direto, sem a pessoa rever nada.
+  const [resumo, setResumo] = useState(!!resumoInicial);
+  // Veio do resumo para corrigir UMA resposta: ao responder, volta ao resumo (não segue pela lista de perguntas).
+  const [deResumo, setDeResumo] = useState(false);
+  const tituloResumoRef = useRef<HTMLHeadingElement>(null);
   const perguntaRef = useRef<HTMLFieldSetElement>(null);
   const jaMontou = useRef(false);
   const avancoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -105,6 +113,10 @@ export function BoxingProfileQuestionnaire({
     }
     perguntaRef.current?.focus();
   }, [index]);
+
+  useEffect(() => {
+    if (resumo) tituloResumoRef.current?.focus();
+  }, [resumo]);
 
   // Cancela um avanço automático pendente ao sair da tela ou mudar de pergunta.
   useEffect(() => {
@@ -152,15 +164,28 @@ export function BoxingProfileQuestionnaire({
 
   function goNext() {
     if (!answered) return;
+    if (deResumo) {
+      setDeResumo(false);
+      setResumo(true);
+      return;
+    }
     if (isLast) {
       if (!isComplete(answers, questions)) {
         toast.error(`Faltam ${missing.length} questão(ões) para concluir. Volte e responda todas.`);
         return;
       }
-      submit.mutate();
+      setResumo(true);
       return;
     }
     setIndex((i) => Math.min(i + 1, questions.length - 1));
+  }
+
+  /** Rótulo da resposta dada a uma pergunta (para o resumo). */
+  function rotuloDa(q: Question): string {
+    const v = answers[q.id];
+    if (v === undefined) return "Sem resposta";
+    if (q.type === "likert") return LIKERT_OPTIONS.find((o) => o.value === v)?.label ?? String(v);
+    return q.options.find((o) => o.value === v)?.label ?? String(v);
   }
 
   /**
@@ -171,13 +196,31 @@ export function BoxingProfileQuestionnaire({
   function responde(value: Answers[string]) {
     setAnswers((a) => ({ ...a, [question.id]: value }));
     if (avancoRef.current) clearTimeout(avancoRef.current);
-    if (question.type === "likert" && !isLast) {
-      avancoRef.current = setTimeout(() => setIndex((i) => Math.min(i + 1, questions.length - 1)), 350);
+    if (question.type === "likert" && (!isLast || deResumo)) {
+      avancoRef.current = setTimeout(() => {
+        if (deResumo) {
+          setDeResumo(false);
+          setResumo(true);
+        } else {
+          setIndex((i) => Math.min(i + 1, questions.length - 1));
+        }
+      }, 350);
     }
   }
 
   function goBack() {
     if (avancoRef.current) clearTimeout(avancoRef.current);
+    if (resumo) {
+      // Do resumo, "voltar" reabre a última pergunta.
+      setResumo(false);
+      setIndex(questions.length - 1);
+      return;
+    }
+    if (deResumo) {
+      setDeResumo(false);
+      setResumo(true);
+      return;
+    }
     if (index === 0) {
       setConfirmExit(true);
       return;
@@ -199,20 +242,20 @@ export function BoxingProfileQuestionnaire({
         </button>
         <div className="flex-1">
           <div className="text-[12px] text-muted-foreground mb-1.5" aria-live="polite">
-            Questão {index + 1} de {questions.length}
+            {resumo ? "Revisão final" : `Questão ${index + 1} de ${questions.length}`}
           </div>
           <div
             className="h-1.5 rounded-full bg-secondary overflow-hidden"
             role="progressbar"
             aria-label="Progresso do questionário"
-            aria-valuetext={`Questão ${index + 1} de ${questions.length}`}
-            aria-valuenow={index + 1}
+            aria-valuetext={resumo ? "Revisão final" : `Questão ${index + 1} de ${questions.length}`}
+            aria-valuenow={resumo ? questions.length : index + 1}
             aria-valuemin={1}
             aria-valuemax={questions.length}
           >
             <div
               className="h-full rounded-full bg-gradient-gold transition-[width] duration-300"
-              style={{ width: `${((index + 1) / questions.length) * 100}%` }}
+              style={{ width: `${((resumo ? questions.length : index + 1) / questions.length) * 100}%` }}
             />
           </div>
         </div>
@@ -226,67 +269,111 @@ export function BoxingProfileQuestionnaire({
         </button>
       </div>
 
+      {resumo ? (
+        <section aria-labelledby="resumo-titulo" className="mt-6 mb-6">
+          <h2
+            id="resumo-titulo"
+            ref={tituloResumoRef}
+            tabIndex={-1}
+            className="text-[19px] font-semibold text-foreground leading-snug mb-1 focus:outline-none"
+          >
+            Confira suas respostas
+          </h2>
+          <p className="text-[13.5px] text-muted-foreground mb-4">
+            Você respondeu {questions.length - missing.length} de {questions.length} perguntas. Toque numa resposta para mudá-la.
+          </p>
+          <ul className="flex flex-col gap-2">
+            {questions.map((q, i) => (
+              <li key={q.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIndex(i);
+                    setDeResumo(true);
+                    setResumo(false);
+                  }}
+                  className="w-full text-left rounded-2xl border border-muted-foreground/50 bg-secondary px-4 py-3 min-h-[56px] active:scale-[0.99] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <span className="block text-[12.5px] text-muted-foreground leading-snug line-clamp-2">
+                    {i + 1}. {q.text}
+                  </span>
+                  <span className="block text-[14px] font-semibold text-foreground leading-snug mt-0.5">{rotuloDa(q)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : (
+        <>
       <fieldset ref={perguntaRef} tabIndex={-1} className="mt-6 mb-8 focus:outline-none">
-        <legend className="text-[19px] font-semibold text-foreground leading-snug mb-5">{question.text}</legend>
-
-        {question.type === "likert" && (
-          <div className="flex flex-col gap-2.5">
-            {LIKERT_OPTIONS.map((opt) => {
-              const checked = answers[question.id] === opt.value;
-              return (
-                <label key={opt.value} className={cn(OPCAO_BASE, "items-center", checked ? OPCAO_ON : OPCAO_OFF)}>
-                  <input
-                    type="radio"
-                    name={question.id}
-                    value={opt.value}
-                    checked={checked}
-                    onChange={() => responde(opt.value)}
-                    className="h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
-                  />
-                  <span className={cn("flex-1 text-[14.5px]", checked ? "font-semibold text-foreground" : "font-medium text-foreground/85")}>
-                    {opt.label}
-                  </span>
-                  {checked && <Check className="h-4 w-4 shrink-0 text-[hsl(var(--red-text))]" strokeWidth={3} aria-hidden />}
-                </label>
-              );
-            })}
-          </div>
+          <legend className="text-[19px] font-semibold text-foreground leading-snug mb-5">{question.text}</legend>
+  
+          {question.type === "likert" && (
+            <div className="flex flex-col gap-2.5">
+              {LIKERT_OPTIONS.map((opt) => {
+                const checked = answers[question.id] === opt.value;
+                return (
+                  <label key={opt.value} className={cn(OPCAO_BASE, "items-center", checked ? OPCAO_ON : OPCAO_OFF)}>
+                    <input
+                      type="radio"
+                      name={question.id}
+                      value={opt.value}
+                      checked={checked}
+                      onChange={() => responde(opt.value)}
+                      className="h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                    />
+                    <span className={cn("flex-1 text-[14.5px]", checked ? "font-semibold text-foreground" : "font-medium text-foreground/85")}>
+                      {opt.label}
+                    </span>
+                    {checked && <Check className="h-4 w-4 shrink-0 text-[hsl(var(--red-text))]" strokeWidth={3} aria-hidden />}
+                  </label>
+                );
+              })}
+            </div>
+          )}
+  
+          {question.type === "behavioral" && (
+            <div className="flex flex-col gap-2.5">
+              {question.options.map((opt) => {
+                const checked = answers[question.id] === opt.value;
+                return (
+                  <label key={opt.value} className={cn(OPCAO_BASE, "items-start py-3", checked ? OPCAO_ON : OPCAO_OFF)}>
+                    <input
+                      type="radio"
+                      name={question.id}
+                      value={opt.value}
+                      checked={checked}
+                      onChange={() => responde(opt.value)}
+                      className="h-5 w-5 shrink-0 mt-0.5 accent-[hsl(var(--primary))]"
+                    />
+                    <span className={cn("flex-1 text-[14px] leading-snug", checked ? "text-foreground font-semibold" : "text-foreground/85")}>
+                      {opt.label}
+                    </span>
+                    {checked && <Check className="h-4 w-4 shrink-0 mt-0.5 text-[hsl(var(--red-text))]" strokeWidth={3} aria-hidden />}
+                  </label>
+                );
+              })}
+            </div>
+          )}
+        </fieldset>
+  
+        {question.type === "likert" && !isLast && index === 0 && (
+          <p className="text-[12.5px] text-muted-foreground text-center -mt-4 mb-4">
+            Ao tocar numa resposta, a próxima pergunta abre sozinha. Você pode voltar e mudar.
+          </p>
         )}
-
-        {question.type === "behavioral" && (
-          <div className="flex flex-col gap-2.5">
-            {question.options.map((opt) => {
-              const checked = answers[question.id] === opt.value;
-              return (
-                <label key={opt.value} className={cn(OPCAO_BASE, "items-start py-3", checked ? OPCAO_ON : OPCAO_OFF)}>
-                  <input
-                    type="radio"
-                    name={question.id}
-                    value={opt.value}
-                    checked={checked}
-                    onChange={() => responde(opt.value)}
-                    className="h-5 w-5 shrink-0 mt-0.5 accent-[hsl(var(--primary))]"
-                  />
-                  <span className={cn("flex-1 text-[14px] leading-snug", checked ? "text-foreground font-semibold" : "text-foreground/85")}>
-                    {opt.label}
-                  </span>
-                  {checked && <Check className="h-4 w-4 shrink-0 mt-0.5 text-[hsl(var(--red-text))]" strokeWidth={3} aria-hidden />}
-                </label>
-              );
-            })}
-          </div>
-        )}
-      </fieldset>
-
-      {question.type === "likert" && !isLast && index === 0 && (
-        <p className="text-[12.5px] text-muted-foreground text-center -mt-4 mb-4">
-          Ao tocar numa resposta, a próxima pergunta abre sozinha. Você pode voltar e mudar.
-        </p>
+  
+        <Button size="lg" className="w-full" onClick={goNext} disabled={!answered}>
+          {deResumo ? "Voltar ao resumo" : isLast ? "Revisar respostas" : "Avançar"}
+        </Button>
+        </>
       )}
 
-      <Button size="lg" className="w-full" onClick={goNext} disabled={!answered || submit.isPending}>
-        {submit.isPending ? "Enviando…" : isLast ? "Concluir" : "Avançar"}
-      </Button>
+      {resumo ? (
+        <Button size="lg" className="w-full" onClick={() => submit.mutate()} disabled={missing.length > 0 || submit.isPending}>
+          {submit.isPending ? "Enviando…" : "Enviar avaliação"}
+        </Button>
+      ) : null}
 
       <ConfirmDialog
         open={confirmExit}
