@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { Input } from "@/components/ui/input";
@@ -38,6 +40,38 @@ const empty: Form = {
   notes: "",
 };
 
+function formDe(d: ClassGuidelines): Form {
+  return {
+    cep: d.cep ?? "",
+    street: d.street ?? "",
+    number: d.number ?? "",
+    complement: d.complement ?? "",
+    neighborhood: d.neighborhood ?? "",
+    city: d.city ?? "",
+    state: d.state ?? "",
+    referencePoint: d.referencePoint ?? "",
+    arrivalMinutes: d.arrivalMinutes ?? null,
+    equipment: d.equipment ?? {},
+    notes: d.notes ?? "",
+  };
+}
+
+/** Chave para comparar formulário x salvo: sem espaços nas pontas e com listas ordenadas (marcar e desmarcar um tamanho muda a ordem). */
+function chaveDe(f: Form): string {
+  const t = (v: string | null) => (v ?? "").trim();
+  const eq = f.equipment;
+  return JSON.stringify({
+    ...f,
+    cep: t(f.cep), street: t(f.street), number: t(f.number), complement: t(f.complement), neighborhood: t(f.neighborhood),
+    city: t(f.city), state: t(f.state), referencePoint: t(f.referencePoint), notes: t(f.notes),
+    equipment: {
+      gloves: eq.gloves ? { level: eq.gloves.level, sizes: [...eq.gloves.sizes].sort() } : null,
+      wraps: eq.wraps ? { level: eq.wraps.level, lengths: [...eq.wraps.lengths].sort() } : null,
+      mouthguard: !!eq.mouthguard, groinGuard: !!eq.groinGuard, headgear: !!eq.headgear, shinGuards: !!eq.shinGuards,
+    },
+  });
+}
+
 function toggleSize(list: string[], size: string) {
   return list.includes(size) ? list.filter((s) => s !== size) : [...list, size];
 }
@@ -45,7 +79,10 @@ function toggleSize(list: string[], size: string) {
 export default function AdminOrientacoesAula() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [form, setForm] = useState<Form>(empty);
+  const [sairOpen, setSairOpen] = useState(false);
+  const [salvoEm, setSalvoEm] = useState<string | null>(null);
   const [cepLoading, setCepLoading] = useState(false);
   // Sem isso, o React Query padrão refaz a busca sempre que a aba/teclado reganha foco — o que é
   // comum ao alternar entre campos no celular — e o useEffect abaixo sobrescrevia o que o
@@ -63,19 +100,7 @@ export default function AdminOrientacoesAula() {
   useEffect(() => {
     if (data && !loadedRef.current) {
       loadedRef.current = true;
-      setForm({
-        cep: data.cep ?? "",
-        street: data.street ?? "",
-        number: data.number ?? "",
-        complement: data.complement ?? "",
-        neighborhood: data.neighborhood ?? "",
-        city: data.city ?? "",
-        state: data.state ?? "",
-        referencePoint: data.referencePoint ?? "",
-        arrivalMinutes: data.arrivalMinutes ?? null,
-        equipment: data.equipment ?? {},
-        notes: data.notes ?? "",
-      });
+      setForm(formDe(data));
     }
   }, [data]);
 
@@ -105,9 +130,11 @@ export default function AdminOrientacoesAula() {
     mutationFn: () => saveClassGuidelines(profile!.id, form),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["class-guidelines", profile?.id] });
+      setSalvoEm(new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
       toast.success("Orientações salvas");
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível salvar."),
+    // Frase em português (antes o toast mostrava o texto cru do banco). O que o professor digitou continua na tela.
+    onError: () => toast.error("Não foi possível salvar. Verifique sua conexão e tente de novo — o que você digitou continua aqui."),
   });
 
   function setEquipment(patch: Partial<EquipmentConfig>) {
@@ -140,10 +167,28 @@ export default function AdminOrientacoesAula() {
   }
 
   const eq = form.equipment;
+  // O que está salvo (`data === null` = nunca salvou: comparar com o vazio). Salvar só vale quando algo mudou.
+  const mudou = chaveDe(form) !== chaveDe(data ? formDe(data) : empty);
+
+  // Fechar/recarregar a aba com alterações não salvas: o navegador pergunta. Sair pelo "voltar" do cabeçalho: janela própria. (As abas de
+  // baixo do app não dá para interceptar — o app usa BrowserRouter, sem `useBlocker`.)
+  useEffect(() => {
+    if (!mudou) return;
+    const aviso = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", aviso);
+    return () => window.removeEventListener("beforeunload", aviso);
+  }, [mudou]);
 
   return (
     <div className="page-container">
-      <PageHeader title="ORIENTAÇÕES DA AULA" subtitle="Padrão mostrado aos alunos nos detalhes de cada aula" back />
+      <PageHeader
+        title="ORIENTAÇÕES DA AULA"
+        subtitle="Padrão mostrado aos alunos nos detalhes de cada aula"
+        back
+        onBack={() => (mudou ? setSairOpen(true) : navigate(-1))}
+      />
 
       <Section title="Local da aula">
         <div className="grid grid-cols-2 gap-3 mb-3">
@@ -264,9 +309,29 @@ export default function AdminOrientacoesAula() {
         />
       </Section>
 
-      <Button size="lg" className="w-full mt-2" onClick={() => save.mutate()} disabled={save.isPending || !isSuccess}>
+      <Button
+        size="lg"
+        className="w-full mt-2"
+        onClick={() => save.mutate()}
+        disabled={save.isPending || !isSuccess || !mudou}
+        aria-describedby="salvar-motivo"
+      >
         {save.isPending ? "Salvando…" : "Salvar orientações"}
       </Button>
+      {/* Botão desativado explica o motivo; depois de salvar, diz que salvou (antes só um aviso que some). */}
+      <p id="salvar-motivo" role="status" className="text-[13px] text-muted-foreground text-center mt-2.5">
+        {mudou ? "\u00a0" : salvoEm ? `Salvo às ${salvoEm}. Os alunos já veem estas orientações.` : "Nenhuma alteração para salvar."}
+      </p>
+
+      <ConfirmDialog
+        open={sairOpen}
+        onOpenChange={setSairOpen}
+        title="SAIR SEM SALVAR?"
+        description="Você mudou alguma orientação e ainda não salvou. Se sair agora, as mudanças serão perdidas."
+        confirmLabel="Sair sem salvar"
+        cancelLabel="Continuar editando"
+        onConfirm={() => navigate(-1)}
+      />
     </div>
   );
 }
