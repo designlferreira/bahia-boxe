@@ -47,6 +47,8 @@ import StudentPerfilLutadorHistorico from "@/pages/student/PerfilLutadorHistoric
 import AlterarSenha from "@/pages/shared/AlterarSenha";
 import { NotificationBell } from "@/components/NotificationBell";
 import AdminPerfilAlunos from "@/pages/admin/PerfilAlunos";
+import { StudentBottomNav } from "@/components/StudentBottomNav";
+import { AdminBottomNav } from "@/components/AdminBottomNav";
 import { FAIXAS_ALTURA_CM, FAIXAS_PESO_KG, contarFaixas, type Faixa } from "@/lib/studentProfile";
 import { BoxingProfileHeading, BoxingProfileQuestionnaire } from "@/components/BoxingProfileQuestionnaire";
 import { getQuestions, QUESTIONNAIRE_VERSION } from "@/lib/boxingProfile";
@@ -1615,6 +1617,50 @@ export default function Amostras() {
                 </Seeded>
               </Frame>
             ));
+          })()}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Barras de navegação (aluno e professor)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {(() => {
+            // A barra é `fixed` na tela: o `transform` do contêiner a prende ao quadro da amostra.
+            const moldura = (children: ReactNode) => (
+              <div className="relative h-[110px] w-[375px] overflow-hidden rounded-2xl border border-border bg-background [transform:translateZ(0)]">{children}</div>
+            );
+            const pedidos = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `pr${i}`, studentId: `s${i}`, kind: "package", status: "pending" }));
+            const aluno = (url: string, modo: Modo) => (
+              <Seeded data={base} modo={modo}>
+                <ComRota path="*" url={url}>
+                  {moldura(<StudentBottomNav />)}
+                </ComRota>
+              </Seeded>
+            );
+            const professor = (url: string, n: number) => (
+              <SeededAdmin data={null} seed={(qc) => qc.setQueryData(["purchase-requests", PROFESSOR.id], pedidos(n))}>
+                <ComRota path="*" url={url}>
+                  {moldura(<AdminBottomNav />)}
+                </ComRota>
+              </SeededAdmin>
+            );
+            return (
+              <>
+                <Frame title="Barra · aluno (4 abas)" note="autosserviço, na Home">
+                  {aluno("/app/home", "autosservico")}
+                </Frame>
+                <Frame title="Barra · aluno em Recorrência (3 abas)" note="sem 'Agendar'; na tela Aulas">
+                  {aluno("/app/historico", "recorrencia")}
+                </Frame>
+                <Frame title="Barra · professor (5 abas)" note="no Painel, com 3 pedidos esperando">
+                  {professor("/admin/dashboard", 3)}
+                </Frame>
+                <Frame title="Barra · professor com 12 pedidos" note="o número vira 9+">
+                  {professor("/admin/dashboard", 12)}
+                </Frame>
+                <Frame title="Barra · professor, sem pedidos" note="na Agenda">
+                  {professor("/admin/agenda", 0)}
+                </Frame>
+              </>
+            );
           })()}
         </div>
 
