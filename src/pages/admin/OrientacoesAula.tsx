@@ -31,7 +31,9 @@ const empty: Form = {
   city: "",
   state: "",
   referencePoint: "",
-  arrivalMinutes: 15,
+  // Sem valor padrão: antes "15" já vinha marcado e era GRAVADO mesmo que o professor nunca o escolhesse (o aluno passava a ver "chegue
+  // 15 minutos antes" sem ninguém ter decidido isso).
+  arrivalMinutes: null,
   equipment: {},
   notes: "",
 };
@@ -70,7 +72,7 @@ export default function AdminOrientacoesAula() {
         city: data.city ?? "",
         state: data.state ?? "",
         referencePoint: data.referencePoint ?? "",
-        arrivalMinutes: data.arrivalMinutes ?? 15,
+        arrivalMinutes: data.arrivalMinutes ?? null,
         equipment: data.equipment ?? {},
         notes: data.notes ?? "",
       });
@@ -196,7 +198,8 @@ export default function AdminOrientacoesAula() {
               <button
                 key={min}
                 type="button"
-                onClick={() => setForm((f) => ({ ...f, arrivalMinutes: min }))}
+                // Tocar de novo na marcada desmarca: sem isso não havia como voltar a "não avisar antecedência".
+                onClick={() => setForm((f) => ({ ...f, arrivalMinutes: f.arrivalMinutes === min ? null : min }))}
                 className={cn(
                   "shrink-0 h-11 px-4 rounded-xl border text-sm font-semibold transition-all active:scale-95",
                   on ? "bg-primary/15 border-primary text-primary" : "bg-secondary border-[#333] text-foreground/85",
@@ -207,11 +210,11 @@ export default function AdminOrientacoesAula() {
             );
           })}
         </div>
-        {arrivalMessage(form.arrivalMinutes) && (
-          <div className="text-[12.5px] text-muted-foreground mt-2.5">
-            O aluno vê: “{arrivalMessage(form.arrivalMinutes)}”
-          </div>
-        )}
+        <div className="text-[12.5px] text-muted-foreground mt-2.5">
+          {arrivalMessage(form.arrivalMinutes)
+            ? `O aluno vê: “${arrivalMessage(form.arrivalMinutes)}”`
+            : "Nenhuma marcada: o aluno não vê aviso de antecedência. Toque de novo na escolhida para desmarcar."}
+        </div>
       </Section>
 
       <Section title="Equipamentos recomendados">
