@@ -79,10 +79,18 @@ export default function AdminAlunos() {
         onSearchChange={setSearch}
         searchPlaceholder="Buscar aluno"
         filters={FILTROS}
+        filtersLabel="Filtrar alunos"
         activeFilter={filtro}
         onFilterChange={(v) => setParams(v === "todos" ? {} : { filtro: v }, { replace: true })}
       />
       {DESCRICAO[filtro] && <div className="text-sm text-muted-foreground -mt-1.5 mb-3">{DESCRICAO[filtro]}</div>}
+
+      {/* Anuncia o resultado ao trocar de filtro ou buscar (leitor de tela não vê a lista mudar). */}
+      <p role="status" className="sr-only">
+        {!isLoading && !isError && data
+          ? `${data.length} ${data.length === 1 ? "aluno" : "alunos"}${filtro === "risco" ? " em risco" : filtro === "sem-pacote" ? " sem pacote" : ""}${search ? ` para "${search}"` : ""}`
+          : ""}
+      </p>
 
       {isError && (
         <ErrorState
@@ -96,13 +104,27 @@ export default function AdminAlunos() {
       {isLoading && !isError && <SkeletonList count={5} height={72} />}
 
       {!isLoading && !isError && data && data.length > 0 && (
-        <div className="flex flex-col gap-2.5">
+        <ul aria-label="Alunos" className="flex flex-col gap-2.5">
           {data.map(({ student, restantes, package: pkg }) => {
             const emRisco = motivoPorAluno.get(student.id);
+            // Nome falado do cartão, em partes separadas por ponto (antes o leitor juntava tudo: "Ana…Pacote 8 aulas3restantes").
+            const falado = [
+              student.name,
+              soRisco && emRisco ? emRisco.motivo : pkg ? pkg.templateName : null,
+              // Em "Em risco" o motivo já diz quantas aulas restam (ou que não há pacote); repetir soava duas vezes.
+              soRisco && emRisco
+                ? null
+                : restantes === null
+                  ? "Sem pacote"
+                  : `${restantes} ${restantes === 1 ? "aula restante" : "aulas restantes"}`,
+            ]
+              .filter(Boolean)
+              .join(". ");
             return (
+            <li key={student.id}>
             <button
-              key={student.id}
               type="button"
+              aria-label={falado}
               onClick={() => navigate(`/admin/alunos/${student.id}`)}
               className="w-full min-h-[70px] text-left card-dark p-3.5 flex items-center gap-3 active:scale-[0.985] transition-transform hover:border-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
@@ -134,9 +156,10 @@ export default function AdminAlunos() {
               )}
               <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
             </button>
+            </li>
             );
           })}
-        </div>
+        </ul>
       )}
 
       {!isLoading && !isError && data && data.length === 0 && filtrado && !search && (
