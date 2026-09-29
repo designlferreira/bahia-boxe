@@ -37,10 +37,17 @@ export function AdminBottomNav() {
           </>
         )}
       </BottomNavItem>
-      <BottomNavItem to="/admin/agenda" label="Agenda" icon={CalendarDays} />
+      {/* O detalhe de uma aula acende a Agenda (de onde o professor mais chega a ele); as telas de Minha conta, a aba Conta. Antes só
+          `/admin/alunos/` tinha exceção e, nas outras telas de segundo nível, nenhuma aba acendia. */}
+      <BottomNavItem to="/admin/agenda" label="Agenda" icon={CalendarDays} prefixos={["/admin/aula"]} />
       <BottomNavItem to="/admin/alunos" label="Alunos" icon={Users} />
       <BottomNavItem to="/admin/historico" label="Aulas" icon={History} />
-      <BottomNavItem to="/admin/minha-conta" label="Conta" icon={UserRound} />
+      <BottomNavItem
+        to="/admin/minha-conta"
+        label="Conta"
+        icon={UserRound}
+        prefixos={["/admin/pacotes", "/admin/disponibilidade", "/admin/orientacoes", "/admin/perfil-alunos", "/admin/configuracoes"]}
+      />
     </nav>
   );
 }

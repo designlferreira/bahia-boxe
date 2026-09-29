@@ -33,8 +33,9 @@ export function StudentBottomNav() {
     >
       <BottomNavItem to="/app/home" label="Início" icon={Home} />
       {modoEfetivo !== "recorrencia" && <BottomNavItem to="/app/agendar" label="Agendar" icon={CalendarPlus} />}
-      <BottomNavItem to="/app/historico" label="Aulas" icon={ListChecks} />
-      <BottomNavItem to="/app/minha-conta" label="Conta" icon={UserRound} />
+      {/* O detalhe de uma aula acende Aulas; Pacotes e o Perfil de Boxe (linhas de Minha conta), a aba Conta. */}
+      <BottomNavItem to="/app/historico" label="Aulas" icon={ListChecks} prefixos={["/app/aula"]} />
+      <BottomNavItem to="/app/minha-conta" label="Conta" icon={UserRound} prefixos={["/app/pacotes", "/app/perfil-lutador"]} />
     </nav>
   );
 }

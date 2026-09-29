@@ -1659,6 +1659,21 @@ export default function Amostras() {
                 <Frame title="Barra · professor, sem pedidos" note="na Agenda">
                   {professor("/admin/agenda", 0)}
                 </Frame>
+                <Frame title="Barra · aluno no detalhe da aula" note="/app/aula/7: acende Aulas">
+                  {aluno("/app/aula/7", "autosservico")}
+                </Frame>
+                <Frame title="Barra · aluno no Perfil de Boxe" note="/app/perfil-lutador/resultado/1: acende Conta">
+                  {aluno("/app/perfil-lutador/resultado/1", "autosservico")}
+                </Frame>
+                <Frame title="Barra · professor no detalhe da aula" note="/admin/aula/7: acende Agenda">
+                  {professor("/admin/aula/7", 0)}
+                </Frame>
+                <Frame title="Barra · professor em Disponibilidade" note="/admin/disponibilidade: acende Conta">
+                  {professor("/admin/disponibilidade", 0)}
+                </Frame>
+                <Frame title="Barra · professor em Pedidos" note="/admin/solicitacoes: acende Painel">
+                  {professor("/admin/solicitacoes", 2)}
+                </Frame>
               </>
             );
           })()}
