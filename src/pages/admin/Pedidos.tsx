@@ -10,6 +10,7 @@ import { SkeletonList } from "@/components/SkeletonCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatPriceLabel } from "@/lib/packageUtils";
+import { relativeTime } from "@/lib/dateUtils";
 import {
   approvePurchaseRequest,
   getPurchaseRequests,
@@ -67,7 +68,7 @@ export default function AdminPedidos() {
 
       {!isLoading && !isError && data && data.length > 0 && (
         <div className="flex flex-col gap-2.5">
-          {data.map(({ request, studentName, template, classesLostOnApprove, recorrenciaRestantes }) => (
+          {data.map(({ request, studentName, template, classesLostOnApprove, recorrenciaRestantes, aulasRestantes }) => (
             <div key={request.id} className="card-dark p-[15px]">
               <div className="flex items-center gap-2.5 mb-3">
                 <div className="flex-1">
@@ -75,6 +76,15 @@ export default function AdminPedidos() {
                   <div className="text-[12.5px] text-muted-foreground mt-0.5">
                     {template?.name}
                     {template ? ` · ${formatPriceLabel(template.priceCents)}` : ""}
+                  </div>
+                  {/* Contexto pra decidir sem abrir o perfil: há quanto tempo espera e o que o aluno tem hoje. */}
+                  <div className="text-[12.5px] text-muted-foreground mt-0.5">
+                    Pedido {relativeTime(request.createdAt)} ·{" "}
+                    {aulasRestantes === null
+                      ? "sem pacote ativo"
+                      : aulasRestantes === 1
+                        ? "1 aula restante"
+                        : `${aulasRestantes} aulas restantes`}
                   </div>
                 </div>
                 <Badge
@@ -85,6 +95,11 @@ export default function AdminPedidos() {
                   {request.kind === "package" ? "Pacote" : "Aula avulsa"}
                 </Badge>
               </div>
+              {request.notes && (
+                <p className="rounded-xl bg-secondary px-3 py-2.5 text-sm text-foreground mb-3">
+                  <span className="sr-only">Recado do aluno: </span>“{request.notes}”
+                </p>
+              )}
               {classesLostOnApprove > 0 && (
                 // Aprovar encerra o pacote ativo do aluno (regra do banco — ver getPurchaseRequests).
                 // Sem este aviso, o professor aprovava sem saber que o aluno perdia o que sobrava.

@@ -1663,6 +1663,13 @@ export async function getPurchaseRequests(adminId: string) {
     const closed = (activeByStudent.get(r.student_id) ?? []).filter((p) => p.origin !== "trial");
     const normais = closed.filter((p) => p.origin !== "recurrence");
     const recorrencia = closed.filter((p) => p.origin === "recurrence");
+    // O que o aluno tem hoje, todos os pacotes ativos (a experimental também conta): dá contexto pra
+    // decidir sem ter que abrir o perfil dele.
+    const ativos = activeByStudent.get(r.student_id) ?? [];
+    const aulasRestantes = ativos.reduce(
+      (acc, p) => acc + (p.origin === "recurrence" ? (restantesRec.get(p.id) ?? 0) : Math.max(0, p.totalClasses - p.usedClasses)),
+      0,
+    );
     return {
       request,
       studentName: nameOf.get(r.student_id) ?? "Aluno",
@@ -1671,6 +1678,8 @@ export async function getPurchaseRequests(adminId: string) {
       classesLostOnApprove: normais.reduce((acc, p) => acc + Math.max(0, p.totalClasses - p.usedClasses), 0),
       /** Aulas marcadas num pacote de recorrência: continuam valendo mesmo com a aprovação. */
       recorrenciaRestantes: recorrencia.reduce((acc, p) => acc + (restantesRec.get(p.id) ?? 0), 0),
+      /** Aulas restantes em todos os pacotes ativos; `null` = sem pacote ativo. */
+      aulasRestantes: ativos.length ? aulasRestantes : null,
     };
   });
 }

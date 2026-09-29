@@ -674,23 +674,25 @@ const pedido = (
   template: ReturnType<typeof modelo> | null,
   lost: number,
   recorrenciaRestantes = 0,
+  extra: { dias?: number; notes?: string; aulas?: number | null } = {},
 ) => ({
-  request: { id, studentId: `s-${id}`, adminId: ADMIN_ID, kind, templateId: template?.id ?? null, status: "pending" as const, notes: null, createdAt: at(-1, 10), decidedAt: null },
+  request: { id, studentId: `s-${id}`, adminId: ADMIN_ID, kind, templateId: template?.id ?? null, status: "pending" as const, notes: extra.notes ?? null, createdAt: at(-(extra.dias ?? 1), 10), decidedAt: null },
   studentName: student,
   template,
   classesLostOnApprove: lost,
   recorrenciaRestantes,
+  aulasRestantes: extra.aulas === undefined ? 0 : extra.aulas,
 });
 const PEDIDOS_CASOS: { title: string; note: string; lista: unknown[] }[] = [
   {
     title: "Vários pedidos",
     note: "pacote sem perda, encerra 3 aulas, aula avulsa, sem preço, aluno de recorrência (5 marcadas)",
     lista: [
-      pedido("r1", "package", "Ana Beatriz Souza", modelo("t1", "Pacote de 8 aulas", 8, 32000), 0),
-      pedido("r2", "package", "Carlos Henrique Lima", modelo("t2", "Pacote de 12 aulas", 12, 45000), 3),
-      pedido("r3", "single", "Julia Pereira", modelo("t3", "Aula avulsa", 1, 5000), 0),
-      pedido("r4", "package", "Marina Costa", modelo("t4", "Pacote de 4 aulas", 4, null), 1),
-      pedido("r5", "package", "Igor Nascimento", modelo("t5", "Pacote de 8 aulas", 8, 32000), 0, 5),
+      pedido("r1", "package", "Ana Beatriz Souza", modelo("t1", "Pacote de 8 aulas", 8, 32000), 0, 0, { dias: 1, aulas: null }),
+      pedido("r2", "package", "Carlos Henrique Lima", modelo("t2", "Pacote de 12 aulas", 12, 45000), 3, 0, { dias: 4, aulas: 3, notes: "Posso pagar na sexta?" }),
+      pedido("r3", "single", "Julia Pereira", modelo("t3", "Aula avulsa", 1, 5000), 0, 0, { dias: 1, aulas: 1 }),
+      pedido("r4", "package", "Marina Costa", modelo("t4", "Pacote de 4 aulas", 4, null), 1, 0, { dias: 2, aulas: 1 }),
+      pedido("r5", "package", "Igor Nascimento", modelo("t5", "Pacote de 8 aulas", 8, 32000), 0, 5, { dias: 1, aulas: 5 }),
     ],
   },
   { title: "Nenhum pedido", note: "tudo em dia", lista: [] },
