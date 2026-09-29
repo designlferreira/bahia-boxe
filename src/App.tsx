@@ -13,6 +13,7 @@ import RecuperarSenha from "@/pages/auth/RecuperarSenha";
 import ResetPassword from "@/pages/auth/ResetPassword";
 import Convite from "@/pages/auth/Convite";
 import NotFound from "@/pages/NotFound";
+import { TelaDeAbertura } from "@/components/TelaDeAbertura";
 
 import StudentHome from "@/pages/student/Home";
 import StudentAgendar from "@/pages/student/Agendar";
@@ -50,7 +51,9 @@ const queryClient = new QueryClient({
 });
 
 function PostLoginRedirect() {
-  const { profile } = useAuth();
+  const { profile, loading } = useAuth();
+  // Espera a sessão: sem isso, abrir o app já logado mandava para /login (o formulário piscava) antes da home.
+  if (loading) return <TelaDeAbertura />;
   if (!profile) return <Navigate to="/login" replace />;
   return <Navigate to={profile.role === "admin" ? "/admin/dashboard" : "/app/home"} replace />;
 }

@@ -7,11 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { AuthError, resendConfirmationEmail } from "@/integrations/backend/auth";
 import { lerConvitePendente } from "@/lib/convitePendente";
+import { TelaDeAbertura } from "@/components/TelaDeAbertura";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Login() {
-  const { profile, signIn } = useAuth();
+  const { profile, loading: carregandoSessao, signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -28,6 +29,8 @@ export default function Login() {
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
 
+  // Enquanto a sessão carrega o formulário NÃO aparece: quem já estava logado o via piscar antes de ir para a home.
+  if (carregandoSessao) return <TelaDeAbertura />;
   if (profile) {
     return <Navigate to={profile.role === "admin" ? "/admin/dashboard" : "/app/home"} replace />;
   }

@@ -47,6 +47,8 @@ import StudentPerfilLutadorHistorico from "@/pages/student/PerfilLutadorHistoric
 import AlterarSenha from "@/pages/shared/AlterarSenha";
 import { NotificationBell } from "@/components/NotificationBell";
 import AdminPerfilAlunos from "@/pages/admin/PerfilAlunos";
+import NotFound from "@/pages/NotFound";
+import { TelaDeAbertura } from "@/components/TelaDeAbertura";
 import { StudentBottomNav } from "@/components/StudentBottomNav";
 import { AdminBottomNav } from "@/components/AdminBottomNav";
 import { FAIXAS_ALTURA_CM, FAIXAS_PESO_KG, contarFaixas, type Faixa } from "@/lib/studentProfile";
@@ -1618,6 +1620,27 @@ export default function Amostras() {
               </Frame>
             ));
           })()}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Página não encontrada</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          <Frame title="404 · logado" note="botão 'Ir para o início' (sem 'Voltar': a amostra não tem histórico)">
+            <Seeded data={base} modo="autosservico">
+              <ComRota path="*" url="/uma-pagina-que-nao-existe">
+                <NotFound amostra />
+              </ComRota>
+            </Seeded>
+          </Frame>
+          <Frame title="Abertura do app" note="enquanto a sessão carrega (no lugar do formulário de login que piscava)">
+            <TelaDeAbertura />
+          </Frame>
+          <Frame title="404 · deslogado" note="botão 'Entrar'">
+            <SemLogin>
+              <ComRota path="*" url="/uma-pagina-que-nao-existe">
+                <NotFound amostra />
+              </ComRota>
+            </SemLogin>
+          </Frame>
         </div>
 
         <h2 className="text-lg font-semibold mb-4">Barras de navegação (aluno e professor)</h2>
