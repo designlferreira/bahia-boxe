@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ChevronRight, HelpCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { GuardInfoDialog } from "@/components/GuardInfoDialog";
@@ -25,6 +26,42 @@ interface Form {
   laterality: Laterality | null;
 }
 
+/** Faixas aceitas (a tela é opcional: vazio vale). Um "168" digitado em Altura mudaria o estilo do Perfil de Boxe (envergadura ÷ altura). */
+const FAIXAS = {
+  heightCm: { min: 100, max: 250, msg: "Altura entre 100 e 250 cm." },
+  weightKg: { min: 30, max: 300, msg: "Peso entre 30 e 300 kg." },
+  wingspanCm: { min: 100, max: 260, msg: "Envergadura entre 100 e 260 cm." },
+} as const;
+type CampoNumerico = keyof typeof FAIXAS;
+
+/** "59,5" ou "59.5" → 59.5; vazio → null; qualquer outra coisa → NaN (nunca chega ao banco: o Salvar fica bloqueado). */
+function parseNumero(v: string): number | null {
+  const t = v.trim();
+  if (!t) return null;
+  return Number(t.replace(",", "."));
+}
+function erroDoCampo(campo: CampoNumerico, v: string): string | null {
+  const n = parseNumero(v);
+  if (n === null) return null;
+  const f = FAIXAS[campo];
+  return Number.isNaN(n) || n < f.min || n > f.max ? f.msg : null;
+}
+/** Peso: até 3 dígitos, no máximo UM separador e uma casa decimal (o banco guarda numeric(5,1); antes "60,5,5" virava NaN). */
+function limpaPeso(v: string) {
+  const m = v.replace(/[^\d.,]/g, "").match(/^\d{0,3}(?:[.,]\d?)?/);
+  return m ? m[0] : "";
+}
+function formDe(d: { sex: Sex | null; heightCm: number | null; weightKg: number | null; wingspanCm: number | null; guard: Guard | null; laterality: Laterality | null }): Form {
+  return {
+    sex: d.sex,
+    heightCm: d.heightCm !== null ? String(d.heightCm) : "",
+    weightKg: d.weightKg !== null ? String(d.weightKg) : "",
+    wingspanCm: d.wingspanCm !== null ? String(d.wingspanCm) : "",
+    guard: d.guard,
+    laterality: d.laterality,
+  };
+}
+
 const empty: Form = { sex: null, heightCm: "", weightKg: "", wingspanCm: "", guard: null, laterality: null };
 
 export default function StudentPerfil() {
@@ -34,6 +71,8 @@ export default function StudentPerfil() {
   const [form, setForm] = useState<Form>(empty);
   const [guardInfoOpen, setGuardInfoOpen] = useState<Guard | null>(null);
   const loadedRef = useRef(false);
+  const [tocados, setTocados] = useState<Partial<Record<CampoNumerico, boolean>>>({});
+  const [sairOpen, setSairOpen] = useState(false);
 
   const { data: studentId, isError: erroId, refetch: recarregarId } = useQuery({
     queryKey: ["my-student-id", profile?.id],
@@ -52,14 +91,7 @@ export default function StudentPerfil() {
   useEffect(() => {
     if (data && !loadedRef.current) {
       loadedRef.current = true;
-      setForm({
-        sex: data.sex,
-        heightCm: data.heightCm !== null ? String(data.heightCm) : "",
-        weightKg: data.weightKg !== null ? String(data.weightKg) : "",
-        wingspanCm: data.wingspanCm !== null ? String(data.wingspanCm) : "",
-        guard: data.guard,
-        laterality: data.laterality,
-      });
+      setForm(formDe(data));
     }
   }, [data]);
 
@@ -75,10 +107,37 @@ export default function StudentPerfil() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["student-profile", studentId] });
-      toast.success("Perfil atualizado");
+      toast.success("Dados salvos");
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível salvar."),
   });
+
+  // O que está salvo (comparado por VALOR: "59,5" digitado e 59.5 salvo são o mesmo peso).
+  const salvo = data ? formDe(data) : empty;
+  const erros = {
+    heightCm: erroDoCampo("heightCm", form.heightCm),
+    weightKg: erroDoCampo("weightKg", form.weightKg),
+    wingspanCm: erroDoCampo("wingspanCm", form.wingspanCm),
+  };
+  const invalido = Object.values(erros).some(Boolean);
+  const mudou =
+    form.sex !== salvo.sex ||
+    form.guard !== salvo.guard ||
+    form.laterality !== salvo.laterality ||
+    parseNumero(form.heightCm) !== parseNumero(salvo.heightCm) ||
+    parseNumero(form.weightKg) !== parseNumero(salvo.weightKg) ||
+    parseNumero(form.wingspanCm) !== parseNumero(salvo.wingspanCm);
+
+  // Fechar/recarregar a aba com alterações não salvas: o navegador pergunta. (Sair por dentro do app: o "voltar" do cabeçalho pergunta;
+  // as abas de baixo não dá para interceptar — o app usa BrowserRouter, sem `useBlocker`.)
+  useEffect(() => {
+    if (!mudou) return;
+    const aviso = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", aviso);
+    return () => window.removeEventListener("beforeunload", aviso);
+  }, [mudou]);
 
   if (isLoading || (!data && !erroId && !erroDados)) {
     return (
@@ -109,7 +168,12 @@ export default function StudentPerfil() {
 
   return (
     <div className="page-container">
-      <PageHeader title="MEUS DADOS FÍSICOS" subtitle="Opcional — ajuda seu professor a te conhecer melhor" back />
+      <PageHeader
+        title="MEUS DADOS FÍSICOS"
+        subtitle="Opcional — ajuda seu professor a te conhecer melhor"
+        back
+        onBack={() => (mudou ? setSairOpen(true) : navigate(-1))}
+      />
 
       <button
         type="button"
@@ -173,10 +237,16 @@ export default function StudentPerfil() {
           <Input
             id="height"
             inputMode="numeric"
+            maxLength={3}
             value={form.heightCm}
             onChange={(e) => setForm((f) => ({ ...f, heightCm: e.target.value.replace(/[^\d]/g, "") }))}
+            onBlur={() => setTocados((t) => ({ ...t, heightCm: true }))}
+            aria-invalid={!!(tocados.heightCm && erros.heightCm)}
+            aria-describedby={tocados.heightCm && erros.heightCm ? "erro-height" : undefined}
+            className={tocados.heightCm && erros.heightCm ? "border-destructive" : undefined}
             placeholder="165"
           />
+          <ErroCampo id="erro-height" msg={tocados.heightCm ? erros.heightCm : null} />
         </div>
         <div>
           <Label htmlFor="weight">Peso (kg)</Label>
@@ -184,9 +254,14 @@ export default function StudentPerfil() {
             id="weight"
             inputMode="decimal"
             value={form.weightKg}
-            onChange={(e) => setForm((f) => ({ ...f, weightKg: e.target.value.replace(/[^\d.,]/g, "") }))}
-            placeholder="59.5"
+            onChange={(e) => setForm((f) => ({ ...f, weightKg: limpaPeso(e.target.value) }))}
+            onBlur={() => setTocados((t) => ({ ...t, weightKg: true }))}
+            aria-invalid={!!(tocados.weightKg && erros.weightKg)}
+            aria-describedby={tocados.weightKg && erros.weightKg ? "erro-weight" : undefined}
+            className={tocados.weightKg && erros.weightKg ? "border-destructive" : undefined}
+            placeholder="59,5"
           />
+          <ErroCampo id="erro-weight" msg={tocados.weightKg ? erros.weightKg : null} />
         </div>
       </div>
       <div className="mb-5">
@@ -197,10 +272,16 @@ export default function StudentPerfil() {
         <Input
           id="wingspan"
           inputMode="numeric"
+          maxLength={3}
           value={form.wingspanCm}
           onChange={(e) => setForm((f) => ({ ...f, wingspanCm: e.target.value.replace(/[^\d]/g, "") }))}
+          onBlur={() => setTocados((t) => ({ ...t, wingspanCm: true }))}
+          aria-invalid={!!(tocados.wingspanCm && erros.wingspanCm)}
+          aria-describedby={tocados.wingspanCm && erros.wingspanCm ? "erro-wingspan" : undefined}
+          className={tocados.wingspanCm && erros.wingspanCm ? "border-destructive" : undefined}
           placeholder="168"
         />
+        <ErroCampo id="erro-wingspan" msg={tocados.wingspanCm ? erros.wingspanCm : null} />
       </div>
 
       <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Boxe</div>
@@ -257,11 +338,39 @@ export default function StudentPerfil() {
         </div>
       </div>
 
-      <Button size="lg" className="w-full" onClick={() => save.mutate()} disabled={save.isPending || !studentId || !data}>
+      <Button
+        size="lg"
+        className="w-full"
+        onClick={() => save.mutate()}
+        disabled={save.isPending || !studentId || !data || !mudou || invalido}
+        aria-describedby="salvar-motivo"
+      >
         {save.isPending ? "Salvando…" : "Salvar"}
       </Button>
+      {/* Botão desativado explica o motivo. */}
+      <p id="salvar-motivo" className="text-[13px] text-muted-foreground text-center mt-2.5">
+        {invalido ? "Corrija os campos em vermelho para salvar." : !mudou ? "Nenhuma alteração para salvar." : " "}
+      </p>
+
+      <ConfirmDialog
+        open={sairOpen}
+        onOpenChange={setSairOpen}
+        title="SAIR SEM SALVAR?"
+        description="Você mudou alguns dados e ainda não salvou. Se sair agora, as mudanças serão perdidas."
+        confirmLabel="Sair sem salvar"
+        cancelLabel="Continuar editando"
+        onConfirm={() => navigate(-1)}
+      />
 
       <GuardInfoDialog guard={guardInfoOpen} onOpenChange={(o) => !o && setGuardInfoOpen(null)} />
+    </div>
+  );
+}
+
+function ErroCampo({ id, msg }: { id: string; msg: string | null }) {
+  return (
+    <div id={id} role="alert" className="text-[12.5px] text-[hsl(var(--red-text))] mt-1.5">
+      {msg}
     </div>
   );
 }
