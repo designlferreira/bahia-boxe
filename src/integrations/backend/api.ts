@@ -1506,6 +1506,20 @@ function computeRecorrenciaSlots(
 }
 
 /**
+ * As datas que `gerarPacoteRecorrencia` criaria — o MESMO cálculo, sem gravar nada. A tela mostra
+ * isso antes do toque em "Gerar" (o professor vê o que vai acontecer, não descobre depois).
+ */
+export function previewRecorrenciaAulas(
+  recorrencias: Pick<AlunoRecorrencia, "id" | "diaSemana" | "horario" | "duracaoMinutos">[],
+  totalAulas: number,
+  startDate?: string | null,
+): string[] {
+  if (recorrencias.length === 0) return [];
+  const fromInstant = startDate ? fromZonedTime(`${startDate}T00:00:00`, TIMEZONE) : new Date();
+  return computeRecorrenciaSlots(recorrencias, totalAulas, fromInstant).map((s) => s.start_time);
+}
+
+/**
  * Datas "yyyy-MM-dd" válidas pra iniciar um pacote — só dias que caem em algum `diaSemana` ativo,
  * dentro de `weeksAhead` semanas, com horário ainda não passado (mesmo filtro de
  * `computeRecorrenciaSlots`). Usada pela tela pra restringir o seletor de data de início às
@@ -1562,11 +1576,12 @@ export async function getSaldoPacote(pacoteId: string): Promise<SaldoPacote | nu
  * exatamente o que `gerar_pacote_recorrencia` (0018) cancela (`cancelado_por = 'professor'`) antes
  * de gerar um pacote novo. A tela usa isso pra avisar o professor ANTES de gerar, nunca depois.
  */
-export async function countAulasCancelaveisRecorrencia(studentId: string): Promise<number> {
+export async function getAulasCancelaveisRecorrencia(studentId: string): Promise<string[]> {
   const nowIso = new Date().toISOString();
-  const { count, error } = await client()
+  const { data, error } = await client()
     .from("bookings")
-    .select("id", { count: "exact", head: true })
+    .select("start_time")
+    .order("start_time", { ascending: true })
     .eq("student_id", studentId)
     .not("pacote_id", "is", null)
     .eq("status", "scheduled")
@@ -1576,7 +1591,7 @@ export async function countAulasCancelaveisRecorrencia(studentId: string): Promi
     .is("replacement_for_booking_id", null)
     .gt("start_time", nowIso);
   if (error) throw new Error(error.message);
-  return count ?? 0;
+  return (data ?? []).map((r) => r.start_time as string);
 }
 
 // ---------------------------------------------------------------------------

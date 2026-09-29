@@ -15,10 +15,11 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { formatDateShort, formatWeekdayShort, TIMEZONE } from "@/lib/dateUtils";
+import { formatDateShort, formatTime, formatWeekdayShort, TIMEZONE } from "@/lib/dateUtils";
 import type { AlunoRecorrencia } from "@/integrations/backend/types";
 import {
-  countAulasCancelaveisRecorrencia,
+  getAulasCancelaveisRecorrencia,
+  previewRecorrenciaAulas,
   createAlunoRecorrencia,
   excluirAlunoRecorrencia,
   gerarPacoteRecorrencia,
@@ -164,7 +165,7 @@ export default function AdminAlunoRecorrencia() {
   // silenciosamente.
   const cancelaveisQuery = useQuery({
     queryKey: ["aulas-cancelaveis-recorrencia", studentId],
-    queryFn: () => countAulasCancelaveisRecorrencia(studentId!),
+    queryFn: () => getAulasCancelaveisRecorrencia(studentId!),
     enabled: !!studentId,
   });
 
@@ -248,7 +249,8 @@ export default function AdminAlunoRecorrencia() {
   const inativasOrdenadas = groupByDiaSemana(recorrencias.filter((r) => !r.ativo));
   const activasCount = ativas.length;
   const saldo = saldoQuery.data ?? null;
-  const cancelaveis = cancelaveisQuery.data ?? 0;
+  const datasCancelaveis = cancelaveisQuery.data ?? [];
+  const cancelaveis = datasCancelaveis.length;
   // CLAUDE.md, Etapa 7: ver a tela (dias fixos, saldo, histórico) é sempre permitido — só GERAR
   // pacote (a ação que materializa bookings/packages de verdade) exige o professor estar em
   // RECORRENCIA. `undefined` (settings ainda carregando) não bloqueia: já coberto pelo loading gate
@@ -268,6 +270,16 @@ export default function AdminAlunoRecorrencia() {
   // dias fixos depois de escolher), cai pra primeira opção em vez de travar num valor obsoleto.
   const startDateOptions = getRecorrenciaStartDateOptions(ativas);
   const effectiveStartDate = startDate && startDateOptions.includes(startDate) ? startDate : (startDateOptions[0] ?? null);
+
+  // O que "Gerar" vai fazer, mostrado ANTES do toque: quais dias/horários, de quando a quando, e
+  // quantas aulas já marcadas serão canceladas (não só na janela de confirmação, depois do compromisso).
+  const aulasNovas = effectiveStartDate ? previewRecorrenciaAulas(ativas, totalAulas, effectiveStartDate) : [];
+  const horariosAtivos = Array.from(new Set(ativas.map((r) => `${r.diaSemana}|${r.horario}`)))
+    .map((k) => k.split("|"))
+    .sort((a, b) => Number(a[0]) - Number(b[0]) || a[1].localeCompare(b[1]))
+    .map(([d, h]) => `${WEEKDAY_LABELS[Number(d)].slice(0, 3).toLowerCase()} ${h}`);
+  const periodo = (datas: string[]) =>
+    datas.length > 1 ? `de ${formatDateShort(datas[0])} a ${formatDateShort(datas[datas.length - 1])}` : formatDateShort(datas[0]);
 
   return (
     <div className="page-container">
@@ -356,6 +368,21 @@ export default function AdminAlunoRecorrencia() {
           </>
         )}
 
+        {aulasNovas.length > 0 && (
+          <div className="rounded-xl bg-background border border-border p-3 mb-3 text-[13px] leading-snug">
+            <div className="text-foreground">
+              Vai criar <strong>{aulasNovas.length} aula{aulasNovas.length > 1 ? "s" : ""}</strong>: {horariosAtivos.join(" e ")},{" "}
+              {periodo(aulasNovas)}.
+            </div>
+            {cancelaveis > 0 && (
+              <div className="text-amber mt-1.5">
+                As {cancelaveis} aula{cancelaveis > 1 ? "s" : ""} já marcada{cancelaveis > 1 ? "s" : ""} ({periodo(datasCancelaveis)}) serão
+                canceladas e substituídas. Não contam falta nem gastam aula.
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex gap-2.5">
           <Input
             type="number"
@@ -370,7 +397,7 @@ export default function AdminAlunoRecorrencia() {
             disabled={emAutosservico || activasCount === 0 || !effectiveStartDate || gerarPacote.isPending}
             onClick={pedirGeracao}
           >
-            Gerar {totalAulas} aula{totalAulas > 1 ? "s" : ""}
+            {cancelaveis > 0 ? `Gerar ${totalAulas} e cancelar ${cancelaveis}` : `Gerar ${totalAulas} aula${totalAulas > 1 ? "s" : ""}`}
           </Button>
         </div>
         {emAutosservico ? (
@@ -444,7 +471,11 @@ export default function AdminAlunoRecorrencia() {
         open={confirmGerar}
         onOpenChange={setConfirmGerar}
         title="GERAR PACOTE"
-        description={`${cancelaveis} aula${cancelaveis > 1 ? "s" : ""} do pacote anterior de ${student.name.split(" ")[0]} ${cancelaveis > 1 ? "serão canceladas" : "será cancelada"} (sem contar falta nem gastar crédito) antes de gerar as ${totalAulas} novas. Continuar?`}
+        description={
+          cancelaveis > 0
+            ? `${cancelaveis} aula${cancelaveis > 1 ? "s" : ""} de ${student.name.split(" ")[0]} (${datasCancelaveis.map((d) => `${formatDateShort(d)} ${formatTime(d)}`).join(", ")}) ${cancelaveis > 1 ? "serão canceladas" : "será cancelada"}, sem contar falta nem gastar aula, e ${totalAulas} novas serão criadas. Continuar?`
+            : ""
+        }
         confirmLabel="Gerar mesmo assim"
         tone="default"
         onConfirm={() => {

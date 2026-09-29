@@ -26,6 +26,7 @@ import Login from "@/pages/auth/Login";
 import Convite from "@/pages/auth/Convite";
 import CriarConta from "@/pages/auth/CriarConta";
 import ConfirmarEmail from "@/pages/auth/ConfirmarEmail";
+import AdminAlunoRecorrencia from "@/pages/admin/AlunoRecorrencia";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
 import { RemarcacaoSheet } from "@/components/RemarcacaoSheet";
@@ -727,6 +728,40 @@ function semearAlunos(qc: QueryClient) {
   qc.setQueryData(["alunos-em-risco", ADMIN_ID], RISCO);
 }
 
+const recDia = (id: string, diaSemana: number, horario: string, ativo: boolean, temUso: boolean) => ({
+  id, studentId: "s1", diaSemana, horario, duracaoMinutos: 60, ativo, createdAt: at(-30, 10), temUso,
+});
+const REC_PKG = pkg(8, 3, { id: "pkg-rec-a", studentId: "s1", origin: "recurrence", templateName: undefined });
+const RECORRENCIA_CASOS: { title: string; note: string; modo: "recorrencia" | "autosservico"; recs: ReturnType<typeof recDia>[]; pacote: PackageRecord | null; saldo: SaldoPacote | null; cancelaveis: number }[] = [
+  {
+    title: "Recorrência em uso",
+    note: "professor em Recorrência; pacote ativo, 3 dias fixos (1 inativo), 5 aulas seriam canceladas ao gerar",
+    modo: "recorrencia",
+    recs: [recDia("r1", 1, "18:00", true, true), recDia("r2", 3, "19:00", true, true), recDia("r3", 5, "07:00", false, false)],
+    pacote: REC_PKG,
+    saldo: { pacoteId: "pkg-rec-a", studentId: "s1", recorrenciaId: "r1", total: 8, consumidas: 3, restantes: 5, aRepor: 1 },
+    cancelaveis: 5,
+  },
+  {
+    title: "Primeira vez",
+    note: "professor em Recorrência, aluno sem nenhum dia fixo e sem pacote",
+    modo: "recorrencia",
+    recs: [],
+    pacote: null,
+    saldo: null,
+    cancelaveis: 0,
+  },
+  {
+    title: "Professor em Autosserviço",
+    note: "dias fixos já cadastrados, mas gerar pacote fica desabilitado",
+    modo: "autosservico",
+    recs: [recDia("r1", 2, "18:00", true, false)],
+    pacote: null,
+    saldo: null,
+    cancelaveis: 0,
+  },
+];
+
 function SeededAdmin({ data, children, seed }: { data: unknown; children: ReactNode; seed?: (qc: QueryClient) => void }) {
   const [client] = useState(() => {
     const qc = new QueryClient({
@@ -742,7 +777,9 @@ function SeededAdmin({ data, children, seed }: { data: unknown; children: ReactN
     (w.__amostrasAdmin ??= []).push(qc);
     // Professor configurado pra falta NÃO descontar, mas o pacote de recorrência do Diego foi criado
     // quando descontava: a janela de falta tem que seguir o pacote (regra da aula, não a geral).
-    qc.setQueryData(["admin-settings", ADMIN_ID], { adminId: ADMIN_ID, noShowConsumesClass: false, modoAgendamento: "autosservico", whatsapp: null });
+    if (!qc.getQueryData(["admin-settings", ADMIN_ID])) {
+      qc.setQueryData(["admin-settings", ADMIN_ID], { adminId: ADMIN_ID, noShowConsumesClass: false, modoAgendamento: "autosservico", whatsapp: null });
+    }
     qc.setQueryData(["regra-consumo", "a-s3--1-19", false], { falta: true, cancelamentoPeloAluno: true, origem: "pacote" });
     qc.setQueryData(["notifications", ADMIN_ID], []);
     return qc;
@@ -911,6 +948,35 @@ export default function Amostras() {
               <AdminAgenda />
             </SeededAdmin>
           </Frame>
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Recorrência do aluno (professor)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {RECORRENCIA_CASOS.map((c) => (
+            <Frame key={c.title} title={c.title} note={c.note}>
+              <SeededAdmin
+                data={null}
+                seed={(qc) => {
+                  qc.setQueryData(["admin-settings", ADMIN_ID], { adminId: ADMIN_ID, noShowConsumesClass: false, modoAgendamento: c.modo, whatsapp: null });
+                  qc.setQueryData(["admin-student-detail", "s1"], {
+                    student: aluno("s1", "Ana Beatriz Souza"),
+                    package: c.pacote,
+                    credits: 0,
+                    history: [],
+                    completedCount: 3,
+                    noShowCount: 1,
+                  });
+                  qc.setQueryData(["aluno-recorrencias", "s1"], c.recs);
+                  if (c.pacote) qc.setQueryData(["saldo-pacote", c.pacote.id], c.saldo);
+                  qc.setQueryData(["aulas-cancelaveis-recorrencia", "s1"], Array.from({ length: c.cancelaveis }, (_, i) => at(1 + i * 2, 18)));
+                }}
+              >
+                <ComRota path="/admin/alunos/:studentId/recorrencia" url="/admin/alunos/s1/recorrencia">
+                  <AdminAlunoRecorrencia />
+                </ComRota>
+              </SeededAdmin>
+            </Frame>
+          ))}
         </div>
 
         <h2 className="text-lg font-semibold mb-4">Lista de alunos</h2>
