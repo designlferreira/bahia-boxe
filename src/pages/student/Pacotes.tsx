@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
-import { SkeletonList } from "@/components/SkeletonCard";
+import { SkeletonCard, SkeletonList } from "@/components/SkeletonCard";
 import { CalendarClock } from "lucide-react";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -89,6 +89,7 @@ export default function StudentPacotes() {
     onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível enviar o pedido."),
   });
 
+  const aguardandoModo = modoEfetivo === undefined;
   const pedido = home?.pendingRequest ?? null;
   const pedidoNome = pedido?.kind === "package" ? "pacote" : "aula avulsa";
   const pedidoModelo = pedido?.templateId ? templates?.find((t) => t.id === pedido.templateId) : undefined;
@@ -115,8 +116,14 @@ export default function StudentPacotes() {
     <div className="page-container">
       <PageHeader title="MEUS PACOTES" back />
 
+      {/* Só mostra o conteúdo depois de saber o modo: em Recorrência esta tela redireciona, e antes a lista de pedidos aparecia por
+          um instante até o redirecionamento. */}
+      {aguardandoModo && <SkeletonList count={3} height={90} />}
+      {!aguardandoModo && modoEfetivo !== "recorrencia" && (
+        <>
       {/* O mesmo cartão de pacote da Home (antes esta tela tinha uma terceira cópia: "8 de 8 usadas" com selo "Ativo", sem "aulas
           restantes" nem o alerta de poucas aulas). Sem alerta aqui: a lista logo abaixo já É o "pedir mais". */}
+      {!home && !erroHome && <SkeletonCard height={120} className="mb-6" />}
       {home && (home.package ?? home.lastPackage) && (
         <div className="mb-6">
           <ActivePackageCard pkg={home.package ?? home.lastPackage} credits={home.credits} audience="student" hideAlert />
@@ -174,9 +181,9 @@ export default function StudentPacotes() {
         />
       )}
 
-      <div className="flex flex-col gap-2.5">
+      <ul aria-label="Modelos de pacote" className="flex flex-col gap-2.5">
         {templates?.map((t) => (
-          <div key={t.id} className="card-dark p-4 flex items-center gap-3">
+          <li key={t.id} className="card-dark p-4 flex items-center gap-3">
             <div className="flex-1 min-w-0">
               {/* Nome e descrição têm limite: um texto longo do professor fazia o cartão passar de 400px de altura. */}
               <div className="text-[15px] font-semibold text-foreground leading-snug line-clamp-2 break-words">{t.name}</div>
@@ -207,9 +214,11 @@ export default function StudentPacotes() {
             >
               Pedir
             </Button>
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
+        </>
+      )}
 
       <ConfirmDialog
         open={!!escolhido}
