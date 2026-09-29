@@ -1643,20 +1643,73 @@ export async function getPurchaseRequests(adminId: string) {
     activeByStudent.set(p.studentId, [...(activeByStudent.get(p.studentId) ?? []), p]);
   }
 
+  // Pacote de RECORRÊNCIA: as aulas restantes já nascem todas MARCADAS e continuam valendo depois que o
+  // pacote é encerrado (a conclusão debita pelo `pacote_id`). Então aprovar não "tira" nada dali — e o
+  // número certo vem de `saldo_pacotes` (a autoridade, decisão 4), não da cópia `used_classes`, que
+  // fica defasada depois de um desfazer. Antes o aviso contava as duas coisas do mesmo jeito e dizia
+  // "essas aulas deixam de valer" para quem tinha só aulas já marcadas.
+  const recIds = (activePkgsRes.data ?? []).filter((r) => r.origin === "recurrence").map((r) => r.id as string);
+  const saldoRes = recIds.length
+    ? await client().from("saldo_pacotes").select("pacote_id, restantes").in("pacote_id", recIds)
+    : { data: [], error: null };
+  if (saldoRes.error) throw new Error(saldoRes.error.message);
+  const restantesRec = new Map((saldoRes.data ?? []).map((r) => [r.pacote_id as string, r.restantes as number]));
+
   const nameOf = new Map(students.map((s) => [s.id, s.name]));
   const templates = new Map((templatesRes.data ?? []).map((t) => [t.id, mapTemplate(t)]));
 
   return rows.map((r) => {
     const request = mapRequest(r);
     const closed = (activeByStudent.get(r.student_id) ?? []).filter((p) => p.origin !== "trial");
+    const normais = closed.filter((p) => p.origin !== "recurrence");
+    const recorrencia = closed.filter((p) => p.origin === "recurrence");
+    // O que o aluno tem hoje, todos os pacotes ativos (a experimental também conta): dá contexto pra
+    // decidir sem ter que abrir o perfil dele.
+    const ativos = activeByStudent.get(r.student_id) ?? [];
+    const aulasRestantes = ativos.reduce(
+      (acc, p) => acc + (p.origin === "recurrence" ? (restantesRec.get(p.id) ?? 0) : Math.max(0, p.totalClasses - p.usedClasses)),
+      0,
+    );
     return {
       request,
       studentName: nameOf.get(r.student_id) ?? "Aluno",
       template: r.template_id ? (templates.get(r.template_id) ?? null) : null,
-      /** Aulas que o aluno ainda tinha pra usar e que a aprovação encerra. 0 = aprovar não tira nada. */
-      classesLostOnApprove: closed.reduce((acc, p) => acc + Math.max(0, p.totalClasses - p.usedClasses), 0),
+      /** Aulas que o aluno ainda tinha pra AGENDAR e que a aprovação encerra (pacotes que não são de recorrência). 0 = aprovar não tira nada. */
+      classesLostOnApprove: normais.reduce((acc, p) => acc + Math.max(0, p.totalClasses - p.usedClasses), 0),
+      /** Aulas marcadas num pacote de recorrência: continuam valendo mesmo com a aprovação. */
+      recorrenciaRestantes: recorrencia.reduce((acc, p) => acc + (restantesRec.get(p.id) ?? 0), 0),
+      /** Aulas restantes em todos os pacotes ativos; `null` = sem pacote ativo. */
+      aulasRestantes: ativos.length ? aulasRestantes : null,
     };
   });
+}
+
+/** Os últimos pedidos já decididos (aprovados ou recusados) — pra conferir o que foi feito. */
+export async function getPedidosDecididos(adminId: string, limite = 5) {
+  const { data, error } = await client()
+    .from("purchase_requests")
+    .select("*")
+    .eq("admin_id", adminId)
+    .neq("status", "pending")
+    .order("decided_at", { ascending: false, nullsFirst: false })
+    .limit(limite);
+  if (error) throw new Error(error.message);
+  const rows = data ?? [];
+  const templateIds = Array.from(new Set(rows.map((r) => r.template_id).filter(Boolean)));
+  const [students, templatesRes] = await Promise.all([
+    adminStudents(adminId),
+    templateIds.length
+      ? client().from("package_templates").select("*").in("id", templateIds)
+      : Promise.resolve({ data: [], error: null } as const),
+  ]);
+  if (templatesRes.error) throw new Error(templatesRes.error.message);
+  const nameOf = new Map(students.map((s) => [s.id, s.name]));
+  const templates = new Map((templatesRes.data ?? []).map((t) => [t.id, mapTemplate(t)]));
+  return rows.map((r) => ({
+    request: mapRequest(r),
+    studentName: nameOf.get(r.student_id) ?? "Aluno",
+    template: r.template_id ? (templates.get(r.template_id) ?? null) : null,
+  }));
 }
 
 export async function approvePurchaseRequest(requestId: string) {
@@ -2174,16 +2227,34 @@ async function deriveNotifications(userId: string): Promise<AppNotification[]> {
         });
       }
     }
+    // "Já dá para agendar" só é verdade no autosserviço: na recorrência o aluno não escolhe horário
+    // (o professor marca) e a aba de agendar nem aparece. Sem o modo, o aviso prometia o que o
+    // aluno não podia fazer.
+    let autosservico = true;
+    if ((requestsRes.data ?? []).some((r) => r.status === "approved")) {
+      try {
+        const { data: st } = await client().from("students").select("admin_id").eq("id", studentId).maybeSingle();
+        if (st?.admin_id) autosservico = (await getModoAgendamentoEfetivo(st.admin_id)) === "autosservico";
+      } catch {
+        /* sem o modo: mantém o texto do autosserviço (o padrão) */
+      }
+    }
     for (const r of requestsRes.data ?? []) {
+      const aprovado = r.status === "approved";
       items.push({
         id: `request:${r.id}:${r.status}`,
         userId,
         kind: "system",
-        title: r.status === "approved" ? "Pedido aprovado" : "Pedido recusado",
-        description: r.status === "approved" ? "Suas aulas já estão disponíveis para agendar." : "Fale com seu professor para entender o motivo.",
+        title: aprovado ? "Pedido aprovado" : "Pedido recusado",
+        description: aprovado
+          ? autosservico
+            ? "Suas aulas já estão disponíveis para agendar."
+            : "Seu professor liberou o pacote. As aulas são marcadas por ele."
+          : "Fale com seu professor para entender o motivo.",
         createdAt: r.decided_at ?? r.created_at,
         read: false,
-        entity: { type: "purchase_requests" },
+        // Recusado leva à tela inicial (onde está o WhatsApp); aprovado, aos pacotes.
+        entity: aprovado ? { type: "purchase_requests" } : { type: "home" },
       });
     }
     for (const a of coachAssessmentsRes.data ?? []) {

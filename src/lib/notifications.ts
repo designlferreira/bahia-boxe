@@ -14,6 +14,9 @@ export function notificationHref(n: Pick<AppNotification, "entity">, role: Role)
   if (n.entity.type === "purchase_requests") {
     return role === "admin" ? "/admin/solicitacoes" : "/app/pacotes";
   }
+  if (n.entity.type === "home") {
+    return role === "admin" ? null : "/app/home";
+  }
   if (n.entity.type === "boxing_profile") {
     // Só o aluno recebe esta notificação (deriveNotifications só a gera no ramo dele) — a
     // comparação aparece inline em /app/perfil-lutador agora, sem rota própria.

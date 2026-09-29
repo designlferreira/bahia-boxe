@@ -53,7 +53,7 @@ export default function RecuperarSenha() {
                 setEmail(e.target.value);
                 if (emailError) setEmailError(null);
               }}
-              placeholder="voce@bahiaboxe.com"
+              placeholder="voce@email.com"
               aria-invalid={!!emailError}
               aria-describedby={emailError ? "email-error" : undefined}
             />

@@ -13,13 +13,16 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { addDays, subDays } from "date-fns";
 import { AuthContext } from "@/context/AuthContext";
+import { AuthError } from "@/integrations/backend/auth";
 import StudentHome from "@/pages/student/Home";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminAlunos from "@/pages/admin/Alunos";
+import AdminPedidos from "@/pages/admin/Pedidos";
 import AdminAgenda from "@/pages/admin/Agenda";
 import StudentAgendar from "@/pages/student/Agendar";
 import AdminAulaDetalhe from "@/pages/admin/AulaDetalhe";
 import StudentAulaDetalhe from "@/pages/student/AulaDetalhe";
+import Login from "@/pages/auth/Login";
 import Convite from "@/pages/auth/Convite";
 import CriarConta from "@/pages/auth/CriarConta";
 import ConfirmarEmail from "@/pages/auth/ConfirmarEmail";
@@ -579,7 +582,19 @@ function SemLogin({ convite, children }: { convite?: { valid: boolean; reason: s
   return (
     <QueryClientProvider client={client}>
       <AuthContext.Provider
-        value={{ profile: null, loading: false, signIn: () => Promise.reject(new Error("amostra")), signOut: async () => {}, refreshProfile: () => {} }}
+        value={{
+          profile: null,
+          loading: false,
+          // Amostra do Login: e-mail com "naoconfirmado" simula o erro de e-mail não confirmado.
+          signIn: (email: string) =>
+            Promise.reject(
+              /naoconfirmado/i.test(email)
+                ? new AuthError("Seu e-mail ainda não foi confirmado. Abra o link que enviamos para você.", "email_not_confirmed")
+                : new Error("amostra"),
+            ),
+          signOut: async () => {},
+          refreshProfile: () => {},
+        }}
       >
         {children}
       </AuthContext.Provider>
@@ -663,6 +678,40 @@ const DETALHE_ALUNO: { title: string; note: string; id: string; valor: unknown; 
   },
 ];
 
+const modelo = (id: string, name: string, totalClasses: number, priceCents: number | null) => ({
+  id, adminId: ADMIN_ID, name, description: "", totalClasses, priceCents, validityDays: null, isActive: true,
+});
+const pedido = (
+  id: string,
+  kind: "package" | "single",
+  student: string,
+  template: ReturnType<typeof modelo> | null,
+  lost: number,
+  recorrenciaRestantes = 0,
+  extra: { dias?: number; notes?: string; aulas?: number | null } = {},
+) => ({
+  request: { id, studentId: `s-${id}`, adminId: ADMIN_ID, kind, templateId: template?.id ?? null, status: "pending" as const, notes: extra.notes ?? null, createdAt: at(-(extra.dias ?? 1), 10), decidedAt: null },
+  studentName: student,
+  template,
+  classesLostOnApprove: lost,
+  recorrenciaRestantes,
+  aulasRestantes: extra.aulas === undefined ? 0 : extra.aulas,
+});
+const PEDIDOS_CASOS: { title: string; note: string; lista: unknown[] }[] = [
+  {
+    title: "Vários pedidos",
+    note: "pacote sem perda, encerra 3 aulas, aula avulsa, sem preço, aluno de recorrência (5 marcadas)",
+    lista: [
+      pedido("r1", "package", "Ana Beatriz Souza", modelo("t1", "Pacote de 8 aulas", 8, 32000), 0, 0, { dias: 1, aulas: null }),
+      pedido("r2", "package", "Carlos Henrique Lima", modelo("t2", "Pacote de 12 aulas", 12, 45000), 3, 0, { dias: 4, aulas: 3, notes: "Posso pagar na sexta?" }),
+      pedido("r3", "single", "Julia Pereira", modelo("t3", "Aula avulsa", 1, 5000), 0, 0, { dias: 1, aulas: 1 }),
+      pedido("r4", "package", "Marina Costa", modelo("t4", "Pacote de 4 aulas", 4, null), 1, 0, { dias: 2, aulas: 1 }),
+      pedido("r5", "package", "Igor Nascimento", modelo("t5", "Pacote de 8 aulas", 8, 32000), 0, 5, { dias: 1, aulas: 5 }),
+    ],
+  },
+  { title: "Nenhum pedido", note: "tudo em dia", lista: [] },
+];
+
 /** Lista de alunos: 6 alunos, 4 deles em risco (os mesmos do painel). */
 function semearAlunos(qc: QueryClient) {
   const nomes = ["Ana Beatriz Souza", "Helena Costa", "Igor Nascimento", "Julia Pereira", "Karina Duarte", "Leonardo Prado"];
@@ -741,8 +790,35 @@ export default function Amostras() {
           ))}
         </div>
 
+        <h2 className="text-lg font-semibold mb-4">Solicitações (professor)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {PEDIDOS_CASOS.map((c) => (
+            <Frame key={c.title} title={c.title} note={c.note}>
+              <SeededAdmin
+                data={null}
+                seed={(qc) => {
+                  qc.setQueryData(["purchase-requests", ADMIN_ID], c.lista);
+                  qc.setQueryData(["purchase-requests-decididos", ADMIN_ID], [
+                    { request: { ...pedido("d1", "package", "x", null, 0).request, status: "approved", decidedAt: at(-2, 9) }, studentName: "Fernanda Rocha", template: modelo("t9", "Pacote de 8 aulas", 8, 32000) },
+                    { request: { ...pedido("d2", "single", "x", null, 0).request, status: "rejected", decidedAt: at(-5, 9) }, studentName: "Gustavo Alves", template: modelo("t8", "Aula avulsa", 1, 5000) },
+                  ]);
+                }}
+              >
+                <AdminPedidos />
+              </SeededAdmin>
+            </Frame>
+          ))}
+        </div>
+
         <h2 className="text-lg font-semibold mb-4">Entrada (convite e criar conta)</h2>
         <div className="flex flex-wrap gap-6 mb-12">
+          <Frame title="Login" note="tela de entrada de quem já tem conta">
+            <SemLogin>
+              <ComRota path="/login" url="/login">
+                <Login />
+              </ComRota>
+            </SemLogin>
+          </Frame>
           <Frame title="Convite válido" note="link de convite do professor">
             <SemLogin convite={{ valid: true, reason: "ok" }}>
               <ComRota path="/convite/:token" url="/convite/amostra">
