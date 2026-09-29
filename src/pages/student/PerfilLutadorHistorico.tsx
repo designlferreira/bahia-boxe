@@ -1,4 +1,5 @@
 import { FighterProfileGloss } from "@/components/FighterProfileGloss";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { History } from "lucide-react";
@@ -8,9 +9,46 @@ import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/SkeletonCard";
 import { Button } from "@/components/ui/button";
-import { formatDateShort } from "@/lib/dateUtils";
-import { DIMENSIONS, DIMENSION_LABELS, FIGHTER_PROFILE_LABELS, SCORING_VERSION } from "@/lib/boxingProfile";
+import { formatDateShort, formatDateWithYear } from "@/lib/dateUtils";
+import { DIMENSIONS, DIMENSION_LABELS, FIGHTER_PROFILE_LABELS, SCORING_VERSION, type Dimension } from "@/lib/boxingProfile";
 import { getBoxingProfileHistory, studentIdForProfile } from "@/integrations/backend/api";
+
+type Linha = { dim: Dimension; from: number; to: number; delta: number };
+
+/** Uma competência: duas barras rotuladas com a data (primeira e mais recente) e a diferença em palavras — sem vermelho para quedas. */
+function LinhaCompetencia({ linha, de, para }: { linha: Linha; de: string; para: string }) {
+  const { dim, from, to, delta } = linha;
+  const texto =
+    delta > 0
+      ? `Subiu ${delta} ${delta === 1 ? "ponto" : "pontos"}`
+      : delta === 0
+        ? "Ficou igual"
+        : `Ficou em ${to}, ${Math.abs(delta)} a menos`;
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-3 mb-1.5" aria-hidden>
+        <span className="text-[13.5px] font-semibold text-foreground">{DIMENSION_LABELS[dim]}</span>
+        <span className="text-[12.5px] text-muted-foreground text-right">{texto}</span>
+      </div>
+      {[
+        { data: de, valor: from, cor: "bg-muted-foreground" },
+        { data: para, valor: to, cor: "bg-accent" },
+      ].map((b) => (
+        <div key={b.data} className="flex items-center gap-2 mt-1" aria-hidden>
+          <span className="w-[86px] shrink-0 text-xs text-muted-foreground">{formatDateWithYear(b.data)}</span>
+          <div className="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
+            <div className={`h-full rounded-full ${b.cor}`} style={{ width: `${b.valor}%` }} />
+          </div>
+          <span className="w-7 shrink-0 text-right text-xs text-foreground tabular-nums">{b.valor}</span>
+        </div>
+      ))}
+      {/* As barras são só para a vista; o leitor de tela recebe os dois números e a diferença em texto. */}
+      <span className="sr-only">
+        {`${DIMENSION_LABELS[dim]}: de ${from} para ${to}. ${texto}.`}
+      </span>
+    </div>
+  );
+}
 
 export default function StudentPerfilLutadorHistorico() {
   const { profile } = useAuth();
@@ -50,6 +88,22 @@ export default function StudentPerfilLutadorHistorico() {
   const oldest = chronological[0];
   const newest = chronological[chronological.length - 1];
   const temEvolucao = chronological.length >= 2;
+
+  // Primeira × mais recente, por competência; quem mais subiu (até 2, só se subiu de fato) abre a lista, o resto fica recolhido.
+  const linhas: Linha[] =
+    oldest && newest
+      ? DIMENSIONS.map((dim) => {
+          const from = oldest.dimensionScores[dim];
+          const to = newest.dimensionScores[dim];
+          return { dim, from, to, delta: to - from };
+        })
+      : [];
+  const destaques = linhas
+    .filter((l) => l.delta > 0)
+    .sort((a, b) => b.delta - a.delta)
+    .slice(0, 2);
+  const resto = linhas.filter((l) => !destaques.includes(l));
+  const [verTodas, setVerTodas] = useState(false);
 
   function novaAvaliacao() {
     navigate("/app/perfil-lutador/questionario");
@@ -96,40 +150,41 @@ export default function StudentPerfilLutadorHistorico() {
           {temEvolucao && oldest && newest && (
             <>
               <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2.5">
-                Evolução por dimensão
+                Evolução por competência
               </div>
               <div className="text-xs text-muted-foreground leading-relaxed mb-3">
-                Comparando sua primeira autoavaliação ({formatDateShort(oldest.completedAt)}) com a mais recente (
-                {formatDateShort(newest.completedAt)}).
+                Comparando sua primeira avaliação completa ({formatDateWithYear(oldest.completedAt)}) com a mais recente (
+                {formatDateWithYear(newest.completedAt)}).
               </div>
-              <div className="card-dark p-4 mb-5">
-                <div className="flex flex-col gap-3.5">
-                  {DIMENSIONS.map((dim) => {
-                    const from = oldest.dimensionScores[dim];
-                    const to = newest.dimensionScores[dim];
-                    return (
-                      <div key={dim}>
-                        <div className="flex items-baseline justify-between mb-1">
-                          <span className="text-[13px] font-medium text-foreground">{DIMENSION_LABELS[dim]}</span>
-                          <span className="text-[12px] text-muted-foreground tabular-nums">
-                            {from} → {to}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {chronological.map((a) => (
-                            <div key={a.id} className="flex-1 h-1.5 rounded-full bg-secondary overflow-hidden">
-                              <div className="h-full rounded-full bg-accent" style={{ width: `${a.dimensionScores[dim]}%` }} />
-                            </div>
-                          ))}
-                        </div>
-                        <p className="text-xs text-muted-foreground leading-relaxed mt-1.5">
-                          Sua autoavaliação de {DIMENSION_LABELS[dim]} mudou de {from} para {to} nesse período.
-                        </p>
-                      </div>
-                    );
-                  })}
+              {destaques.length > 0 && (
+                <p className="text-[15px] font-semibold text-foreground mb-3">
+                  Você subiu mais em {destaques.map((l) => DIMENSION_LABELS[l.dim]).join(" e ")}.
+                </p>
+              )}
+              <div className="card-dark p-4 mb-3">
+                <div className="flex flex-col gap-4">
+                  {(verTodas || destaques.length === 0 ? linhas : destaques).map((l) => (
+                    <LinhaCompetencia key={l.dim} linha={l} de={oldest.completedAt} para={newest.completedAt} />
+                  ))}
                 </div>
               </div>
+              {destaques.length > 0 && resto.length > 0 && (
+                <Button
+                  variant="secondary"
+                  className="w-full mb-3"
+                  aria-expanded={verTodas}
+                  onClick={() => setVerTodas((v) => !v)}
+                >
+                  {verTodas ? "Mostrar só as que mais subiram" : `Ver as outras ${resto.length} competências`}
+                </Button>
+              )}
+              {linhas.some((l) => l.delta < 0) && (
+                <p className="text-xs text-muted-foreground leading-relaxed mb-3">
+                  Uma nota mais baixa não quer dizer que você piorou: pode ser uma leitura mais atenta de si mesmo. Converse com o seu
+                  professor sobre isso.
+                </p>
+              )}
+              <div className="h-2" />
             </>
           )}
 

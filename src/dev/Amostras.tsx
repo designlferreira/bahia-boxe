@@ -1587,6 +1587,18 @@ export default function Amostras() {
               { title: "Evolução · 1 completa + rápida", note: "falta mais uma completa", lista: [av("ev-r", -5, { assessmentLength: "short" }), av("ev-c", -70)] },
               { title: "Evolução · 2 completas + fórmula anterior", note: "a antiga fica fora do gráfico (só 1 atual: cartão) e leva o selo", lista: [av("ev-n", -5), av("ev-o", -90, { scoringVersion: "boxing-profile-scoring-v1" }, -12)] },
               { title: "Evolução · 3 completas (1 da fórmula anterior)", note: "gráfico só com as 2 da fórmula atual", lista: [av("ev-3", -5, {}, 8), av("ev-2", -60, {}, 0), av("ev-1", -150, { scoringVersion: "boxing-profile-scoring-v1" }, -20)] },
+              {
+                title: "Evolução · com queda e igual",
+                note: "uma competência caiu, uma ficou igual; sem vermelho",
+                lista: [
+                  av("ev-b", -5),
+                  av("ev-a", -120, {
+                    dimensionScores: Object.fromEntries(
+                      DIMENSIONS.map((d, i) => [d, Math.max(0, Math.min(100, SELF.dimensionScores[d] + ([15, 0, -20, -6][i] ?? -2)))]),
+                    ) as BoxingProfileAssessment["dimensionScores"],
+                  }),
+                ],
+              },
               { title: "Evolução · 3 completas", note: "gráfico e botão de nova avaliação", lista: [av("ev-3", -5, {}, 8), av("ev-2", -60, {}, 0), av("ev-1", -150, {}, -10)] },
             ];
             return casos.map((c) => (
