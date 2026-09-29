@@ -1627,7 +1627,6 @@ export default function Amostras() {
             const moldura = (children: ReactNode) => (
               <div className="relative h-[110px] w-[375px] overflow-hidden rounded-2xl border border-border bg-background [transform:translateZ(0)]">{children}</div>
             );
-            const pedidos = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `pr${i}`, studentId: `s${i}`, kind: "package", status: "pending" }));
             const aluno = (url: string, modo: Modo) => (
               <Seeded data={base} modo={modo}>
                 <ComRota path="*" url={url}>
@@ -1636,7 +1635,7 @@ export default function Amostras() {
               </Seeded>
             );
             const professor = (url: string, n: number) => (
-              <SeededAdmin data={null} seed={(qc) => qc.setQueryData(["purchase-requests", PROFESSOR.id], pedidos(n))}>
+              <SeededAdmin data={null} seed={(qc) => qc.setQueryData(["admin-dashboard", "pendencias", PROFESSOR.id], n)}>
                 <ComRota path="*" url={url}>
                   {moldura(<AdminBottomNav />)}
                 </ComRota>

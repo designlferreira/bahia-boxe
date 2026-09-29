@@ -978,6 +978,21 @@ async function alunosEmRisco(students: StudentRecord[]): Promise<AlunoEmRisco[]>
  * já vem ordenada por `start_time` ascendente) pra navegar direto pra ela.
  */
 /** Pedidos ainda sem resposta do professor (novo horário ou remarcação) — pra marcar os dias na Agenda. */
+/**
+ * Número na aba Painel: tudo que espera a resposta do professor — pedidos de pacote/aula avulsa (`purchase_requests` pendentes) E pedidos de
+ * horário/remarcação (`bookings` em `pending_confirmation`). É o mesmo conjunto do "Resolver agora" do Painel e do sino. Só CONTA (`head: true`):
+ * antes a barra usava `getPurchaseRequests`, que traz alunos, modelos, pacotes e saldos para depois só olhar `.length`.
+ */
+export async function countPendenciasDoProfessor(adminId: string): Promise<number> {
+  const [pedidos, horarios] = await Promise.all([
+    client().from("purchase_requests").select("id", { count: "exact", head: true }).eq("admin_id", adminId).eq("status", "pending"),
+    client().from("bookings").select("id", { count: "exact", head: true }).eq("admin_id", adminId).eq("status", "pending_confirmation"),
+  ]);
+  if (pedidos.error) throw new Error(pedidos.error.message);
+  if (horarios.error) throw new Error(horarios.error.message);
+  return (pedidos.count ?? 0) + (horarios.count ?? 0);
+}
+
 export async function getPedidosPendentes(adminId: string): Promise<Booking[]> {
   const { data, error } = await client()
     .from("bookings")

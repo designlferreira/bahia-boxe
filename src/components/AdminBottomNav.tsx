@@ -1,6 +1,6 @@
 import { LayoutDashboard, CalendarDays, Users, History, UserRound } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { getPurchaseRequests } from "@/integrations/backend/api";
+import { countPendenciasDoProfessor } from "@/integrations/backend/api";
 import { useAuth } from "@/context/AuthContext";
 import { BottomNavItem } from "@/components/BottomNavItem";
 
@@ -10,13 +10,17 @@ import { BottomNavItem } from "@/components/BottomNavItem";
  */
 export function AdminBottomNav() {
   const { profile } = useAuth();
+  // A chave começa com "admin-dashboard" DE PROPÓSITO: Pedidos, Painel, Agenda e o detalhe da aula já invalidam esse prefixo quando o
+  // professor decide algo, então o número acompanha sem cada tela precisar conhecer esta chave. A cada 60s (era 15s, com uma consulta que
+  // trazia alunos, modelos e pacotes), e só com o app visível (`refetchIntervalInBackground` é falso por padrão).
   const { data } = useQuery({
-    queryKey: ["purchase-requests", profile?.id],
-    queryFn: () => getPurchaseRequests(profile!.id),
+    queryKey: ["admin-dashboard", "pendencias", profile?.id],
+    queryFn: () => countPendenciasDoProfessor(profile!.id),
     enabled: !!profile,
-    refetchInterval: 15000,
+    refetchInterval: 60000,
+    staleTime: 30000,
   });
-  const count = data?.length ?? 0;
+  const count = data ?? 0;
 
   return (
     <nav
@@ -32,7 +36,7 @@ export function AdminBottomNav() {
               {count > 9 ? "9+" : count}
             </span>
             <span className="sr-only">
-              , {count} {count === 1 ? "pedido esperando" : "pedidos esperando"}
+              , {count} {count === 1 ? "pendência" : "pendências"}
             </span>
           </>
         )}
