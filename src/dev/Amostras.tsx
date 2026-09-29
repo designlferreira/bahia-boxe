@@ -39,6 +39,7 @@ import StudentHistorico from "@/pages/student/Historico";
 import StudentPacotes from "@/pages/student/Pacotes";
 import StudentPerfil from "@/pages/student/Perfil";
 import AdminMinhaConta from "@/pages/admin/MinhaConta";
+import AdminOrientacoesAula from "@/pages/admin/OrientacoesAula";
 import AdminHistorico from "@/pages/admin/Historico";
 import AdminAlunoDetalhe from "@/pages/admin/AlunoDetalhe";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
@@ -1394,6 +1395,32 @@ export default function Amostras() {
               <AdminMinhaConta />
             </SeededAdmin>
           </Frame>
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Orientações da aula (professor)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {(
+            [
+              {
+                title: "Orientações · preenchidas",
+                note: "tudo preenchido",
+                dados: {
+                  adminId: ADMIN_ID, cep: "41810-010", street: "Rua das Palmeiras", number: "123", complement: "Sala 2", neighborhood: "Pituba",
+                  city: "Salvador", state: "BA", referencePoint: "Entrada ao lado do estacionamento do mercado.", arrivalMinutes: 15,
+                  equipment: { gloves: { level: "required", sizes: ["12oz", "14oz"] }, wraps: { level: "recommended", lengths: ["3m"] }, mouthguard: true },
+                  notes: "Traga garrafa de água e uma toalha.",
+                } as Record<string, unknown> | null,
+              },
+              { title: "Orientações · vazias", note: "professor que nunca preencheu (nada salvo)", dados: null },
+              { title: "Orientações · erro", note: "a consulta falhou (não é semeada de propósito)", dados: undefined },
+            ] as { title: string; note: string; dados: Record<string, unknown> | null | undefined }[]
+          ).map((c) => (
+            <Frame key={c.title} title={c.title} note={c.note}>
+              <SeededAdmin data={null} seed={(qc) => { if (c.dados !== undefined) qc.setQueryData(["class-guidelines", ADMIN_ID], c.dados); }}>
+                <AdminOrientacoesAula />
+              </SeededAdmin>
+            </Frame>
+          ))}
         </div>
 
         <h2 className="text-lg font-semibold mb-4">Histórico (professor)</h2>
