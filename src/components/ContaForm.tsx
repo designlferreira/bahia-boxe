@@ -80,6 +80,7 @@ export function ContaForm({ submitLabel, loadingLabel, loading, error, onSubmit 
         <Label htmlFor="name">Nome completo</Label>
         <Input
           id="name"
+          maxLength={80}
           ref={nameRef}
           autoComplete="name"
           value={name}
@@ -105,6 +106,7 @@ export function ContaForm({ submitLabel, loadingLabel, loading, error, onSubmit 
         <Label htmlFor="email">E-mail</Label>
         <Input
           id="email"
+          maxLength={254}
           ref={emailRef}
           type="email"
           autoComplete="email"
@@ -148,6 +150,7 @@ export function ContaForm({ submitLabel, loadingLabel, loading, error, onSubmit 
         </div>
         <Input
           id="password"
+          maxLength={72}
           ref={passwordRef}
           type={showPassword ? "text" : "password"}
           autoComplete="new-password"
@@ -176,6 +179,7 @@ export function ContaForm({ submitLabel, loadingLabel, loading, error, onSubmit 
         <Label htmlFor="confirm">Confirmar senha</Label>
         <Input
           id="confirm"
+          maxLength={72}
           ref={confirmRef}
           type={showPassword ? "text" : "password"}
           autoComplete="new-password"

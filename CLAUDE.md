@@ -3535,6 +3535,25 @@ Se voltar a acontecer, fale com o seu professor."
 - Só em DESENVOLVIMENTO aparece a mensagem técnica do erro (pequena, embaixo); em produção, nunca. O erro sempre vai para o `console.error`.
 - **Continua sem:** relato automático do erro (não há serviço de monitoramento); um erro numa tela específica derruba o app inteiro em vez de só aquela tela (um boundary por rota seria o passo seguinte, se fizer falta).
 
+### Endurecimento (`harden`) das telas que salvam dados (2026-09-30) — sem migration nova
+
+Três passos na `dev`, testados pelo Lucas. Escopo escolhido por ele: telas que gravam dados.
+
+**Passo 1 — avisos de erro legíveis (`src/lib/erros.ts`, `mensagemDeErro(err, fallback)`, com testes).** ~33 telas faziam `err instanceof Error ? err.message : fallback` e o usuário via o texto CRU do servidor
+("Failed to fetch", "JWT expired", "not_allowed", "row-level security"). Agora: sem internet/falha de rede → "Sem conexão com a internet…"; sessão vencida → "Sua sessão venceu. Entre de novo…"; código snake_case ou mensagem técnica
+(Postgres/PostgREST/JS) → o texto de reserva da tela; o resto passa como veio (as RPCs e o `api.ts` já lançam português de propósito). **Todo `onError` novo usa `mensagemDeErro`, nunca `err.message` direto.**
+Exceção deliberada: `Agendar.tsx` (`scheduleBookingErrorMessage`) lê o CÓDIGO da RPC e traduz por mapa — não passar pelo tradutor.
+
+**Passo 2 — textos longos.** `overflow-wrap: anywhere` no `body` (`index.css`): nome/e-mail sem espaço quebra em vez de estourar o cartão ("anywhere", não "break-word", porque também reduz o mínimo de itens flex). Antes, 5 de 38 pontos
+da galeria estouravam com um nome de 79 letras. `maxLength`: nome 80, e-mail 254, senhas 72, nome do modelo de pacote 60, descrição 300, recado ao recusar aula 300, WhatsApp 20, peso 6. **Limite conhecido:** a medição da galeria
+apontou 1 item restante, achado tratado como falso positivo (fora do quadro medido); não confirmado em tela.
+
+**Passo 3 — offline.** `FaixaSemInternet` (faixa âmbar no topo, `role="status"`, some ao reconectar; `useSyncExternalStore` sobre `navigator.onLine`, só aparece quando é falso) montada em `App.tsx`. `QueryClient`:
+`mutations: { networkMode: "always" }` — gravação offline FALHA NA HORA e cai no `onError`, em vez de pausar com o botão em "Salvando…" para sempre; consultas continuam no padrão (pausam sem rede e retomam sozinhas).
+
+**Não feito (registrado, não pedido):** conexão lenta (as chamadas não têm tempo limite); o que o app instalado mostra offline além da faixa (o service worker só guarda o cache do próprio app); outras partes do `harden`
+(RTL/i18n não se aplicam: o app é só em português; listas com centenas de itens não foram testadas além do que já é paginado).
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa

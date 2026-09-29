@@ -25,6 +25,7 @@ import {
   updatePackageTemplate,
 } from "@/integrations/backend/api";
 import type { PackageTemplate } from "@/integrations/backend/types";
+import { mensagemDeErro } from "@/lib/erros";
 
 const empty = { name: "", description: "", totalClasses: 10, priceCents: null as number | null, validityDays: null as number | null };
 
@@ -114,7 +115,7 @@ export default function AdminPacotes() {
       toast.success(editing ? "Modelo atualizado" : "Modelo criado");
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Não foi possível salvar o modelo.");
+      toast.error(mensagemDeErro(err, "Não foi possível salvar o modelo."));
     },
   });
 
@@ -132,14 +133,14 @@ export default function AdminPacotes() {
               invalidate();
               toast.success("Modelo de volta");
             } catch (err) {
-              toast.error(err instanceof Error ? err.message : "Não foi possível desfazer. Crie o modelo de novo.");
+              toast.error(mensagemDeErro(err, "Não foi possível desfazer. Crie o modelo de novo."));
             }
           },
         },
       });
     },
     // Antes uma falha aqui não mostrava nada: o professor achava que tinha removido.
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível remover o modelo."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível remover o modelo.")),
   });
 
   // O botão desativado diz por quê (antes só ficava apagado).
@@ -228,12 +229,13 @@ export default function AdminPacotes() {
           <div className="flex flex-col gap-3.5 mt-4">
             <div>
               <Label htmlFor="name">Nome</Label>
-              <Input id="name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Pacote 10 aulas" />
+              <Input id="name" maxLength={60} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Pacote 10 aulas" />
             </div>
             <div>
               <Label htmlFor="desc">Descrição</Label>
               <Textarea
                 id="desc"
+                maxLength={300}
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 placeholder="2x por semana"

@@ -119,6 +119,7 @@ export default function Login() {
           <Label htmlFor="email">E-mail</Label>
           <Input
             id="email"
+            maxLength={254}
             ref={emailRef}
             type="email"
             autoComplete="email"
@@ -150,6 +151,7 @@ export default function Login() {
           <div className="relative">
             <Input
               id="password"
+              maxLength={72}
               ref={passwordRef}
               type={showPassword ? "text" : "password"}
               autoComplete="current-password"

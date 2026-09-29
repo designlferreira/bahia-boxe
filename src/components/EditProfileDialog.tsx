@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { updateProfileName } from "@/integrations/backend/api";
 import { useAuth } from "@/context/AuthContext";
+import { mensagemDeErro } from "@/lib/erros";
 
 const MAX_NOME = 80;
 
@@ -22,7 +23,7 @@ export function EditProfileDialog({ open, onOpenChange }: { open: boolean; onOpe
       toast.success("Nome atualizado");
     },
     // Antes uma falha de gravação não mostrava nada: o diálogo ficava aberto e o botão voltava a "Salvar".
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível salvar o nome. Tente de novo."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível salvar o nome. Tente de novo.")),
   });
 
   // O botão apagado diz por quê (antes só ficava apagado).

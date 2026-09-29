@@ -67,6 +67,8 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    /* Nome/e-mail sem espaço (ou colado) quebra em vez de estourar a tela; "anywhere" também reduz o mínimo de itens flex. */
+    overflow-wrap: anywhere;
   }
 
   ::-webkit-scrollbar {

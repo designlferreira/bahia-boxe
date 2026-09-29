@@ -23,6 +23,7 @@ import {
   requestSingleClass,
 } from "@/integrations/backend/api";
 import type { PackageTemplate } from "@/integrations/backend/types";
+import { mensagemDeErro } from "@/lib/erros";
 
 export default function StudentPacotes() {
   const { profile } = useAuth();
@@ -86,7 +87,7 @@ export default function StudentPacotes() {
       queryClient.invalidateQueries({ queryKey: ["student-home"] });
       toast.success(`Pedido enviado: ${t.name}. O professor vai responder.`);
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível enviar o pedido."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível enviar o pedido.")),
   });
 
   const aguardandoModo = modoEfetivo === undefined;

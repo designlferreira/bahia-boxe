@@ -5,6 +5,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { RejectBookingModal } from "@/components/RejectBookingModal";
 import { approveBooking, devolverParaPendente, rejectBooking } from "@/integrations/backend/api";
 import { formatDate, formatTime } from "@/lib/dateUtils";
+import { mensagemDeErro } from "@/lib/erros";
 
 /** Um pendente como o painel e a agenda o conhecem. */
 export interface PendenteAlvo {
@@ -51,11 +52,11 @@ export function usePendingActions(adminId: string, invalidate: () => void) {
                 invalidate();
                 toast("Aprovação desfeita · a aula voltou a aguardar sua aprovação");
               })
-              .catch((err) => toast.error(err instanceof Error ? err.message : "Não foi possível desfazer.")),
+              .catch((err) => toast.error(mensagemDeErro(err, "Não foi possível desfazer."))),
         },
       });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível aprovar."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível aprovar.")),
   });
 
   const reject = useMutation({
@@ -67,7 +68,7 @@ export function usePendingActions(adminId: string, invalidate: () => void) {
       if (alvo.antecessorInicio) toast.warning("Remarcação recusada · a aula original continua valendo");
       else toast.warning(start ? "Recusado com sugestão de horário" : "Agendamento recusado");
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível recusar."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível recusar.")),
   });
 
   function requestApprove(alvo: PendenteAlvo) {

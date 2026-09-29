@@ -30,6 +30,7 @@ import {
   getSaldoPacote,
   setAlunoRecorrenciaAtivo,
 } from "@/integrations/backend/api";
+import { mensagemDeErro } from "@/lib/erros";
 
 /** "2026-09-14" -> "Seg, 14 set" — as opções de início são datas soltas ("yyyy-MM-dd"), sem hora;
  *  meio-dia é só um instante seguro pra formatar sem risco de virar o dia anterior por fuso. */
@@ -187,7 +188,7 @@ export default function AdminAlunoRecorrencia() {
       setAddOpen(false);
       toast.success(`Horário fixo adicionado · toda ${WEEKDAY_LABELS[diaSemana].toLowerCase()} às ${horario}`);
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível adicionar o horário fixo."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível adicionar o horário fixo.")),
   });
 
   const toggleAtivo = useMutation({
@@ -198,7 +199,7 @@ export default function AdminAlunoRecorrencia() {
         className: vars.ativo ? undefined : "!text-amber",
       });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível alterar o horário fixo."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível alterar o horário fixo.")),
   });
 
   // CLAUDE.md, "excluir dia fixo de recorrência" — só aceita quando `temUso` é false (checagem
@@ -210,7 +211,7 @@ export default function AdminAlunoRecorrencia() {
       invalidate();
       toast("Horário fixo excluído", { className: "!text-amber" });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível excluir o horário fixo."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível excluir o horário fixo.")),
   });
 
   const gerarPacote = useMutation({
@@ -222,7 +223,7 @@ export default function AdminAlunoRecorrencia() {
         action: { label: "Ver na agenda", onClick: () => navigate("/admin/agenda") },
       });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível gerar o pacote."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível gerar o pacote.")),
   });
 
   if (detailQuery.isLoading || recorrenciasQuery.isLoading || settingsQuery.isLoading) {

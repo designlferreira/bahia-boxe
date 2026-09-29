@@ -22,6 +22,7 @@ import {
   toggleAvailabilityDay,
 } from "@/integrations/backend/api";
 import type { AvailabilityInterval } from "@/integrations/backend/types";
+import { mensagemDeErro } from "@/lib/erros";
 
 /** Horas de treino razoáveis (05h–22h início, 06h–23h fim) — o resto (madrugada) só aparece se o horário JÁ existe. */
 const START_MIN = 5;
@@ -148,7 +149,7 @@ export default function AdminDisponibilidade() {
         className: vars.active ? undefined : "!text-amber",
       });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível alterar o dia."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível alterar o dia.")),
   });
 
   const saveSlot = useMutation({
@@ -166,7 +167,7 @@ export default function AdminDisponibilidade() {
     // Falha de gravação (rede, servidor): antes o sheet ficava aberto sem nenhum aviso e o professor
     // achava que tinha salvado. A mensagem aparece dentro do sheet, junto do botão.
     onError: (err) => {
-      setEditorError(err instanceof Error ? err.message : "Não foi possível salvar. Tente de novo.");
+      setEditorError(mensagemDeErro(err, "Não foi possível salvar. Tente de novo."));
     },
   });
 
@@ -185,13 +186,13 @@ export default function AdminDisponibilidade() {
               toast.success("Horário de volta");
             } catch (err) {
               // Sem isto, um "Desfazer" que falha deixava a lista como estava e o professor sem saber.
-              toast.error(err instanceof Error ? err.message : "Não foi possível desfazer. Adicione o horário de novo.");
+              toast.error(mensagemDeErro(err, "Não foi possível desfazer. Adicione o horário de novo."));
             }
           },
         },
       });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível remover o horário."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível remover o horário.")),
   });
 
   if (!profile) return null;

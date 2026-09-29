@@ -103,6 +103,7 @@ export default function RecuperarSenha({ amostraEnviado }: { amostraEnviado?: st
             <Label htmlFor="email">E-mail</Label>
             <Input
               id="email"
+              maxLength={254}
               ref={emailRef}
               type="email"
               autoComplete="email"

@@ -136,6 +136,7 @@ export default function ResetPassword({ amostra }: { amostra?: Fase }) {
           </div>
           <Input
             id="next"
+            maxLength={72}
             type={showPassword ? "text" : "password"}
             autoComplete="new-password"
             value={next}
@@ -156,6 +157,7 @@ export default function ResetPassword({ amostra }: { amostra?: Fase }) {
           <Label htmlFor="confirm">Confirmar nova senha</Label>
           <Input
             id="confirm"
+            maxLength={72}
             type={showPassword ? "text" : "password"}
             autoComplete="new-password"
             value={confirm}

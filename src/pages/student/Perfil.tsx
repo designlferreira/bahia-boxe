@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { getStudentProfile, saveStudentProfile, studentIdForProfile } from "@/integrations/backend/api";
 import type { Guard, Laterality, Sex } from "@/integrations/backend/types";
 import { GUARD_INFO, LATERALITY_LABELS, MIN_ALUNOS_NA_ESTATISTICA, SEX_LABELS } from "@/lib/studentProfile";
+import { mensagemDeErro } from "@/lib/erros";
 
 interface Form {
   sex: Sex | null;
@@ -111,7 +112,7 @@ export default function StudentPerfil() {
       queryClient.invalidateQueries({ queryKey: ["student-profile", studentId] });
       toast.success("Dados salvos");
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível salvar."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível salvar.")),
   });
 
   // O que está salvo (comparado por VALOR: "59,5" digitado e 59.5 salvo são o mesmo peso).
@@ -220,6 +221,7 @@ export default function StudentPerfil() {
           <Label htmlFor="weight">Peso (kg)</Label>
           <Input
             id="weight"
+            maxLength={6}
             inputMode="decimal"
             value={form.weightKg}
             onChange={(e) => setForm((f) => ({ ...f, weightKg: limpaPeso(e.target.value) }))}

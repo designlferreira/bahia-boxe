@@ -22,6 +22,7 @@ import type { Booking } from "@/integrations/backend/types";
 import { getStatusConfig } from "@/lib/bookingStatus";
 import { formatDayNumber, formatMonthShort, formatDate, formatDateShort, formatTime, formatRelativeDay } from "@/lib/dateUtils";
 import { StatusBadge } from "@/components/StatusBadge";
+import { mensagemDeErro } from "@/lib/erros";
 
 export default function StudentHome() {
   const { profile } = useAuth();
@@ -48,7 +49,7 @@ export default function StudentHome() {
     onError: (err) =>
       err instanceof SlotTakenError
         ? toast.error(err.message, { action: { label: "Ver horários", onClick: () => navigate("/app/agendar") } })
-        : toast.error(err instanceof Error ? err.message : "Não foi possível aceitar o novo horário."),
+        : toast.error(mensagemDeErro(err, "Não foi possível aceitar o novo horário.")),
   });
 
   // Recusar não pede confirmação: vira um aviso com "Desfazer" (o guia de escrita prefere desfazer
@@ -74,11 +75,11 @@ export default function StudentHome() {
                 navigate("/app/home");
                 toast.success("Sugestão de horário de volta");
               })
-              .catch((err) => toast.error(err instanceof Error ? err.message : "Não foi possível desfazer.")),
+              .catch((err) => toast.error(mensagemDeErro(err, "Não foi possível desfazer."))),
         },
       });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível recusar o horário."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível recusar o horário.")),
   });
 
   const { data: adminId, isError: adminIdError } = useQuery({

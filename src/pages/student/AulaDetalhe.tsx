@@ -26,6 +26,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { OrientacoesDaAula } from "@/components/OrientacoesDaAula";
 import { isAwaitingConfirmation } from "@/lib/bookingStatus";
 import { Badge } from "@/components/ui/badge";
+import { mensagemDeErro } from "@/lib/erros";
 
 export default function StudentAulaDetalhe() {
   const { id } = useParams<{ id: string }>();
@@ -91,7 +92,7 @@ export default function StudentAulaDetalhe() {
       toast("Pedido cancelado · sua aula continua no horário original");
       if (isPedido) navigate("/app/home");
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível cancelar o pedido."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível cancelar o pedido.")),
   });
 
   const cancel = useMutation({
@@ -104,7 +105,7 @@ export default function StudentAulaDetalhe() {
       // prometer que "voltou para o pacote".
       toast.warning(isRecorrencia ? "Aula cancelada" : "Aula cancelada · a aula voltou para o seu pacote");
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível cancelar a aula."),
+    onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível cancelar a aula.")),
   });
 
   const accept = useMutation({
@@ -118,7 +119,7 @@ export default function StudentAulaDetalhe() {
     onError: (err) =>
       err instanceof SlotTakenError
         ? toast.error(err.message, { action: { label: "Ver horários", onClick: () => navigate("/app/agendar") } })
-        : toast.error(err instanceof Error ? err.message : "Não foi possível aceitar o novo horário."),
+        : toast.error(mensagemDeErro(err, "Não foi possível aceitar o novo horário.")),
   });
 
   if (isLoading) {
@@ -369,7 +370,7 @@ export default function StudentAulaDetalhe() {
           onError={(err) =>
             err instanceof SlotTakenError
               ? toast.error("Esse horário acabou de ser ocupado. Escolha outro.")
-              : toast.error(err instanceof Error ? err.message : "Não foi possível enviar o pedido.")
+              : toast.error(mensagemDeErro(err, "Não foi possível enviar o pedido."))
           }
         />
       )}
