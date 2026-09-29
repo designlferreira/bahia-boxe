@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SkeletonList } from "@/components/SkeletonCard";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { formatPriceLabel, packageProgressPct } from "@/lib/packageUtils";
 import { formatDateShort } from "@/lib/dateUtils";
 import {
@@ -23,6 +24,8 @@ export default function StudentPacotes() {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  // Tocar em "Pedir" só ESCOLHE o modelo: quem envia é a janela de confirmação (antes um toque já criava o pedido).
+  const [escolhido, setEscolhido] = useState<PackageTemplate | null>(null);
 
   const { data: home } = useQuery({
     queryKey: ["student-home", profile?.id],
@@ -69,7 +72,7 @@ export default function StudentPacotes() {
       // A Home mostra o pedido em espera no lugar do "solicitar" — sem invalidar, ela continuaria
       // pedindo pra solicitar o que o aluno acabou de solicitar.
       queryClient.invalidateQueries({ queryKey: ["student-home"] });
-      toast.success(`Pedido de ${t.name.toLowerCase()} enviado`);
+      toast.success(`Pedido enviado: ${t.name}. O professor vai responder.`);
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível enviar o pedido."),
   });
@@ -77,6 +80,24 @@ export default function StudentPacotes() {
   const pedido = home?.pendingRequest ?? null;
   const pedidoNome = pedido?.kind === "package" ? "pacote" : "aula avulsa";
   const pedidoModelo = pedido?.templateId ? templates?.find((t) => t.id === pedido.templateId) : undefined;
+
+  // O que o aluno precisa saber ANTES de pedir: quem decide é o professor (pagamento combinado com ele) e liberar um pacote novo
+  // encerra o atual — as aulas sem data deixam de valer, as já marcadas continuam (regra do banco: aprovar encerra o pacote
+  // ativo não experimental; a aula experimental fica).
+  const atual = home?.package && home.package.origin !== "trial" ? home.package : null;
+  const restantesAtual = atual ? Math.max(0, atual.totalClasses - atual.usedClasses) : 0;
+  const semDataAtual = atual ? Math.min(Math.max(home?.credits ?? 0, 0), restantesAtual) : 0;
+  const descricaoPedido = escolhido
+    ? [
+        `${escolhido.name} · ${formatPriceLabel(escolhido.priceCents)}.`,
+        "O professor combina o pagamento com você e libera as aulas. Você é avisado quando ele responder.",
+        semDataAtual > 0
+          ? `Atenção: você ainda tem ${semDataAtual} ${semDataAtual === 1 ? "aula" : "aulas"} sem data no pacote atual. Ao liberar o novo pacote, o atual é encerrado e ${semDataAtual === 1 ? "essa aula deixa" : "essas aulas deixam"} de valer. As aulas já marcadas continuam.`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(String.fromCharCode(10, 10))
+    : "";
 
   return (
     <div className="page-container">
@@ -141,7 +162,7 @@ export default function StudentPacotes() {
               variant="secondary"
               size="sm"
               className="shrink-0 hover:border-primary hover:text-primary"
-              onClick={() => request.mutate(t)}
+              onClick={() => setEscolhido(t)}
               // Desativado enquanto há pedido em espera (e enquanto a Home ainda não chegou: sem ela não dá para saber).
               disabled={request.isPending || !home || !!pedido}
               aria-describedby={pedido ? "pedido-motivo" : undefined}
@@ -151,6 +172,19 @@ export default function StudentPacotes() {
           </div>
         ))}
       </div>
+
+      <ConfirmDialog
+        open={!!escolhido}
+        onOpenChange={(o) => {
+          if (!o) setEscolhido(null);
+        }}
+        title={escolhido ? `PEDIR ${escolhido.name.toUpperCase()}` : "PEDIR"}
+        description={descricaoPedido}
+        confirmLabel="Enviar pedido"
+        cancelLabel="Voltar"
+        tone="default"
+        onConfirm={() => escolhido && request.mutate(escolhido)}
+      />
     </div>
   );
 }
