@@ -249,9 +249,12 @@ export default function StudentPerfil() {
 
       <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Boxe</div>
       <div className="mb-5">
-        <Label>Guarda</Label>
-        <div className="text-[12px] text-muted-foreground mb-2.5 -mt-1">Qual você considera a sua guarda principal?</div>
-        <div className="grid grid-cols-2 gap-2.5">
+        <Label id="guarda-label">Guarda</Label>
+        <div className="text-[12.5px] text-muted-foreground mb-2.5 -mt-1 leading-snug">
+          Qual você considera a sua guarda principal? Não sabe? Pode deixar em branco. Lutando com o pé esquerdo à frente, costuma ser
+          ortodoxa; com o direito, southpaw. Toque de novo na escolhida para desmarcar.
+        </div>
+        <div role="radiogroup" aria-labelledby="guarda-label" className="grid grid-cols-2 gap-2.5">
           {(Object.keys(GUARD_INFO) as Guard[]).map((g) => {
             const on = form.guard === g;
             return (
@@ -264,23 +267,25 @@ export default function StudentPerfil() {
               >
                 <button
                   type="button"
+                  role="radio"
+                  aria-checked={on}
                   onClick={() => setForm((f) => ({ ...f, guard: f.guard === g ? null : g }))}
-                  className="w-full text-left active:scale-[0.98] transition-transform"
+                  className="w-full text-left rounded-lg active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <div className={cn("text-[13.5px] font-semibold mb-1", on ? "text-primary" : "text-foreground")}>
+                  <div className={cn("text-[13.5px] font-semibold mb-1", on ? "text-[hsl(var(--red-text))]" : "text-foreground")}>
                     {GUARD_INFO[g].label}
                   </div>
-                  <div className="text-[11px] text-muted-foreground leading-snug">{GUARD_INFO[g].summary}</div>
+                  {/* 12px (eram 11px): o resumo é o que o iniciante lê para reconhecer a própria guarda. */}
+                  <div className="text-xs text-muted-foreground leading-snug">{GUARD_INFO[g].summary}</div>
                 </button>
+                {/* Ajuda: alvo de 44px (eram 33px) e nome próprio — "O que é essa guarda?" repetido seis vezes não dizia qual. */}
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setGuardInfoOpen(g);
-                  }}
-                  className="mt-2.5 flex items-center gap-1 min-h-8 text-[11px] font-semibold text-accent"
+                  aria-label={`O que é a guarda ${GUARD_INFO[g].label}?`}
+                  onClick={() => setGuardInfoOpen(g)}
+                  className="mt-1.5 -mb-1.5 flex items-center gap-1.5 min-h-11 text-xs font-semibold text-accent rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <HelpCircle className="h-3 w-3" /> O que é essa guarda?
+                  <HelpCircle className="h-3.5 w-3.5" aria-hidden /> O que é essa guarda?
                 </button>
               </div>
             );
