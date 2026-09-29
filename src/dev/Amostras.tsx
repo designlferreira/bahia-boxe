@@ -40,6 +40,10 @@ import StudentPacotes from "@/pages/student/Pacotes";
 import StudentPerfil from "@/pages/student/Perfil";
 import AdminMinhaConta from "@/pages/admin/MinhaConta";
 import AdminOrientacoesAula from "@/pages/admin/OrientacoesAula";
+import StudentPerfilLutadorQuestionario from "@/pages/student/PerfilLutadorQuestionario";
+import AdminAlunoPerfilBoxeQuestionario from "@/pages/admin/AlunoPerfilBoxeQuestionario";
+import { BoxingProfileHeading, BoxingProfileQuestionnaire } from "@/components/BoxingProfileQuestionnaire";
+import { getQuestions, QUESTIONNAIRE_VERSION } from "@/lib/boxingProfile";
 import AdminHistorico from "@/pages/admin/Historico";
 import AdminAlunoDetalhe from "@/pages/admin/AlunoDetalhe";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
@@ -276,6 +280,53 @@ function historicoAluno(proximas: Booking[], anteriores: Booking[]): [unknown[],
     [["student-history", PROFILE.id, "proximas"], proximas],
     [["student-history", PROFILE.id, "anteriores"], anteriores],
   ];
+}
+
+/**
+ * Questionário do Perfil de Boxe já em andamento: grava um RASCUNHO no localStorage antes de montar (o componente retoma na primeira
+ * pergunta sem resposta). `ate` = quantas perguntas já respondidas; `todas` = respondeu todas (abre na última, com "Concluir").
+ */
+function AmostraQuestionario({ voz, ate, todas, chave, resumo }: { voz: "self" | "coach"; ate: number; todas?: boolean; chave: string; resumo?: boolean }) {
+  const questions = getQuestions(voz, "short");
+  const draftKey = `amostra.q.${chave}`;
+  const [pronto] = useState(() => {
+    const answers: Record<string, number | string> = {};
+    questions.slice(0, todas ? questions.length : ate).forEach((q) => {
+      answers[q.id] = q.type === "likert" ? 3 : q.options[0].value;
+    });
+    try {
+      if (Object.keys(answers).length > 0) localStorage.setItem(draftKey, JSON.stringify({ questionnaireVersion: QUESTIONNAIRE_VERSION, answers }));
+      else localStorage.removeItem(draftKey);
+    } catch {
+      /* sem storage: a amostra abre na primeira pergunta */
+    }
+    return true;
+  });
+  return pronto ? (
+    <div className="page-container">
+      <BoxingProfileQuestionnaire
+        heading={
+          <BoxingProfileHeading
+            subtitle={
+              voz === "self" ? (
+                "Sua autoavaliação · versão rápida"
+              ) : (
+                <>
+                  <strong className="font-semibold text-foreground">Ana Beatriz Souza</strong> · versão rápida
+                </>
+              )
+            }
+          />
+        }
+        resumoInicial={resumo}
+        questions={questions}
+        draftKey={draftKey}
+        onSubmit={() => Promise.reject(new Error("amostra"))}
+        onSuccess={() => {}}
+        onExit={() => {}}
+      />
+    </div>
+  ) : null;
 }
 
 function Frame({ title, note, children }: { title: string; note: string; children: ReactNode }) {
@@ -1421,6 +1472,52 @@ export default function Amostras() {
               </SeededAdmin>
             </Frame>
           ))}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Questionário do Perfil de Boxe</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          <Frame title="Aluno · escolha da versão" note="primeira tela: rápida ou completa">
+            <Seeded data={base} modo="autosservico">
+              <ComRota path="/app/perfil-lutador/questionario" url="/app/perfil-lutador/questionario">
+                <StudentPerfilLutadorQuestionario />
+              </ComRota>
+            </Seeded>
+          </Frame>
+          <Frame title="Aluno · pergunta de escala" note="versão rápida, primeira pergunta (5 opções de frequência)">
+            <Seeded data={base} modo="autosservico">
+              <AmostraQuestionario voz="self" ate={0} chave="self-0" />
+            </Seeded>
+          </Frame>
+          <Frame title="Aluno · pergunta de escolha" note="depois das 8 de escala: escolher entre situações">
+            <Seeded data={base} modo="autosservico">
+              <AmostraQuestionario voz="self" ate={8} chave="self-8" />
+            </Seeded>
+          </Frame>
+          <Frame title="Aluno · última pergunta" note="tudo respondido: abre na última, com Concluir">
+            <Seeded data={base} modo="autosservico">
+              <AmostraQuestionario voz="self" ate={0} todas chave="self-todas" />
+            </Seeded>
+          </Frame>
+          <Frame title="Aluno · resumo final" note="conferir as respostas antes de enviar (toque numa para mudá-la)">
+            <Seeded data={base} modo="autosservico">
+              <AmostraQuestionario voz="self" ate={0} todas resumo chave="self-resumo" />
+            </Seeded>
+          </Frame>
+          <Frame title="Professor · escolha da versão" note="primeira tela, na voz de quem avalia o aluno">
+            <SeededAdmin
+              data={null}
+              seed={(qc) => qc.setQueryData(["admin-student-detail", "s1"], { student: aluno("s1", "Ana Beatriz Souza") })}
+            >
+              <ComRota path="/admin/alunos/:studentId/perfil-lutador/questionario" url="/admin/alunos/s1/perfil-lutador/questionario">
+                <AdminAlunoPerfilBoxeQuestionario />
+              </ComRota>
+            </SeededAdmin>
+          </Frame>
+          <Frame title="Professor · pergunta" note="voz do professor sobre o aluno">
+            <SeededAdmin data={null}>
+              <AmostraQuestionario voz="coach" ate={0} chave="coach-0" />
+            </SeededAdmin>
+          </Frame>
         </div>
 
         <h2 className="text-lg font-semibold mb-4">Histórico (professor)</h2>

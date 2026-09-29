@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronLeft, X } from "lucide-react";
+import { Check, ChevronLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { cn } from "@/lib/utils";
@@ -35,6 +35,27 @@ function clearDraft(key: string) {
   }
 }
 
+// Opção marcada: antes o texto era o vermelho de destaque (`text-primary`) sobre vermelho translúcido — 3,5:1 num texto de 14px — e a
+// desmarcada tinha contorno de 1,5:1. Agora: texto normal + ✓ (não depende só de cor), contorno legível e anel de foco por teclado.
+const OPCAO_BASE =
+  "relative flex gap-3 min-h-[56px] px-4 rounded-2xl border transition-all active:scale-[0.99] has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring";
+const OPCAO_ON = "bg-primary/15 border-primary";
+const OPCAO_OFF = "bg-secondary border-muted-foreground/50";
+
+/**
+ * Título das telas do questionário. O questionário tem a própria barra (voltar, progresso, sair) e não usava o cabeçalho do app: o aluno
+ * via "PERFIL DE BOXE" só na escolha da versão e o professor nunca via título — e o "Avaliando <nome>" (12,5px) sumia depois de escolher a
+ * versão, então quem avalia o 5º aluno da noite não via de quem se tratava. `subtitle` leva o nome/contexto e é sempre visível.
+ */
+export function BoxingProfileHeading({ subtitle }: { subtitle: ReactNode }) {
+  return (
+    <div className="mb-4">
+      <h1 className="page-title">PERFIL DE BOXE</h1>
+      <div className="text-[13.5px] text-muted-foreground mt-0.5">{subtitle}</div>
+    </div>
+  );
+}
+
 interface BoxingProfileQuestionnaireProps {
   /** QUESTIONS (voz do aluno) ou COACH_QUESTIONS (voz do professor) — mesmos 32 ids, texto diferente. */
   questions: Question[];
@@ -49,6 +70,10 @@ interface BoxingProfileQuestionnaireProps {
   onError?: (err: unknown) => void;
   onExit: () => void;
   exitDescription?: string;
+  /** Cabeçalho acima da barra do questionário (ver `BoxingProfileHeading`). */
+  heading?: ReactNode;
+  /** Só para a página de amostras de desenvolvimento: abre já na tela de resumo. */
+  resumoInicial?: boolean;
 }
 
 /**
@@ -63,26 +88,51 @@ export function BoxingProfileQuestionnaire({
   onSuccess,
   onError,
   onExit,
-  exitDescription = "Suas respostas ficam salvas neste dispositivo — você pode continuar de onde parou depois.",
+  exitDescription = "Suas respostas ficam salvas neste aparelho. Você pode continuar de onde parou depois, por aqui.",
+  heading,
+  resumoInicial,
 }: BoxingProfileQuestionnaireProps) {
-  const [answers, setAnswers] = useState<Answers>({});
-  const [index, setIndex] = useState(0);
+  // O rascunho é lido ANTES do primeiro render. Antes um `useEffect` o restaurava depois: a tela abria na pergunta 1 por um instante e
+  // pulava para a certa (piscada), e esse pulo ainda tirava o foco do lugar.
+  const [rascunho] = useState(() => loadDraft(draftKey));
+  const [answers, setAnswers] = useState<Answers>(rascunho);
+  const [index, setIndex] = useState(() => {
+    // Retoma na primeira pergunta ainda sem resposta (`findIndex` cobre lacunas); tudo respondido = abre na última, para revisar/enviar.
+    const primeira = questions.findIndex((q) => rascunho[q.id] === undefined);
+    return primeira === -1 ? questions.length - 1 : primeira;
+  });
+  // Aviso "Continuando de onde você parou": só quando havia rascunho de verdade (e some ao responder a pergunta seguinte).
+  const [retomado, setRetomado] = useState(() => Object.keys(rascunho).length > 0);
+  const [confirmRecomecar, setConfirmRecomecar] = useState(false);
   const [confirmExit, setConfirmExit] = useState(false);
+  // Tela final de conferência ("Você respondeu N de N"): antes "Concluir" na última pergunta ENVIAVA direto, sem a pessoa rever nada.
+  const [resumo, setResumo] = useState(!!resumoInicial);
+  // Veio do resumo para corrigir UMA resposta: ao responder, volta ao resumo (não segue pela lista de perguntas).
+  const [deResumo, setDeResumo] = useState(false);
+  const tituloResumoRef = useRef<HTMLHeadingElement>(null);
+  const perguntaRef = useRef<HTMLFieldSetElement>(null);
+  const indiceAnterior = useRef(index);
+  const avancoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Ao mudar de pergunta (avançar, voltar ou o avanço automático) o foco vai para a pergunta nova: antes ele caía no <body> (o botão
+  // "Avançar" ficava desativado na pergunta seguinte) e o leitor de tela não ouvia a pergunta. Não na primeira montagem: não rouba o foco.
+  useEffect(() => {
+    // Compara com o índice anterior (e não com "já montou"): em desenvolvimento o React executa os efeitos duas vezes na montagem.
+    if (indiceAnterior.current === index) return;
+    indiceAnterior.current = index;
+    perguntaRef.current?.focus();
+  }, [index]);
 
   useEffect(() => {
-    const draft = loadDraft(draftKey);
-    setAnswers(draft);
-    // Retoma na primeira pergunta ainda sem resposta, não sempre em 0 — a versão anterior
-    // restaurava as respostas mas reabria em 0 incondicionalmente, então dava pra chegar na
-    // pergunta certa clicando "Avançar" várias vezes, sem perder nada, só com fricção. Gaps no
-    // meio (responder 5 sem ter respondido 3/4) não são possíveis pela UI hoje — `goNext` só anda
-    // uma pergunta por vez e exige a atual respondida — mas `findIndex` cobre esse caso também se
-    // um dia deixar de ser verdade. Se tudo já estiver respondido, abre na última (pra revisar/
-    // enviar), não fora do array.
-    const firstUnanswered = questions.findIndex((q) => draft[q.id] === undefined);
-    setIndex(firstUnanswered === -1 ? questions.length - 1 : firstUnanswered);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftKey]);
+    if (resumo) tituloResumoRef.current?.focus();
+  }, [resumo]);
+
+  // Cancela um avanço automático pendente ao sair da tela ou mudar de pergunta.
+  useEffect(() => {
+    return () => {
+      if (avancoRef.current) clearTimeout(avancoRef.current);
+    };
+  }, [index]);
 
   useEffect(() => {
     if (Object.keys(answers).length > 0) saveDraft(draftKey, answers);
@@ -97,7 +147,8 @@ export function BoxingProfileQuestionnaire({
     },
     onError: (err) => {
       if (onError) onError(err);
-      else toast.error(err instanceof Error ? err.message : "Não foi possível concluir a avaliação.");
+      // Frase em português (antes o texto cru do banco). As respostas continuam guardadas: só saem do aparelho quando o envio dá certo.
+      else toast.error("Não foi possível enviar sua avaliação. Verifique sua conexão e tente de novo — suas respostas continuam salvas.");
     },
   });
 
@@ -108,18 +159,74 @@ export function BoxingProfileQuestionnaire({
 
   function goNext() {
     if (!answered) return;
+    if (deResumo) {
+      setDeResumo(false);
+      setResumo(true);
+      return;
+    }
     if (isLast) {
       if (!isComplete(answers, questions)) {
         toast.error(`Faltam ${missing.length} questão(ões) para concluir. Volte e responda todas.`);
         return;
       }
-      submit.mutate();
+      setResumo(true);
       return;
     }
     setIndex((i) => Math.min(i + 1, questions.length - 1));
   }
 
+  function recomecar() {
+    if (avancoRef.current) clearTimeout(avancoRef.current);
+    clearDraft(draftKey);
+    setAnswers({});
+    setIndex(0);
+    setResumo(false);
+    setDeResumo(false);
+    setRetomado(false);
+  }
+
+  /** Rótulo da resposta dada a uma pergunta (para o resumo). */
+  function rotuloDa(q: Question): string {
+    const v = answers[q.id];
+    if (v === undefined) return "Sem resposta";
+    if (q.type === "likert") return LIKERT_OPTIONS.find((o) => o.value === v)?.label ?? String(v);
+    return q.options.find((o) => o.value === v)?.label ?? String(v);
+  }
+
+  /**
+   * Pergunta de ESCALA (5 níveis de frequência): tocar na resposta abre a próxima sozinha, depois de um instante para ver a escolha
+   * (antes eram dois toques por pergunta: 28 na versão rápida, 74 na completa). Dá para voltar e mudar. Nunca avança sozinho na
+   * última pergunta (concluir é uma decisão) nem nas de ESCOLHA entre situações (exigem ler opções longas).
+   */
+  function responde(value: Answers[string]) {
+    setRetomado(false);
+    setAnswers((a) => ({ ...a, [question.id]: value }));
+    if (avancoRef.current) clearTimeout(avancoRef.current);
+    if (question.type === "likert" && (!isLast || deResumo)) {
+      avancoRef.current = setTimeout(() => {
+        if (deResumo) {
+          setDeResumo(false);
+          setResumo(true);
+        } else {
+          setIndex((i) => Math.min(i + 1, questions.length - 1));
+        }
+      }, 350);
+    }
+  }
+
   function goBack() {
+    if (avancoRef.current) clearTimeout(avancoRef.current);
+    if (resumo) {
+      // Do resumo, "voltar" reabre a última pergunta.
+      setResumo(false);
+      setIndex(questions.length - 1);
+      return;
+    }
+    if (deResumo) {
+      setDeResumo(false);
+      setResumo(true);
+      return;
+    }
     if (index === 0) {
       setConfirmExit(true);
       return;
@@ -129,29 +236,32 @@ export function BoxingProfileQuestionnaire({
 
   return (
     <div>
+      {heading}
       <div className="flex items-center gap-3 mb-3">
         <button
           type="button"
           onClick={goBack}
           aria-label="Voltar"
-          className="h-11 w-11 shrink-0 rounded-xl bg-secondary border border-border flex items-center justify-center active:scale-95 transition-transform"
+          className="h-11 w-11 shrink-0 rounded-xl bg-secondary border border-muted-foreground/50 flex items-center justify-center active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <ChevronLeft className="h-[18px] w-[18px] text-foreground" />
+          <ChevronLeft className="h-[18px] w-[18px] text-foreground" aria-hidden />
         </button>
         <div className="flex-1">
           <div className="text-[12px] text-muted-foreground mb-1.5" aria-live="polite">
-            Questão {index + 1} de {questions.length}
+            {resumo ? "Revisão final" : `Questão ${index + 1} de ${questions.length}`}
           </div>
           <div
             className="h-1.5 rounded-full bg-secondary overflow-hidden"
             role="progressbar"
-            aria-valuenow={index + 1}
+            aria-label="Progresso do questionário"
+            aria-valuetext={resumo ? "Revisão final" : `Questão ${index + 1} de ${questions.length}`}
+            aria-valuenow={resumo ? questions.length : index + 1}
             aria-valuemin={1}
             aria-valuemax={questions.length}
           >
             <div
               className="h-full rounded-full bg-gradient-gold transition-[width] duration-300"
-              style={{ width: `${((index + 1) / questions.length) * 100}%` }}
+              style={{ width: `${((resumo ? questions.length : index + 1) / questions.length) * 100}%` }}
             />
           </div>
         </div>
@@ -159,75 +269,152 @@ export function BoxingProfileQuestionnaire({
           type="button"
           onClick={() => setConfirmExit(true)}
           aria-label="Sair do questionário"
-          className="h-11 w-11 shrink-0 rounded-xl bg-secondary border border-border flex items-center justify-center active:scale-95 transition-transform"
+          className="h-11 w-11 shrink-0 rounded-xl bg-secondary border border-muted-foreground/50 flex items-center justify-center active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <X className="h-[18px] w-[18px] text-muted-foreground" />
+          <X className="h-[18px] w-[18px] text-muted-foreground" aria-hidden />
         </button>
       </div>
 
-      <fieldset className="mt-6 mb-8">
-        <legend className="text-[19px] font-semibold text-foreground leading-snug mb-5">{question.text}</legend>
+      {retomado && !resumo && (
+        <div role="status" className="flex items-center gap-3 rounded-xl border border-border bg-card px-3.5 py-2.5 mt-4 text-[13px] text-muted-foreground">
+          <span className="flex-1">Continuando de onde você parou.</span>
+          <button
+            type="button"
+            onClick={() => setConfirmRecomecar(true)}
+            className="shrink-0 min-h-11 px-2 -my-1 font-semibold text-accent underline underline-offset-4 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Recomeçar
+          </button>
+        </div>
+      )}
 
-        {question.type === "likert" && (
-          <div className="flex flex-col gap-2.5">
-            {LIKERT_OPTIONS.map((opt) => {
-              const checked = answers[question.id] === opt.value;
-              return (
-                <label
-                  key={opt.value}
-                  className={cn(
-                    "flex items-center gap-3 min-h-[56px] px-4 rounded-2xl border transition-all active:scale-[0.99]",
-                    checked ? "bg-primary/15 border-primary" : "bg-secondary border-border",
-                  )}
+      {resumo ? (
+        <section aria-labelledby="resumo-titulo" className="mt-6 mb-6">
+          <h2
+            id="resumo-titulo"
+            ref={tituloResumoRef}
+            tabIndex={-1}
+            className="text-[19px] font-semibold text-foreground leading-snug mb-1 focus:outline-none"
+          >
+            Confira suas respostas
+          </h2>
+          <p className="text-[13.5px] text-muted-foreground mb-4">
+            Você respondeu {questions.length - missing.length} de {questions.length} perguntas. Toque numa resposta para mudá-la.
+          </p>
+          <ul className="flex flex-col gap-2">
+            {questions.map((q, i) => (
+              <li key={q.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIndex(i);
+                    setDeResumo(true);
+                    setResumo(false);
+                  }}
+                  className="w-full text-left rounded-2xl border border-muted-foreground/50 bg-secondary px-4 py-3 min-h-[56px] active:scale-[0.99] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <input
-                    type="radio"
-                    name={question.id}
-                    value={opt.value}
-                    checked={checked}
-                    onChange={() => setAnswers((a) => ({ ...a, [question.id]: opt.value }))}
-                    className="h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
-                  />
-                  <span className={cn("text-[14.5px] font-medium", checked ? "text-primary" : "text-foreground/85")}>{opt.label}</span>
-                </label>
-              );
-            })}
-          </div>
-        )}
-
-        {question.type === "behavioral" && (
-          <div className="flex flex-col gap-2.5">
-            {question.options.map((opt) => {
-              const checked = answers[question.id] === opt.value;
-              return (
-                <label
-                  key={opt.value}
-                  className={cn(
-                    "flex items-start gap-3 min-h-[56px] px-4 py-3 rounded-2xl border transition-all active:scale-[0.99]",
-                    checked ? "bg-primary/15 border-primary" : "bg-secondary border-border",
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name={question.id}
-                    value={opt.value}
-                    checked={checked}
-                    onChange={() => setAnswers((a) => ({ ...a, [question.id]: opt.value }))}
-                    className="h-5 w-5 shrink-0 mt-0.5 accent-[hsl(var(--primary))]"
-                  />
-                  <span className={cn("text-[14px] leading-snug", checked ? "text-primary font-medium" : "text-foreground/85")}>
-                    {opt.label}
+                  <span className="block text-[12.5px] text-muted-foreground leading-snug line-clamp-2">
+                    {i + 1}. {q.text}
                   </span>
-                </label>
-              );
-            })}
-          </div>
+                  <span className="block text-[14px] font-semibold text-foreground leading-snug mt-0.5">{rotuloDa(q)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : (
+        <>
+      <fieldset ref={perguntaRef} tabIndex={-1} className="mt-6 mb-8 focus:outline-none">
+          <legend className="text-[19px] font-semibold text-foreground leading-snug mb-5">{question.text}</legend>
+  
+          {question.type === "likert" && (
+            <div className="flex flex-col gap-2.5">
+              {LIKERT_OPTIONS.map((opt) => {
+                const checked = answers[question.id] === opt.value;
+                return (
+                  <label key={opt.value} className={cn(OPCAO_BASE, "items-center", checked ? OPCAO_ON : OPCAO_OFF)}>
+                    <input
+                      type="radio"
+                      name={question.id}
+                      value={opt.value}
+                      checked={checked}
+                      onChange={() => responde(opt.value)}
+                      className="h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                    />
+                    <span className={cn("flex-1 text-[14.5px]", checked ? "font-semibold text-foreground" : "font-medium text-foreground/85")}>
+                      {opt.label}
+                    </span>
+                    {checked && <Check className="h-4 w-4 shrink-0 text-[hsl(var(--red-text))]" strokeWidth={3} aria-hidden />}
+                  </label>
+                );
+              })}
+            </div>
+          )}
+  
+          {question.type === "behavioral" && (
+            <div className="flex flex-col gap-2.5">
+              {question.options.map((opt) => {
+                const checked = answers[question.id] === opt.value;
+                return (
+                  <label key={opt.value} className={cn(OPCAO_BASE, "items-start py-3", checked ? OPCAO_ON : OPCAO_OFF)}>
+                    <input
+                      type="radio"
+                      name={question.id}
+                      value={opt.value}
+                      checked={checked}
+                      onChange={() => responde(opt.value)}
+                      className="h-5 w-5 shrink-0 mt-0.5 accent-[hsl(var(--primary))]"
+                    />
+                    <span className={cn("flex-1 text-[14px] leading-snug", checked ? "text-foreground font-semibold" : "text-foreground/85")}>
+                      {opt.label}
+                    </span>
+                    {checked && <Check className="h-4 w-4 shrink-0 mt-0.5 text-[hsl(var(--red-text))]" strokeWidth={3} aria-hidden />}
+                  </label>
+                );
+              })}
+            </div>
+          )}
+        </fieldset>
+  
+        {question.type === "likert" && !isLast && index === 0 && (
+          <p className="text-[12.5px] text-muted-foreground text-center -mt-4 mb-4">
+            Ao tocar numa resposta, a próxima pergunta abre sozinha. Você pode voltar e mudar.
+          </p>
         )}
-      </fieldset>
+  
+        <Button
+          size="lg"
+          className="w-full"
+          onClick={goNext}
+          disabled={!answered}
+          aria-describedby={!answered ? "dica-resposta" : undefined}
+        >
+          {deResumo ? "Voltar ao resumo" : isLast ? "Revisar respostas" : "Avançar"}
+        </Button>
+        {/* Botão desativado explica o motivo. */}
+        {!answered && (
+          <p id="dica-resposta" className="text-center text-[13px] text-muted-foreground mt-2.5">
+            Escolha uma resposta para continuar.
+          </p>
+        )}
+        </>
+      )}
 
-      <Button size="lg" className="w-full" onClick={goNext} disabled={!answered || submit.isPending}>
-        {submit.isPending ? "Enviando…" : isLast ? "Concluir" : "Avançar"}
-      </Button>
+      {resumo ? (
+        <Button size="lg" className="w-full" onClick={() => submit.mutate()} disabled={missing.length > 0 || submit.isPending}>
+          {submit.isPending ? "Enviando…" : "Enviar avaliação"}
+        </Button>
+      ) : null}
+
+      <ConfirmDialog
+        open={confirmRecomecar}
+        onOpenChange={setConfirmRecomecar}
+        title="RECOMEÇAR?"
+        description="As respostas que você já deu serão apagadas e o questionário volta para a primeira pergunta."
+        confirmLabel="Recomeçar"
+        cancelLabel="Continuar de onde parei"
+        onConfirm={recomecar}
+      />
 
       <ConfirmDialog
         open={confirmExit}

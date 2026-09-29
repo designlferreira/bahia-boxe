@@ -3172,6 +3172,42 @@ geral do projeto: **toda tela que salva por `upsert` o que veio de uma consulta 
 "Não recomendado" renomear para "Não pedir"; "outra" vira "12oz ou outra" na tela do aluno; `mapsUrl` sem CEP; atualização funcional (`setEquipment(prev => …)`)
 para dois toques no mesmo instante (não reproduzível por uma pessoa); o cartão em Configurações não cita os "recados".
 
+### Questionário do Perfil de Boxe (aluno e professor): rodada de crítica (2026-09-29) — sem migration nova
+
+`src/components/BoxingProfileQuestionnaire.tsx` (o questionário passo a passo, ÚNICO para as duas vozes), `BoxingProfileLengthChoice.tsx` (escolha da versão) e as
+páginas `student/PerfilLutadorQuestionario.tsx` / `admin/AlunoPerfilBoxeQuestionario.tsx`: crítica **20/40**, relatório em
+`.impeccable/critique/*boxingprofilequestionnaire*`. Seis passos na `dev`, testados pelo Lucas. Na página de amostras ("Questionário do Perfil de Boxe": escolha
+do aluno e do professor, pergunta de escala, pergunta de escolha, última pergunta, resumo final, pergunta do professor — a galeria grava um RASCUNHO no
+`localStorage` para abrir na pergunta desejada). **As notas/regras de pontuação NÃO foram tocadas** (só a interface; ver "Reforma do questionário").
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Pergunta de ESCALA (5 níveis) avança sozinha** 0,35s depois de tocar (antes: dois toques por pergunta, 28 na rápida e 74 na completa); dá para voltar e mudar (a
+  resposta continua marcada) e o botão "Avançar" continua lá. **Nunca avança sozinho** na última pergunta (concluir é uma decisão) nem nas perguntas de ESCOLHA entre
+  situações (exigem ler opções longas). Dica na primeira pergunta. O foco vai para a pergunta nova a cada troca (antes caía no `<body>`).
+- **Tela de resumo antes de enviar** ("Confira suas respostas": N de N + a lista com a resposta de cada pergunta): o botão da última pergunta virou **"Revisar respostas"**
+  (antes "Concluir" ENVIAVA direto); tocar numa linha reabre aquela pergunta com "Voltar ao resumo" (e uma resposta de escala, ao ser mudada, volta ao resumo
+  sozinha); **"Enviar avaliação"** só ativa com tudo respondido. Rótulo do progresso "Revisão final".
+- **Escolha da versão:** a **rápida é a recomendada** ("Recomendada para a primeira vez" no aluno, "…para começar" no professor); a completa "mais detalhada e mais demorada";
+  **SEM tempos em minutos** (ninguém mediu — a opção "cerca de 3 min/8 min" foi oferecida e recusada; se um dia forem medidos, entra aqui). Link "Preencher altura e
+  envergadura em Meus dados físicos" só na voz do aluno (a completa usa altura e envergadura: `physicalAnchor.ts`); no professor a frase fala dos dados do aluno.
+  O rodapé deixou de ser aviso solto: "escolha a mesma versão nas próximas vezes para acompanhar a evolução — as duas não são comparáveis".
+- **Título e contexto em todas as telas** (`BoxingProfileHeading`): "PERFIL DE BOXE" + "Sua autoavaliação · versão rápida" (aluno) ou **"Ana Beatriz Souza · versão
+  rápida" (professor, nome SEMPRE visível — antes o "Avaliando <nome>" de 12,5px sumia depois de escolher a versão e quem avalia o 5º aluno da noite não via de quem se
+  tratava)**; `return null` (tela em branco) virou esqueleto.
+
+**O que mudou / armadilhas:**
+- **Opção marcada:** texto normal em negrito + ✓ (`Check`) e contorno `border-primary`; antes `text-primary` sobre `bg-primary/15` dava **3,51:1**. Desmarcada com
+  `border-muted-foreground/50` (era 1,48:1). Anel de foco na opção INTEIRA (`has-[input:focus-visible]`) e em Voltar/X/cartões; ícones `aria-hidden`.
+- **Rascunho:** lido no `useState` preguiçoso (ANTES do primeiro render). Antes um `useEffect` o restaurava depois: piscada na pergunta 1 e o pulo tirava o foco.
+  Aviso "Continuando de onde você parou." com **Recomeçar** (pede confirmação, apaga o rascunho). Texto de sair: "ficam salvas neste aparelho" (só vale neste aparelho e se o
+  `localStorage` funcionar). **O foco só se move quando o índice muda de fato** (`indiceAnterior`): em desenvolvimento o React roda os efeitos duas vezes e "já montou" roubava o foco.
+- Barra de progresso com `aria-label` e `aria-valuetext`; "Escolha uma resposta para continuar." explica o botão desativado; erro de envio em português com "suas respostas
+  continuam salvas" (o rascunho só é apagado no sucesso); `studentId!` no envio do aluno virou espera com esqueleto.
+
+**Deixado para depois (registrado, não pedido):** glossário/"não sei" para quem não conhece "jab"/"aparadores"/"guarda"; nomear as 8 dimensões durante o questionário ("Defesa, 2 de 4");
+um texto de que "não existe resposta certa"; "usar a mesma versão da última vez" para o professor; trocar de versão sem sair; uma frase de "o que vem depois" ao concluir; a escala
+"Quase nunca…Quase sempre" mistura capacidade e frequência ("Consigo iniciar ataques…") — é conteúdo do questionário, não da interface; medir o tempo real das duas versões.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
