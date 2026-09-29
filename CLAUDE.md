@@ -3554,6 +3554,26 @@ apontou 1 item restante, achado tratado como falso positivo (fora do quadro medi
 **Não feito (registrado, não pedido):** conexão lenta (as chamadas não têm tempo limite); o que o app instalado mostra offline além da faixa (o service worker só guarda o cache do próprio app); outras partes do `harden`
 (RTL/i18n não se aplicam: o app é só em português; listas com centenas de itens não foram testadas além do que já é paginado).
 
+### Endurecimento (`harden`) da entrada e da sessão (2026-09-30) — sem migration nova
+
+Um passo na `dev`, testado pelo Lucas. Continuação do `harden` das telas que salvam dados (seção acima); alvo escolhido por ele: entrada e sessão.
+
+**ERRO REAL corrigido (por leitura do código): falha ao carregar o perfil virava "sem perfil" e mandava a pessoa para o login com a sessão ainda válida.** `loadProfile` (`auth.ts`) devolvia `null` tanto para "a linha não existe"
+quanto para qualquer erro (sem rede, servidor fora, token em renovação). Consequências: abrir o app instalado SEM SINAL caía no login; e a cada renovação do login (`onAuthStateChange`) numa conexão ruim a pessoa era jogada para fora no meio do uso.
+Agora `loadProfile` LANÇA `AuthError` (`code = "profile_load_failed"`) em erro e só devolve `null` quando a linha realmente não existe.
+- `AuthProvider` ganhou `loadError` e `retry` (opcionais no tipo do contexto, para a galeria não precisar informá-los). Se o perfil não carrega na abertura: `loadError = true` e `loading = false` — **não** vira "deslogado".
+  Se falha numa renovação durante o uso, a pessoa continua onde está (o listener engole o erro em vez de chamar `cb(null)`). `refreshProfile` também tem `.catch`.
+- **`TelaSessaoNaoCarregou`** ("NÃO CONSEGUIMOS ABRIR SUA CONTA", "Tentar de novo" e "Entrar com outra conta"; textos meus, aprovados) é mostrada por `PostLoginRedirect` (`App.tsx`) e `ProtectedRoute` quando `!profile && loadError`, no lugar do redirecionamento ao login.
+  "Entrar com outra conta" encerra a sessão local. Está na galeria ("Sessão sem perfil").
+- **Aviso quando a sessão termina sozinha** (vencida, revogada ou encerrada em outra aba): `toast("Sua sessão terminou. Entre de novo para continuar.", { id: "sessao-terminou" })`. Não aparece quando a própria pessoa toca em Sair
+  (`saidaManual` ref + `profileRef`). Neutro, não vermelho.
+- **Regra:** `loadProfile` não pode voltar a engolir o erro; qualquer novo chamador precisa tratar a exceção (signIn e cadastro já a mostram na tela).
+
+**Não conferido:** a abertura offline do app instalado em aparelho real (o service worker pode nem entregar o app sem cache); o aviso de "sessão terminou" quando o Supabase só notifica a outra aba com atraso.
+
+**Não feito (registrado, não pedido):** o que o aluno VÊ no app sem vínculo com um professor (segue dependendo da consulta no SQL Editor que o Lucas ficou de rodar); `accept_invite` que falha continua calado (ver "Polish do fluxo do aluno novo");
+tempo limite nas chamadas (conexão lenta); `markNotificationRead` em `PerfilLutador.tsx` sem `.catch` (rejeição não tratada no console se a chamada falhar).
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
