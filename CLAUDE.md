@@ -2659,6 +2659,36 @@ errou a senha e a redefinia em círculos. Agora:
 **Deixado para depois:** "manter conectado"/aviso de sessão; comprimir o topo em telas muito baixas
 (hoje cabe em 375×667); marca por professor no Login.
 
+### Horários fixos (Recorrência do aluno): rodada de crítica (2026-09-29) — sem migration nova
+
+`src/pages/admin/AlunoRecorrencia.tsx` (rota `/admin/alunos/:studentId/recorrencia`): crítica **19/40**,
+relatório em `.impeccable/critique/*alunorecorrencia*`. Seis passos na `dev`, testados pelo Lucas. Na página
+de amostras ("Recorrência do aluno (professor)", 3 situações: em uso, primeira vez, professor em Autosserviço).
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Nome único para o professor: "Horários fixos"** (título, seção, sheet, avisos, cartão em `AlunoDetalhe`).
+  "Recorrência" continua sendo só o nome do **modo** em Configurações (e no aviso do Autosserviço).
+- **"Gerar" mostra o efeito ANTES do toque:** resumo acima do botão (dias/horários, período) e linha âmbar
+  com as aulas que serão canceladas; o botão vira "Gerar N e cancelar M". A janela de confirmação continua,
+  agora listando as datas (`getAulasCancelaveisRecorrencia` devolve as datas; antes só a contagem).
+  `previewRecorrenciaAulas` reaproveita `computeRecorrenciaSlots` — o preview é o MESMO cálculo da geração.
+
+**O que mudou / armadilhas:**
+- Em modo Autosserviço o cartão de gerar some (botão e campos) e entra um aviso com o link "Abrir
+  Configurações"; sem horário ativo, o motivo fica acima do botão e ligado a ele (`aria-describedby`).
+- Uma frase única sob "Horários fixos da semana" explica que desativar/excluir não muda as aulas já marcadas;
+  saiu o aviso de 11px repetido por cartão. Depois de gerar, o aviso tem "Ver na agenda".
+- Acessibilidade: Switch e lixeira com nome por linha ("Horário fixo de segunda às 18:00"), lixeira 44px,
+  `aria-pressed` nos botões de data/dia/hora, texto selecionado com `--red-text` (era 3,25:1), esmaecimento
+  da linha inativa só no texto. **O `Switch` (`ui/switch.tsx`) ganhou anel de foco por teclado no app inteiro.**
+- Campo de aulas é texto numérico (1–52): dá para apagar e digitar; sheet só com 05h–22h (horários já
+  cadastrados fora disso continuam aparecendo); aluno sem horário fixo vê "Adicionar o primeiro horário" e
+  não o cartão de gerar.
+
+**Deixado para depois (registrado, não pedido):** editar um horário fixo existente; visão semanal (D S T Q Q S S)
+dos horários; avisar o aluno quando aulas são canceladas e substituídas ao gerar; mostrar no sheet se o horário
+colide com outro aluno (hoje só falha ao gerar); confirmar o anel de foco com Tab real.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
