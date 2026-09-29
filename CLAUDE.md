@@ -3060,6 +3060,35 @@ do tamanho do formulário. `PageHeader` agora aceita `onBack` (substitui o `navi
 aviso "preencha altura e envergadura juntas" (sem uma das duas o índice é `null`); motivo por campo (sexo/peso são só estatística do conjunto);
 "Prefiro não dizer" em Sexo; barra "Salvar" fixa numa tela de ~1800px; a borda global do `card-dark`/inputs (1,48:1) segue no tema.
 
+### Minha conta (professor): rodada de crítica (2026-09-29) — sem migration nova
+
+`src/pages/admin/MinhaConta.tsx` (rota `/admin/minha-conta`, aba "Conta" da barra do professor): crítica **19/40**, relatório em
+`.impeccable/critique/*admin-minhaconta*`. Seis passos na `dev`, testados pelo Lucas. Na página de amostras ("Minha conta (professor)" — a
+galeria só tinha a do aluno). É o que a rodada da Minha conta do aluno deixou como "aplicar o mesmo estilo à do professor" e "extrair `AccountRow`".
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Duas listas com título, em vez de uma lista de 6:** **"O que você oferece"** (Minha disponibilidade, Modelos de pacote, Perfil dos alunos) e
+  **"Minha conta"** (Configurações, Meu nome, Alterar senha). Antes "onde mudo meus horários?" dependia de adivinhar que era em "Conta" (a barra de
+  baixo tem Painel, Agenda, Alunos, Aulas, Pedidos e Conta — **sem** Horários nem Pacotes). **A barra NÃO mudou**; a alternativa de renomear a aba
+  "Conta" para "Ajustes" foi oferecida e recusada. Frases nas linhas ambíguas: Configurações → "Modo de agendamento, WhatsApp e regra de faltas"
+  (o WhatsApp ficava escondido atrás de um nome genérico); Perfil dos alunos → "Médias de altura, peso e guarda dos alunos".
+- **Cartão do topo mostra o e-mail da conta** ("com qual conta eu entrei?", como no aluno). **"Professor · desde 13 mar" saiu:** sem ano e era a
+  data de criação da CONTA, não de quando começou a dar aula (`profile.createdAt`). Alternativas "e-mail + Professor" e "manter" foram oferecidas.
+- **"Sair da conta" discreto** (ghost, `--red-text`, ícone, 44px), igual ao do aluno: a tela não tem ação principal e o vermelho cheio de 56px
+  colado ao banner de instalar era o elemento mais forte para uma ação rara. **"Editar perfil" → "Meu nome"** (ícone `UserRound`; só edita o nome).
+
+**O que mudou / armadilhas:**
+- **`src/components/AccountRow.tsx` é a linha ÚNICA de aluno e professor** (antes cada tela tinha a sua cópia e a do professor ficou para trás). Ícone
+  obrigatório (uma linha sem ícone desalinha o texto das outras), `min-h-[52px]`, anel de foco, divisor `border-border` (o do professor era
+  `#232323`, 1,11:1), `aria-hidden` nos ícones; **cada linha é um `<li>`**, então o container TEM que ser um `<ul>` — aluno (`aria-label="Minha conta"`) e
+  professor (`aria-labelledby` dos `<h2>` dos blocos). **Não voltar a copiar a linha para dentro de uma tela.**
+- **Antes `return null` deixava a tela em branco sem título** enquanto o perfil não chegava: agora `PageHeader` + esqueleto (`SkeletonCard`). Título com
+  `PageHeader`. Iniciais com `filter(Boolean)` + maiúsculas; nome e e-mail com `min-w-0` + quebra (um nome de 60 letras sem espaço estourava para 712px).
+
+**Deixado para depois (registrado, não pedido):** resumo do estado nas linhas ("Seg, ter, sex abertos", "3 modelos" — exige dados em cache);
+link de ajuda/suporte e versão do app (útil com o aviso do service worker); "Perfil dos alunos" talvez pertença à aba Alunos; trocar a aba "Conta" por
+"Ajustes"; WhatsApp do professor visível na própria conta.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
