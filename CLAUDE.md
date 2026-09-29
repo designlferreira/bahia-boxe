@@ -2460,6 +2460,45 @@ noite, as aulas "futuras" aparecem como passadas.
 **Deixado para depois (sugerido pela crítica, não pedido):** "Todas aconteceram" também na agenda;
 "ir para data"; tocar num horário livre pra marcar aula ali.
 
+### Agendar (aluno): rodada de crítica (2026-09-28) — sem migration nova
+
+`src/pages/student/Agendar.tsx`: crítica **24/40** (relatório em `.impeccable/critique/*student-agendar*`),
+seis passos na `dev`, testados pelo Lucas.
+
+**FATO DO BANCO (conferido pelo Lucas em 2026-09-28, não é suposição): a aula do autosserviço já
+nasce CONFIRMADA.** `schedule_booking` (0025) grava `status = 'scheduled'`, e `bookings` não tem
+nenhum gatilho de INSERT — os três gatilhos (`trg_guarda_update_booking_pelo_cliente`,
+`trg_prevent_future_completed`, `trg_validate_booking_status_time`) são todos BEFORE UPDATE. Todas as
+aulas com `slot_id` estavam `completed`, nenhuma `pending_confirmation`. Consequências:
+- O aviso depois de confirmar NÃO fala em aprovação ("Aula agendada · Amanhã, 19:00").
+- Hoje o "Aprovar/Recusar" do painel e da agenda só recebe **pedido de remarcação** (0033). O caminho
+  de aprovar um "novo horário" do autosserviço continua no código, mas nada o alimenta — não remover
+  sem decisão; só não escrever texto novo supondo que o aluno espera aprovação.
+- Resolve a dúvida registrada em `supabase/README.md` ("não dá para ver com que status a aula nasce").
+
+**Decisões do Lucas:**
+- A tela **abre no primeiro dia com horário livre** (senão, amanhã). Antes abria sempre em depois de
+  amanhã (`useState(1)` com a lista já começando amanhã).
+- **Horários ocupados não aparecem** pro aluno — só os livres.
+- Vocabulário: "Você pode agendar mais N aulas" (nunca "crédito(s) disponível(is)").
+
+**O que mudou e armadilhas:**
+- Horários da semana numa busca só: `getAvailableSlotsForDays` (chave `available-slots-semana`,
+  agrupado por dia "yyyy-MM-dd" em São Paulo). A faixa de dias é a mesma da agenda do professor
+  (7 dias na largura, ponto nos dias com horário, número apagado nos sem), com o dia por extenso e a
+  contagem embaixo.
+- Sem aula para agendar (`credits === 0`), a tela inteira vira um aviso com o motivo — todas
+  agendadas / aulas acabaram ("Pedir mais aulas"), nunca teve pacote ("Pedir pacote"), pedido já com
+  o professor (sem botão). Antes deixava escolher e só errava no "Confirmar".
+- Dia sem horário aponta o próximo dia que tem ("Ver Quinta-feira, 01 out"), em botão secundário
+  (`EmptyState` ganhou `ctaVariant`).
+- **Armadilha resolvida, vale pro app inteiro:** `.page-container` usava `animation-fill-mode: both`;
+  a transformação final (identidade) ficava aplicada e transformava o container na referência de
+  qualquer `position: fixed` dentro dele — a barra "Confirmar" rolava junto com a lista. Agora é
+  `backwards` (`index.css`). Não voltar pra `both`, e desconfiar de qualquer `transform`/`filter`
+  permanente num ancestral de elemento fixo.
+- `PageHeader`: foco visível no voltar; subtítulo 13px (vale pra todas as telas que o usam).
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
