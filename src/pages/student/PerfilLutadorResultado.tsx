@@ -8,7 +8,13 @@ import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { BoxingProfileResultView } from "@/components/BoxingProfileResultView";
 import { formatDateWithYear } from "@/lib/dateUtils";
-import { getBoxingProfileAssessment, getBoxingProfileHistory, studentIdForProfile } from "@/integrations/backend/api";
+import {
+  getBoxingProfileAssessment,
+  getBoxingProfileHistory,
+  getStudentAdminId,
+  getWhatsappDoProfessor,
+  studentIdForProfile,
+} from "@/integrations/backend/api";
 
 /**
  * Uma avaliação ESPECÍFICA (aberta pelo histórico). Logo depois de enviar o questionário o aluno vai para o Perfil de Boxe
@@ -43,6 +49,19 @@ export default function StudentPerfilLutadorResultado() {
     queryFn: () => getBoxingProfileHistory(studentId!),
     enabled: !!studentId,
   });
+  // Canal do aluno com o professor (mesmo da Home/Minha conta): sem número cadastrado, o botão não aparece.
+  const { data: adminId } = useQuery({
+    queryKey: ["student-admin-id", profile?.id],
+    queryFn: () => getStudentAdminId(profile!.id),
+    enabled: !!profile,
+    staleTime: Infinity,
+  });
+  const { data: whatsapp } = useQuery({
+    queryKey: ["whatsapp-professor", adminId],
+    queryFn: () => getWhatsappDoProfessor(adminId!),
+    enabled: !!adminId,
+    staleTime: 60 * 60 * 1000,
+  });
   const maisRecente = history
     ?.filter((a) => a.assessmentType === "self")
     .sort((a, b) => b.completedAt.localeCompare(a.completedAt))[0];
@@ -72,6 +91,30 @@ export default function StudentPerfilLutadorResultado() {
         </div>
       )}
       {!isLoading && !isError && assessment && <BoxingProfileResultView assessment={assessment} />}
+
+      {/* Antes a tela terminava no aviso de autopercepção: depois de ler quase três telas o único botão era o de voltar. */}
+      {!isLoading && !isError && assessment && (
+        <div className="flex flex-col gap-2.5 mt-6">
+          <Button size="lg" className="w-full" onClick={() => navigate("/app/perfil-lutador/historico")}>
+            Ver minha evolução
+          </Button>
+          <Button variant="secondary" size="lg" className="w-full" onClick={() => navigate("/app/perfil-lutador")}>
+            Ir para o meu Perfil de Boxe
+          </Button>
+          {whatsapp && (
+            <Button asChild variant="ghost" size="lg" className="w-full">
+              <a
+                href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(`Olá! Aqui é ${profile?.name.split(" ")[0] ?? ""}. Vi o resultado do meu Perfil de Boxe e queria conversar sobre ele.`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Falar com o professor sobre isso
+                <span className="sr-only"> (abre o WhatsApp em nova aba)</span>
+              </a>
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
