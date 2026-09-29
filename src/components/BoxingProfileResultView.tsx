@@ -19,12 +19,22 @@ export function BoxingProfileResultView({ assessment, notice }: BoxingProfileRes
   const { primaryProfile, dimensionScores } = assessment;
   return (
     <div>
-      <BoxingProfileScoresSummary assessment={assessment} description={FIGHTER_PROFILE_DESCRIPTIONS[primaryProfile]} notice={notice} />
+      {/* O aviso de autopercepção ficava no FIM da tela (a mais de 2.000px do estilo, em 12px). O risco de a pessoa não se reconhecer ou se sentir
+          rotulada está logo depois de ler o nome do estilo — é ali que ele precisa estar, e em tom de convite. */}
+      <BoxingProfileScoresSummary
+        assessment={assessment}
+        description={FIGHTER_PROFILE_DESCRIPTIONS[primaryProfile]}
+        notice={
+          <>
+            <p className="text-[13px] text-muted-foreground leading-relaxed mb-4">
+              É como você se vê hoje, não uma avaliação técnica. Se não se reconheceu, converse com o seu professor: o resultado muda com você.
+            </p>
+            {notice}
+          </>
+        }
+      />
 
       <BoxingProfileNextSteps primaryProfile={primaryProfile} dimensionScores={dimensionScores} />
-      <p className="text-xs text-muted-foreground leading-relaxed">
-        Este resultado representa sua autopercepção no momento da avaliação — não substitui a avaliação técnica do seu treinador.
-      </p>
     </div>
   );
 }
