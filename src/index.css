@@ -1,3 +1,23 @@
+/*
+ * Fontes hospedadas com o próprio app (pacotes @fontsource): antes vinham do Google Fonts, um CSS externo que trava a primeira pintura e
+ * NÃO ficava guardado para uso offline (o app instalado sem internet trocava os títulos por uma fonte comum). Só o subconjunto "latin"
+ * (cobre todo o português). O service worker guarda os .woff2 (ver `workbox.globPatterns` em vite.config.ts).
+ */
+@font-face {
+  font-family: "Bebas Neue";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(../node_modules/@fontsource/bebas-neue/files/bebas-neue-latin-400-normal.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2) format("woff2-variations");
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

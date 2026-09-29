@@ -9,6 +9,8 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg"],
+      // Padrão do plugin não inclui fontes: sem isto os títulos (Bebas Neue) caem numa fonte comum no app instalado sem internet.
+      workbox: { globPatterns: ["**/*.{js,css,html,woff2,svg,webmanifest}"] },
       manifest: {
         name: "Bahia Boxe",
         short_name: "Bahia Boxe",
@@ -24,6 +26,20 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        // Bibliotecas pesadas e que quase nunca mudam ficam em arquivos próprios: um deploy só do código do app não invalida o cache delas,
+        // e o navegador baixa em paralelo.
+        manualChunks: {
+          react: ["react", "react-dom", "react-router-dom"],
+          supabase: ["@supabase/supabase-js"],
+          query: ["@tanstack/react-query"],
+          datas: ["date-fns", "date-fns-tz"],
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

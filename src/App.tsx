@@ -1,53 +1,54 @@
+import { Suspense, lazy } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { StudentLayout } from "@/layouts/StudentLayout";
-import { AdminLayout } from "@/layouts/AdminLayout";
+const StudentLayout = lazy(() => import("@/layouts/StudentLayout").then((m) => ({ default: m.StudentLayout })));
+const AdminLayout = lazy(() => import("@/layouts/AdminLayout").then((m) => ({ default: m.AdminLayout })));
 
-import Login from "@/pages/auth/Login";
-import CriarConta from "@/pages/auth/CriarConta";
-import ConfirmarEmail from "@/pages/auth/ConfirmarEmail";
-import RecuperarSenha from "@/pages/auth/RecuperarSenha";
-import ResetPassword from "@/pages/auth/ResetPassword";
-import Convite from "@/pages/auth/Convite";
-import NotFound from "@/pages/NotFound";
+const Login = lazy(() => import("@/pages/auth/Login"));
+const CriarConta = lazy(() => import("@/pages/auth/CriarConta"));
+const ConfirmarEmail = lazy(() => import("@/pages/auth/ConfirmarEmail"));
+const RecuperarSenha = lazy(() => import("@/pages/auth/RecuperarSenha"));
+const ResetPassword = lazy(() => import("@/pages/auth/ResetPassword"));
+const Convite = lazy(() => import("@/pages/auth/Convite"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
 import { TelaDeAbertura } from "@/components/TelaDeAbertura";
 import { FaixaSemInternet } from "@/components/FaixaSemInternet";
 import { FaixaConexaoLenta } from "@/components/FaixaConexaoLenta";
 import { TelaSessaoNaoCarregou } from "@/components/TelaSessaoNaoCarregou";
 
-import StudentHome from "@/pages/student/Home";
-import StudentAgendar from "@/pages/student/Agendar";
-import StudentHistorico from "@/pages/student/Historico";
-import StudentAulaDetalhe from "@/pages/student/AulaDetalhe";
-import StudentPacotes from "@/pages/student/Pacotes";
-import StudentMinhaConta from "@/pages/student/MinhaConta";
-import StudentPerfil from "@/pages/student/Perfil";
-import StudentPerfilLutador from "@/pages/student/PerfilLutador";
-import StudentPerfilLutadorQuestionario from "@/pages/student/PerfilLutadorQuestionario";
-import StudentPerfilLutadorResultado from "@/pages/student/PerfilLutadorResultado";
-import StudentPerfilLutadorHistorico from "@/pages/student/PerfilLutadorHistorico";
+const StudentHome = lazy(() => import("@/pages/student/Home"));
+const StudentAgendar = lazy(() => import("@/pages/student/Agendar"));
+const StudentHistorico = lazy(() => import("@/pages/student/Historico"));
+const StudentAulaDetalhe = lazy(() => import("@/pages/student/AulaDetalhe"));
+const StudentPacotes = lazy(() => import("@/pages/student/Pacotes"));
+const StudentMinhaConta = lazy(() => import("@/pages/student/MinhaConta"));
+const StudentPerfil = lazy(() => import("@/pages/student/Perfil"));
+const StudentPerfilLutador = lazy(() => import("@/pages/student/PerfilLutador"));
+const StudentPerfilLutadorQuestionario = lazy(() => import("@/pages/student/PerfilLutadorQuestionario"));
+const StudentPerfilLutadorResultado = lazy(() => import("@/pages/student/PerfilLutadorResultado"));
+const StudentPerfilLutadorHistorico = lazy(() => import("@/pages/student/PerfilLutadorHistorico"));
 
-import AdminDashboard from "@/pages/admin/Dashboard";
-import AdminAgenda from "@/pages/admin/Agenda";
-import AdminAulaDetalhe from "@/pages/admin/AulaDetalhe";
-import AdminAlunos from "@/pages/admin/Alunos";
-import AdminAlunoDetalhe from "@/pages/admin/AlunoDetalhe";
-import AdminAlunoPerfilBoxe from "@/pages/admin/AlunoPerfilBoxe";
-import AdminAlunoPerfilBoxeQuestionario from "@/pages/admin/AlunoPerfilBoxeQuestionario";
-import AdminAlunoRecorrencia from "@/pages/admin/AlunoRecorrencia";
-import AdminHistorico from "@/pages/admin/Historico";
-import AdminPedidos from "@/pages/admin/Pedidos";
-import AdminPacotes from "@/pages/admin/Pacotes";
-import AdminDisponibilidade from "@/pages/admin/Disponibilidade";
-import AdminOrientacoesAula from "@/pages/admin/OrientacoesAula";
-import AdminPerfilAlunos from "@/pages/admin/PerfilAlunos";
-import AdminConfiguracoes from "@/pages/admin/Configuracoes";
-import AdminMinhaConta from "@/pages/admin/MinhaConta";
+const AdminDashboard = lazy(() => import("@/pages/admin/Dashboard"));
+const AdminAgenda = lazy(() => import("@/pages/admin/Agenda"));
+const AdminAulaDetalhe = lazy(() => import("@/pages/admin/AulaDetalhe"));
+const AdminAlunos = lazy(() => import("@/pages/admin/Alunos"));
+const AdminAlunoDetalhe = lazy(() => import("@/pages/admin/AlunoDetalhe"));
+const AdminAlunoPerfilBoxe = lazy(() => import("@/pages/admin/AlunoPerfilBoxe"));
+const AdminAlunoPerfilBoxeQuestionario = lazy(() => import("@/pages/admin/AlunoPerfilBoxeQuestionario"));
+const AdminAlunoRecorrencia = lazy(() => import("@/pages/admin/AlunoRecorrencia"));
+const AdminHistorico = lazy(() => import("@/pages/admin/Historico"));
+const AdminPedidos = lazy(() => import("@/pages/admin/Pedidos"));
+const AdminPacotes = lazy(() => import("@/pages/admin/Pacotes"));
+const AdminDisponibilidade = lazy(() => import("@/pages/admin/Disponibilidade"));
+const AdminOrientacoesAula = lazy(() => import("@/pages/admin/OrientacoesAula"));
+const AdminPerfilAlunos = lazy(() => import("@/pages/admin/PerfilAlunos"));
+const AdminConfiguracoes = lazy(() => import("@/pages/admin/Configuracoes"));
+const AdminMinhaConta = lazy(() => import("@/pages/admin/MinhaConta"));
 
-import AlterarSenha from "@/pages/shared/AlterarSenha";
+const AlterarSenha = lazy(() => import("@/pages/shared/AlterarSenha"));
 
 const queryClient = new QueryClient({
   // Consultas ficam no padrão ("online"): sem rede pausam e retomam ao reconectar. Gravações NÃO podem pausar em silêncio
@@ -66,6 +67,8 @@ function PostLoginRedirect() {
 
 function AppRoutes() {
   return (
+    // Fallback externo: só para o que fica FORA dos layouts (login, cadastro, 404) e para os próprios layouts. Dentro deles cada tela tem o seu.
+    <Suspense fallback={<TelaDeAbertura />}>
     <Routes>
       <Route path="/" element={<PostLoginRedirect />} />
       <Route path="/login" element={<Login />} />
@@ -117,6 +120,7 @@ function AppRoutes() {
 
       <Route path="*" element={<NotFound />} />
     </Routes>
+    </Suspense>
   );
 }
 
