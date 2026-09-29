@@ -22,7 +22,7 @@ import {
 } from "@/integrations/backend/api";
 import type { PackageTemplate } from "@/integrations/backend/types";
 
-const empty = { name: "", description: "", totalClasses: 10, priceCents: null as number | null, validityDays: 60 };
+const empty = { name: "", description: "", totalClasses: 10, priceCents: null as number | null, validityDays: null as number | null };
 
 function priceError(priceCents: number | null): string | null {
   if (priceCents === null) return "Informe o preço do pacote.";
@@ -57,7 +57,8 @@ export default function AdminPacotes() {
         description: editing.description,
         totalClasses: editing.totalClasses,
         priceCents: editing.priceCents,
-        validityDays: editing.validityDays ?? 60,
+        // Não inventa 60 dias para modelo sem prazo: antes abrir e salvar um modelo gravava 60 sem o professor pedir.
+        validityDays: editing.validityDays,
       });
       setPriceMode(editing.priceCents === null ? "tbd" : "defined");
     } else {
@@ -165,7 +166,7 @@ export default function AdminPacotes() {
                 id="desc"
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                placeholder="2x por semana · 60 dias"
+                placeholder="2x por semana"
                 className="h-16"
               />
             </div>
@@ -181,16 +182,25 @@ export default function AdminPacotes() {
                 />
               </div>
               <div>
-                <Label htmlFor="validity">Validade (dias)</Label>
+                <Label htmlFor="validity">Prazo sugerido (dias)</Label>
                 <Input
                   id="validity"
-                  type="number"
-                  min={1}
-                  value={form.validityDays}
-                  onChange={(e) => setForm((f) => ({ ...f, validityDays: Number(e.target.value) }))}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={3}
+                  placeholder="Opcional"
+                  aria-describedby="validity-help"
+                  value={form.validityDays ?? ""}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, "");
+                    setForm((f) => ({ ...f, validityDays: digits ? Number(digits) : null }));
+                  }}
                 />
               </div>
             </div>
+            <p id="validity-help" className="text-[12.5px] text-muted-foreground -mt-1.5">
+              O prazo é só uma sugestão que o aluno vê: o pacote não vence sozinho. Deixe em branco para não sugerir nada.
+            </p>
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <Label htmlFor="price" className="mb-0">

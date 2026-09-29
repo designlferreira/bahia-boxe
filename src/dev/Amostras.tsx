@@ -31,6 +31,7 @@ import StudentPerfilLutador from "@/pages/student/PerfilLutador";
 import AdminAlunoPerfilBoxe from "@/pages/admin/AlunoPerfilBoxe";
 import AdminConfiguracoes from "@/pages/admin/Configuracoes";
 import AdminDisponibilidade from "@/pages/admin/Disponibilidade";
+import AdminPacotes from "@/pages/admin/Pacotes";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
 import { RemarcacaoSheet } from "@/components/RemarcacaoSheet";
@@ -807,6 +808,21 @@ const DISPONIBILIDADE_CASOS: { title: string; note: string; dados: ReturnType<ty
   },
 ];
 
+const PACOTES_CASOS: { title: string; note: string; lista: unknown[] }[] = [
+  {
+    title: "Com modelos",
+    note: "preço definido, preço a combinar, aula avulsa e um gratuito",
+    lista: [
+      { ...modelo("m1", "Pacote 8 aulas", 8, 32000), description: "2x por semana · 60 dias", validityDays: 60 },
+      { ...modelo("m2", "Pacote 12 aulas", 12, 45000), description: "3x por semana · 90 dias", validityDays: 90 },
+      { ...modelo("m3", "Pacote Trimestral Premium com Avaliação Física Completa", 24, null), description: "Preço combinado direto com o aluno", validityDays: 120 },
+      { ...modelo("m4", "Aula avulsa", 1, 5000), description: "", validityDays: null },
+      { ...modelo("m5", "Aula experimental", 1, 0), description: "Cortesia para quem está começando", validityDays: 30 },
+    ],
+  },
+  { title: "Nenhum modelo", note: "primeira vez", lista: [] },
+];
+
 function SeededAdmin({ data, children, seed }: { data: unknown; children: ReactNode; seed?: (qc: QueryClient) => void }) {
   const [client] = useState(() => {
     const qc = new QueryClient({
@@ -1091,6 +1107,17 @@ export default function Amostras() {
                 }}
               >
                 <AdminDisponibilidade />
+              </SeededAdmin>
+            </Frame>
+          ))}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Pacotes (professor)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {PACOTES_CASOS.map((c) => (
+            <Frame key={c.title} title={c.title} note={c.note}>
+              <SeededAdmin data={null} seed={(qc) => qc.setQueryData(["package-templates", ADMIN_ID], c.lista)}>
+                <AdminPacotes />
               </SeededAdmin>
             </Frame>
           ))}
