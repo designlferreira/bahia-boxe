@@ -1065,6 +1065,13 @@ export default function Amostras() {
               </ComRota>
             </SemLogin>
           </Frame>
+          <Frame title="Recuperar senha · enviado" note="depois de enviar: o que fazer se o e-mail não chegar (contagem do reenvio)">
+            <SemLogin>
+              <ComRota path="/recuperar-senha" url="/recuperar-senha">
+                <RecuperarSenha amostraEnviado="aluno.com.nome.bem.comprido@dominio-de-email.com.br" />
+              </ComRota>
+            </SemLogin>
+          </Frame>
           <Frame title="Nova senha" note="a tela aberta pelo link do e-mail (link válido)">
             <SemLogin>
               <ComRota path="/auth/reset-password" url="/auth/reset-password">
