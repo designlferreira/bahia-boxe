@@ -2,9 +2,10 @@ import { useState } from "react";
 import { addDays, isSameDay, startOfWeek } from "date-fns";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarX, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { ErrorState } from "@/components/ErrorState";
+import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -22,6 +23,7 @@ import { useLessonActions } from "@/hooks/useLessonActions";
 import { usePendingActions, type PendenteAlvo } from "@/hooks/usePendingActions";
 import {
   getAdminAgendaForDay,
+  getAdminSettings,
   getAwaitingConfirmationBookings,
   getPedidosPendentes,
   type TimelineEntry,
@@ -113,6 +115,15 @@ export default function AdminAgenda() {
     [...(awaitingQuery.data ?? []), ...(pedidosQuery.data ?? [])].map((b) => isoDateOnly(b.startTime)),
   );
   const nAulas = data?.filter((t) => !t.free).length ?? 0;
+
+  // Dia vazio: publicar horários só faz sentido no autosserviço e num dia que ainda não passou.
+  const { data: settings } = useQuery({
+    queryKey: ["admin-settings", profile?.id],
+    queryFn: () => getAdminSettings(profile!.id),
+    enabled: !!profile,
+  });
+  const diaPassado = isoDateOnly(selectedDate) < isoDateOnly(hoje);
+  const podePublicar = !diaPassado && (settings?.modoAgendamento ?? "autosservico") === "autosservico";
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["admin-agenda"] });
@@ -216,7 +227,24 @@ export default function AdminAgenda() {
         </div>
       )}
 
-      {!isLoading && !isError && data && (
+      {/* Dia sem aula nem horário publicado: antes a tela ficava em branco abaixo da semana. */}
+      {!isLoading && !isError && data && data.length === 0 && (
+        <EmptyState
+          icon={CalendarX}
+          title={diaPassado ? "Nenhuma aula neste dia" : "Nenhum horário neste dia"}
+          description={
+            podePublicar
+              ? "Publique seus horários para os alunos poderem agendar."
+              : diaPassado
+                ? "Não houve aula nem horário publicado."
+                : "Nenhuma aula marcada para este dia."
+          }
+          ctaLabel={podePublicar ? "Publicar horários" : undefined}
+          onCta={podePublicar ? () => navigate("/admin/disponibilidade") : undefined}
+        />
+      )}
+
+      {!isLoading && !isError && data && data.length > 0 && (
         <div className="flex flex-col">
           {data.map((entry) => {
             const booking = entry.booking;
