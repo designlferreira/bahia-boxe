@@ -109,9 +109,9 @@ export default function AdminAlunoDetalhe() {
     mutationFn: () => removeActivePackage(studentId!),
     onSuccess: () => {
       invalidate();
-      toast.warning("Pacote removido");
+      toast.warning("Pacote encerrado");
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível remover o pacote."),
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível encerrar o pacote."),
   });
 
   if (isLoading) {
@@ -138,6 +138,15 @@ export default function AdminAlunoDetalhe() {
   const primeiroNome = student.name.split(" ")[0];
   // O pacote experimental (trial) convive com os outros e NAO e encerrado ao atribuir; os demais sao.
   const restantes = saldo ? saldo.restantes : pkg ? Math.max(0, pkg.totalClasses - pkg.usedClasses) : 0;
+  // O que acontece de verdade ao encerrar: `remove_active_package` só marca o pacote como encerrado. As aulas SEM
+  // data (as que sobravam para agendar) deixam de valer; as JÁ MARCADAS continuam e são registradas normalmente.
+  const semData = pkg && pkg.origin !== "recurrence" ? Math.min(credits, restantes) : 0;
+  const jaMarcadas = Math.max(0, restantes - semData);
+  const partesEncerrar = [
+    semData > 0 && (semData === 1 ? "1 aula ainda sem data será perdida." : `${semData} aulas ainda sem data serão perdidas.`),
+    jaMarcadas > 0 && (jaMarcadas === 1 ? "1 aula já marcada continua valendo." : `${jaMarcadas} aulas já marcadas continuam valendo.`),
+  ].filter(Boolean);
+  const descricaoEncerrar = `O pacote de ${primeiroNome} será encerrado. ${partesEncerrar.length ? partesEncerrar.join(" ") : "Não sobram aulas."}`;
   const avisoSubstitui =
     pkg && pkg.origin !== "trial"
       ? `${primeiroNome} já tem um pacote ativo (${restantes === 1 ? "1 aula restante" : `${restantes} aulas restantes`}). Atribuir um novo encerra o atual. As aulas já marcadas continuam valendo.`
@@ -178,8 +187,39 @@ export default function AdminAlunoDetalhe() {
         )}
       </div>
 
-      <div className="mb-3.5">
-        <ActivePackageCard pkg={pkg} credits={credits} saldo={saldo} />
+      <div className="mb-4">
+        {/* As ações de pacote moram no cartão do pacote (agem SOBRE ele): "Atribuir" vermelho no topo da tela era uma ação
+            rara ocupando o lugar do dado. Só sem pacote o botão é o principal da tela. */}
+        <ActivePackageCard
+          pkg={pkg}
+          credits={credits}
+          saldo={saldo}
+          actions={
+            pkg ? (
+              <>
+                <Button variant="secondary" size="sm" onClick={() => setAssignOpen(true)}>
+                  Atribuir novo pacote
+                </Button>
+                {/* `remove_active_package` só encerra pacotes NÃO experimentais: com a aula experimental como único
+                    pacote ativo, "Encerrar" não faria nada. */}
+                {pkg.origin !== "trial" && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-[hsl(var(--red-text))] hover:text-[hsl(var(--red-text))]"
+                    onClick={() => setConfirmRemove(true)}
+                  >
+                    Encerrar pacote
+                  </Button>
+                )}
+              </>
+            ) : (
+              <Button size="sm" onClick={() => setAssignOpen(true)}>
+                Atribuir primeiro pacote
+              </Button>
+            )
+          }
+        />
       </div>
 
       <div className="flex gap-2.5 mb-4">
@@ -191,15 +231,6 @@ export default function AdminAlunoDetalhe() {
           <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Faltas</div>
           <div className="font-display text-[28px] text-destructive leading-tight">{faltas}</div>
         </div>
-      </div>
-
-      <div className="flex gap-2.5 mb-5">
-        <Button className="flex-1" onClick={() => setAssignOpen(true)}>
-          Atribuir pacote
-        </Button>
-        <Button variant="secondary" className="flex-1" disabled={!pkg} onClick={() => setConfirmRemove(true)}>
-          Remover pacote
-        </Button>
       </div>
 
       <button
@@ -337,9 +368,9 @@ export default function AdminAlunoDetalhe() {
       <ConfirmDialog
         open={confirmRemove}
         onOpenChange={setConfirmRemove}
-        title="REMOVER PACOTE"
-        description={`O pacote ativo de ${student.name} será encerrado. Créditos restantes serão perdidos.`}
-        confirmLabel="Remover"
+        title="ENCERRAR PACOTE"
+        description={descricaoEncerrar}
+        confirmLabel="Encerrar"
         onConfirm={() => remove.mutate()}
       />
     </div>

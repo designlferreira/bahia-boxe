@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,8 @@ interface ActivePackageCardProps {
    * pacote é o professor, e o professor não pede pacote pra si.
    */
   onRequestMore?: () => void;
+  /** Botões do próprio pacote (professor: atribuir novo / encerrar) — dentro do cartão, porque agem SOBRE ele. */
+  actions?: ReactNode;
 }
 
 type Tone = "ok" | "low" | "empty";
@@ -91,6 +94,7 @@ export function ActivePackageCard({
   hideAlert,
   audience = "admin",
   onRequestMore,
+  actions,
 }: ActivePackageCardProps) {
   // Autosserviço: `credits` soma TODOS os pacotes ativos (inclusive trial) e já desconta as
   // reservas futuras; o que sobra entre "restantes no pacote" e `credits` é o que está agendado —
@@ -244,6 +248,7 @@ export function ActivePackageCard({
           )}
         </div>
       )}
+      {actions && <div className="mt-4 flex flex-wrap gap-2.5">{actions}</div>}
     </section>
   );
 }
