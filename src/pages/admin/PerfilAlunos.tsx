@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { EmptyState } from "@/components/EmptyState";
+import { ErrorState } from "@/components/ErrorState";
 import { getStudentProfileStats, type CategoryStats, type NumericStats } from "@/integrations/backend/api";
 import { GUARD_LABELS, LATERALITY_LABELS, MIN_ALUNOS_NA_ESTATISTICA, SEX_LABELS } from "@/lib/studentProfile";
 import type { Guard, Laterality, Sex } from "@/integrations/backend/types";
@@ -11,24 +12,62 @@ import type { Guard, Laterality, Sex } from "@/integrations/backend/types";
 export default function AdminPerfilAlunos() {
   const { profile } = useAuth();
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["student-profile-stats", profile?.id],
     queryFn: () => getStudentProfileStats(profile!.id),
     enabled: !!profile,
   });
 
+  // Há alunos, mas ninguém preencheu nada: um aviso só, no lugar de cinco cartões iguais dizendo "Ninguém preencheu ainda".
+  const ninguemPreencheu =
+    !!data &&
+    data.totalStudents > 0 &&
+    data.sex.filled === 0 &&
+    data.guard.filled === 0 &&
+    data.laterality.filled === 0 &&
+    data.heightCm.filled === 0 &&
+    data.weightKg.filled === 0;
+
   return (
     <div className="page-container">
       <PageHeader title="PERFIL DOS ALUNOS" subtitle="Dados que os próprios alunos preencheram" back />
 
-      {isLoading && <SkeletonCard height={280} />}
-      {isError && <div className="text-[13px] text-destructive">Não foi possível carregar os dados.</div>}
+      {/* Esqueleto com a forma da página (cinco cartões), não um bloco de 280px numa página de ~1000px. Também cobre a consulta
+          ainda desligada (sem perfil), que antes deixava só o título na tela. */}
+      {!isError && (isLoading || !data) && (
+        <div aria-busy="true" className="flex flex-col gap-3.5">
+          <p role="status" className="sr-only">
+            Carregando o perfil dos alunos…
+          </p>
+          <SkeletonCard height={96} />
+          <SkeletonCard height={190} />
+          <SkeletonCard height={96} />
+          <SkeletonCard height={84} />
+          <SkeletonCard height={84} />
+        </div>
+      )}
+      {/* Falha ≠ vazio: com o botão de tentar de novo (antes uma linha de texto vermelho solto, sem `role=alert`). */}
+      {isError && (
+        <ErrorState
+          title="Não conseguimos carregar o perfil dos alunos"
+          description="Verifique sua conexão e tente novamente."
+          onRetry={() => refetch()}
+        />
+      )}
 
       {!isLoading && !isError && data && data.totalStudents === 0 && (
         <EmptyState icon={Users} title="Nenhum aluno ainda" description="As análises aparecem aqui assim que você tiver alunos." />
       )}
 
-      {!isLoading && !isError && data && data.totalStudents > 0 && (
+      {ninguemPreencheu && (
+        <EmptyState
+          icon={Users}
+          title="Ninguém preencheu ainda"
+          description={`Os alunos preenchem em Minha conta > Meus dados físicos, e é opcional. Os números aparecem aqui quando pelo menos ${MIN_ALUNOS_NA_ESTATISTICA} tiverem preenchido cada dado.`}
+        />
+      )}
+
+      {!isLoading && !isError && data && data.totalStudents > 0 && !ninguemPreencheu && (
         <div className="flex flex-col gap-3.5">
           <CategoryCard title="Lateralidade" stats={data.laterality} labels={LATERALITY_LABELS} total={data.totalStudents} order={["right", "left", "ambidextrous"] as Laterality[]} />
           <CategoryCard

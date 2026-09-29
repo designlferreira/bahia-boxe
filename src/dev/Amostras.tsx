@@ -1647,6 +1647,18 @@ export default function Amostras() {
                 },
               },
               {
+                title: "Perfil dos alunos · ninguém preencheu",
+                note: "8 alunos, nenhum dado: um aviso só, sem cinco cartões",
+                stats: {
+                  totalStudents: 8,
+                  sex: { filled: 0, breakdown: { female: 0, male: 0, other: 0 } },
+                  guard: { filled: 0, breakdown: g({}) },
+                  laterality: { filled: 0, breakdown: { right: 0, left: 0, ambidextrous: 0 } },
+                  heightCm: { filled: 0, avg: null, min: null, max: null },
+                  weightKg: { filled: 0, avg: null, min: null, max: null },
+                },
+              },
+              {
                 title: "Perfil dos alunos · sem alunos",
                 note: "estado vazio",
                 stats: {
@@ -1659,15 +1671,24 @@ export default function Amostras() {
                 },
               },
             ];
-            return casos.map((c) => (
-              <Frame key={c.title} title={c.title} note={c.note}>
-                <SeededAdmin data={null} seed={(qc) => qc.setQueryData(["student-profile-stats", PROFESSOR.id], c.stats)}>
+            return [
+              ...casos.map((c) => (
+                <Frame key={c.title} title={c.title} note={c.note}>
+                  <SeededAdmin data={null} seed={(qc) => qc.setQueryData(["student-profile-stats", PROFESSOR.id], c.stats)}>
+                    <ComRota path="/admin/perfil-alunos" url="/admin/perfil-alunos">
+                      <AdminPerfilAlunos />
+                    </ComRota>
+                  </SeededAdmin>
+                </Frame>
+              )),
+              <Frame key="erro" title="Perfil dos alunos · a consulta falhou" note="não é semeada de propósito: erro com 'Tentar novamente'">
+                <SeededAdmin data={null}>
                   <ComRota path="/admin/perfil-alunos" url="/admin/perfil-alunos">
                     <AdminPerfilAlunos />
                   </ComRota>
                 </SeededAdmin>
-              </Frame>
-            ));
+              </Frame>,
+            ];
           })()}
         </div>
 
