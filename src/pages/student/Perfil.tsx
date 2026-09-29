@@ -221,6 +221,7 @@ export default function StudentPerfil() {
           <Label htmlFor="weight">Peso (kg)</Label>
           <Input
             id="weight"
+            maxLength={6}
             inputMode="decimal"
             value={form.weightKg}
             onChange={(e) => setForm((f) => ({ ...f, weightKg: limpaPeso(e.target.value) }))}

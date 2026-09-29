@@ -126,6 +126,7 @@ export default function AlterarSenha({ backTo, amostra }: { backTo: string; amos
           </div>
           <Input
             id="current"
+            maxLength={72}
             ref={currentRef}
             type={show ? "text" : "password"}
             autoComplete="current-password"
@@ -165,6 +166,7 @@ export default function AlterarSenha({ backTo, amostra }: { backTo: string; amos
           <Label htmlFor="next">Nova senha</Label>
           <Input
             id="next"
+            maxLength={72}
             type={show ? "text" : "password"}
             autoComplete="new-password"
             value={next}
@@ -185,6 +187,7 @@ export default function AlterarSenha({ backTo, amostra }: { backTo: string; amos
           <Label htmlFor="confirm">Confirmar nova senha</Label>
           <Input
             id="confirm"
+            maxLength={72}
             type={show ? "text" : "password"}
             autoComplete="new-password"
             value={confirm}

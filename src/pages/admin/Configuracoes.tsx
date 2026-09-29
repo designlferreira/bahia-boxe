@@ -179,6 +179,7 @@ export default function AdminConfiguracoes() {
           </div>
           <input
             id="whatsapp"
+            maxLength={20}
             type="tel"
             inputMode="tel"
             autoComplete="tel"

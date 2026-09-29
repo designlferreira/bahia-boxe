@@ -95,7 +95,7 @@ export function RejectBookingModal({
             </div>
           )}
         </div>
-        <Textarea
+        <Textarea maxLength={300}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="Observação para o aluno (opcional)"

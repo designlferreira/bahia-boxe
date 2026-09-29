@@ -229,12 +229,13 @@ export default function AdminPacotes() {
           <div className="flex flex-col gap-3.5 mt-4">
             <div>
               <Label htmlFor="name">Nome</Label>
-              <Input id="name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Pacote 10 aulas" />
+              <Input id="name" maxLength={60} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Pacote 10 aulas" />
             </div>
             <div>
               <Label htmlFor="desc">Descrição</Label>
               <Textarea
                 id="desc"
+                maxLength={300}
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 placeholder="2x por semana"
