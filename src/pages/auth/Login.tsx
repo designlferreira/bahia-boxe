@@ -79,7 +79,7 @@ export default function Login() {
       <div>
         <div className="flex items-center gap-3 mb-10">
           <div className="h-11 w-11 rounded-2xl bg-gradient-hero shadow-glow flex items-center justify-center">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
+            <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
               <path d="M7 5h8a4 4 0 0 1 4 4v3a4 4 0 0 1-4 4H9" />
               <path d="M7 5v11a3 3 0 0 0 3 3h5" />
             </svg>
@@ -125,6 +125,11 @@ export default function Login() {
             value={email}
             onChange={(e) => {
               setEmail(e.target.value);
+              if (error) {
+                setError(null);
+                setNaoConfirmado(false);
+                setReenvio(null);
+              }
               if (fieldErrors.email) setFieldErrors((f) => ({ ...f, email: undefined }));
             }}
             placeholder="voce@email.com"
@@ -148,6 +153,11 @@ export default function Login() {
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);
+                if (error) {
+                  setError(null);
+                  setNaoConfirmado(false);
+                  setReenvio(null);
+                }
                 if (fieldErrors.password) setFieldErrors((f) => ({ ...f, password: undefined }));
               }}
               placeholder="••••••••"
@@ -199,7 +209,7 @@ export default function Login() {
       <div className="text-center text-[13px] text-muted-foreground mt-4">
         <Link
           to="/recuperar-senha"
-          className="inline-flex min-h-11 items-center hover:text-foreground"
+          className="inline-flex min-h-11 items-center hover:text-foreground rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           Esqueceu a senha? Recuperar
         </Link>
@@ -207,13 +217,13 @@ export default function Login() {
 
       <div className="flex items-center gap-3 my-2">
         <span className="h-px flex-1 bg-border" />
-        <span className="text-[11px] uppercase tracking-wide text-muted-foreground">ou</span>
+        <span className="text-xs uppercase tracking-wide text-muted-foreground">ou</span>
         <span className="h-px flex-1 bg-border" />
       </div>
 
       <div className="text-center text-[13px] text-muted-foreground">
         Ainda não tem uma conta?{" "}
-        <Link to="/criar-conta" className="inline-flex min-h-11 items-center font-semibold text-accent hover:text-foreground">
+        <Link to="/criar-conta" className="inline-flex min-h-11 items-center font-semibold text-accent hover:text-foreground rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           Criar conta
         </Link>
       </div>
