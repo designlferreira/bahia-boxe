@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { fromZonedTime } from "date-fns-tz";
@@ -79,11 +79,6 @@ function RecorrenciaDiaGroup({ grupo, onToggle, onExcluir }: RecorrenciaDiaGroup
             <div className="flex-1">
               <div className="text-[14.5px] font-semibold text-foreground">{r.horario}</div>
               <div className="text-[12.5px] text-muted-foreground mt-0.5">{r.duracaoMinutos} min</div>
-              {r.temUso && (
-                <div className="text-[11px] text-muted-foreground mt-1">
-                  Já gerou aula ou pacote — desative em vez de excluir.
-                </div>
-              )}
             </div>
             <Switch
               aria-label="Ativar horário fixo"
@@ -113,6 +108,7 @@ export default function AdminAlunoRecorrencia() {
   const { studentId } = useParams<{ studentId: string }>();
   const { profile } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [addOpen, setAddOpen] = useState(false);
   const [diaSemana, setDiaSemana] = useState(1);
   const [horario, setHorario] = useState("18:00");
@@ -216,7 +212,9 @@ export default function AdminAlunoRecorrencia() {
       gerarPacoteRecorrencia(studentId!, data.totalAulas, data.startDate ?? undefined),
     onSuccess: (_r, vars) => {
       invalidate();
-      toast.success(`Pacote de ${vars.totalAulas} aulas gerado`);
+      toast.success(`Pacote de ${vars.totalAulas} aulas gerado`, {
+        action: { label: "Ver na agenda", onClick: () => navigate("/admin/agenda") },
+      });
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível gerar o pacote."),
   });
@@ -296,6 +294,13 @@ export default function AdminAlunoRecorrencia() {
           Adicionar
         </Button>
       </div>
+
+      {recorrencias.length > 0 && (
+        <p className="text-[13px] text-muted-foreground mb-3 leading-snug">
+          Desativar ou excluir um horário não muda as aulas que já estão na agenda; vale só para o próximo pacote. Quem já gerou
+          aulas não pode ser excluído, só desativado.
+        </p>
+      )}
 
       <div className="flex flex-col gap-4 mb-5">
         {recorrencias.length === 0 && (
