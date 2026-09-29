@@ -275,7 +275,7 @@ export default function AdminAgenda() {
                                 disabled={actions.isBusy(booking.id)}
                                 onClick={() => actions.openComplete(booking, entry.studentName ?? "Aluno")}
                               >
-                                Concluir
+                                Aconteceu
                               </Button>
                               <Button
                                 variant="secondary"
@@ -284,7 +284,7 @@ export default function AdminAgenda() {
                                 disabled={actions.isBusy(booking.id)}
                                 onClick={() => actions.openNoShow(booking, entry.studentName ?? "Aluno")}
                               >
-                                Falta
+                                Faltou
                               </Button>
                             </div>
                           )}

@@ -31,6 +31,15 @@ interface Target {
   studentName: string;
 }
 
+interface AcaoAula {
+  id: string;
+  studentName: string;
+  /** Falta: se desconta aula (null = não se sabe) — só muda o texto do aviso. */
+  desconta?: boolean | null;
+}
+
+const primeiroNome = (nome: string) => nome.split(" ")[0];
+
 /** Falta/cancelamento: a janela precisa da regra DESTA aula (null = não deu pra ler). */
 interface TargetComRegra extends Target {
   regra: RegraDeConsumo | null;
@@ -56,7 +65,8 @@ function textoFalta(regra: RegraDeConsumo | null) {
 export function useLessonActions(onChanged: () => void) {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
-  const [confirmComplete, setConfirmComplete] = useState<Target | null>(null);
+  /** Aula cuja regra de falta está sendo lida (trava o botão nesse meio-tempo). */
+  const [lendoRegra, setLendoRegra] = useState<string | null>(null);
   const [confirmNoShow, setConfirmNoShow] = useState<TargetComRegra | null>(null);
   const [replacementTarget, setReplacementTarget] = useState<Target | null>(null);
   const [reagendarTarget, setReagendarTarget] = useState<Target | null>(null);
@@ -101,29 +111,43 @@ export function useLessonActions(onChanged: () => void) {
     onError: (err) => toast.error(errorMessage(err, "Não foi possível desfazer.")),
   });
 
+  // "Aconteceu" registra direto, sem janela (decisão do Lucas, 2026-09-28): é reversível pelo
+  // "Desfazer" do aviso e pelo botão permanente no detalhe da aula — a janela só atrasava.
   const complete = useMutation({
-    mutationFn: (id: string) => completeBooking(id),
-    onSuccess: (_r, id) => {
+    mutationFn: ({ id }: AcaoAula) => completeBooking(id),
+    onSuccess: (_r, { id, studentName }) => {
       after();
-      toast.success("Aula concluída com sucesso.", {
+      toast.success(`Aula de ${primeiroNome(studentName)} registrada`, {
         duration: UNDO_TOAST_MS,
         action: { label: "Desfazer", onClick: () => undo.mutate(id) },
       });
     },
-    onError: (err) => toast.error(errorMessage(err, "Não foi possível concluir a aula.")),
+    onError: (err) => toast.error(errorMessage(err, "Não foi possível registrar a aula.")),
   });
 
   const noShow = useMutation({
-    mutationFn: (id: string) => markNoShow(id),
-    onSuccess: (_r, id) => {
+    mutationFn: ({ id }: AcaoAula) => markNoShow(id),
+    onSuccess: (_r, { id, studentName, desconta }) => {
       after();
-      toast.warning("Falta registrada.", {
+      toast.warning(`Falta de ${primeiroNome(studentName)} registrada${desconta === false ? " · não desconta aula" : ""}`, {
         duration: UNDO_TOAST_MS,
         action: { label: "Desfazer", onClick: () => undo.mutate(id) },
       });
     },
     onError: (err) => toast.error(errorMessage(err, "Não foi possível registrar a falta.")),
   });
+
+  /**
+   * Faltou: só pede confirmação quando a falta DESCONTA aula (ou quando não deu pra ler a regra) —
+   * é o caso em que o professor precisa saber a consequência antes. Sem desconto, registra direto.
+   */
+  async function pedirFalta(booking: Booking, studentName: string) {
+    setLendoRegra(booking.id);
+    const alvo = await comRegra(booking, studentName);
+    setLendoRegra(null);
+    if (alvo.regra && !alvo.regra.falta) noShow.mutate({ id: booking.id, studentName, desconta: false });
+    else setConfirmNoShow(alvo);
+  }
 
   const replacement = useMutation({
     mutationFn: ({ bookingId, replacesBookingId }: { bookingId: string; replacesBookingId: string }) =>
@@ -164,24 +188,15 @@ export function useLessonActions(onChanged: () => void) {
 
   function isBusy(bookingId: string) {
     return (
-      (complete.isPending && complete.variables === bookingId) ||
-      (noShow.isPending && noShow.variables === bookingId) ||
+      lendoRegra === bookingId ||
+      (complete.isPending && complete.variables?.id === bookingId) ||
+      (noShow.isPending && noShow.variables?.id === bookingId) ||
       (undo.isPending && undo.variables === bookingId)
     );
   }
 
   const dialogs = (
     <>
-      <ConfirmDialog
-        open={!!confirmComplete}
-        onOpenChange={(o) => !o && setConfirmComplete(null)}
-        title="CONCLUIR AULA?"
-        description="Ao confirmar, você estará declarando que esta aula aconteceu normalmente. O crédito referente a esta aula será consumido do aluno."
-        confirmLabel="Confirmar conclusão"
-        cancelLabel="Cancelar"
-        tone="default"
-        onConfirm={() => confirmComplete && complete.mutate(confirmComplete.booking.id)}
-      />
 
       <ConfirmDialog
         open={!!confirmNoShow}
@@ -195,7 +210,14 @@ export function useLessonActions(onChanged: () => void) {
         confirmLabel="Registrar falta"
         cancelLabel="Cancelar"
         tone="default"
-        onConfirm={() => confirmNoShow && noShow.mutate(confirmNoShow.booking.id)}
+        onConfirm={() =>
+          confirmNoShow &&
+          noShow.mutate({
+            id: confirmNoShow.booking.id,
+            studentName: confirmNoShow.studentName,
+            desconta: confirmNoShow.regra?.falta ?? null,
+          })
+        }
       />
 
       {replacementTarget && (
@@ -237,9 +259,10 @@ export function useLessonActions(onChanged: () => void) {
 
   return {
     isBusy,
-    openComplete: (booking: Booking, studentName: string) => setConfirmComplete({ booking, studentName }),
+    /** Registra direto (sem janela), com "Desfazer" no aviso. */
+    openComplete: (booking: Booking, studentName: string) => complete.mutate({ id: booking.id, studentName }),
     openNoShow: (booking: Booking, studentName: string) => {
-      void comRegra(booking, studentName).then(setConfirmNoShow);
+      void pedirFalta(booking, studentName);
     },
     openReplacement: (booking: Booking, studentName: string) => setReplacementTarget({ booking, studentName }),
     openReagendar: (booking: Booking, studentName: string) => setReagendarTarget({ booking, studentName }),

@@ -115,7 +115,7 @@ export default function AdminAulaDetalhe() {
                 disabled={actions.isBusy(booking.id)}
                 onClick={() => actions.openComplete(booking, studentName)}
               >
-                Concluir
+                Aconteceu
               </Button>
               <Button
                 variant="secondary"
@@ -124,7 +124,7 @@ export default function AdminAulaDetalhe() {
                 disabled={actions.isBusy(booking.id)}
                 onClick={() => actions.openNoShow(booking, studentName)}
               >
-                Falta
+                Faltou
               </Button>
             </div>
           )}
