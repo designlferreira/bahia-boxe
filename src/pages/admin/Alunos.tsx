@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronRight, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { BookingFilters } from "@/components/BookingFilters";
+import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/SkeletonCard";
@@ -102,7 +103,7 @@ export default function AdminAlunos() {
               key={student.id}
               type="button"
               onClick={() => navigate(`/admin/alunos/${student.id}`)}
-              className="w-full text-left card-dark p-3.5 flex items-center gap-3 active:scale-[0.985] transition-transform hover:border-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="w-full min-h-[70px] text-left card-dark p-3.5 flex items-center gap-3 active:scale-[0.985] transition-transform hover:border-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <div className="flex-1 min-w-0">
                 {/* Sem avatar de iniciais (repetia o nome e tomava ~54px): com a coluna mais larga o nome cabe inteiro
@@ -112,11 +113,12 @@ export default function AdminAlunos() {
                   <div className={`text-[12.5px] ${emRisco.grave ? "text-[hsl(var(--red-text))]" : "text-amber"}`}>{emRisco.motivo}</div>
                 ) : (
                   // O número de aulas restantes já está à direita; repetir "5/8 usadas" só cortava o texto. O detalhe do aluno tem o resto.
-                  <div className="text-[12.5px] text-muted-foreground line-clamp-2 break-words">
-                    {pkg ? pkg.templateName : "Sem pacote ativo"}
-                  </div>
+                  pkg && <div className="text-[12.5px] text-muted-foreground line-clamp-2 break-words">{pkg.templateName}</div>
                 )}
               </div>
+              {/* Sem pacote não é "0 aulas": é o aluno que mais precisa do professor, e ficava com um vazio à direita.
+                  Selo âmbar (âmbar = depende do professor), igual em "Todos" e em "Em risco". */}
+              {restantes === null && <Badge className="bg-amber/20 text-amber shrink-0">Sem pacote</Badge>}
               {restantes !== null && (
                 <div className="text-right shrink-0">
                   <div
