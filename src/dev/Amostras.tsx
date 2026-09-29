@@ -42,7 +42,7 @@ import AdminMinhaConta from "@/pages/admin/MinhaConta";
 import AdminOrientacoesAula from "@/pages/admin/OrientacoesAula";
 import StudentPerfilLutadorQuestionario from "@/pages/student/PerfilLutadorQuestionario";
 import AdminAlunoPerfilBoxeQuestionario from "@/pages/admin/AlunoPerfilBoxeQuestionario";
-import { BoxingProfileQuestionnaire } from "@/components/BoxingProfileQuestionnaire";
+import { BoxingProfileHeading, BoxingProfileQuestionnaire } from "@/components/BoxingProfileQuestionnaire";
 import { getQuestions, QUESTIONNAIRE_VERSION } from "@/lib/boxingProfile";
 import AdminHistorico from "@/pages/admin/Historico";
 import AdminAlunoDetalhe from "@/pages/admin/AlunoDetalhe";
@@ -305,6 +305,19 @@ function AmostraQuestionario({ voz, ate, todas, chave }: { voz: "self" | "coach"
   return pronto ? (
     <div className="page-container">
       <BoxingProfileQuestionnaire
+        heading={
+          <BoxingProfileHeading
+            subtitle={
+              voz === "self" ? (
+                "Sua autoavaliação · versão rápida"
+              ) : (
+                <>
+                  <strong className="font-semibold text-foreground">Ana Beatriz Souza</strong> · versão rápida
+                </>
+              )
+            }
+          />
+        }
         questions={questions}
         draftKey={draftKey}
         onSubmit={() => Promise.reject(new Error("amostra"))}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Check, ChevronLeft, X } from "lucide-react";
@@ -42,6 +42,20 @@ const OPCAO_BASE =
 const OPCAO_ON = "bg-primary/15 border-primary";
 const OPCAO_OFF = "bg-secondary border-muted-foreground/50";
 
+/**
+ * Título das telas do questionário. O questionário tem a própria barra (voltar, progresso, sair) e não usava o cabeçalho do app: o aluno
+ * via "PERFIL DE BOXE" só na escolha da versão e o professor nunca via título — e o "Avaliando <nome>" (12,5px) sumia depois de escolher a
+ * versão, então quem avalia o 5º aluno da noite não via de quem se tratava. `subtitle` leva o nome/contexto e é sempre visível.
+ */
+export function BoxingProfileHeading({ subtitle }: { subtitle: ReactNode }) {
+  return (
+    <div className="mb-4">
+      <h1 className="page-title">PERFIL DE BOXE</h1>
+      <div className="text-[13.5px] text-muted-foreground mt-0.5">{subtitle}</div>
+    </div>
+  );
+}
+
 interface BoxingProfileQuestionnaireProps {
   /** QUESTIONS (voz do aluno) ou COACH_QUESTIONS (voz do professor) — mesmos 32 ids, texto diferente. */
   questions: Question[];
@@ -56,6 +70,8 @@ interface BoxingProfileQuestionnaireProps {
   onError?: (err: unknown) => void;
   onExit: () => void;
   exitDescription?: string;
+  /** Cabeçalho acima da barra do questionário (ver `BoxingProfileHeading`). */
+  heading?: ReactNode;
 }
 
 /**
@@ -71,6 +87,7 @@ export function BoxingProfileQuestionnaire({
   onError,
   onExit,
   exitDescription = "Suas respostas ficam salvas neste dispositivo — você pode continuar de onde parou depois.",
+  heading,
 }: BoxingProfileQuestionnaireProps) {
   const [answers, setAnswers] = useState<Answers>({});
   const [index, setIndex] = useState(0);
@@ -136,6 +153,7 @@ export function BoxingProfileQuestionnaire({
 
   return (
     <div>
+      {heading}
       <div className="flex items-center gap-3 mb-3">
         <button
           type="button"
