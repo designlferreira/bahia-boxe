@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Check, ChevronLeft, X } from "lucide-react";
@@ -92,6 +92,26 @@ export function BoxingProfileQuestionnaire({
   const [answers, setAnswers] = useState<Answers>({});
   const [index, setIndex] = useState(0);
   const [confirmExit, setConfirmExit] = useState(false);
+  const perguntaRef = useRef<HTMLFieldSetElement>(null);
+  const jaMontou = useRef(false);
+  const avancoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Ao mudar de pergunta (avançar, voltar ou o avanço automático) o foco vai para a pergunta nova: antes ele caía no <body> (o botão
+  // "Avançar" ficava desativado na pergunta seguinte) e o leitor de tela não ouvia a pergunta. Não na primeira montagem: não rouba o foco.
+  useEffect(() => {
+    if (!jaMontou.current) {
+      jaMontou.current = true;
+      return;
+    }
+    perguntaRef.current?.focus();
+  }, [index]);
+
+  // Cancela um avanço automático pendente ao sair da tela ou mudar de pergunta.
+  useEffect(() => {
+    return () => {
+      if (avancoRef.current) clearTimeout(avancoRef.current);
+    };
+  }, [index]);
 
   useEffect(() => {
     const draft = loadDraft(draftKey);
@@ -143,7 +163,21 @@ export function BoxingProfileQuestionnaire({
     setIndex((i) => Math.min(i + 1, questions.length - 1));
   }
 
+  /**
+   * Pergunta de ESCALA (5 níveis de frequência): tocar na resposta abre a próxima sozinha, depois de um instante para ver a escolha
+   * (antes eram dois toques por pergunta: 28 na versão rápida, 74 na completa). Dá para voltar e mudar. Nunca avança sozinho na
+   * última pergunta (concluir é uma decisão) nem nas de ESCOLHA entre situações (exigem ler opções longas).
+   */
+  function responde(value: Answers[string]) {
+    setAnswers((a) => ({ ...a, [question.id]: value }));
+    if (avancoRef.current) clearTimeout(avancoRef.current);
+    if (question.type === "likert" && !isLast) {
+      avancoRef.current = setTimeout(() => setIndex((i) => Math.min(i + 1, questions.length - 1)), 350);
+    }
+  }
+
   function goBack() {
+    if (avancoRef.current) clearTimeout(avancoRef.current);
     if (index === 0) {
       setConfirmExit(true);
       return;
@@ -170,6 +204,8 @@ export function BoxingProfileQuestionnaire({
           <div
             className="h-1.5 rounded-full bg-secondary overflow-hidden"
             role="progressbar"
+            aria-label="Progresso do questionário"
+            aria-valuetext={`Questão ${index + 1} de ${questions.length}`}
             aria-valuenow={index + 1}
             aria-valuemin={1}
             aria-valuemax={questions.length}
@@ -190,7 +226,7 @@ export function BoxingProfileQuestionnaire({
         </button>
       </div>
 
-      <fieldset className="mt-6 mb-8">
+      <fieldset ref={perguntaRef} tabIndex={-1} className="mt-6 mb-8 focus:outline-none">
         <legend className="text-[19px] font-semibold text-foreground leading-snug mb-5">{question.text}</legend>
 
         {question.type === "likert" && (
@@ -204,7 +240,7 @@ export function BoxingProfileQuestionnaire({
                     name={question.id}
                     value={opt.value}
                     checked={checked}
-                    onChange={() => setAnswers((a) => ({ ...a, [question.id]: opt.value }))}
+                    onChange={() => responde(opt.value)}
                     className="h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
                   />
                   <span className={cn("flex-1 text-[14.5px]", checked ? "font-semibold text-foreground" : "font-medium text-foreground/85")}>
@@ -228,7 +264,7 @@ export function BoxingProfileQuestionnaire({
                     name={question.id}
                     value={opt.value}
                     checked={checked}
-                    onChange={() => setAnswers((a) => ({ ...a, [question.id]: opt.value }))}
+                    onChange={() => responde(opt.value)}
                     className="h-5 w-5 shrink-0 mt-0.5 accent-[hsl(var(--primary))]"
                   />
                   <span className={cn("flex-1 text-[14px] leading-snug", checked ? "text-foreground font-semibold" : "text-foreground/85")}>
@@ -241,6 +277,12 @@ export function BoxingProfileQuestionnaire({
           </div>
         )}
       </fieldset>
+
+      {question.type === "likert" && !isLast && index === 0 && (
+        <p className="text-[12.5px] text-muted-foreground text-center -mt-4 mb-4">
+          Ao tocar numa resposta, a próxima pergunta abre sozinha. Você pode voltar e mudar.
+        </p>
+      )}
 
       <Button size="lg" className="w-full" onClick={goNext} disabled={!answered || submit.isPending}>
         {submit.isPending ? "Enviando…" : isLast ? "Concluir" : "Avançar"}
