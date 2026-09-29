@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { BookingFilters } from "@/components/BookingFilters";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/SkeletonCard";
 import { formatDateTime } from "@/lib/dateUtils";
-import { getAdminBookingHistory } from "@/integrations/backend/api";
+import { Button } from "@/components/ui/button";
+import { getAdminBookingHistoryPage } from "@/integrations/backend/api";
 import { CalendarX } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
@@ -26,12 +27,22 @@ export default function AdminHistorico() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("todas");
 
-  const key = ["admin-history", profile?.id, search, statusFilter];
-  const { data, isLoading, isError, refetch } = useQuery({
+  // A consulta só sai ~0,3 s depois da última tecla (antes cada tecla refazia a busca).
+  const [buscaAplicada, setBuscaAplicada] = useState("");
+  useEffect(() => {
+    const t = window.setTimeout(() => setBuscaAplicada(search), 300);
+    return () => window.clearTimeout(t);
+  }, [search]);
+
+  const key = ["admin-history", profile?.id, buscaAplicada, statusFilter];
+  const { data, isLoading, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: key,
-    queryFn: () => getAdminBookingHistory(profile!.id, search, statusFilter),
+    queryFn: ({ pageParam }) => getAdminBookingHistoryPage(profile!.id, buscaAplicada, statusFilter, pageParam as number),
+    initialPageParam: 0,
+    getNextPageParam: (ultima, todas) => (ultima.hasMore ? todas.length : undefined),
     enabled: !!profile,
   });
+  const aulas = data?.pages.flatMap((p) => p.items) ?? [];
 
   return (
     <div className="page-container">
@@ -48,9 +59,9 @@ export default function AdminHistorico() {
       {isError && <ErrorState title="Não foi possível carregar o histórico" onRetry={() => refetch()} />}
       {isLoading && !isError && <SkeletonList count={3} height={104} />}
 
-      {!isLoading && !isError && data && data.length > 0 && (
+      {!isLoading && !isError && data && aulas.length > 0 && (
         <div className="flex flex-col gap-2.5">
-          {data.map(({ booking, studentName }) => {
+          {aulas.map(({ booking, studentName }) => {
             return (
               <button
                 key={booking.id}
@@ -72,7 +83,20 @@ export default function AdminHistorico() {
         </div>
       )}
 
-      {!isLoading && !isError && data && data.length === 0 && (
+      {!isLoading && !isError && data && aulas.length > 0 && (
+        <div className="mt-4 text-center">
+          <div className="text-[12.5px] text-muted-foreground mb-2.5" aria-live="polite">
+            {hasNextPage ? `Mostrando as ${aulas.length} mais recentes` : aulas.length === 1 ? "1 aula no total" : `${aulas.length} aulas no total`}
+          </div>
+          {hasNextPage && (
+            <Button variant="secondary" className="w-full" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+              {isFetchingNextPage ? "Carregando…" : "Ver mais aulas"}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {!isLoading && !isError && data && aulas.length === 0 && (
         <EmptyState icon={CalendarX} title="Nenhuma aula nesse filtro" description="Ajuste a busca ou o status." />
       )}
 

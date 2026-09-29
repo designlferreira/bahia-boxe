@@ -1598,23 +1598,42 @@ export async function getAulasCancelaveisRecorrencia(studentId: string): Promise
 // admin · histórico
 // ---------------------------------------------------------------------------
 
-export async function getAdminBookingHistory(
+export const HISTORICO_PAGINA = 30;
+
+/** "João" e "joao" são a mesma busca (sem acento, sem maiúscula). */
+const semAcento = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+/**
+ * Uma página do histórico do professor. A busca por aluno e o filtro de status são aplicados NA CONSULTA (antes eram
+ * aplicados no aparelho sobre as 200 aulas mais recentes: um aluno antigo, ou "Faltas", podia sumir sem aviso).
+ * `hasMore` vem de pedir uma linha a mais que a página.
+ */
+export async function getAdminBookingHistoryPage(
   adminId: string,
   search: string,
   statusFilter: string,
-): Promise<{ booking: Booking; studentName: string }[]> {
-  const [bookingsRes, students] = await Promise.all([
-    client().from("bookings").select("*").eq("admin_id", adminId).order("start_time", { ascending: false }).limit(200),
-    adminStudents(adminId),
-  ]);
-  if (bookingsRes.error) throw new Error(bookingsRes.error.message);
-
+  page: number,
+): Promise<{ items: { booking: Booking; studentName: string }[]; hasMore: boolean }> {
+  const students = await adminStudents(adminId);
   const nameOf = new Map(students.map((s) => [s.id, s.name]));
-  const q = search.trim().toLowerCase();
-  return (bookingsRes.data ?? [])
-    .filter((r) => statusFilter === "todas" || r.status === statusFilter)
-    .map((r) => ({ booking: mapBooking(r), studentName: nameOf.get(r.student_id) ?? "Aluno" }))
-    .filter((e) => !q || e.studentName.toLowerCase().includes(q));
+
+  let query = client().from("bookings").select("*").eq("admin_id", adminId);
+  const q = semAcento(search);
+  if (q) {
+    const ids = students.filter((s) => semAcento(s.name).includes(q)).map((s) => s.id);
+    if (ids.length === 0) return { items: [], hasMore: false };
+    query = query.in("student_id", ids);
+  }
+  if (statusFilter !== "todas") query = query.eq("status", statusFilter);
+
+  const from = page * HISTORICO_PAGINA;
+  const { data, error } = await query.order("start_time", { ascending: false }).range(from, from + HISTORICO_PAGINA);
+  if (error) throw new Error(error.message);
+  const rows = data ?? [];
+  return {
+    items: rows.slice(0, HISTORICO_PAGINA).map((r) => ({ booking: mapBooking(r), studentName: nameOf.get(r.student_id) ?? "Aluno" })),
+    hasMore: rows.length > HISTORICO_PAGINA,
+  };
 }
 
 // ---------------------------------------------------------------------------
