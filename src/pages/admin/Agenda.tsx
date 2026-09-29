@@ -30,6 +30,7 @@ import {
   VINCULO_LABEL,
 } from "@/integrations/backend/api";
 import { StatusBadge } from "@/components/StatusBadge";
+import type { Booking } from "@/integrations/backend/types";
 
 const DAY_COUNT = 7;
 
@@ -116,6 +117,33 @@ export default function AdminAgenda() {
   );
   const nAulas = data?.filter((t) => !t.free).length ?? 0;
 
+  // Pendências FORA da semana na tela (decisão do Lucas, 2026-09-28): numa segunda-feira, a aula
+  // sem registro de domingo fica na semana anterior e nada avisava. Uma linha com atalho leva ao dia.
+  const primeiroDia = isoDateOnly(days[0]);
+  const ultimoDia = isoDateOnly(days[DAY_COUNT - 1]);
+  const semanaAnterior = isoDateOnly(addDays(days[0], -DAY_COUNT));
+  const foraDaSemana = (lado: "antes" | "depois") => {
+    const dentro = (b: Booking) => (lado === "antes" ? isoDateOnly(b.startTime) < primeiroDia : isoDateOnly(b.startTime) > ultimoDia);
+    const semRegistro = (awaitingQuery.data ?? []).filter(dentro);
+    const pedidos = (pedidosQuery.data ?? []).filter(dentro);
+    const todas = [...semRegistro, ...pedidos].sort((a, b) => a.startTime.localeCompare(b.startTime));
+    if (!todas.length) return null;
+    const partes = [
+      semRegistro.length && (semRegistro.length === 1 ? "1 aula sem registro" : `${semRegistro.length} aulas sem registro`),
+      pedidos.length && (pedidos.length === 1 ? "1 pedido" : `${pedidos.length} pedidos`),
+    ].filter(Boolean);
+    const onde =
+      lado === "depois"
+        ? "depois desta semana"
+        : todas.every((b) => isoDateOnly(b.startTime) >= semanaAnterior)
+          ? "na semana passada"
+          : "em semanas anteriores";
+    // Vai pro dia da mais cedo: antes, a mais antiga (a que mais corre risco de ser esquecida);
+    // depois, a mais próxima.
+    return { texto: `${partes.join(" e ")} ${onde}`, data: new Date(todas[0].startTime) };
+  };
+  const avisos = [foraDaSemana("antes"), foraDaSemana("depois")].filter((a): a is { texto: string; data: Date } => !!a);
+
   // Dia vazio: publicar horários só faz sentido no autosserviço e num dia que ainda não passou.
   const { data: settings } = useQuery({
     queryKey: ["admin-settings", profile?.id],
@@ -150,6 +178,19 @@ export default function AdminAgenda() {
           Disponibilidade
         </Button>
       </div>
+
+      {avisos.map((a) => (
+        <button
+          key={a.texto}
+          type="button"
+          onClick={() => setSelectedDate(a.data)}
+          className="w-full min-h-11 mb-2 px-3 rounded-xl border border-amber/40 bg-card flex items-center gap-2 text-left text-sm text-foreground active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-amber" />
+          <span className="flex-1 min-w-0">{a.texto}</span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+        </button>
+      ))}
 
       {/* Setas e "Hoje" numa linha própria: assim os 7 dias cabem na largura toda (cada um com
           ~45px de toque) sem rolagem lateral — antes só uns 4 dos 7 apareciam no celular. */}
