@@ -4,14 +4,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SkeletonList } from "@/components/SkeletonCard";
 import { CalendarClock } from "lucide-react";
+import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
-import { formatPriceLabel, packageProgressPct } from "@/lib/packageUtils";
+import { formatPriceLabel } from "@/lib/packageUtils";
 import { formatDateShort } from "@/lib/dateUtils";
 import {
   getModoAgendamentoEfetivo,
@@ -115,22 +115,11 @@ export default function StudentPacotes() {
     <div className="page-container">
       <PageHeader title="MEUS PACOTES" back />
 
-      {home?.package && (
-        <div className="card-dark p-[18px] mb-6">
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-[15px] font-semibold text-foreground">{home.package.templateName}</span>
-            <Badge className="bg-accent/15 text-accent">Ativo</Badge>
-          </div>
-          <div className="h-2 rounded-full bg-secondary overflow-hidden mb-2">
-            <div
-              className="h-full rounded-full bg-gradient-gold origin-left animate-bb-bar"
-              style={{ width: `${packageProgressPct(home.package.totalClasses, home.package.usedClasses)}%` }}
-            />
-          </div>
-          <div className="text-[12.5px] text-muted-foreground">
-            {home.package.usedClasses} de {home.package.totalClasses} usadas · desde{" "}
-            {formatDateShort(home.package.createdAt)}
-          </div>
+      {/* O mesmo cartão de pacote da Home (antes esta tela tinha uma terceira cópia: "8 de 8 usadas" com selo "Ativo", sem "aulas
+          restantes" nem o alerta de poucas aulas). Sem alerta aqui: a lista logo abaixo já É o "pedir mais". */}
+      {home && (home.package ?? home.lastPackage) && (
+        <div className="mb-6">
+          <ActivePackageCard pkg={home.package ?? home.lastPackage} credits={home.credits} audience="student" hideAlert />
         </div>
       )}
 

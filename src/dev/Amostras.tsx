@@ -1296,7 +1296,7 @@ export default function Amostras() {
             [
               { title: "Pacotes · com pacote ativo", note: "pacote em andamento e três modelos para pedir", data: { ...base, package: pkg(8, 5, { id: "pk-a" }), credits: 1 }, modelos: 3 },
               { title: "Pacotes · sem pacote", note: "aluno sem pacote ativo", data: base, modelos: 3 },
-              { title: "Pacotes · pedido em análise", note: "já pediu um pacote e o professor não respondeu", data: { ...base, package: pkg(8, 8, { id: "pk-b", status: "finished" }), pendingRequest: { ...PEDIDO, templateId: "m1" } }, modelos: 3 },
+              { title: "Pacotes · pedido em análise", note: "já pediu um pacote e o professor não respondeu", data: { ...base, package: null, lastPackage: pkg(8, 8, { id: "pk-b", status: "finished" }), pendingRequest: { ...PEDIDO, templateId: "m1" } }, modelos: 3 },
               { title: "Pacotes · sem modelos", note: "o professor ainda não cadastrou nenhum modelo", data: base, modelos: 0 },
               { title: "Pacotes · erro", note: "a consulta dos modelos falhou (não é semeada de propósito)", data: base, modelos: -1 },
             ] as { title: string; note: string; data: HomeData; modelos: number }[]
