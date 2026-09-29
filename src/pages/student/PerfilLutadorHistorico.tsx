@@ -1,3 +1,4 @@
+import { FighterProfileGloss } from "@/components/FighterProfileGloss";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { History } from "lucide-react";
@@ -67,7 +68,7 @@ export default function StudentPerfilLutadorHistorico() {
               <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2.5">
                 Evolução por dimensão
               </div>
-              <div className="text-[11.5px] text-muted-foreground leading-relaxed mb-3">
+              <div className="text-xs text-muted-foreground leading-relaxed mb-3">
                 Comparando sua primeira autoavaliação ({formatDateShort(oldest.completedAt)}) com a mais recente (
                 {formatDateShort(newest.completedAt)}).
               </div>
@@ -91,7 +92,7 @@ export default function StudentPerfilLutadorHistorico() {
                             </div>
                           ))}
                         </div>
-                        <p className="text-[11.5px] text-muted-foreground leading-relaxed mt-1.5">
+                        <p className="text-xs text-muted-foreground leading-relaxed mt-1.5">
                           Sua autoavaliação de {DIMENSION_LABELS[dim]} mudou de {from} para {to} nesse período.
                         </p>
                       </div>
@@ -112,13 +113,16 @@ export default function StudentPerfilLutadorHistorico() {
                 className="card-dark p-4 text-left w-full active:scale-[0.99] transition-transform"
               >
                 <div className="flex items-baseline justify-between mb-1">
-                  <span className="text-[14.5px] font-semibold text-foreground">{FIGHTER_PROFILE_LABELS[a.primaryProfile]}</span>
+                  <span className="text-[14.5px] font-semibold text-foreground">
+                    {FIGHTER_PROFILE_LABELS[a.primaryProfile]}
+                    <FighterProfileGloss profile={a.primaryProfile} />
+                  </span>
                   <span className="text-[12px] text-muted-foreground">{formatDateShort(a.completedAt)}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[12.5px] text-accent font-semibold">{a.profileScores[a.primaryProfile]}% de compatibilidade</span>
+                  <span className="text-[12.5px] text-accent font-semibold">{a.profileScores[a.primaryProfile]}% de afinidade</span>
                   {a.assessmentLength === "short" && (
-                    <span className="text-[9.5px] font-bold uppercase tracking-wide text-muted-foreground bg-secondary rounded-full px-2 py-0.5">
+                    <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground bg-secondary rounded-full px-2 py-0.5">
                       Rápida
                     </span>
                   )}

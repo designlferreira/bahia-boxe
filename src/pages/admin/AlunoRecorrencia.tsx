@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { fromZonedTime } from "date-fns-tz";
@@ -15,10 +15,11 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { formatDateShort, formatWeekdayShort, TIMEZONE } from "@/lib/dateUtils";
+import { formatDateShort, formatTime, formatWeekdayShort, TIMEZONE } from "@/lib/dateUtils";
 import type { AlunoRecorrencia } from "@/integrations/backend/types";
 import {
-  countAulasCancelaveisRecorrencia,
+  getAulasCancelaveisRecorrencia,
+  previewRecorrenciaAulas,
   createAlunoRecorrencia,
   excluirAlunoRecorrencia,
   gerarPacoteRecorrencia,
@@ -47,7 +48,10 @@ const WEEKDAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sex
  * que a recorrência prometia (nada de 30/45/90 min por enquanto) em troca de nunca depender de um
  * aviso pós-fato. Se precisar de outra duração no futuro, resolve a view antes, não aqui.
  */
-const HOURS = Array.from({ length: 24 }, (_, h) => h);
+/** Horários de treino razoáveis (05h–22h): 24 botões, com a madrugada no meio, só atrapalhavam a escolha. */
+const HOURS = Array.from({ length: 18 }, (_, h) => h + 5);
+const MAX_AULAS = 52; // o cálculo das datas já limita a 52 semanas
+const FOCO = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 const hhmm = (h: number) => String(h).padStart(2, "0") + ":00";
 const DURACAO_MINUTOS = 60;
 
@@ -74,32 +78,28 @@ function RecorrenciaDiaGroup({ grupo, onToggle, onExcluir }: RecorrenciaDiaGroup
       <div className="text-[13px] font-semibold text-foreground/85">{WEEKDAY_LABELS[grupo.diaSemana]}</div>
       <div className="flex flex-col gap-2">
         {grupo.items.map((r) => (
-          <div key={r.id} className={cn("card-dark p-3.5 flex items-center gap-3", !r.ativo && "opacity-50")}>
-            <div className="flex-1">
+          <div key={r.id} className="card-dark p-3.5 flex items-center gap-3">
+            <div className={cn("flex-1", !r.ativo && "opacity-60")}>
               <div className="text-[14.5px] font-semibold text-foreground">{r.horario}</div>
               <div className="text-[12.5px] text-muted-foreground mt-0.5">{r.duracaoMinutos} min</div>
-              {r.temUso && (
-                <div className="text-[11px] text-muted-foreground mt-1">
-                  Já gerou aula ou pacote — desative em vez de excluir.
-                </div>
-              )}
             </div>
             <Switch
-              aria-label="Alternar recorrência"
+              aria-label={`Horário fixo de ${WEEKDAY_LABELS[r.diaSemana].toLowerCase()} às ${r.horario}`}
               checked={r.ativo}
               onCheckedChange={(checked) => onToggle({ id: r.id, ativo: checked })}
             />
             <button
               type="button"
-              aria-label="Excluir recorrência"
+              aria-label={`Excluir horário fixo de ${WEEKDAY_LABELS[r.diaSemana].toLowerCase()} às ${r.horario}`}
+              aria-describedby={r.temUso ? "horarios-explica" : undefined}
               disabled={r.temUso}
               onClick={() => onExcluir(r)}
               className={cn(
-                "h-9 w-9 shrink-0 rounded-lg flex items-center justify-center transition-colors active:scale-95",
-                r.temUso ? "text-muted-foreground/30" : "text-destructive hover:bg-destructive/10",
+                `h-11 w-11 shrink-0 rounded-lg flex items-center justify-center transition-colors active:scale-95 ${FOCO}`,
+                r.temUso ? "text-muted-foreground/40" : "text-destructive hover:bg-destructive/10",
               )}
             >
-              <Trash2 className="h-[18px] w-[18px]" />
+              <Trash2 className="h-[18px] w-[18px]" aria-hidden />
             </button>
           </div>
         ))}
@@ -112,10 +112,13 @@ export default function AdminAlunoRecorrencia() {
   const { studentId } = useParams<{ studentId: string }>();
   const { profile } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [addOpen, setAddOpen] = useState(false);
   const [diaSemana, setDiaSemana] = useState(1);
   const [horario, setHorario] = useState("18:00");
-  const [totalAulas, setTotalAulas] = useState(8);
+  // Texto do campo, não número: com número, apagar o "8" virava "1" na hora e não dava para digitar "12".
+  const [totalTexto, setTotalTexto] = useState("8");
+  const totalAulas = Math.min(MAX_AULAS, Math.max(1, parseInt(totalTexto, 10) || 1));
   const [startDate, setStartDate] = useState<string | null>(null);
   const [confirmGerar, setConfirmGerar] = useState(false);
   const [excluirAlvo, setExcluirAlvo] = useState<AlunoRecorrencia | null>(null);
@@ -164,7 +167,7 @@ export default function AdminAlunoRecorrencia() {
   // silenciosamente.
   const cancelaveisQuery = useQuery({
     queryKey: ["aulas-cancelaveis-recorrencia", studentId],
-    queryFn: () => countAulasCancelaveisRecorrencia(studentId!),
+    queryFn: () => getAulasCancelaveisRecorrencia(studentId!),
     enabled: !!studentId,
   });
 
@@ -182,20 +185,20 @@ export default function AdminAlunoRecorrencia() {
     onSuccess: () => {
       invalidate();
       setAddOpen(false);
-      toast.success(`Recorrência adicionada · toda ${WEEKDAY_LABELS[diaSemana].toLowerCase()} às ${horario}`);
+      toast.success(`Horário fixo adicionado · toda ${WEEKDAY_LABELS[diaSemana].toLowerCase()} às ${horario}`);
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível adicionar a recorrência."),
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível adicionar o horário fixo."),
   });
 
   const toggleAtivo = useMutation({
     mutationFn: ({ id, ativo }: { id: string; ativo: boolean }) => setAlunoRecorrenciaAtivo(id, ativo),
     onSuccess: (_r, vars) => {
       invalidate();
-      toast(vars.ativo ? "Recorrência reativada" : "Recorrência desativada", {
+      toast(vars.ativo ? "Horário fixo reativado" : "Horário fixo desativado", {
         className: vars.ativo ? undefined : "!text-amber",
       });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível alterar a recorrência."),
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível alterar o horário fixo."),
   });
 
   // CLAUDE.md, "excluir dia fixo de recorrência" — só aceita quando `temUso` é false (checagem
@@ -205,9 +208,9 @@ export default function AdminAlunoRecorrencia() {
     mutationFn: (id: string) => excluirAlunoRecorrencia(id),
     onSuccess: () => {
       invalidate();
-      toast("Recorrência excluída", { className: "!text-amber" });
+      toast("Horário fixo excluído", { className: "!text-amber" });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível excluir a recorrência."),
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível excluir o horário fixo."),
   });
 
   const gerarPacote = useMutation({
@@ -215,7 +218,9 @@ export default function AdminAlunoRecorrencia() {
       gerarPacoteRecorrencia(studentId!, data.totalAulas, data.startDate ?? undefined),
     onSuccess: (_r, vars) => {
       invalidate();
-      toast.success(`Pacote de ${vars.totalAulas} aulas gerado`);
+      toast.success(`Pacote de ${vars.totalAulas} aulas gerado`, {
+        action: { label: "Ver na agenda", onClick: () => navigate("/admin/agenda") },
+      });
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível gerar o pacote."),
   });
@@ -223,7 +228,7 @@ export default function AdminAlunoRecorrencia() {
   if (detailQuery.isLoading || recorrenciasQuery.isLoading || settingsQuery.isLoading) {
     return (
       <div className="page-container">
-        <PageHeader title="RECORRÊNCIA" back />
+        <PageHeader title="HORÁRIOS FIXOS" back />
         <SkeletonCard height={140} className="mb-4" />
         <SkeletonList count={2} height={72} />
       </div>
@@ -233,7 +238,7 @@ export default function AdminAlunoRecorrencia() {
   if (detailQuery.isError || recorrenciasQuery.isError || !detailQuery.data) {
     return (
       <div className="page-container">
-        <PageHeader title="RECORRÊNCIA" back />
+        <PageHeader title="HORÁRIOS FIXOS" back />
         <ErrorState onRetry={() => (detailQuery.refetch(), recorrenciasQuery.refetch())} />
       </div>
     );
@@ -248,7 +253,8 @@ export default function AdminAlunoRecorrencia() {
   const inativasOrdenadas = groupByDiaSemana(recorrencias.filter((r) => !r.ativo));
   const activasCount = ativas.length;
   const saldo = saldoQuery.data ?? null;
-  const cancelaveis = cancelaveisQuery.data ?? 0;
+  const datasCancelaveis = cancelaveisQuery.data ?? [];
+  const cancelaveis = datasCancelaveis.length;
   // CLAUDE.md, Etapa 7: ver a tela (dias fixos, saldo, histórico) é sempre permitido — só GERAR
   // pacote (a ação que materializa bookings/packages de verdade) exige o professor estar em
   // RECORRENCIA. `undefined` (settings ainda carregando) não bloqueia: já coberto pelo loading gate
@@ -269,28 +275,50 @@ export default function AdminAlunoRecorrencia() {
   const startDateOptions = getRecorrenciaStartDateOptions(ativas);
   const effectiveStartDate = startDate && startDateOptions.includes(startDate) ? startDate : (startDateOptions[0] ?? null);
 
+  // O que "Gerar" vai fazer, mostrado ANTES do toque: quais dias/horários, de quando a quando, e
+  // quantas aulas já marcadas serão canceladas (não só na janela de confirmação, depois do compromisso).
+  const aulasNovas = effectiveStartDate ? previewRecorrenciaAulas(ativas, totalAulas, effectiveStartDate) : [];
+  const horariosAtivos = Array.from(new Set(ativas.map((r) => `${r.diaSemana}|${r.horario}`)))
+    .map((k) => k.split("|"))
+    .sort((a, b) => Number(a[0]) - Number(b[0]) || a[1].localeCompare(b[1]))
+    .map(([d, h]) => `${WEEKDAY_LABELS[Number(d)].slice(0, 3).toLowerCase()} ${h}`);
+  const periodo = (datas: string[]) =>
+    datas.length > 1 ? `de ${formatDateShort(datas[0])} a ${formatDateShort(datas[datas.length - 1])}` : formatDateShort(datas[0]);
+
   return (
     <div className="page-container">
-      <PageHeader title="RECORRÊNCIA" subtitle={student.name} back />
+      <PageHeader title="HORÁRIOS FIXOS" subtitle={student.name} back />
 
       <div className="mb-4">
         <ActivePackageCard pkg={pkg} credits={credits} saldo={saldo} />
       </div>
 
       <div className="flex items-center justify-between mb-2.5">
-        <h2 className="section-title">Dias fixos</h2>
+        <h2 className="section-title">Horários fixos da semana</h2>
         <Button variant="secondary" size="sm" onClick={() => setAddOpen(true)}>
           <Plus className="h-4 w-4" />
           Adicionar
         </Button>
       </div>
 
+      {recorrencias.length > 0 && (
+        <p id="horarios-explica" className="text-[13px] text-muted-foreground mb-3 leading-snug">
+          Desativar ou excluir um horário não muda as aulas que já estão na agenda; vale só para o próximo pacote. Quem já gerou
+          aulas não pode ser excluído, só desativado.
+        </p>
+      )}
+
       <div className="flex flex-col gap-4 mb-5">
         {recorrencias.length === 0 && (
-          <div className="border border-dashed border-[#2E2E2E] rounded-[13px] p-4 text-center">
-            <div className="text-[12.5px] text-muted-foreground">
-              Nenhum dia fixo cadastrado para {student.name.split(" ")[0]} ainda.
+          <div className="border border-dashed border-border rounded-[13px] p-5 text-center">
+            <div className="text-[13px] text-muted-foreground leading-snug mb-3">
+              {student.name.split(" ")[0]} ainda não tem horário fixo. Cadastre os dias e horários em que treina toda semana; depois é
+              só gerar as aulas.
             </div>
+            <Button onClick={() => setAddOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Adicionar o primeiro horário
+            </Button>
           </div>
         )}
 
@@ -298,7 +326,7 @@ export default function AdminAlunoRecorrencia() {
           <div className="flex flex-col gap-3">
             {/* Só rotula "Ativos" quando há inativos pra distinguir — com uma lista só, o rótulo é ruído. */}
             {inativasOrdenadas.length > 0 && (
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Ativos</div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">Ativos</div>
             )}
             {ativasOrdenadas.map((grupo) => (
               <RecorrenciaDiaGroup key={grupo.diaSemana} grupo={grupo} onToggle={toggleAtivo.mutate} onExcluir={setExcluirAlvo} />
@@ -309,7 +337,7 @@ export default function AdminAlunoRecorrencia() {
         {inativasOrdenadas.length > 0 && (
           <div className="flex flex-col gap-3">
             {ativasOrdenadas.length > 0 && (
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Inativos</div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">Inativos</div>
             )}
             {inativasOrdenadas.map((grupo) => (
               <RecorrenciaDiaGroup key={grupo.diaSemana} grupo={grupo} onToggle={toggleAtivo.mutate} onExcluir={setExcluirAlvo} />
@@ -318,17 +346,33 @@ export default function AdminAlunoRecorrencia() {
         )}
       </div>
 
+      {recorrencias.length > 0 && (
       <div className="card-dark p-4">
         <h2 className="section-title mb-1">Gerar pacote</h2>
         <div className="text-[12.5px] text-muted-foreground mb-3">
-          Materializa aulas concretas na agenda a partir dos dias fixos ativos
+          Cria as aulas na agenda a partir dos horários fixos ativos
           {activasCount > 0 ? ` (${activasCount} ativo${activasCount > 1 ? "s" : ""})` : ""}.
         </div>
 
-        {activasCount > 0 && (
+        {emAutosservico && (
+          <div className="rounded-xl border border-amber/40 bg-amber/10 p-3 text-[13px] leading-snug">
+            <div className="text-amber">
+              Você está no modo Autosserviço, em que o aluno escolhe os próprios horários. Para gerar aulas por aqui, mude para o
+              modo Recorrência.
+            </div>
+            <Link
+              to="/admin/configuracoes"
+              className="mt-1.5 inline-flex min-h-11 items-center font-semibold text-foreground underline underline-offset-4 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Abrir Configurações
+            </Link>
+          </div>
+        )}
+
+        {!emAutosservico && activasCount > 0 && (
           <>
             <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">
-              Começa em
+              Primeira aula em
             </div>
             {startDateOptions.length > 0 ? (
               <div className="flex gap-2 overflow-x-auto -mx-4 px-4 mb-3.5 pb-1 scroll-fade-x">
@@ -337,11 +381,12 @@ export default function AdminAlunoRecorrencia() {
                     key={d}
                     type="button"
                     onClick={() => setStartDate(d)}
+                    aria-pressed={effectiveStartDate === d}
                     className={cn(
-                      "shrink-0 h-11 px-4 rounded-xl border text-sm font-semibold transition-all active:scale-95",
+                      `shrink-0 h-11 px-4 rounded-xl border text-sm font-semibold transition-all active:scale-95 ${FOCO}`,
                       effectiveStartDate === d
-                        ? "bg-primary/15 border-primary text-primary"
-                        : "bg-secondary border-[#333] text-foreground/85",
+                        ? "bg-primary/15 border-primary text-[hsl(var(--red-text))]"
+                        : "bg-secondary border-border text-foreground/85",
                     )}
                   >
                     {labelForDateOnly(d)}
@@ -350,44 +395,64 @@ export default function AdminAlunoRecorrencia() {
               </div>
             ) : (
               <div className="text-[12px] text-amber mb-3.5">
-                Nenhuma data futura encontrada nos próximos dias fixos — confira se estão ativos.
+                Os horários fixos ativos não têm data livre nas próximas 8 semanas. Confira se estão ativos.
               </div>
             )}
           </>
         )}
 
-        <div className="flex gap-2.5">
-          <Input
-            type="number"
-            min={1}
-            value={totalAulas}
-            onChange={(e) => setTotalAulas(Math.max(1, parseInt(e.target.value, 10) || 1))}
-            className="w-24 text-center"
-            aria-label="Número de aulas"
-          />
-          <Button
-            className="flex-1"
-            disabled={emAutosservico || activasCount === 0 || !effectiveStartDate || gerarPacote.isPending}
-            onClick={pedirGeracao}
-          >
-            Gerar {totalAulas} aula{totalAulas > 1 ? "s" : ""}
-          </Button>
-        </div>
-        {emAutosservico ? (
-          <div className="text-[12px] text-amber mt-2">
-            Ative o modo Recorrência em Configurações para gerar pacotes por aqui.
+        {!emAutosservico && aulasNovas.length > 0 && (
+          <div className="rounded-xl bg-background border border-border p-3 mb-3 text-[13px] leading-snug">
+            <div className="text-foreground">
+              Vai criar <strong>{aulasNovas.length} aula{aulasNovas.length > 1 ? "s" : ""}</strong>: {horariosAtivos.join(" e ")},{" "}
+              {periodo(aulasNovas)}.
+            </div>
+            {cancelaveis > 0 && (
+              <div className="text-amber mt-1.5">
+                As {cancelaveis} aula{cancelaveis > 1 ? "s" : ""} já marcada{cancelaveis > 1 ? "s" : ""} ({periodo(datasCancelaveis)}) serão
+                canceladas e substituídas. Não contam falta nem gastam aula.
+              </div>
+            )}
           </div>
-        ) : (
-          activasCount === 0 && (
-            <div className="text-[12px] text-amber mt-2">Ative pelo menos um dia fixo para gerar um pacote.</div>
-          )
+        )}
+
+        {!emAutosservico && (
+          <>
+            {activasCount === 0 && (
+              <div id="gerar-motivo" className="text-[13px] text-amber mb-2.5">
+                Ative pelo menos um horário fixo para gerar um pacote.
+              </div>
+            )}
+            <div className="flex gap-2.5">
+              <Input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={2}
+                value={totalTexto}
+                onChange={(e) => setTotalTexto(e.target.value.replace(/\D/g, ""))}
+                onBlur={() => setTotalTexto(String(totalAulas))}
+                className="w-24 text-center"
+                aria-label="Número de aulas"
+              />
+              <Button
+                className="flex-1"
+                disabled={activasCount === 0 || !effectiveStartDate || gerarPacote.isPending}
+                aria-describedby={activasCount === 0 ? "gerar-motivo" : undefined}
+                onClick={pedirGeracao}
+              >
+                {cancelaveis > 0 ? `Gerar ${totalAulas} e cancelar ${cancelaveis}` : `Gerar ${totalAulas} aula${totalAulas > 1 ? "s" : ""}`}
+              </Button>
+            </div>
+          </>
         )}
       </div>
+      )}
 
       <Sheet open={addOpen} onOpenChange={setAddOpen}>
         <SheetContent>
-          <SheetTitle>ADICIONAR DIA FIXO</SheetTitle>
-          <div className="text-[13px] text-muted-foreground mb-4">Novo dia/horário recorrente para {student.name}</div>
+          <SheetTitle>ADICIONAR HORÁRIO FIXO</SheetTitle>
+          <div className="text-[13px] text-muted-foreground mb-4">Novo horário fixo para {student.name}</div>
 
           <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Dia da semana</div>
           <div className="flex gap-2 overflow-x-auto -mx-5 px-5 mb-3.5 pb-1 scroll-fade-x">
@@ -396,9 +461,11 @@ export default function AdminAlunoRecorrencia() {
                 key={label}
                 type="button"
                 onClick={() => setDiaSemana(idx)}
+                aria-pressed={diaSemana === idx}
+                aria-label={label}
                 className={cn(
-                  "shrink-0 h-11 px-4 rounded-xl border text-sm font-semibold transition-all active:scale-95",
-                  diaSemana === idx ? "bg-primary/15 border-primary text-primary" : "bg-secondary border-[#333] text-foreground/85",
+                  `shrink-0 h-11 px-4 rounded-xl border text-sm font-semibold transition-all active:scale-95 ${FOCO}`,
+                  diaSemana === idx ? "bg-primary/15 border-primary text-[hsl(var(--red-text))]" : "bg-secondary border-border text-foreground/85",
                 )}
               >
                 {label.slice(0, 3)}
@@ -415,9 +482,10 @@ export default function AdminAlunoRecorrencia() {
                   key={v}
                   type="button"
                   onClick={() => setHorario(v)}
+                  aria-pressed={horario === v}
                   className={cn(
-                    "shrink-0 h-11 px-4 rounded-xl border text-sm font-semibold transition-all active:scale-95",
-                    horario === v ? "bg-primary/15 border-primary text-primary" : "bg-secondary border-[#333] text-foreground/85",
+                    `shrink-0 h-11 px-4 rounded-xl border text-sm font-semibold transition-all active:scale-95 ${FOCO}`,
+                    horario === v ? "bg-primary/15 border-primary text-[hsl(var(--red-text))]" : "bg-secondary border-border text-foreground/85",
                   )}
                 >
                   {v}
@@ -444,7 +512,11 @@ export default function AdminAlunoRecorrencia() {
         open={confirmGerar}
         onOpenChange={setConfirmGerar}
         title="GERAR PACOTE"
-        description={`${cancelaveis} aula${cancelaveis > 1 ? "s" : ""} do pacote anterior de ${student.name.split(" ")[0]} ${cancelaveis > 1 ? "serão canceladas" : "será cancelada"} (sem contar falta nem gastar crédito) antes de gerar as ${totalAulas} novas. Continuar?`}
+        description={
+          cancelaveis > 0
+            ? `${cancelaveis} aula${cancelaveis > 1 ? "s" : ""} de ${student.name.split(" ")[0]} (${datasCancelaveis.map((d) => `${formatDateShort(d)} ${formatTime(d)}`).join(", ")}) ${cancelaveis > 1 ? "serão canceladas" : "será cancelada"}, sem contar falta nem gastar aula, e ${totalAulas} novas serão criadas. Continuar?`
+            : ""
+        }
         confirmLabel="Gerar mesmo assim"
         tone="default"
         onConfirm={() => {
@@ -456,7 +528,7 @@ export default function AdminAlunoRecorrencia() {
       <ConfirmDialog
         open={!!excluirAlvo}
         onOpenChange={(open) => !open && setExcluirAlvo(null)}
-        title="EXCLUIR RECORRÊNCIA"
+        title="EXCLUIR HORÁRIO FIXO"
         description={
           excluirAlvo
             ? `Excluir ${WEEKDAY_LABELS[excluirAlvo.diaSemana].toLowerCase()} às ${excluirAlvo.horario}? Esta ação não pode ser desfeita.`

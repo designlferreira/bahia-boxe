@@ -13,7 +13,15 @@ import { BoxingProfileResultView } from "@/components/BoxingProfileResultView";
 import { BoxingProfileScoresSummary } from "@/components/BoxingProfileScoresSummary";
 import { BoxingProfileComparisonView } from "@/components/BoxingProfileComparisonView";
 import { BoxingProfilePartialNotice } from "@/components/BoxingProfilePartialNotice";
-import { getBoxingProfileAssessment, getBoxingProfileHistory, markNotificationRead, studentIdForProfile } from "@/integrations/backend/api";
+import {
+  getBoxingProfileAssessment,
+  getBoxingProfileHistory,
+  getStudentAdminId,
+  getWhatsappDoProfessor,
+  markNotificationRead,
+  studentIdForProfile,
+} from "@/integrations/backend/api";
+import { getQuestions } from "@/lib/boxingProfile";
 import { coachAssessmentNotificationId } from "@/components/BoxingProfileHomeCard";
 
 /** Abaixo disso, refazer o teste mostra um aviso (não bloqueante) antes de seguir. */
@@ -44,6 +52,20 @@ export default function StudentPerfilLutador() {
 
   // `history` traz 'self' e 'coach' juntos (RLS por posse, não por tipo) — filtra por tipo em vez
   // de assumir a linha mais recente.
+  // Canal do aluno com o professor (mesmo da Home): só usado quando as leituras divergem.
+  const { data: adminId } = useQuery({
+    queryKey: ["student-admin-id", profile?.id],
+    queryFn: () => getStudentAdminId(profile!.id),
+    enabled: !!profile,
+    staleTime: Infinity,
+  });
+  const { data: whatsapp } = useQuery({
+    queryKey: ["whatsapp-professor", adminId],
+    queryFn: () => getWhatsappDoProfessor(adminId!),
+    enabled: !!adminId,
+    staleTime: 60 * 60 * 1000,
+  });
+
   const latest = history?.find((a) => a.assessmentType === "self");
   const latestCoach = history?.find((a) => a.assessmentType === "coach");
   // Abrir esta tela = ver a avaliação do professor. Marca o aviso como lido pra Home parar de
@@ -101,11 +123,11 @@ export default function StudentPerfilLutador() {
           <EmptyState
             icon={Sparkles}
             title="Descubra seu Perfil de Boxe"
-            description="Responda 32 perguntas rápidas sobre como você se enxerga dentro do ringue e descubra qual estilo de luta mais combina com o seu jeito de lutar."
+            description={`Responda ${getQuestions("self", "short").length} perguntas (versão rápida) ou ${getQuestions("self", "full").length} (versão completa) sobre como você se enxerga dentro do ringue e descubra qual estilo de luta mais combina com o seu jeito de lutar.`}
             ctaLabel="Descobrir meu perfil"
             onCta={goToQuestionnaire}
           />
-          <p className="text-[11.5px] text-muted-foreground text-center leading-relaxed mt-3">
+          <p className="text-xs text-muted-foreground text-center leading-relaxed mt-3">
             É uma autoavaliação: reflete como você percebe o seu próprio jogo no momento, não uma medição técnica feita pelo seu
             treinador.
           </p>
@@ -117,8 +139,12 @@ export default function StudentPerfilLutador() {
           pra comparar ainda) em vez de escondê-la atrás de um botão. */}
       {!isLoading && !isError && !latest && latestCoach && (
         <>
-          <BoxingProfileScoresSummary assessment={latestCoach} heroLabel="Leitura do seu professor" radarHeading="Radar" />
-          <BoxingProfilePartialNotice text="Por enquanto, este resultado usa só a avaliação do seu professor. Assim que você fizer sua autoavaliação, o combinado passa a considerar as duas leituras." />
+          <BoxingProfileScoresSummary
+            assessment={latestCoach}
+            heroLabel="Leitura do seu professor"
+            radarHeading="Radar"
+            notice={<BoxingProfilePartialNotice waiting="student" text="Por enquanto, este resultado usa só a avaliação do seu professor. Assim que você fizer sua autoavaliação, o combinado passa a considerar as duas leituras." />}
+          />
           <Button className="w-full" onClick={goToQuestionnaire}>
             <Sparkles className="h-4 w-4 mr-1.5" /> Descobrir meu perfil
           </Button>
@@ -140,13 +166,25 @@ export default function StudentPerfilLutador() {
         />
       )}
       {!isLoading && !isError && bothExist && selfFullQuery.data && coachFullQuery.data && (
-        <BoxingProfileComparisonView self={selfFullQuery.data} coach={coachFullQuery.data} viewer="student" />
+        <BoxingProfileComparisonView
+          self={selfFullQuery.data}
+          coach={coachFullQuery.data}
+          viewer="student"
+          showNextSteps
+          talkToCoachHref={
+            whatsapp
+              ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(`Olá! Aqui é ${profile?.name.split(" ")[0] ?? ""}. Vi o resultado do meu Perfil de Boxe e queria conversar sobre ele.`)}`
+              : null
+          }
+        />
       )}
 
       {!isLoading && !isError && latest && !latestCoach && (
         <>
-          <BoxingProfilePartialNotice text="Por enquanto, este resultado usa só a sua autoavaliação. Assim que seu professor avaliar você, o combinado passa a considerar as duas leituras." />
-          <BoxingProfileResultView assessment={latest} />
+          <BoxingProfileResultView
+            assessment={latest}
+            notice={<BoxingProfilePartialNotice waiting="coach" text="Por enquanto, este resultado usa só a sua autoavaliação. Assim que seu professor avaliar você, o combinado passa a considerar as duas leituras." />}
+          />
         </>
       )}
 

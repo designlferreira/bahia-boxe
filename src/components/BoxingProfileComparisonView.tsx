@@ -1,5 +1,14 @@
+import { MessageCircle, Trophy } from "lucide-react";
+import { BoxingProfileNextSteps } from "@/components/BoxingProfileNextSteps";
+import { FighterProfileGloss } from "@/components/FighterProfileGloss";
 import { BoxingRadarChart } from "@/components/BoxingRadarChart";
-import { DIMENSIONS, DIMENSION_LABELS, FIGHTER_PROFILE_LABELS, combineAssessments } from "@/lib/boxingProfile";
+import {
+  DIMENSIONS,
+  DIMENSION_LABELS,
+  FIGHTER_PROFILE_DESCRIPTIONS,
+  FIGHTER_PROFILE_LABELS,
+  combineAssessments,
+} from "@/lib/boxingProfile";
 import type { BoxingProfileAssessment } from "@/integrations/backend/types";
 
 interface BoxingProfileComparisonViewProps {
@@ -13,6 +22,13 @@ interface BoxingProfileComparisonViewProps {
   coach: BoxingProfileAssessment;
   /** Quem está lendo — só muda os rótulos/o texto de apoio, nunca os números. */
   viewer: "student" | "admin";
+  /**
+   * Só o aluno: mostra "pontos fortes / prioridades / foco" calculados sobre o resultado COMBINADO
+   * (o professor lê sobre o aluno; a voz desses textos é do aluno).
+   */
+  showNextSteps?: boolean;
+  /** Link do WhatsApp do professor; aparece quando as leituras divergem. Sem número, sem link. */
+  talkToCoachHref?: string | null;
 }
 
 const VIEWER_COPY: Record<
@@ -65,7 +81,7 @@ function divergenceText(dim: string | null): string {
  * Comparação Aluno×Professor lado a lado — sempre neutra, nunca "quem está certo". Só monta
  * quando as duas avaliações existem; quem chama decide o que mostrar se faltar uma das duas.
  */
-export function BoxingProfileComparisonView({ self, coach, viewer }: BoxingProfileComparisonViewProps) {
+export function BoxingProfileComparisonView({ self, coach, viewer, showNextSteps = false, talkToCoachHref }: BoxingProfileComparisonViewProps) {
   const copy = VIEWER_COPY[viewer];
   const samePrimaryProfile = self.primaryProfile === coach.primaryProfile;
   // Nunca null aqui: as duas avaliações sempre existem quando este componente é montado.
@@ -80,72 +96,108 @@ export function BoxingProfileComparisonView({ self, coach, viewer }: BoxingProfi
   return (
     <div>
       {(lengthMismatch || versionMismatch) && (
-        <p className="text-[11.5px] text-amber leading-relaxed mb-4 bg-amber/10 rounded-xl px-3.5 py-2.5">
+        <p className="text-xs text-amber leading-relaxed mb-4 bg-amber/10 rounded-xl px-3.5 py-2.5">
           {lengthMismatch
             ? "Essas duas avaliações usam versões diferentes do questionário (rápida e completa) — os números abaixo não são diretamente comparáveis."
             : "Essas duas avaliações foram calculadas por versões diferentes da fórmula — os números abaixo não são diretamente comparáveis."}
         </p>
       )}
-      <p className="text-[13px] text-muted-foreground leading-relaxed mb-4">{copy.intro}</p>
-
-      <div className="grid grid-cols-2 gap-2.5 mb-2.5">
-        <div className="card-dark p-3.5">
-          <div className="text-[10.5px] uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">{copy.selfLabel}</div>
-          <div className="text-[14px] font-semibold text-foreground leading-snug">{FIGHTER_PROFILE_LABELS[self.primaryProfile]}</div>
-          <div className="text-[12px] text-accent font-semibold mt-0.5">{self.profileScores[self.primaryProfile]}%</div>
+      {/* O resultado que a tela promete vem PRIMEIRO; as duas leituras que o formam ficam logo abaixo,
+          e radar/tabela como detalhe (antes o combinado era o último bloco, a ~75% da página). */}
+      <div className="rounded-[20px] p-5 mb-3 bg-[linear-gradient(150deg,#1F1B0C,#171717_60%)] border border-amber/30">
+        <div className="flex items-center gap-1.5 text-amber text-xs font-bold uppercase tracking-wide mb-2">
+          <Trophy className="h-3.5 w-3.5" aria-hidden /> Resultado combinado
         </div>
-        <div className="card-dark p-3.5">
-          <div className="text-[10.5px] uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">{copy.coachLabel}</div>
-          <div className="text-[14px] font-semibold text-foreground leading-snug">{FIGHTER_PROFILE_LABELS[coach.primaryProfile]}</div>
-          <div className="text-[12px] text-accent font-semibold mt-0.5">{coach.profileScores[coach.primaryProfile]}%</div>
+        <div className="font-display text-[28px] tracking-wide text-foreground leading-none mb-1">
+          {FIGHTER_PROFILE_LABELS[combined.primaryProfile]}
         </div>
+        <FighterProfileGloss profile={combined.primaryProfile} className="text-[13.5px] text-foreground/70 mb-2" />
+        <div className="text-accent text-[15px] font-semibold mb-3">{combined.profileScores[combined.primaryProfile]}% de afinidade com esse estilo</div>
+        {viewer === "student" && (
+          <p className="text-[13.5px] text-foreground/85 leading-relaxed mb-2.5">{FIGHTER_PROFILE_DESCRIPTIONS[combined.primaryProfile]}</p>
+        )}
+        <p className="text-[12.5px] text-muted-foreground leading-relaxed">
+          Vem da média das duas leituras, competência por competência.
+        </p>
       </div>
-      <p className="text-[11.5px] text-muted-foreground leading-relaxed mb-5">{samePrimaryProfile ? copy.agree : copy.differ}</p>
 
       {combined.isDivergent && (
-        <p className="text-[11.5px] text-amber leading-relaxed mb-5 -mt-2.5">
+        <p className="text-xs text-amber leading-relaxed mb-4">
           {divergenceText(combined.divergentDimension ? DIMENSION_LABELS[combined.divergentDimension] : null)}
         </p>
       )}
 
+      <h2 className="section-title mb-2.5 mt-5">As duas leituras</h2>
+      <p className="text-[13px] text-muted-foreground leading-relaxed mb-3">{copy.intro}</p>
+
+      <div className="grid grid-cols-2 gap-2.5 mb-2.5">
+        <div className="card-dark p-3.5">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">{copy.selfLabel}</div>
+          <div className="text-[14px] font-semibold text-foreground leading-snug">{FIGHTER_PROFILE_LABELS[self.primaryProfile]}</div>
+          <FighterProfileGloss profile={self.primaryProfile} />
+          <div className="text-[12px] text-accent font-semibold mt-0.5">{self.profileScores[self.primaryProfile]}%</div>
+        </div>
+        <div className="card-dark p-3.5">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">{copy.coachLabel}</div>
+          <div className="text-[14px] font-semibold text-foreground leading-snug">{FIGHTER_PROFILE_LABELS[coach.primaryProfile]}</div>
+          <FighterProfileGloss profile={coach.primaryProfile} />
+          <div className="text-[12px] text-accent font-semibold mt-0.5">{coach.profileScores[coach.primaryProfile]}%</div>
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground leading-relaxed mb-5">{samePrimaryProfile ? copy.agree : copy.differ}</p>
+
+      {viewer === "student" && talkToCoachHref && (!samePrimaryProfile || combined.isDivergent) && (
+        <a
+          href={talkToCoachHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mb-6 flex items-center gap-3 rounded-2xl border border-border p-4 active:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <MessageCircle className="h-5 w-5 text-foreground/85 shrink-0" aria-hidden />
+          <div className="flex-1 min-w-0">
+            <div className="text-[15px] font-semibold text-foreground">Conversar com o professor</div>
+            <div className="text-sm text-muted-foreground">Abre uma conversa no WhatsApp</div>
+          </div>
+        </a>
+      )}
+
+      {showNextSteps && viewer === "student" && (
+        <BoxingProfileNextSteps primaryProfile={combined.primaryProfile} dimensionScores={combined.dimensionScores} />
+      )}
+
+      <h2 className="section-title mb-2.5">Competências</h2>
       <div className="card-dark p-4 mb-2 flex flex-col items-center">
         <BoxingRadarChart scores={self.dimensionScores} compareScores={coach.dimensionScores} />
         <div className="flex items-center gap-4 mt-1">
-          <span className="flex items-center gap-1.5 text-[11px] text-foreground/80">
+          <span className="flex items-center gap-1.5 text-xs text-foreground/80">
             <span className="h-2 w-2 rounded-full bg-accent" /> {copy.selfLabel}
           </span>
-          <span className="flex items-center gap-1.5 text-[11px] text-foreground/80">
-            <span className="h-2 w-2 rounded-full border border-dashed border-muted-foreground" /> {copy.coachLabel}
+          <span className="flex items-center gap-1.5 text-xs text-foreground/80">
+            <span className="h-2 w-2 rounded-full border border-dashed border-foreground" /> {copy.coachLabel}
           </span>
         </div>
       </div>
 
-      <div className="card-dark p-4 mb-5">
-        <div className="flex items-center text-[10.5px] uppercase tracking-wide text-muted-foreground font-semibold mb-2.5">
-          <span className="flex-1">Dimensão</span>
-          <span className="w-11 text-right">{copy.selfColumn}</span>
-          <span className="w-11 text-right">{copy.coachColumn}</span>
-          <span className="w-11 text-right">Combin.</span>
+      <div role="table" aria-label="Notas por competência" className="card-dark p-4 mb-5">
+        <div role="row" className="flex items-center text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2.5">
+          <span role="columnheader" className="flex-1">Competência</span>
+          <span role="columnheader" className="w-14 text-right">{copy.selfColumn}</span>
+          <span role="columnheader" className="w-14 text-right">{copy.coachColumn}</span>
+          <span role="columnheader" className="w-14 text-right">Combin.</span>
         </div>
         <div className="flex flex-col gap-2">
           {DIMENSIONS.map((dim) => (
-            <div key={dim} className="flex items-center text-[13px]">
-              <span className="flex-1 text-foreground/80">{DIMENSION_LABELS[dim]}</span>
-              <span className="w-11 text-right font-semibold text-foreground tabular-nums">{self.dimensionScores[dim]}</span>
-              <span className="w-11 text-right font-semibold text-muted-foreground tabular-nums">{coach.dimensionScores[dim]}</span>
-              <span className="w-11 text-right font-semibold text-accent tabular-nums">{combined.dimensionScores[dim]}</span>
+            <div key={dim} role="row" className="flex items-center text-[13px]">
+              <span role="rowheader" className="flex-1 text-foreground/80">{DIMENSION_LABELS[dim]}</span>
+              <span role="cell" className="w-14 text-right font-semibold text-foreground tabular-nums">{self.dimensionScores[dim]}</span>
+              <span role="cell" className="w-14 text-right font-semibold text-foreground tabular-nums">{coach.dimensionScores[dim]}</span>
+              <span role="cell" className="w-14 text-right font-semibold text-accent tabular-nums">{combined.dimensionScores[dim]}</span>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="card-dark p-3.5 mb-5">
-        <div className="text-[10.5px] uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">Resultado combinado</div>
-        <div className="text-[14px] font-semibold text-foreground leading-snug">{FIGHTER_PROFILE_LABELS[combined.primaryProfile]}</div>
-        <div className="text-[12px] text-accent font-semibold mt-0.5">{combined.profileScores[combined.primaryProfile]}%</div>
-      </div>
-
-      <p className="text-[11.5px] text-muted-foreground leading-relaxed">{copy.disclaimer}</p>
+      <p className="text-xs text-muted-foreground leading-relaxed">{copy.disclaimer}</p>
     </div>
   );
 }
