@@ -1116,7 +1116,15 @@ export default function Amostras() {
         <div className="flex flex-wrap gap-6 mb-12">
           {PACOTES_CASOS.map((c) => (
             <Frame key={c.title} title={c.title} note={c.note}>
-              <SeededAdmin data={null} seed={(qc) => qc.setQueryData(["package-templates", ADMIN_ID], c.lista)}>
+              <SeededAdmin
+                data={null}
+                seed={(qc) => {
+                  qc.setQueryData(["package-templates", ADMIN_ID], c.lista);
+                  // Pedidos pendentes: 2 para o primeiro modelo, 1 para o segundo.
+                  const [m1, m2] = c.lista as ReturnType<typeof modelo>[];
+                  qc.setQueryData(["purchase-requests", ADMIN_ID], m1 ? [pedido("pk1", "package", "Ana Beatriz Souza", m1, 0), pedido("pk2", "package", "Carlos Lima", m1, 0), pedido("pk3", "package", "Julia Pereira", m2, 0)] : []);
+                }}
+              >
                 <AdminPacotes />
               </SeededAdmin>
             </Frame>

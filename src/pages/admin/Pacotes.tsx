@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Package, Pencil, Trash2 } from "lucide-react";
@@ -18,6 +19,7 @@ import {
   createPackageTemplate,
   deletePackageTemplate,
   getPackageTemplates,
+  getPurchaseRequests,
   restorePackageTemplate,
   updatePackageTemplate,
 } from "@/integrations/backend/api";
@@ -62,6 +64,18 @@ export default function AdminPacotes() {
     queryFn: () => getPackageTemplates(profile!.id),
     enabled: !!profile,
   });
+
+  // Pedidos pendentes por modelo (mesma consulta da tela Pedidos, cache compartilhado): o professor vê
+  // quais modelos os alunos estão pedindo sem precisar abrir outra tela.
+  const { data: pedidos } = useQuery({
+    queryKey: ["purchase-requests", profile?.id],
+    queryFn: () => getPurchaseRequests(profile!.id),
+    enabled: !!profile,
+  });
+  const pendentesPorModelo = new Map<string, number>();
+  for (const p of pedidos ?? []) {
+    if (p.request.templateId) pendentesPorModelo.set(p.request.templateId, (pendentesPorModelo.get(p.request.templateId) ?? 0) + 1);
+  }
 
   useEffect(() => {
     if (editing) {
@@ -163,10 +177,21 @@ export default function AdminPacotes() {
         <div className="flex flex-col gap-2.5">
           {data.map((t) => (
             <div key={t.id} className="card-dark p-4 flex items-center gap-3">
-              <div className="flex-1">
-                <div className="text-[15px] font-semibold text-foreground">{t.name}</div>
-                <div className="text-[12.5px] text-muted-foreground mt-0.5">{t.description}</div>
+              <div className="flex-1 min-w-0">
+                {/* Nome longo corta em 2 linhas (antes o cartão dobrava de altura); o texto inteiro segue no DOM. */}
+                <div className="text-[15px] font-semibold text-foreground line-clamp-2 break-words">{t.name}</div>
+                <div className="text-[12.5px] text-muted-foreground mt-0.5">{t.totalClasses === 1 ? "1 aula" : `${t.totalClasses} aulas`}</div>
+                {t.description && <div className="text-[12.5px] text-muted-foreground mt-0.5 line-clamp-2">{t.description}</div>}
                 <div className="text-base text-accent font-semibold mt-1.5">{formatPriceLabel(t.priceCents)}</div>
+                {(pendentesPorModelo.get(t.id) ?? 0) > 0 && (
+                  // Âmbar = depende do professor: há pedido esperando decisão.
+                  <Link
+                    to="/admin/solicitacoes"
+                    className="mt-0.5 inline-flex min-h-11 items-center text-[13px] font-semibold text-amber underline underline-offset-4 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {pendentesPorModelo.get(t.id) === 1 ? "1 pedido esperando" : `${pendentesPorModelo.get(t.id)} pedidos esperando`}
+                  </Link>
+                )}
               </div>
               <button
                 type="button"
