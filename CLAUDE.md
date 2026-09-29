@@ -2860,6 +2860,44 @@ cópia e NÃO foi mexida (só herdou o diálogo de nome e o `Avatar`).
 do professor; extrair `AccountRow` (copiado nos dois arquivos); notificações / excluir conta / trocar e-mail;
 esqueci a senha a partir daqui (só existe no Login).
 
+### Aulas (antigo "Histórico" do professor): rodada de crítica (2026-09-29) — sem migration nova
+
+`src/pages/admin/Historico.tsx` (rota `/admin/historico`, item **"Aulas"** da barra inferior) e `BookingFilters`: crítica
+**20/40**, relatório em `.impeccable/critique/*historico*`. Seis passos na `dev`, testados pelo Lucas. Na página de amostras
+("Histórico (professor)": a busca e os filtros funcionam sobre 18 aulas de amostra; e "Sem aulas").
+
+**ERRO REAL corrigido (P0): a busca e o filtro só enxergavam as 200 aulas mais recentes.** `getAdminBookingHistory` fazia
+`limit(200)` e filtrava status e nome NO APARELHO; aulas futuras já ocupavam vaga da janela. Um aluno antigo (ou "Faltas")
+sumia sem aviso — o professor concluía "ele nunca teve aula". Agora `getAdminBookingHistoryPage` faz busca e status NA
+CONSULTA, em páginas de 30 (`HISTORICO_PAGINA`, pede 31 para saber se há mais), com "Ver mais aulas" e "Mostrando as N mais
+recentes / N aulas no total". A busca é sem acento/maiúscula (`semAcento`) e só sai ~0,3 s depois da última tecla.
+**Não voltar a filtrar no cliente sobre um `limit`.**
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **A tela se chama "AULAS"** (igual ao menu) e tem duas partes, **Anteriores** (abre primeiro; da mais recente para a mais
+  antiga) e **Próximas** (da mais próxima); `end_time` decide a parte. Cabeçalho `<h2>` por dia ("Hoje", "Amanhã", "Ontem",
+  "Quinta-feira, 01 out", com ano se não for o atual). Os filtros mudam por parte e voltam a "Todas" ao trocar:
+  Anteriores = Todas, Sem registro, Concluídas, Faltas, Canceladas, Remarcadas; Próximas = Todas, Agendadas, Pendentes.
+- **Busca com espera de ~0,3 s** (não botão Buscar), com botão de limpar.
+
+**O que mudou / armadilhas:**
+- **"Sem registro"** (âmbar, `StatusBadge semRegistro`) no lugar de "Agendada" em aula passada não registrada; "Agora" na que
+  está em andamento. `sem_registro` e `scheduled` são o mesmo `status = 'scheduled'`; o que os separa é a PARTE (`end_time`).
+- **Esta continua sendo a tela de auditoria:** não aplica `SEM_DESCARTE_DE_REGENERACAO` (as aulas descartadas na regeneração
+  aparecem, com "Substituída ao gerar novas aulas").
+- **Cartão com contexto:** "Cancelada por você / pelo aluno / Substituída…" (`canceladoPor`), "Remarcada para …" (sucessor) e
+  "Veio de …" + etiqueta Remarcada/Reposição (antecessor via `antecessores()`): UMA consulta de antecessores e UMA de
+  sucessores por página, nunca uma por cartão. Nome longo com `line-clamp-2`.
+- **`BookingFilters` é compartilhado com `Alunos.tsx`:** busca `type="search"` com nome acessível e botão de limpar (44px),
+  chips de 44px com `aria-pressed`, foco, contornos ≥ 3:1 e o chip escolhido rola para a vista.
+- Estados vazios que dizem a verdade: "Nenhuma aula anterior ainda", "Nenhuma aula marcada" (+ "Ver agenda") e "Nenhuma aula
+  encontrada" (+ "Limpar busca e filtro") — antes todos diziam "Ajuste a busca ou o status".
+- Na galeria a consulta de cada busca/filtro é preenchida no `QueryCache` (`subscribe` no evento `added`), porque a tela passa
+  o próprio `queryFn` (que vence o `setQueryDefaults`); a galeria NÃO pagina, então o botão "Ver mais aulas" só aparece no app real.
+
+**Deixado para depois (registrado, não pedido):** filtro por período/mês e "faltas do aluno X em setembro" (contagens por
+filtro); cabeçalho por mês além do dia; atalho para o perfil do aluno; o filtro "Recusadas".
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
