@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -23,9 +23,76 @@ import {
 } from "@/integrations/backend/api";
 import type { AvailabilityInterval } from "@/integrations/backend/types";
 
-const START_HOURS = Array.from({ length: 24 }, (_, h) => h);
-const END_HOURS = Array.from({ length: 24 }, (_, h) => h + 1);
+/** Horas de treino razoáveis (05h–22h início, 06h–23h fim) — o resto (madrugada) só aparece se o horário JÁ existe. */
+const START_MIN = 5;
+const START_MAX = 22;
+const END_MIN = 6;
+const END_MAX = 23;
+const FOCO = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 const hhmm = (h: number) => String(h).padStart(2, "0") + ":00";
+const horaDe = (v: string) => parseInt(v.slice(0, 2), 10);
+
+function faixa(min: number, max: number, extras: number[]): number[] {
+  const set = new Set<number>();
+  for (let h = min; h <= max; h++) set.add(h);
+  for (const h of extras) set.add(h);
+  return [...set].sort((a, b) => a - b);
+}
+
+interface HoraChipsProps {
+  label: string;
+  horas: number[];
+  selecionada: string;
+  desabilitada: (h: number) => boolean;
+  onPick: (v: string) => void;
+}
+
+/** Fileira de horas: marca a escolhida (`aria-pressed`), apaga as que não servem e já rola até a escolhida. */
+function HoraChips({ label, horas, selecionada, desabilitada, onPick }: HoraChipsProps) {
+  const selRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    // O escolhido pode estar fora da vista (a fileira rola): traz pra dentro ao abrir.
+    const t = window.setTimeout(() => selRef.current?.scrollIntoView({ inline: "center", block: "nearest" }), 60);
+    return () => window.clearTimeout(t);
+  }, []);
+  return (
+    <>
+      <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">{label}</div>
+      <div role="group" aria-label={label} className="flex gap-2 overflow-x-auto -mx-5 px-5 mb-3.5 pb-1 scroll-fade-x">
+        {horas.map((h) => {
+          const v = hhmm(h);
+          const on = selecionada === v;
+          const off = desabilitada(h);
+          return (
+            <button
+              key={v}
+              ref={on ? selRef : undefined}
+              type="button"
+              disabled={off}
+              aria-pressed={on}
+              onClick={() => onPick(v)}
+              className={cn(
+                `shrink-0 h-11 px-4 rounded-xl border text-sm font-semibold transition-all active:scale-95 ${FOCO}`,
+                on ? "bg-primary/15 border-primary text-[hsl(var(--red-text))]" : "bg-secondary border-border text-foreground/85",
+                off && "opacity-40",
+              )}
+            >
+              {v}
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+/** "Toda segunda", "Todo domingo" — Domingo e Sábado são masculinos. */
+const todo = (weekday: number) => (weekday === 0 || weekday === 6 ? "Todo" : "Toda");
+
+function descreveDuracao(start: string, end: string): string {
+  const n = horaDe(end) - horaDe(start);
+  return n === 1 ? "1 hora" : `${n} horas`;
+}
 
 interface EditorState {
   weekday: number;
@@ -265,49 +332,34 @@ export default function AdminDisponibilidade() {
           <SheetContent>
             <SheetTitle>{editor.interval ? "EDITAR HORÁRIO" : "ADICIONAR HORÁRIO"}</SheetTitle>
             <div className="text-[13px] text-muted-foreground mb-4">
-              Toda {editor.dayName.toLowerCase()}, pelas próximas {HORIZON_WEEKS} semanas
+              {todo(editor.weekday)} {editor.dayName.toLowerCase()}, pelas próximas {HORIZON_WEEKS} semanas
             </div>
 
-            <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Início</div>
-            <div className="flex gap-2 overflow-x-auto -mx-5 px-5 mb-3.5 pb-1 scroll-fade-x">
-              {START_HOURS.map((h) => {
-                const v = hhmm(h);
-                const on = editor.start === v;
-                return (
-                  <button
-                    key={v}
-                    type="button"
-                    onClick={() => setEditor({ ...editor, start: v })}
-                    className={cn(
-                      "shrink-0 h-11 px-4 rounded-xl border text-sm font-semibold transition-all active:scale-95",
-                      on ? "bg-primary/15 border-primary text-primary" : "bg-secondary border-[#333] text-foreground/85",
-                    )}
-                  >
-                    {v}
-                  </button>
-                );
-              })}
-            </div>
+            <HoraChips
+              label="Início"
+              horas={faixa(START_MIN, START_MAX, [horaDe(editor.start)])}
+              selecionada={editor.start}
+              desabilitada={() => false}
+              onPick={(v) => {
+                // Se o novo início passa do fim, o fim acompanha (início + 1h): nunca deixa um intervalo inválido.
+                const end = horaDe(editor.end) > horaDe(v) ? editor.end : hhmm(Math.min(horaDe(v) + 1, 24));
+                setEditor({ ...editor, start: v, end });
+                setEditorError(null);
+              }}
+            />
+            <HoraChips
+              label="Fim"
+              horas={faixa(END_MIN, END_MAX, [horaDe(editor.end)])}
+              selecionada={editor.end}
+              desabilitada={(h) => h <= horaDe(editor.start)}
+              onPick={(v) => {
+                setEditor({ ...editor, end: v });
+                setEditorError(null);
+              }}
+            />
 
-            <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Fim</div>
-            <div className="flex gap-2 overflow-x-auto -mx-5 px-5 mb-3.5 pb-1 scroll-fade-x">
-              {END_HOURS.map((h) => {
-                const v = hhmm(h);
-                const on = editor.end === v;
-                return (
-                  <button
-                    key={v}
-                    type="button"
-                    onClick={() => setEditor({ ...editor, end: v })}
-                    className={cn(
-                      "shrink-0 h-11 px-4 rounded-xl border text-sm font-semibold transition-all active:scale-95",
-                      on ? "bg-primary/15 border-primary text-primary" : "bg-secondary border-[#333] text-foreground/85",
-                    )}
-                  >
-                    {v}
-                  </button>
-                );
-              })}
+            <div className="rounded-xl bg-background border border-border p-3 mb-3.5 text-[13px] text-foreground/85" aria-live="polite">
+              {editor.dayName}, <strong className="text-foreground">{editor.start} às {editor.end}</strong> ({descreveDuracao(editor.start, editor.end)})
             </div>
 
             {editorError && (
