@@ -144,7 +144,7 @@ export default function AdminDashboard() {
                 {data.atRisk.length > 3 && (
                   <button
                     type="button"
-                    onClick={() => navigate("/admin/alunos")}
+                    onClick={() => navigate("/admin/alunos?filtro=risco")}
                     className="min-h-11 text-sm font-semibold text-foreground underline underline-offset-4 self-start"
                   >
                     Ver todos ({data.atRisk.length})

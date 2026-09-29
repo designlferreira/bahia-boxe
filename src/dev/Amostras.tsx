@@ -15,6 +15,7 @@ import { addDays, subDays } from "date-fns";
 import { AuthContext } from "@/context/AuthContext";
 import StudentHome from "@/pages/student/Home";
 import AdminDashboard from "@/pages/admin/Dashboard";
+import AdminAlunos from "@/pages/admin/Alunos";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
 import { RemarcacaoSheet } from "@/components/RemarcacaoSheet";
@@ -473,7 +474,18 @@ const DASH_CASES: { title: string; note: string; data: unknown }[] = [
   },
 ];
 
-function SeededAdmin({ data, children }: { data: unknown; children: ReactNode }) {
+/** Lista de alunos: 6 alunos, 4 deles em risco (os mesmos do painel). */
+function semearAlunos(qc: QueryClient) {
+  const nomes = ["Ana Beatriz Souza", "Helena Costa", "Igor Nascimento", "Julia Pereira", "Karina Duarte", "Leonardo Prado"];
+  const ids = ["s1", "s6", "s7", "s8", "s9", "s10"];
+  qc.setQueryData(
+    ["admin-students", ADMIN_ID, ""],
+    ids.map((id, i) => ({ student: aluno(id, nomes[i]), credits: id === "s6" ? 0 : 3, package: id === "s6" ? null : pkg(8, 5) })),
+  );
+  qc.setQueryData(["alunos-em-risco", ADMIN_ID], RISCO);
+}
+
+function SeededAdmin({ data, children, seed }: { data: unknown; children: ReactNode; seed?: (qc: QueryClient) => void }) {
   const [client] = useState(() => {
     const qc = new QueryClient({
       defaultOptions: {
@@ -481,6 +493,7 @@ function SeededAdmin({ data, children }: { data: unknown; children: ReactNode })
       },
     });
     qc.setQueryData(["admin-dashboard", ADMIN_ID], data);
+    seed?.(qc);
     // Professor configurado pra falta NÃO descontar, mas o pacote de recorrência do Diego foi criado
     // quando descontava: a janela de falta tem que seguir o pacote (regra da aula, não a geral).
     qc.setQueryData(["admin-settings", ADMIN_ID], { adminId: ADMIN_ID, noShowConsumesClass: false, modoAgendamento: "autosservico", whatsapp: null });
@@ -529,6 +542,15 @@ export default function Amostras() {
               </SeededAdmin>
             </Frame>
           ))}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Lista de alunos</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          <Frame title="Alunos" note='toque em "Em risco" (ou abra /dev/amostras?filtro=risco)'>
+            <SeededAdmin data={null} seed={semearAlunos}>
+              <AdminAlunos />
+            </SeededAdmin>
+          </Frame>
         </div>
 
         <h2 className="text-lg font-semibold mb-4">Pedido de remarcação (aluno)</h2>

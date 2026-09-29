@@ -1227,6 +1227,11 @@ export async function getReplaceableBookingsForStudent(studentId: string): Promi
 // admin · alunos
 // ---------------------------------------------------------------------------
 
+/** Mesma lista do painel ("Alunos em risco"), completa — pro filtro "Em risco" da lista de alunos. */
+export async function getAlunosEmRisco(adminId: string): Promise<AlunoEmRisco[]> {
+  return alunosEmRisco(await adminStudents(adminId));
+}
+
 export async function getAdminStudents(adminId: string, search: string) {
   const students = await adminStudents(adminId);
   const ids = students.map((s) => s.id);
