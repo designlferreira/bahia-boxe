@@ -2689,6 +2689,41 @@ de amostras ("Recorrência do aluno (professor)", 3 situações: em uso, primeir
 dos horários; avisar o aluno quando aulas são canceladas e substituídas ao gerar; mostrar no sheet se o horário
 colide com outro aluno (hoje só falha ao gerar); confirmar o anel de foco com Tab real.
 
+### Perfil de Boxe (resultado, aluno e professor): rodada de crítica (2026-09-29) — sem migration nova
+
+`PerfilLutador.tsx` (aluno) e `AlunoPerfilBoxe.tsx` (professor), mais os componentes `BoxingProfile*`: crítica
+**24/40**, relatório em `.impeccable/critique/*perfillutador*`. Seis passos na `dev`, testados pelo Lucas. Na
+página de amostras ("Perfil de Boxe (aluno)" e "(professor)", 4 estados cada; as notas de amostra agora
+variam por competência e entre aluno e professor). O questionário em si NÃO foi criticado.
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Com as duas avaliações, o RESULTADO COMBINADO abre a tela** (destaque com nome, tradução, descrição —
+  descrição só na voz do aluno — e a linha "Vem da média das duas leituras, competência por competência");
+  aviso de divergência logo abaixo; depois "As duas leituras", os próximos passos e, por último, radar e tabela.
+- **Aluno com as duas avaliações volta a ter "o que faço com isso":** `BoxingProfileNextSteps` (pontos fortes,
+  prioridades, foco) calculado sobre o COMBINADO, e "Conversar com o professor" (WhatsApp de `getWhatsappDoProfessor`)
+  quando os estilos predominantes diferem ou as leituras divergem. O professor não vê nada disso (a voz é do aluno).
+- **Aluno que abre a tela com só a avaliação do professor continua vendo a leitura dele** (decisão anterior mantida;
+  a alternativa de exigir a autoavaliação antes foi oferecida e recusada).
+- **Estilo em inglês com tradução embaixo em TODAS as telas de resultado** (`FighterProfileGloss`, mesma tradução
+  da Home) e **"afinidade"** no lugar de "compatibilidade".
+
+**O que mudou / armadilhas:**
+- Selo "Resultado parcial": sempre logo abaixo do destaque (prop `notice` de `BoxingProfileScoresSummary`/`ResultView`);
+  **âmbar só quando falta a avaliação do PROFESSOR**, cinza quando falta o aluno (`waiting="coach" | "student"`).
+  As quatro frases do aviso, aprovadas antes, NÃO foram reescritas.
+- O estado vazio dizia "32 perguntas" (resquício da v1): agora usa `getQuestions("self", ...)`, hoje 14 ou 37.
+- "Ver todos os perfis" e "Ver a nota de cada competência" recolhidos (botões com `aria-expanded`); o radar segue
+  `aria-hidden` e o botão das notas é o caminho de leitor de tela até os números.
+- Radar: nome das competências em 12; o traço do professor é claro (`--foreground`), não mais cinza fraco.
+  Tabela com `role="table"` e colunas `w-14` (o cabeçalho vazava 4px). Coluna "Prof." com o mesmo peso da do aluno.
+- Todo texto das telas de Perfil de Boxe ficou >= 12px.
+
+**Deixado para depois (registrado, não pedido):** amostra com combinado que diverge de verdade (as de hoje têm quatro
+perfis empatados); ilustração ou identidade de boxe no destaque do estilo (a crítica achou a tela genérica);
+mostrar a leitura do professor só depois da autoavaliação (recusado, ver acima); professor sem atalho para a evolução
+do aluno.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
