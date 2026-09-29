@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { ChevronRight, KeyRound, Package, Settings, CalendarClock, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Avatar } from "@/components/ui/avatar";
+import { PageHeader } from "@/components/PageHeader";
+import { SkeletonCard } from "@/components/SkeletonCard";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
@@ -15,12 +17,21 @@ export default function AdminMinhaConta() {
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
 
-  if (!profile) return null;
+  // Antes `return null` deixava a tela em branco, sem título, enquanto o perfil não chegava (o aluno já tinha o esqueleto).
+  if (!profile) {
+    return (
+      <div className="page-container">
+        <PageHeader title="MINHA CONTA" />
+        <SkeletonCard height={90} className="mb-4" />
+        <SkeletonCard height={330} />
+      </div>
+    );
+  }
   const initials = profile.name.split(" ").map((n) => n[0]).slice(0, 2).join("");
 
   return (
     <div className="page-container">
-      <h1 className="font-display text-3xl tracking-wide text-foreground mb-4">MINHA CONTA</h1>
+      <PageHeader title="MINHA CONTA" />
 
       <div className="card-dark p-4 flex items-center gap-3.5 mb-4">
         <Avatar initials={initials} size="md" />
