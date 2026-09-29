@@ -18,6 +18,7 @@ import { TelaDeAbertura } from "@/components/TelaDeAbertura";
 import { FaixaSemInternet } from "@/components/FaixaSemInternet";
 import { FaixaConexaoLenta } from "@/components/FaixaConexaoLenta";
 import { AnunciadorDeRota } from "@/components/AnunciadorDeRota";
+import { TransicaoDeTela } from "@/components/TransicaoDeTela";
 import { TelaSessaoNaoCarregou } from "@/components/TelaSessaoNaoCarregou";
 
 const StudentHome = lazy(() => import("@/pages/student/Home"));
@@ -133,6 +134,7 @@ export default function App() {
         <FaixaConexaoLenta />
         <BrowserRouter>
           <AnunciadorDeRota />
+          <TransicaoDeTela />
           <AppRoutes />
         </BrowserRouter>
         <Toaster

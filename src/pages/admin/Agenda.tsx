@@ -30,6 +30,8 @@ import {
   VINCULO_LABEL,
 } from "@/integrations/backend/api";
 import { StatusBadge } from "@/components/StatusBadge";
+import { FechaAoSair } from "@/components/FechaAoSair";
+import { EstaloAoMudar } from "@/components/EstaloAoMudar";
 import type { Booking } from "@/integrations/backend/types";
 
 const DAY_COUNT = 7;
@@ -384,7 +386,9 @@ export default function AdminAgenda() {
                           )}
                         </div>
                         <span className="flex items-center gap-1 shrink-0">
-                          <StatusBadge status={booking!.status} semRegistro={awaiting} agora={emAndamento} />
+                          <EstaloAoMudar valor={`${booking!.status}-${awaiting}-${emAndamento}`}>
+                            <StatusBadge status={booking!.status} semRegistro={awaiting} agora={emAndamento} />
+                          </EstaloAoMudar>
                           {!temAcao && <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden />}
                         </span>
                         <span className="sr-only">. Ver detalhes</span>
@@ -393,14 +397,14 @@ export default function AdminAgenda() {
                       {pedidoPassou && (
                         <div className="text-[13px] text-amber mb-2">O horário deste pedido já passou.</div>
                       )}
-                      {booking?.status === "pending_confirmation" && (
+                      <FechaAoSair aberto={booking?.status === "pending_confirmation"}>
                         <div className="flex gap-2">
                           <Button
                             variant="soft"
                             size="sm"
                             className="flex-1"
                             onClick={() => pendentes.requestApprove(alvoDe(entry))}
-                            disabled={pendentes.isBusy(booking.id)}
+                            disabled={pendentes.isBusy(booking!.id)}
                             aria-label={`Aprovar: ${entry.studentName}, ${entry.hour}`}
                           >
                             Aprovar
@@ -410,20 +414,20 @@ export default function AdminAgenda() {
                             size="sm"
                             className="flex-1"
                             onClick={() => pendentes.requestReject(alvoDe(entry))}
-                            disabled={pendentes.isBusy(booking.id)}
+                            disabled={pendentes.isBusy(booking!.id)}
                             aria-label={`Recusar: ${entry.studentName}, ${entry.hour}`}
                           >
                             Recusar
                           </Button>
                         </div>
-                      )}
+                      </FechaAoSair>
 
                       {/* Botões no cartão SÓ quando a aula pede ação (decisão do Lucas, 2026-09-28):
                           pedido pendente (Aprovar/Recusar) e aula passada sem registro
                           (Aconteceu/Faltou). Aula futura só mostra — Remarcar, Cancelar e reposição
                           ficam no detalhe, a um toque no nome; no cartão viravam uma coluna de botões
                           vermelhos no estado mais comum da agenda. */}
-                      {awaiting && (
+                      <FechaAoSair aberto={awaiting}>
                         <div className="flex gap-2">
                           <Button
                             variant="soft"
@@ -446,7 +450,7 @@ export default function AdminAgenda() {
                             Faltou
                           </Button>
                         </div>
-                      )}
+                      </FechaAoSair>
                     </div>
                   )}
                 </div>

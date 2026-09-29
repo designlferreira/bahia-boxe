@@ -189,6 +189,44 @@
   }
 }
 
+/* Entrada direcional das telas (ver `TransicaoDeTela`): 18px é só o suficiente para dar direção; o resto é esmaecer. `backwards`, como o
+   `.page-container` de sempre (com `both` o transform final ficaria aplicado e prenderia elementos `fixed`). */
+@keyframes bb-avanca {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes bb-recua {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+html[data-nav] {
+  /* O deslocamento de lado não pode abrir uma barra de rolagem horizontal enquanto a tela entra. */
+  overflow-x: clip;
+}
+html[data-nav="avancar"] .page-container {
+  animation: bb-avanca 0.28s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+html[data-nav="voltar"] .page-container {
+  animation: bb-recua 0.28s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+html[data-nav="aba"] .page-container {
+  animation: bb-fade 0.16s ease-out backwards;
+}
+
 @keyframes bb-sai-suave {
   from {
     opacity: 1;
