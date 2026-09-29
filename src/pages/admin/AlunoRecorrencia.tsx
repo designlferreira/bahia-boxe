@@ -49,6 +49,7 @@ const WEEKDAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sex
  * aviso pós-fato. Se precisar de outra duração no futuro, resolve a view antes, não aqui.
  */
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
+const FOCO = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 const hhmm = (h: number) => String(h).padStart(2, "0") + ":00";
 const DURACAO_MINUTOS = 60;
 
@@ -75,27 +76,28 @@ function RecorrenciaDiaGroup({ grupo, onToggle, onExcluir }: RecorrenciaDiaGroup
       <div className="text-[13px] font-semibold text-foreground/85">{WEEKDAY_LABELS[grupo.diaSemana]}</div>
       <div className="flex flex-col gap-2">
         {grupo.items.map((r) => (
-          <div key={r.id} className={cn("card-dark p-3.5 flex items-center gap-3", !r.ativo && "opacity-50")}>
-            <div className="flex-1">
+          <div key={r.id} className="card-dark p-3.5 flex items-center gap-3">
+            <div className={cn("flex-1", !r.ativo && "opacity-60")}>
               <div className="text-[14.5px] font-semibold text-foreground">{r.horario}</div>
               <div className="text-[12.5px] text-muted-foreground mt-0.5">{r.duracaoMinutos} min</div>
             </div>
             <Switch
-              aria-label="Ativar horário fixo"
+              aria-label={`Horário fixo de ${WEEKDAY_LABELS[r.diaSemana].toLowerCase()} às ${r.horario}`}
               checked={r.ativo}
               onCheckedChange={(checked) => onToggle({ id: r.id, ativo: checked })}
             />
             <button
               type="button"
-              aria-label="Excluir horário fixo"
+              aria-label={`Excluir horário fixo de ${WEEKDAY_LABELS[r.diaSemana].toLowerCase()} às ${r.horario}`}
+              aria-describedby={r.temUso ? "horarios-explica" : undefined}
               disabled={r.temUso}
               onClick={() => onExcluir(r)}
               className={cn(
-                "h-9 w-9 shrink-0 rounded-lg flex items-center justify-center transition-colors active:scale-95",
-                r.temUso ? "text-muted-foreground/30" : "text-destructive hover:bg-destructive/10",
+                `h-11 w-11 shrink-0 rounded-lg flex items-center justify-center transition-colors active:scale-95 ${FOCO}`,
+                r.temUso ? "text-muted-foreground/40" : "text-destructive hover:bg-destructive/10",
               )}
             >
-              <Trash2 className="h-[18px] w-[18px]" />
+              <Trash2 className="h-[18px] w-[18px]" aria-hidden />
             </button>
           </div>
         ))}
@@ -296,7 +298,7 @@ export default function AdminAlunoRecorrencia() {
       </div>
 
       {recorrencias.length > 0 && (
-        <p className="text-[13px] text-muted-foreground mb-3 leading-snug">
+        <p id="horarios-explica" className="text-[13px] text-muted-foreground mb-3 leading-snug">
           Desativar ou excluir um horário não muda as aulas que já estão na agenda; vale só para o próximo pacote. Quem já gerou
           aulas não pode ser excluído, só desativado.
         </p>
@@ -315,7 +317,7 @@ export default function AdminAlunoRecorrencia() {
           <div className="flex flex-col gap-3">
             {/* Só rotula "Ativos" quando há inativos pra distinguir — com uma lista só, o rótulo é ruído. */}
             {inativasOrdenadas.length > 0 && (
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Ativos</div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">Ativos</div>
             )}
             {ativasOrdenadas.map((grupo) => (
               <RecorrenciaDiaGroup key={grupo.diaSemana} grupo={grupo} onToggle={toggleAtivo.mutate} onExcluir={setExcluirAlvo} />
@@ -326,7 +328,7 @@ export default function AdminAlunoRecorrencia() {
         {inativasOrdenadas.length > 0 && (
           <div className="flex flex-col gap-3">
             {ativasOrdenadas.length > 0 && (
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Inativos</div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">Inativos</div>
             )}
             {inativasOrdenadas.map((grupo) => (
               <RecorrenciaDiaGroup key={grupo.diaSemana} grupo={grupo} onToggle={toggleAtivo.mutate} onExcluir={setExcluirAlvo} />
@@ -369,11 +371,12 @@ export default function AdminAlunoRecorrencia() {
                     key={d}
                     type="button"
                     onClick={() => setStartDate(d)}
+                    aria-pressed={effectiveStartDate === d}
                     className={cn(
-                      "shrink-0 h-11 px-4 rounded-xl border text-sm font-semibold transition-all active:scale-95",
+                      `shrink-0 h-11 px-4 rounded-xl border text-sm font-semibold transition-all active:scale-95 ${FOCO}`,
                       effectiveStartDate === d
-                        ? "bg-primary/15 border-primary text-primary"
-                        : "bg-secondary border-[#333] text-foreground/85",
+                        ? "bg-primary/15 border-primary text-[hsl(var(--red-text))]"
+                        : "bg-secondary border-border text-foreground/85",
                     )}
                   >
                     {labelForDateOnly(d)}
@@ -444,9 +447,11 @@ export default function AdminAlunoRecorrencia() {
                 key={label}
                 type="button"
                 onClick={() => setDiaSemana(idx)}
+                aria-pressed={diaSemana === idx}
+                aria-label={label}
                 className={cn(
-                  "shrink-0 h-11 px-4 rounded-xl border text-sm font-semibold transition-all active:scale-95",
-                  diaSemana === idx ? "bg-primary/15 border-primary text-primary" : "bg-secondary border-[#333] text-foreground/85",
+                  `shrink-0 h-11 px-4 rounded-xl border text-sm font-semibold transition-all active:scale-95 ${FOCO}`,
+                  diaSemana === idx ? "bg-primary/15 border-primary text-[hsl(var(--red-text))]" : "bg-secondary border-border text-foreground/85",
                 )}
               >
                 {label.slice(0, 3)}
@@ -463,9 +468,10 @@ export default function AdminAlunoRecorrencia() {
                   key={v}
                   type="button"
                   onClick={() => setHorario(v)}
+                  aria-pressed={horario === v}
                   className={cn(
-                    "shrink-0 h-11 px-4 rounded-xl border text-sm font-semibold transition-all active:scale-95",
-                    horario === v ? "bg-primary/15 border-primary text-primary" : "bg-secondary border-[#333] text-foreground/85",
+                    `shrink-0 h-11 px-4 rounded-xl border text-sm font-semibold transition-all active:scale-95 ${FOCO}`,
+                    horario === v ? "bg-primary/15 border-primary text-[hsl(var(--red-text))]" : "bg-secondary border-border text-foreground/85",
                   )}
                 >
                   {v}
