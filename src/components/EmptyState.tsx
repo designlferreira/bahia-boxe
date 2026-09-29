@@ -7,11 +7,13 @@ interface EmptyStateProps {
   description: string;
   ctaLabel?: string;
   onCta?: () => void;
+  /** "secondary" quando o botão só navega: o vermelho com brilho é pra UMA ação principal por tela. */
+  ctaVariant?: "default" | "secondary";
   dashed?: boolean;
 }
 
 /** Único padrão de estado vazio da aplicação. */
-export function EmptyState({ icon: Icon, title, description, ctaLabel, onCta, dashed = true }: EmptyStateProps) {
+export function EmptyState({ icon: Icon, title, description, ctaLabel, onCta, ctaVariant = "default", dashed = true }: EmptyStateProps) {
   return (
     <div className={dashed ? "rounded-2xl border border-dashed border-border p-8 text-center" : "card-dark p-8 text-center"}>
       {Icon && (
@@ -22,7 +24,7 @@ export function EmptyState({ icon: Icon, title, description, ctaLabel, onCta, da
       <div className="text-[14.5px] font-semibold text-foreground mb-1">{title}</div>
       <div className="text-[12.5px] text-muted-foreground mb-3.5">{description}</div>
       {ctaLabel && onCta && (
-        <Button size="sm" onClick={onCta}>
+        <Button size="sm" variant={ctaVariant} onClick={onCta}>
           {ctaLabel}
         </Button>
       )}

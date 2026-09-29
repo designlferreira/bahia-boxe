@@ -94,7 +94,13 @@ export default function StudentAgendar() {
   const dayOffset = escolhido ?? (primeiroComLivre >= 0 ? primeiroComLivre : 0);
   const selectedDate = days[dayOffset];
   const slots = semana?.[isoDateOnly(selectedDate)];
-  const setDayOffset = (f: (d: number) => number) => setEscolhido(f(dayOffset));
+  const livresDoDia = (slots ?? []).filter((s) => s.status === "free");
+  const livresHoje = slots ? livresDoDia.length : null;
+  // Próximo dia (depois do escolhido, dando a volta) que tem horário livre — "Ver próximo dia" antes
+  // pulava às cegas, inclusive pra outro dia vazio.
+  const proximoComLivre = semana
+    ? (Array.from({ length: DAY_COUNT - 1 }, (_, k) => (dayOffset + 1 + k) % DAY_COUNT).find((i) => livresNoDia(i) > 0) ?? -1)
+    : -1;
 
   const schedule = useMutation({
     // The slot id is what the database books against — no client-side time arithmetic.
@@ -113,6 +119,11 @@ export default function StudentAgendar() {
       queryClient.invalidateQueries({ queryKey: ["available-slots-semana"] });
     },
   });
+
+  /** "Amanhã, 29 set" / "Quinta-feira, 01 out". */
+  function diaPorExtenso(d: Date) {
+    return `${formatRelativeDay(d)}, ${formatDateShort(d)}`;
+  }
 
   /** "Amanhã, 19:00" / "Quinta-feira, 01 out · 19:00" — pro aviso depois de confirmar. */
   const quandoEscolhido = () => {
@@ -165,9 +176,12 @@ export default function StudentAgendar() {
         subtitle={home ? `${home.credits} crédito(s) disponível(is)` : undefined}
       />
 
-      <div className="flex gap-2.5 overflow-x-auto -mx-5 px-5 pb-3.5 scroll-fade-x">
+      {/* Mesma faixa da agenda do professor: os 7 dias cabem na tela (sem rolagem) e cada dia diz se
+          tem horário livre — antes o aluno procurava dia por dia. */}
+      <div className="grid grid-cols-7 gap-1 mb-4">
         {days.map((d, i) => {
           const on = dayOffset === i;
+          const livres = livresNoDia(i);
           return (
             <button
               key={d.toISOString()}
@@ -176,34 +190,50 @@ export default function StudentAgendar() {
                 setEscolhido(i);
                 setSelected(null);
               }}
-              aria-label={`${formatWeekdayLong(d)}, dia ${formatDayNumber(d)}`}
+              aria-label={`${formatWeekdayLong(d)}, dia ${formatDayNumber(d)}${i === 0 ? ", amanhã" : ""}${
+                semana ? (livres ? ` — ${livres === 1 ? "1 horário livre" : `${livres} horários livres`}` : " — sem horário livre") : ""
+              }`}
               aria-pressed={on}
               className={cn(
-                "shrink-0 w-[62px] py-2.5 rounded-2xl border transition-all active:scale-95",
+                "relative min-w-0 pt-1.5 pb-3 rounded-2xl border transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 on ? "bg-primary border-primary" : "bg-secondary border-border",
               )}
             >
-              <div
-                aria-hidden
-                className={cn(
-                  "text-[11px] uppercase tracking-wide whitespace-nowrap",
-                  on ? "text-primary-foreground/80" : "text-muted-foreground",
-                )}
-              >
+              <div aria-hidden className={cn("text-xs", on ? "text-primary-foreground" : "text-muted-foreground")}>
                 {formatWeekdayShort(d)}
               </div>
               <div
                 aria-hidden
-                className={cn("font-display text-2xl leading-tight", on ? "text-primary-foreground" : "text-foreground")}
+                className={cn(
+                  "font-display text-[22px] leading-tight",
+                  on ? "text-primary-foreground" : semana && !livres ? "text-muted-foreground" : "text-foreground",
+                )}
               >
                 {formatDayNumber(d)}
               </div>
+              {livres > 0 && (
+                <span
+                  aria-hidden
+                  className={cn(
+                    "absolute bottom-1 left-1/2 -translate-x-1/2 h-1.5 w-1.5 rounded-full",
+                    on ? "bg-primary-foreground" : "bg-foreground",
+                  )}
+                />
+              )}
             </button>
           );
         })}
       </div>
 
-      <h2 className="section-title mt-2 mb-3">Horários livres</h2>
+      {/* O dia escolhido por extenso ("Amanhã, 29 set") — a faixa só tem o número. */}
+      <div className="mb-3" aria-live="polite">
+        <h2 className="section-title">{diaPorExtenso(selectedDate)}</h2>
+        {livresHoje !== null && (
+          <div className="text-sm text-muted-foreground">
+            {livresHoje === 0 ? "Nenhum horário livre" : livresHoje === 1 ? "1 horário livre" : `${livresHoje} horários livres`}
+          </div>
+        )}
+      </div>
 
       {(isLoading || !adminId) && (
         <div className="grid grid-cols-2 gap-2.5">
@@ -213,29 +243,25 @@ export default function StudentAgendar() {
         </div>
       )}
 
-      {!isLoading && slots && slots.length > 0 && (
+      {/* Só os livres: horário ocupado não é escolha nenhuma pro aluno (decisão do Lucas, 2026-09-28). */}
+      {!isLoading && livresDoDia.length > 0 && (
         <div className="grid grid-cols-2 gap-2.5">
-          {slots.map((s) => {
-            const full = s.status === "booked";
+          {livresDoDia.map((s) => {
             const on = selected?.slotId === s.slotId;
             return (
               <button
                 key={s.slotId}
                 type="button"
-                disabled={full}
+                aria-pressed={on}
                 onClick={() => setSelected(on ? null : s)}
                 className={cn(
-                  "h-[66px] rounded-2xl border text-left px-3.5 transition-all active:scale-95",
-                  full && "bg-[#141414] border-[#222] cursor-not-allowed",
-                  !full && on && "bg-primary/15 border-primary",
-                  !full && !on && "bg-secondary border-border",
+                  "h-[66px] rounded-2xl border text-left px-3.5 transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  on ? "bg-primary/15 border-primary" : "bg-secondary border-border",
                 )}
               >
-                <div className={cn("text-base font-semibold", full ? "text-muted-foreground/40" : "text-foreground")}>
-                  {s.time}
-                </div>
-                <div className={cn("text-[11.5px]", full ? "text-muted-foreground/30" : on ? "text-primary" : "text-muted-foreground")}>
-                  {full ? "Sem vaga" : on ? "Selecionado" : "Disponível"}
+                <div className="text-base font-semibold text-foreground">{s.time}</div>
+                <div className={cn("text-xs", on ? "text-[hsl(var(--red-text))]" : "text-muted-foreground")}>
+                  {on ? "Escolhido" : "Livre"}
                 </div>
               </button>
             );
@@ -243,16 +269,25 @@ export default function StudentAgendar() {
         </div>
       )}
 
-      {!isLoading && slots && slots.length === 0 && (
+      {!isLoading && slots && livresDoDia.length === 0 && (
         <EmptyState
           icon={CalendarSearch}
-          title="Sem horários nesse dia"
-          description="O professor não abriu disponibilidade."
-          ctaLabel="Ver próximo dia"
-          onCta={() => {
-            setDayOffset((d) => (d + 1) % DAY_COUNT);
-            setSelected(null);
-          }}
+          title="Sem horários livres neste dia"
+          description={
+            proximoComLivre >= 0
+              ? "Escolha outro dia — os que têm horário estão marcados com um ponto."
+              : "Seu professor ainda não abriu horários nos próximos dias."
+          }
+          ctaLabel={proximoComLivre >= 0 ? `Ver ${diaPorExtenso(days[proximoComLivre])}` : undefined}
+          ctaVariant="secondary"
+          onCta={
+            proximoComLivre >= 0
+              ? () => {
+                  setEscolhido(proximoComLivre);
+                  setSelected(null);
+                }
+              : undefined
+          }
         />
       )}
 
