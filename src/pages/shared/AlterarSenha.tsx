@@ -46,7 +46,9 @@ export default function AlterarSenha({ backTo }: { backTo: string }) {
       <PageHeader title="ALTERAR SENHA" back />
 
       {!done ? (
-        <div className="card-dark p-[18px]">
+        // O <form> envolve os CAMPOS: antes só envolvia o botão, e o Enter num campo não enviava (nem o "Ir" do teclado do celular),
+        // e o gerenciador de senhas não reconhecia o formulário.
+        <form onSubmit={handleSubmit} noValidate className="card-dark p-[18px]">
           <div className="flex justify-between items-center mb-1.5">
             <Label htmlFor="current" className="mb-0">
               Senha atual
@@ -114,13 +116,10 @@ export default function AlterarSenha({ backTo }: { backTo: string }) {
             </div>
           )}
 
-          <form onSubmit={handleSubmit}>
-            <Button type="submit" size="lg" className="w-full mt-4" disabled={!canSubmit || loading}>
-              {loading ? "Salvando…" : "Alterar senha"}
-            </Button>
-          </form>
-          <div className="text-center text-xs text-muted-foreground mt-2.5">Demo: a senha atual é 123456</div>
-        </div>
+          <Button type="submit" size="lg" className="w-full mt-4" disabled={!canSubmit || loading}>
+            {loading ? "Salvando…" : "Alterar senha"}
+          </Button>
+        </form>
       ) : (
         <div className="card-dark border-accent/30 p-7 text-center animate-bb-up">
           <div className="mx-auto mb-3.5 h-14 w-14 rounded-full bg-accent/15 flex items-center justify-center">
