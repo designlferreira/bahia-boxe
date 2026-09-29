@@ -3500,7 +3500,7 @@ relatório em `.impeccable/critique/*notfound*`. Três passos na `dev`, testados
 - **Um endereço desconhecido NUNCA dá um 404 de verdade:** o `vite-plugin-pwa` (sem `navigateFallback`/`workbox`, o `NavigationRoute` padrão para `index.html`) e o `vercel.json` (rewrite `/(.*)` → `/index.html`) devolvem o app para
   QUALQUER endereço; a 404 é só da SPA (status 200), online e offline. **No app instalado (`display: standalone`) não há barra de endereço nem botão de voltar do navegador**: os botões da 404 são a única saída.
 - A rota `*` fica FORA dos layouts e do `ProtectedRoute`: sem barra de navegação, mesmo logado. Nenhuma outra tela define `document.title`.
-- **Sem `.env` local o `AuthProvider` lança "Supabase não configurado" e NÃO há error boundary: qualquer rota, inclusive a 404, fica em branco** (só afeta quem roda sem credenciais, como o navegador desta sessão).
+- **Sem `.env` local o `AuthProvider` lança "Supabase não configurado"; ANTES não havia error boundary e qualquer rota, inclusive a 404, ficava em branco** (só afeta quem roda sem credenciais, como o navegador desta sessão). **Resolvido depois da rodada: ver "Error boundary" no fim desta seção.**
 
 **Decisões do Lucas (não reabrir sem ele):**
 - **Texto da 404 em português, marca e dois botões:** marca "BAHIA BOXE" + ícone `SearchX`, título **"NÃO ACHAMOS ESSA PÁGINA"**, "O link pode estar antigo ou incompleto. Volte ao início e siga por lá." (**os textos são meus, aprovados**).
@@ -3522,8 +3522,18 @@ relatório em `.impeccable/critique/*notfound*`. Três passos na `dev`, testados
 
 **Não conferido:** o "pisca" com sessão real (só a tela de abertura na galeria), o botão "Voltar" e o foco no título (a galeria não tem histórico), o aviso de papel errado (a galeria não tem o `Toaster` nem sessão), o app instalado em aparelho real.
 
-**Deixado para depois (registrado, não pedido):** um error boundary (sem ele qualquer erro de configuração deixa o app em branco); "Falar com o professor" (WhatsApp) na 404 do aluno logado (exigiria uma consulta na 404); a 404 dentro do layout do papel, com a barra de baixo;
+**Deixado para depois (registrado, não pedido):** "Falar com o professor" (WhatsApp) na 404 do aluno logado (exigiria uma consulta na 404); a 404 dentro do layout do papel, com a barra de baixo;
 um título de aba próprio em TODAS as telas; redirecionar endereços desconhecidos para a home com aviso em vez de mostrar a 404.
+
+**Error boundary (2026-09-29, pedido do Lucas logo depois da rodada; um passo na `dev`, testado):** `src/components/ErrorBoundary.tsx`, montado em volta de `<App />` em `main.tsx`. Um erro de RENDERIZAÇÃO ou de
+EFEITO em qualquer tela derrubava o app numa tela em branco, sem nada a fazer; agora aparece **"ALGO DEU ERRADO"** (marca + `TriangleAlert`, `role="alert"`), com **"Recarregar o app"** (`location.reload()`) e **"Ir para o início"**
+(`location.assign("/")`, recarga completa: o estado quebrado ficaria na memória com um link do Router). **Os textos são meus, aprovados pelo Lucas:** "O app encontrou um problema e não conseguiu continuar. Recarregar costuma resolver.
+Se voltar a acontecer, fale com o seu professor."
+- **Conferido de verdade:** o app real SEM `.env` (o caso que deixava a tela em branco) passou a mostrar a tela de erro; a galeria tem o quadro "Erro inesperado" (`BombaDeAmostra` lança de propósito; o React registra o erro no console, é esperado).
+- **Fica FORA do Router e do `AuthContext` de propósito** (podem ser justamente o que quebrou): só HTML, o `Button` e recarga completa. **Não usar `Link`/`useNavigate`/`useAuth` ali.**
+- **NÃO pega:** erro em manipulador de clique, `setTimeout` e promessa (esses têm aviso de erro nas telas: `onError` das mutations, `ErrorState` das consultas). **Não recarrega sozinho** (um erro persistente viraria um laço de recargas).
+- Só em DESENVOLVIMENTO aparece a mensagem técnica do erro (pequena, embaixo); em produção, nunca. O erro sempre vai para o `console.error`.
+- **Continua sem:** relato automático do erro (não há serviço de monitoramento); um erro numa tela específica derruba o app inteiro em vez de só aquela tela (um boundary por rota seria o passo seguinte, se fizer falta).
 
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
