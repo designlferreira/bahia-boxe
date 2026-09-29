@@ -154,8 +154,8 @@ export default function AdminAlunoDetalhe() {
           <CalendarClock className="h-4 w-4 text-primary" />
         </div>
         <div className="flex-1">
-          <div className="text-[14px] font-semibold text-foreground">Recorrência</div>
-          <div className="text-[12px] text-muted-foreground">Dias fixos e geração de pacotes de aulas recorrentes</div>
+          <div className="text-[14px] font-semibold text-foreground">Horários fixos</div>
+          <div className="text-[12px] text-muted-foreground">Rotina semanal e geração de aulas</div>
         </div>
       </button>
 

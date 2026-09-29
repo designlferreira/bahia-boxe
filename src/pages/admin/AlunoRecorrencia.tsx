@@ -86,13 +86,13 @@ function RecorrenciaDiaGroup({ grupo, onToggle, onExcluir }: RecorrenciaDiaGroup
               )}
             </div>
             <Switch
-              aria-label="Alternar recorrência"
+              aria-label="Ativar horário fixo"
               checked={r.ativo}
               onCheckedChange={(checked) => onToggle({ id: r.id, ativo: checked })}
             />
             <button
               type="button"
-              aria-label="Excluir recorrência"
+              aria-label="Excluir horário fixo"
               disabled={r.temUso}
               onClick={() => onExcluir(r)}
               className={cn(
@@ -183,20 +183,20 @@ export default function AdminAlunoRecorrencia() {
     onSuccess: () => {
       invalidate();
       setAddOpen(false);
-      toast.success(`Recorrência adicionada · toda ${WEEKDAY_LABELS[diaSemana].toLowerCase()} às ${horario}`);
+      toast.success(`Horário fixo adicionado · toda ${WEEKDAY_LABELS[diaSemana].toLowerCase()} às ${horario}`);
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível adicionar a recorrência."),
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível adicionar o horário fixo."),
   });
 
   const toggleAtivo = useMutation({
     mutationFn: ({ id, ativo }: { id: string; ativo: boolean }) => setAlunoRecorrenciaAtivo(id, ativo),
     onSuccess: (_r, vars) => {
       invalidate();
-      toast(vars.ativo ? "Recorrência reativada" : "Recorrência desativada", {
+      toast(vars.ativo ? "Horário fixo reativado" : "Horário fixo desativado", {
         className: vars.ativo ? undefined : "!text-amber",
       });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível alterar a recorrência."),
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível alterar o horário fixo."),
   });
 
   // CLAUDE.md, "excluir dia fixo de recorrência" — só aceita quando `temUso` é false (checagem
@@ -206,9 +206,9 @@ export default function AdminAlunoRecorrencia() {
     mutationFn: (id: string) => excluirAlunoRecorrencia(id),
     onSuccess: () => {
       invalidate();
-      toast("Recorrência excluída", { className: "!text-amber" });
+      toast("Horário fixo excluído", { className: "!text-amber" });
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível excluir a recorrência."),
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível excluir o horário fixo."),
   });
 
   const gerarPacote = useMutation({
@@ -224,7 +224,7 @@ export default function AdminAlunoRecorrencia() {
   if (detailQuery.isLoading || recorrenciasQuery.isLoading || settingsQuery.isLoading) {
     return (
       <div className="page-container">
-        <PageHeader title="RECORRÊNCIA" back />
+        <PageHeader title="HORÁRIOS FIXOS" back />
         <SkeletonCard height={140} className="mb-4" />
         <SkeletonList count={2} height={72} />
       </div>
@@ -234,7 +234,7 @@ export default function AdminAlunoRecorrencia() {
   if (detailQuery.isError || recorrenciasQuery.isError || !detailQuery.data) {
     return (
       <div className="page-container">
-        <PageHeader title="RECORRÊNCIA" back />
+        <PageHeader title="HORÁRIOS FIXOS" back />
         <ErrorState onRetry={() => (detailQuery.refetch(), recorrenciasQuery.refetch())} />
       </div>
     );
@@ -283,14 +283,14 @@ export default function AdminAlunoRecorrencia() {
 
   return (
     <div className="page-container">
-      <PageHeader title="RECORRÊNCIA" subtitle={student.name} back />
+      <PageHeader title="HORÁRIOS FIXOS" subtitle={student.name} back />
 
       <div className="mb-4">
         <ActivePackageCard pkg={pkg} credits={credits} saldo={saldo} />
       </div>
 
       <div className="flex items-center justify-between mb-2.5">
-        <h2 className="section-title">Dias fixos</h2>
+        <h2 className="section-title">Horários fixos da semana</h2>
         <Button variant="secondary" size="sm" onClick={() => setAddOpen(true)}>
           <Plus className="h-4 w-4" />
           Adicionar
@@ -301,7 +301,7 @@ export default function AdminAlunoRecorrencia() {
         {recorrencias.length === 0 && (
           <div className="border border-dashed border-[#2E2E2E] rounded-[13px] p-4 text-center">
             <div className="text-[12.5px] text-muted-foreground">
-              Nenhum dia fixo cadastrado para {student.name.split(" ")[0]} ainda.
+              Nenhum horário fixo cadastrado para {student.name.split(" ")[0]} ainda.
             </div>
           </div>
         )}
@@ -333,7 +333,7 @@ export default function AdminAlunoRecorrencia() {
       <div className="card-dark p-4">
         <h2 className="section-title mb-1">Gerar pacote</h2>
         <div className="text-[12.5px] text-muted-foreground mb-3">
-          Materializa aulas concretas na agenda a partir dos dias fixos ativos
+          Cria as aulas na agenda a partir dos horários fixos ativos
           {activasCount > 0 ? ` (${activasCount} ativo${activasCount > 1 ? "s" : ""})` : ""}.
         </div>
 
@@ -355,7 +355,7 @@ export default function AdminAlunoRecorrencia() {
         {!emAutosservico && activasCount > 0 && (
           <>
             <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">
-              Começa em
+              Primeira aula em
             </div>
             {startDateOptions.length > 0 ? (
               <div className="flex gap-2 overflow-x-auto -mx-4 px-4 mb-3.5 pb-1 scroll-fade-x">
@@ -377,7 +377,7 @@ export default function AdminAlunoRecorrencia() {
               </div>
             ) : (
               <div className="text-[12px] text-amber mb-3.5">
-                Nenhuma data futura encontrada nos próximos dias fixos — confira se estão ativos.
+                Os horários fixos ativos não têm data livre nas próximas 8 semanas. Confira se estão ativos.
               </div>
             )}
           </>
@@ -402,7 +402,7 @@ export default function AdminAlunoRecorrencia() {
           <>
             {activasCount === 0 && (
               <div id="gerar-motivo" className="text-[13px] text-amber mb-2.5">
-                Ative pelo menos um dia fixo para gerar um pacote.
+                Ative pelo menos um horário fixo para gerar um pacote.
               </div>
             )}
             <div className="flex gap-2.5">
@@ -429,8 +429,8 @@ export default function AdminAlunoRecorrencia() {
 
       <Sheet open={addOpen} onOpenChange={setAddOpen}>
         <SheetContent>
-          <SheetTitle>ADICIONAR DIA FIXO</SheetTitle>
-          <div className="text-[13px] text-muted-foreground mb-4">Novo dia/horário recorrente para {student.name}</div>
+          <SheetTitle>ADICIONAR HORÁRIO FIXO</SheetTitle>
+          <div className="text-[13px] text-muted-foreground mb-4">Novo horário fixo para {student.name}</div>
 
           <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Dia da semana</div>
           <div className="flex gap-2 overflow-x-auto -mx-5 px-5 mb-3.5 pb-1 scroll-fade-x">
@@ -503,7 +503,7 @@ export default function AdminAlunoRecorrencia() {
       <ConfirmDialog
         open={!!excluirAlvo}
         onOpenChange={(open) => !open && setExcluirAlvo(null)}
-        title="EXCLUIR RECORRÊNCIA"
+        title="EXCLUIR HORÁRIO FIXO"
         description={
           excluirAlvo
             ? `Excluir ${WEEKDAY_LABELS[excluirAlvo.diaSemana].toLowerCase()} às ${excluirAlvo.horario}? Esta ação não pode ser desfeita.`
