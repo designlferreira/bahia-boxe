@@ -79,12 +79,12 @@ export function NotificationBell({ userId }: NotificationBellProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="Notificações"
-        className="relative h-11 w-11 rounded-[13px] bg-secondary border border-border flex items-center justify-center active:scale-95 transition-transform"
+        aria-label={unread > 0 ? `Notificações, ${unread} não ${unread === 1 ? "lida" : "lidas"}` : "Notificações"}
+        className="relative h-11 w-11 rounded-[13px] bg-secondary border border-border flex items-center justify-center active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <Bell className="h-[18px] w-[18px] text-foreground/90" />
+        <Bell className="h-[18px] w-[18px] text-foreground/90" aria-hidden />
         {unread > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 min-w-[19px] h-[19px] px-1 rounded-full bg-primary text-primary-foreground text-[10.5px] font-bold flex items-center justify-center border-2 border-background">
+          <span aria-hidden className="absolute -top-1.5 -right-1.5 min-w-[19px] h-[19px] px-1 rounded-full bg-primary text-primary-foreground text-[10.5px] font-bold flex items-center justify-center border-2 border-background">
             {unread}
           </span>
         )}
@@ -106,7 +106,7 @@ export function NotificationBell({ userId }: NotificationBellProps) {
               <button
                 type="button"
                 aria-label="Fechar"
-                className="h-11 w-11 shrink-0 rounded-[11px] border border-[#333] bg-secondary flex items-center justify-center active:scale-95 transition-transform"
+                className="h-11 w-11 shrink-0 rounded-[11px] border border-border bg-secondary flex items-center justify-center active:scale-95 transition-transform"
               >
                 <X className="h-[15px] w-[15px] text-foreground/80" />
               </button>
@@ -149,11 +149,11 @@ export function NotificationBell({ userId }: NotificationBellProps) {
                     <div className={cn("text-sm font-semibold", n.read ? "text-muted-foreground" : "text-foreground")}>
                       {n.title}
                     </div>
-                    <div className="text-[12.5px] text-muted-foreground mt-0.5 leading-snug">{n.description}</div>
-                    <div className="text-[11px] text-muted-foreground/70 mt-1">{relativeTime(n.createdAt)}</div>
+                    <div className="text-[13px] text-muted-foreground mt-0.5 leading-snug">{n.description}</div>
+                    <div className="text-xs text-muted-foreground mt-1">{relativeTime(n.createdAt)}</div>
                   </div>
                   {!n.read && (
-                    <span className="shrink-0 text-[10px] font-bold px-1.5 py-1 rounded-full bg-primary/20 text-primary">
+                    <span className="shrink-0 text-xs font-bold px-2 py-1 rounded-full bg-primary/20 text-[hsl(var(--red-text))]">
                       Nova
                     </span>
                   )}

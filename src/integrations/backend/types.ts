@@ -226,6 +226,8 @@ export interface AdminSettings {
   noShowConsumesClass: boolean;
   /** Já coalescido para 'autosservico' quando a coluna é NULL — nunca undefined/null pra quem lê. */
   modoAgendamento: ModoAgendamento;
+  /** Só dígitos, com código do país (0032). null = professor ainda não informou. */
+  whatsapp: string | null;
 }
 
 export type Sex = "female" | "male" | "other";

@@ -51,7 +51,7 @@ export default function StudentPacotes() {
   useEffect(() => {
     if (modoEfetivo === "recorrencia") {
       navigate("/app/historico", { replace: true });
-      toast("Seu professor gerencia sua agenda por recorrência — fale com ele para renovar seu pacote.");
+      toast("Seu professor gerencia sua agenda por recorrência — fale com ele para pedir mais aulas.");
     }
   }, [modoEfetivo, navigate]);
 
@@ -66,6 +66,9 @@ export default function StudentPacotes() {
       t.totalClasses > 1 ? requestPackage(t.id) : requestSingleClass(`Pedido a partir de "${t.name}"`),
     onSuccess: (_r, t) => {
       queryClient.invalidateQueries({ queryKey: ["purchase-requests"] });
+      // A Home mostra o pedido em espera no lugar do "solicitar" — sem invalidar, ela continuaria
+      // pedindo pra solicitar o que o aluno acabou de solicitar.
+      queryClient.invalidateQueries({ queryKey: ["student-home"] });
       toast.success(`Pedido de ${t.name.toLowerCase()} enviado`);
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível enviar o pedido."),
@@ -94,7 +97,7 @@ export default function StudentPacotes() {
         </div>
       )}
 
-      <div className="font-display text-[19px] tracking-wide text-foreground mb-2.5">SOLICITAR</div>
+      <h2 className="section-title mb-3">Pedir mais aulas</h2>
 
       {isLoading && <SkeletonList count={3} height={90} />}
 

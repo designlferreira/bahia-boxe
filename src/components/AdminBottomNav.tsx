@@ -28,8 +28,9 @@ export function AdminBottomNav() {
   return (
     <nav
       aria-label="Navegação principal"
-      className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-0.5 border-t border-border bg-background/92 px-2 pt-2.5 pb-[22px] backdrop-blur-xl"
-      style={{ height: 84 }}
+      className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-0.5 border-t border-border bg-background/92 pt-2.5 pb-[22px] backdrop-blur-xl"
+      // Mesma coluna centralizada do `.page-container`: no tablet as abas não se espalham.
+      style={{ height: 84, paddingInline: "max(0.5rem, calc((100% - 30rem) / 2))" }}
     >
       {items.map(({ to, label, icon: Icon, badge }) => (
         <NavLink

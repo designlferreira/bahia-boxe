@@ -30,7 +30,7 @@ export function BoxingProfileResultView({ assessment }: BoxingProfileResultViewP
     <div>
       <BoxingProfileScoresSummary assessment={assessment} description={FIGHTER_PROFILE_DESCRIPTIONS[primaryProfile]} />
 
-      <div className="font-display text-lg tracking-wide text-foreground mb-3">SEUS PONTOS FORTES</div>
+      <h2 className="section-title mb-3">Seus pontos fortes</h2>
       <div className="flex flex-col gap-2.5 mb-5">
         {strengths.map((dim) => (
           <div key={dim} className="card-dark p-4">
@@ -43,7 +43,7 @@ export function BoxingProfileResultView({ assessment }: BoxingProfileResultViewP
         ))}
       </div>
 
-      <div className="font-display text-lg tracking-wide text-foreground mb-3">PRIORIDADES DE EVOLUÇÃO</div>
+      <h2 className="section-title mb-3">Prioridades de evolução</h2>
       <div className="flex flex-col gap-2.5 mb-5">
         {priorities.map((dim) => (
           <div key={dim} className="card-dark p-4">
@@ -56,7 +56,7 @@ export function BoxingProfileResultView({ assessment }: BoxingProfileResultViewP
         ))}
       </div>
 
-      <div className="font-display text-lg tracking-wide text-foreground mb-3">NO QUE FOCAR NOS PRÓXIMOS TREINOS</div>
+      <h2 className="section-title mb-3">No que focar nos próximos treinos</h2>
       <div className="rounded-2xl p-4 bg-secondary/60 mb-2">
         <p className="text-[13.5px] text-foreground/85 leading-relaxed">{recommendation}</p>
       </div>

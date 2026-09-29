@@ -1,6 +1,7 @@
 import { addDays, addWeeks, format } from "date-fns";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
-import { TIMEZONE } from "@/lib/dateUtils";
+import { TIMEZONE, formatDate, formatTime } from "@/lib/dateUtils";
+export { normalizeWhatsapp } from "@/lib/whatsapp";
 import { supabase } from "@/integrations/supabase/client";
 import type {
   AdminSettings,
@@ -293,7 +294,7 @@ export async function creditsAvailableFor(studentId: string): Promise<number> {
 export async function getStudentHome(profileId: string) {
   const studentId = await studentIdForProfile(profileId);
   const nowIso = new Date().toISOString();
-  const [pkg, credits, upcomingRes, suggestionRes] = await Promise.all([
+  const [pkg, credits, upcomingRes, suggestionRes, pendingRequestRes] = await Promise.all([
     activePackageForStudentRow(studentId),
     creditsAvailableFor(studentId),
     client()
@@ -309,11 +310,28 @@ export async function getStudentHome(profileId: string) {
       .select("*")
       .eq("student_id", studentId)
       .eq("status", "rejected_with_suggestion")
-      .order("start_time", { ascending: false })
+      // Só sugestões que ainda podem ser aceitas: com horário sugerido e no futuro. Sem isso, a
+      // última sugestão já vencida ficava na Home pra sempre, levando a uma aula que não dá mais
+      // pra aceitar. A mais próxima primeiro — é a que o aluno precisa decidir antes.
+      .not("suggested_start_time", "is", null)
+      .gt("suggested_start_time", nowIso)
+      .order("suggested_start_time", { ascending: true })
+      .limit(1),
+    // Pedido de pacote/aula ainda sem decisão do professor. Sem isso, logo depois de pedir o aluno
+    // voltava pra Home e lia de novo "suas aulas acabaram, solicite" — como se o pedido não
+    // tivesse ido. O mais recente basta: a Home só precisa saber que existe um em espera.
+    client()
+      .from("purchase_requests")
+      .select("*")
+      .eq("student_id", studentId)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
       .limit(1),
   ]);
   if (upcomingRes.error) throw new Error(upcomingRes.error.message);
   if (suggestionRes.error) throw new Error(suggestionRes.error.message);
+  if (pendingRequestRes.error) throw new Error(pendingRequestRes.error.message);
+  const pendingRequest = (pendingRequestRes.data ?? [])[0];
   const upcoming = (upcomingRes.data ?? [])[0];
   const suggestion = (suggestionRes.data ?? [])[0];
 
@@ -323,15 +341,35 @@ export async function getStudentHome(profileId: string) {
   // pra esse aluno é "aulas restantes no pacote", vindo de saldo_pacotes (decisão 4 — única
   // autoridade), não do materializado used_classes. `recorrenciaSaldo` fica null pra qualquer
   // outra origem — `credits` continua exatamente como sempre foi, intocado.
+  // Sem pacote ativo, o aluno pode estar num de dois lugares bem diferentes: nunca teve pacote
+  // (recém-convidado) ou o pacote acabou — quando a última aula é usada, o banco muda o status pra
+  // `finished` (0001:498) e `activePackageForStudentRow` passa a devolver null. Sem distinguir os
+  // dois, a Home mostrava "Suas aulas começam em 3 passos" pra aluno veterano. Trial não conta:
+  // quem só usou a aula experimental ainda precisa do primeiro pacote.
+  let lastPackage: PackageRecord | null = null;
+  if (!pkg) {
+    const { data: lastRows, error: lastErr } = await client()
+      .from("packages")
+      .select("*")
+      .eq("student_id", studentId)
+      .neq("origin", "trial")
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (lastErr) throw new Error(lastErr.message);
+    lastPackage = lastRows?.[0] ? mapPackage(lastRows[0]) : null;
+  }
+
   const isRecorrenciaPkg = pkg?.origin === "recurrence" && pkg.status === "active";
   const recorrenciaSaldo = isRecorrenciaPkg ? await getSaldoPacote(pkg!.id) : null;
 
   return {
     package: pkg,
+    lastPackage,
     credits,
     recorrenciaSaldo,
     nextBooking: upcoming ? mapBooking(upcoming) : null,
     suggestion: suggestion ? mapBooking(suggestion) : null,
+    pendingRequest: pendingRequest ? mapRequest(pendingRequest) : null,
   };
 }
 
@@ -414,6 +452,46 @@ export async function getAvailableSlotsForDay(adminId: string, date: Date): Prom
   }));
 }
 
+/**
+ * Os horários de vários dias numa busca só (a tela Agendar mostra 7): a tela precisa saber QUAIS dias
+ * têm horário livre pra abrir no primeiro deles e marcar os dias na faixa. Mesma lógica de
+ * `getAvailableSlotsForDay`, agrupada por dia (chave "yyyy-MM-dd" no fuso de São Paulo).
+ */
+export async function getAvailableSlotsForDays(adminId: string, days: Date[]): Promise<Record<string, DaySlot[]>> {
+  if (days.length === 0) return {};
+  const { startIso } = dayBoundsUtcIso(days[0]);
+  const { endIso } = dayBoundsUtcIso(days[days.length - 1]);
+  const nowIso = new Date().toISOString();
+  const [slotsRes, freeRes] = await Promise.all([
+    client()
+      .from("availability_slots")
+      .select("id, start_time")
+      .eq("admin_id", adminId)
+      .eq("is_active", true)
+      .gt("start_time", nowIso)
+      .gte("start_time", startIso)
+      .lt("start_time", endIso)
+      .order("start_time"),
+    client()
+      .from("available_slots")
+      .select("slot_id")
+      .eq("admin_id", adminId)
+      .gte("start_time", startIso)
+      .lt("start_time", endIso),
+  ]);
+  if (slotsRes.error) throw new Error(slotsRes.error.message);
+  if (freeRes.error) throw new Error(freeRes.error.message);
+
+  const free = new Set((freeRes.data ?? []).map((r) => r.slot_id));
+  const out: Record<string, DaySlot[]> = {};
+  for (const d of days) out[brtDateKey(d)] = [];
+  for (const s of slotsRes.data ?? []) {
+    const key = brtDateKey(new Date(s.start_time));
+    (out[key] ??= []).push({ slotId: s.id, time: hhmm(brtHour(s.start_time)), status: free.has(s.id) ? "free" : "booked" });
+  }
+  return out;
+}
+
 /** `schedule_booking` validates credits, ownership and slot availability server-side. */
 export async function scheduleBooking(slotId: string) {
   const { error } = await client().rpc("schedule_booking", { p_slot_id: slotId });
@@ -421,40 +499,72 @@ export async function scheduleBooking(slotId: string) {
 }
 
 /** Students may cancel their own scheduled class up to 6h before it starts (RLS enforces it). */
-export async function cancelBooking(bookingId: string) {
-  const { data, error } = await client()
-    .from("bookings")
-    .update({ status: "cancelled" })
-    .eq("id", bookingId)
-    .select()
-    .maybeSingle();
+/**
+ * O aluno cancela a própria aula por RPC (0034). Antes era UPDATE direto, que a policy do aluno só
+ * deixava passar em aula `scheduled`: cancelar uma aula ainda PENDENTE (agendada no autosserviço,
+ * sem aprovação) afetava 0 linhas e o app culpava o prazo de 6 horas.
+ */
+/**
+ * Cancelar essa aula desconta uma aula do aluno? (0035) A regra vem do banco — o aluno não lê
+ * `profiles` nem a cópia da regra no pacote —, a mesma que `calcular_saldo_pacote` aplica.
+ */
+export async function getCancelamentoDescontaAula(bookingId: string): Promise<boolean> {
+  const { data, error } = await client().rpc("cancelamento_desconta_aula", { p_booking_id: bookingId });
   if (error) throw new Error(error.message);
-  if (!data) throw new Error("Só é possível cancelar até 6 horas antes do início da aula.");
-  return mapBooking(data);
+  return data === true;
 }
 
+export async function cancelBooking(bookingId: string) {
+  const { error } = await client().rpc("cancelar_minha_aula", { p_booking_id: bookingId });
+  if (!error) return;
+  const m = error.message ?? "";
+  if (m.includes("too_late")) throw new Error("Só é possível cancelar até 6 horas antes do início da aula.");
+  if (m.includes("already_started")) throw new Error("Esta aula já começou.");
+  if (m.includes("not_cancelable")) throw new Error("Esta aula não pode mais ser cancelada.");
+  throw new Error("Não foi possível cancelar a aula. Tente de novo em instantes.");
+}
+
+/**
+ * O horário que o aluno tentou pegar foi ocupado por outra aula nesse meio-tempo. Separado de um
+ * erro genérico pra tela poder oferecer "ver outros horários" em vez de só avisar.
+ */
+export class SlotTakenError extends Error {
+  constructor() {
+    super("Esse horário acabou de ser ocupado. Escolha outro horário.");
+    this.name = "SlotTakenError";
+  }
+}
+
+/** Traduz os códigos das RPCs de sugestão (0030) — o app não mostra texto cru do banco. */
+function sugestaoError(message: string | undefined, fallback: string): Error {
+  const m = message ?? "";
+  if (m.includes("slot_taken")) return new SlotTakenError();
+  if (m.includes("no_credits")) return new Error("Você não tem aulas restantes para aceitar este horário. Peça mais aulas.");
+  if (m.includes("suggestion_expired")) return new Error("O horário sugerido já passou. Escolha outro horário.");
+  if (m.includes("suggestion_not_available")) return new Error("Essa sugestão não está mais disponível.");
+  return new Error(fallback);
+}
+
+/**
+ * Aceite, recusa e desfazer da sugestão passam por RPC (0030). Antes eram UPDATE direto em
+ * `bookings` e NUNCA funcionaram: a policy de UPDATE do aluno só alcança aula `scheduled`, e uma
+ * aula com sugestão está `rejected_with_suggestion` — o UPDATE afetava 0 linhas, sem erro.
+ */
 export async function acceptSuggestion(bookingId: string) {
-  const { data: current, error: readErr } = await client()
-    .from("bookings")
-    .select("suggested_start_time, suggested_end_time")
-    .eq("id", bookingId)
-    .single();
-  if (readErr) throw new Error(readErr.message);
-  const { data, error } = await client()
-    .from("bookings")
-    .update({
-      start_time: current.suggested_start_time,
-      end_time: current.suggested_end_time,
-      status: "scheduled",
-      suggested_start_time: null,
-      suggested_end_time: null,
-    })
-    .eq("id", bookingId)
-    .select()
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("Esse horário não está mais disponível. Escolha outro.");
-  return mapBooking(data);
+  const { error } = await client().rpc("aceitar_sugestao", { p_booking_id: bookingId });
+  if (error) throw sugestaoError(error.message, "Não foi possível aceitar o novo horário. Tente de novo em instantes.");
+}
+
+/** O aluno diz "não" ao horário sugerido; a aula fica `rejected` e o horário sugerido fica guardado pro desfazer. */
+export async function declineSuggestion(bookingId: string) {
+  const { error } = await client().rpc("recusar_sugestao", { p_booking_id: bookingId });
+  if (error) throw sugestaoError(error.message, "Não foi possível recusar o horário. Tente de novo em instantes.");
+}
+
+/** Desfaz a recusa — o banco usa o horário sugerido que já guardou, o cliente não manda nenhum. */
+export async function restoreSuggestion(bookingId: string) {
+  const { error } = await client().rpc("desfazer_recusa_sugestao", { p_booking_id: bookingId });
+  if (error) throw sugestaoError(error.message, "Não foi possível desfazer.");
 }
 
 // ---------------------------------------------------------------------------
@@ -495,14 +605,65 @@ export async function getStudentBookingHistory(
  * The professor's name is not readable from `profiles` by a student (RLS), so it comes from the
  * `booking_history_app` view, which joins it server-side. Falls back to the plain row.
  */
+/**
+ * Mesmo arranjo de `getAdminBookingDetail`: a aula vem da TABELA (a view `booking_history_app` é
+ * anterior às colunas de recorrência — ler a aula dali devolvia `pacoteId`/`replacementForBookingId`
+ * nulos, e a tela não sabia que era aula de recorrência nem pedido de remarcação). Da view só o nome
+ * do professor, que ela resolve server-side (o aluno não lê `profiles` do professor).
+ */
 export async function getBookingDetail(bookingId: string): Promise<{ booking: Booking; adminName: string | null } | undefined> {
-  const viewRes = await client().from("booking_history_app").select("*").eq("id", bookingId).maybeSingle();
-  if (!viewRes.error && viewRes.data) {
-    return { booking: mapBooking(viewRes.data), adminName: viewRes.data.admin_name ?? null };
-  }
-  const { data, error } = await client().from("bookings").select("*").eq("id", bookingId).maybeSingle();
+  const [viewRes, rowRes] = await Promise.all([
+    client().from("booking_history_app").select("admin_name").eq("id", bookingId).maybeSingle(),
+    client().from("bookings").select("*").eq("id", bookingId).maybeSingle(),
+  ]);
+  if (rowRes.error) throw new Error(rowRes.error.message);
+  if (!rowRes.data) return undefined;
+  return { booking: mapBooking(rowRes.data), adminName: viewRes.data?.admin_name ?? null };
+}
+
+// ---------------------------------------------------------------------------
+// student · pedido de remarcação (0033)
+// ---------------------------------------------------------------------------
+
+function remarcacaoError(message: string | undefined, fallback: string): Error {
+  const m = message ?? "";
+  if (m.includes("slot_taken")) return new SlotTakenError();
+  if (m.includes("too_late")) return new Error("Só dá para pedir outro horário até 24 horas antes da aula.");
+  if (m.includes("request_already_pending")) return new Error("Você já tem um pedido de remarcação esperando o professor.");
+  if (m.includes("invalid_time")) return new Error("Escolha uma hora cheia entre 6h e 22h, com pelo menos 24 horas de antecedência.");
+  if (m.includes("request_not_pending")) return new Error("Esse pedido não está mais pendente.");
+  if (m.includes("original_not_scheduled")) return new Error("A aula original mudou nesse meio-tempo e não pode mais ser remarcada.");
+  if (m.includes("not_recurrence") || m.includes("not_scheduled")) return new Error("Esta aula não pode ser remarcada por aqui.");
+  return new Error(fallback);
+}
+
+/** Horas cheias livres do professor no dia (yyyy-MM-dd, horário de São Paulo), pra remarcar `bookingId`. */
+export async function getHorariosLivresRemarcacao(bookingId: string, dia: string): Promise<string[]> {
+  const { data, error } = await client().rpc("horarios_livres_remarcacao", { p_booking_id: bookingId, p_dia: dia });
+  if (error) throw remarcacaoError(error.message, "Não foi possível carregar os horários.");
+  return ((data ?? []) as { inicio: string }[]).map((r) => r.inicio);
+}
+
+export async function pedirRemarcacao(bookingId: string, novoInicio: string) {
+  const { error } = await client().rpc("pedir_remarcacao", { p_booking_id: bookingId, p_novo_inicio: novoInicio });
+  if (error) throw remarcacaoError(error.message, "Não foi possível enviar o pedido.");
+}
+
+export async function cancelarPedidoRemarcacao(pedidoId: string) {
+  const { error } = await client().rpc("cancelar_pedido_remarcacao", { p_pedido_id: pedidoId });
+  if (error) throw remarcacaoError(error.message, "Não foi possível cancelar o pedido.");
+}
+
+/** Pedido de remarcação pendente desta aula (no máximo um — regra da 0033), ou null. */
+export async function getPedidoRemarcacaoPendente(bookingId: string): Promise<Booking | null> {
+  const { data, error } = await client()
+    .from("bookings")
+    .select("*")
+    .eq("replacement_for_booking_id", bookingId)
+    .eq("status", "pending_confirmation")
+    .maybeSingle();
   if (error) throw new Error(error.message);
-  return data ? { booking: mapBooking(data), adminName: null } : undefined;
+  return data ? mapBooking(data) : null;
 }
 
 /** Mesma view, do lado do professor: já traz o nome do aluno resolvido. */
@@ -516,7 +677,10 @@ export async function getBookingDetail(bookingId: string): Promise<{ booking: Bo
  */
 export async function getAdminBookingDetail(
   bookingId: string,
-): Promise<{ booking: Booking; studentName: string; remarcacoes: number; vinculo: VinculoAula | null } | undefined> {
+): Promise<
+  | { booking: Booking; studentName: string; remarcacoes: number; vinculo: VinculoAula | null; antecessorInicio: string | null }
+  | undefined
+> {
   const [viewRes, rowRes] = await Promise.all([
     client().from("booking_history_app").select("*").eq("id", bookingId).maybeSingle(),
     client().from("bookings").select("*").eq("id", bookingId).maybeSingle(),
@@ -528,18 +692,23 @@ export async function getAdminBookingDetail(
   const cadeiaId = rowRes.data.cadeia_id as string | null;
   let remarcacoes = 0;
   if (cadeiaId) {
+    // Sem o pedido de remarcação ainda pendente (0033: ele entra na cadeia ao ser pedido): contá-lo
+    // mostrava "Remarcada 1x" antes de o professor aprovar qualquer coisa.
     const { count, error } = await client()
       .from("bookings")
       .select("id", { count: "exact", head: true })
-      .eq("cadeia_id", cadeiaId);
+      .eq("cadeia_id", cadeiaId)
+      .neq("status", "pending_confirmation");
     if (error) throw new Error(error.message);
     remarcacoes = Math.max((count ?? 1) - 1, 0);
   }
 
   const antecessorId = rowRes.data.replacement_for_booking_id as string | null;
-  const vinculo = antecessorId ? ((await vinculoPorAntecessor([antecessorId])).get(antecessorId) ?? "reposicao") : null;
+  const antes = antecessorId ? (await antecessores([antecessorId])).get(antecessorId) : undefined;
+  const vinculo = antecessorId ? (antes?.vinculo ?? "reposicao") : null;
 
-  return { booking: mapBooking(rowRes.data), studentName, remarcacoes, vinculo };
+  // antecessorInicio: num pedido de remarcação, o horário original — pra tela mostrar "de → para".
+  return { booking: mapBooking(rowRes.data), studentName, remarcacoes, vinculo, antecessorInicio: antes?.inicio ?? null };
 }
 
 /** Etapa 6 — remarcar não edita a aula: marca a original como `rescheduled` e cria a sucessora. */
@@ -596,28 +765,46 @@ export async function reconcileBookingStatuses() {
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Configuração básica do professor. Sem aluno: vira o "Comece por aqui". Com aluno: o que ainda
+ * faltar aparece em "Resolver agora" — antes a lista sumia no primeiro aluno, mesmo sem WhatsApp
+ * (e sem WhatsApp o aluno não vê o botão "Falar com o professor").
+ */
+export interface PrimeirosPassos {
+  /** Tem horário publicado daqui pra frente (sem isso ninguém agenda no autosserviço). */
+  horarios: boolean;
+  pacotes: boolean;
+  whatsapp: boolean;
+  /** Horários e pacotes só importam no autosserviço — na recorrência quem marca é o professor. */
+  modo: ModoAgendamento;
+}
+
 export async function getAdminDashboard(adminId: string) {
   const nowIso = new Date().toISOString();
   const { startIso, endIso } = dayBoundsUtcIso(new Date());
 
-  const [students, todayRes, pendingRes, upcomingRes, awaitingRes] = await Promise.all([
+  const [students, todayRes, pendingRes, nextRes, awaitingRes, pedidosRes] = await Promise.all([
     adminStudents(adminId),
+    // A agenda de HOJE inteira (inclusive o que já passou), sem o que não vai acontecer: cancelada,
+    // remarcada (a sucessora é que vale) e recusada.
     client()
       .from("bookings")
-      .select("id", { count: "exact", head: true })
+      .select("*")
       .eq("admin_id", adminId)
-      .neq("status", "cancelled")
+      .not("status", "in", "(cancelled,rescheduled,rejected,rejected_with_suggestion)")
       .gte("start_time", startIso)
-      .lt("start_time", endIso),
+      .lt("start_time", endIso)
+      .order("start_time", { ascending: true }),
     client().from("bookings").select("*").eq("admin_id", adminId).eq("status", "pending_confirmation").order("start_time"),
+    // Próxima aula depois de hoje — pro "Dia livre" e pro fim do dia ("Próxima aula: amanhã…").
     client()
       .from("bookings")
       .select("*")
       .eq("admin_id", adminId)
       .in("status", ACTIVE_STATUSES)
-      .gt("start_time", nowIso)
+      .gte("start_time", endIso)
       .order("start_time", { ascending: true })
-      .limit(3),
+      .limit(1),
     // scheduled + horário já passou: não vira "completed" sozinha (ver reconcileBookingStatuses
     // acima) — fica visível aqui até o professor confirmar o que aconteceu.
     client()
@@ -627,58 +814,153 @@ export async function getAdminDashboard(adminId: string) {
       .eq("status", "scheduled")
       .lt("end_time", nowIso)
       .order("start_time", { ascending: true }),
+    client()
+      .from("purchase_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("admin_id", adminId)
+      .eq("status", "pending"),
   ]);
+  if (todayRes.error) throw new Error(todayRes.error.message);
   if (pendingRes.error) throw new Error(pendingRes.error.message);
-  if (upcomingRes.error) throw new Error(upcomingRes.error.message);
+  if (nextRes.error) throw new Error(nextRes.error.message);
   if (awaitingRes.error) throw new Error(awaitingRes.error.message);
+  if (pedidosRes.error) throw new Error(pedidosRes.error.message);
 
   const byId = new Map(students.map((s) => [s.id, s]));
   const nameOf = (studentId: string) => byId.get(studentId)?.name ?? "Aluno";
-  const credits = await creditsByStudent(students.map((s) => s.id));
+  const comNome = (r: any) => ({ ...mapBooking(r), studentName: nameOf(r.student_id) });
+  const [atRisk, antesPendentes, primeirosPassos] = await Promise.all([
+    alunosEmRisco(students),
+    antecessores((pendingRes.data ?? []).map((r) => r.replacement_for_booking_id)),
+    getPrimeirosPassos(adminId),
+  ]);
 
   return {
-    kpiToday: todayRes.count ?? 0,
     activeStudents: students.length,
-    pending: (pendingRes.data ?? []).map((r) => ({ ...mapBooking(r), studentName: nameOf(r.student_id) })),
-    upcoming: (upcomingRes.data ?? []).map((r) => ({ ...mapBooking(r), studentName: nameOf(r.student_id) })),
-    awaitingConfirmation: (awaitingRes.data ?? []).map((r) => ({ ...mapBooking(r), studentName: nameOf(r.student_id) })),
-    atRisk: students
-      .map((student) => ({ student, credits: credits[student.id] ?? 0 }))
-      .filter((x) => x.credits <= 1),
+    today: (todayRes.data ?? []).map(comNome),
+    nextAfterToday: nextRes.data?.[0] ? comNome(nextRes.data[0]) : null,
+    pending: (pendingRes.data ?? []).map((r) => ({
+      ...comNome(r),
+      antecessorInicio: r.replacement_for_booking_id ? (antesPendentes.get(r.replacement_for_booking_id)?.inicio ?? null) : null,
+    })),
+    awaitingConfirmation: (awaitingRes.data ?? []).map(comNome),
+    purchaseRequests: pedidosRes.count ?? 0,
+    atRisk,
+    /** Só quando o professor ainda não tem aluno. */
+    primeirosPassos,
   };
 }
 
+/** Três checagens baratas (count sem trazer linha) pro "Comece por aqui". */
+async function getPrimeirosPassos(adminId: string): Promise<PrimeirosPassos> {
+  const [slotsRes, templatesRes, settings] = await Promise.all([
+    client()
+      .from("availability_slots")
+      .select("id", { count: "exact", head: true })
+      .eq("admin_id", adminId)
+      .eq("is_active", true)
+      .gte("start_time", new Date().toISOString()),
+    client().from("package_templates").select("id", { count: "exact", head: true }).eq("admin_id", adminId).eq("is_active", true),
+    getAdminSettings(adminId),
+  ]);
+  if (slotsRes.error) throw new Error(slotsRes.error.message);
+  if (templatesRes.error) throw new Error(templatesRes.error.message);
+  return {
+    horarios: (slotsRes.count ?? 0) > 0,
+    pacotes: (templatesRes.count ?? 0) > 0,
+    whatsapp: !!settings?.whatsapp,
+    modo: settings?.modoAgendamento ?? "autosservico",
+  };
+}
+
+/** Quantas aulas restantes no pacote disparam o alerta (CLAUDE.md: "restarem 2 ou menos"). */
+const RISCO_AULAS_RESTANTES = 2;
+/** Faltas seguidas, nas aulas mais recentes, que disparam o alerta (decisão do Lucas, 2026-09-28). */
+const RISCO_FALTAS_SEGUIDAS = 2;
+
+export interface AlunoEmRisco {
+  student: StudentRecord;
+  /** Frase pronta pro professor ("Restam 2 aulas no pacote", "2 faltas seguidas"...). */
+  motivo: string;
+  /** Sem aula nenhuma (ou sem pacote): mais urgente que "restam poucas". */
+  grave: boolean;
+}
+
 /**
- * Versão em lote da mesma fórmula canônica, para listas de alunos (evita N chamadas de RPC). Um
- * aluno pode ter mais de um pacote `active` simultâneo agora (trial + pago) — soma o restante de
- * todos antes de descontar as reservas futuras, em vez de pegar "o" pacote.
+ * "Aluno em risco" (decisão do Lucas, 2026-09-28): pacote acabando OU faltando muito.
+ *
+ * Pacote acabando = aulas RESTANTES no pacote (total − usadas), não "créditos para agendar". A conta
+ * antiga (`creditsByStudent` <= 1) desconta as aulas já marcadas — na recorrência todas as aulas
+ * restantes já nascem marcadas, então dava 0 pra TODO aluno de recorrência e o painel pintava
+ * todos de vermelho "Sem créditos" (mesmo problema já registrado no CLAUDE.md pro cartão do aluno).
+ * Pacote de recorrência lê `saldo_pacotes` (a autoridade — decisão 4), não o `used_classes`
+ * materializado. A aula experimental não conta como pacote.
+ *
+ * Faltando muito = as RISCO_FALTAS_SEGUIDAS aulas mais recentes (concluídas ou faltas) foram faltas.
  */
-async function creditsByStudent(studentIds: string[]): Promise<Record<string, number>> {
-  if (studentIds.length === 0) return {};
-  const [pkgRes, bookingRes] = await Promise.all([
-    client().from("packages").select("student_id, total_classes, used_classes").in("student_id", studentIds).eq("status", "active"),
+async function alunosEmRisco(students: StudentRecord[]): Promise<AlunoEmRisco[]> {
+  if (students.length === 0) return [];
+  const ids = students.map((s) => s.id);
+  const desde = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString();
+  const [pkgRes, aulasRes] = await Promise.all([
+    client()
+      .from("packages")
+      .select("id, student_id, total_classes, used_classes, origin")
+      .in("student_id", ids)
+      .eq("status", "active")
+      .neq("origin", "trial"),
     client()
       .from("bookings")
-      .select("student_id")
-      .in("student_id", studentIds)
-      .in("status", ACTIVE_STATUSES)
-      .gt("start_time", new Date().toISOString()),
+      .select("student_id, status, start_time")
+      .in("student_id", ids)
+      .in("status", ["completed", "no_show"])
+      .gte("start_time", desde)
+      .order("start_time", { ascending: false }),
   ]);
   if (pkgRes.error) throw new Error(pkgRes.error.message);
-  if (bookingRes.error) throw new Error(bookingRes.error.message);
+  if (aulasRes.error) throw new Error(aulasRes.error.message);
 
-  const future: Record<string, number> = {};
-  for (const b of bookingRes.data ?? []) future[b.student_id] = (future[b.student_id] ?? 0) + 1;
+  const recIds = (pkgRes.data ?? []).filter((p) => p.origin === "recurrence").map((p) => p.id);
+  const saldoRes = recIds.length
+    ? await client().from("saldo_pacotes").select("pacote_id, restantes").in("pacote_id", recIds)
+    : { data: [], error: null };
+  if (saldoRes.error) throw new Error(saldoRes.error.message);
+  const restantesRec = new Map((saldoRes.data ?? []).map((r) => [r.pacote_id as string, r.restantes as number]));
 
-  const remaining: Record<string, number> = {};
-  for (const id of studentIds) remaining[id] = 0;
+  const restantes = new Map<string, number>();
   for (const p of pkgRes.data ?? []) {
-    remaining[p.student_id] = (remaining[p.student_id] ?? 0) + (p.total_classes - p.used_classes);
+    const r = p.origin === "recurrence" ? (restantesRec.get(p.id) ?? 0) : Math.max(0, p.total_classes - p.used_classes);
+    restantes.set(p.student_id, (restantes.get(p.student_id) ?? 0) + r);
   }
 
-  const out: Record<string, number> = {};
-  for (const id of studentIds) out[id] = Math.max(0, (remaining[id] ?? 0) - (future[id] ?? 0));
-  return out;
+  const ultimas = new Map<string, string[]>();
+  for (const a of aulasRes.data ?? []) {
+    const list = ultimas.get(a.student_id) ?? [];
+    if (list.length < RISCO_FALTAS_SEGUIDAS) ultimas.set(a.student_id, [...list, a.status]);
+  }
+
+  const out: AlunoEmRisco[] = [];
+  for (const student of students) {
+    const motivos: string[] = [];
+    let grave = false;
+    const r = restantes.get(student.id);
+    if (r === undefined) {
+      motivos.push("Sem pacote ativo");
+      grave = true;
+    } else if (r === 0) {
+      motivos.push("Sem aulas no pacote");
+      grave = true;
+    } else if (r <= RISCO_AULAS_RESTANTES) {
+      motivos.push(r === 1 ? "Resta 1 aula no pacote" : `Restam ${r} aulas no pacote`);
+    }
+    const u = ultimas.get(student.id) ?? [];
+    if (u.length === RISCO_FALTAS_SEGUIDAS && u.every((s) => s === "no_show")) {
+      motivos.push(`${RISCO_FALTAS_SEGUIDAS} faltas seguidas`);
+    }
+    if (motivos.length) out.push({ student, motivo: motivos.join(" · "), grave });
+  }
+  // Mais urgente primeiro; dentro do grupo, por nome.
+  return out.sort((a, b) => Number(b.grave) - Number(a.grave) || a.student.name.localeCompare(b.student.name));
 }
 
 // ---------------------------------------------------------------------------
@@ -692,6 +974,18 @@ async function creditsByStudent(studentIds: string[]): Promise<Record<string, nu
  * (CLAUDE.md, "Agenda com navegação livre"), e o banner do Dashboard precisa da mais antiga (`[0]`,
  * já vem ordenada por `start_time` ascendente) pra navegar direto pra ela.
  */
+/** Pedidos ainda sem resposta do professor (novo horário ou remarcação) — pra marcar os dias na Agenda. */
+export async function getPedidosPendentes(adminId: string): Promise<Booking[]> {
+  const { data, error } = await client()
+    .from("bookings")
+    .select("*")
+    .eq("admin_id", adminId)
+    .eq("status", "pending_confirmation")
+    .order("start_time", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapBooking);
+}
+
 export async function getAwaitingConfirmationBookings(adminId: string): Promise<Booking[]> {
   const nowIso = new Date().toISOString();
   const { data, error } = await client()
@@ -710,8 +1004,10 @@ export interface TimelineEntry {
   free: boolean;
   booking?: Booking;
   studentName?: string;
-  /** Só quando a aula tem antecessor — ver `vinculoPorAntecessor`. */
+  /** Só quando a aula tem antecessor — ver `antecessores`. */
   vinculo?: VinculoAula | null;
+  /** Horário da aula original — mostrado num pedido de remarcação ("de ... para ..."). */
+  antecessorInicio?: string | null;
 }
 
 /**
@@ -720,20 +1016,37 @@ export interface TimelineEntry {
  * moveu a aula) ou `no_show`/`cancelled` (o aluno perdeu a aula e esta é a reposição). Antes disso
  * a tela chamava as duas de "Reposição", porque só olhava `is_replacement`.
  */
-export type VinculoAula = "remarcacao" | "reposicao";
+/**
+ * `pedido_remarcacao` (0033): o antecessor ainda está `scheduled` — só acontece quando o aluno pediu
+ * pra remarcar e o professor ainda não decidiu (um sucessor "normal" só nasce depois de a original
+ * virar rescheduled/no_show/cancelled).
+ */
+export type VinculoAula = "remarcacao" | "reposicao" | "pedido_remarcacao";
+
+export const VINCULO_LABEL: Record<VinculoAula, string> = {
+  remarcacao: "Remarcada",
+  reposicao: "Reposição",
+  pedido_remarcacao: "Pedido de remarcação",
+};
 
 /**
  * Resolve o vínculo de várias aulas de uma vez, indexado pelo id do ANTECESSOR. Uma consulta só
  * para a tela inteira — nunca uma por linha. O antecessor quase nunca está no conjunto já
  * carregado (remarcar é justamente mover a aula para outro dia), então ele precisa ser buscado.
  */
-async function vinculoPorAntecessor(antecessorIds: (string | null | undefined)[]): Promise<Map<string, VinculoAula>> {
+async function antecessores(
+  antecessorIds: (string | null | undefined)[],
+): Promise<Map<string, { vinculo: VinculoAula; inicio: string }>> {
   const ids = Array.from(new Set(antecessorIds.filter((id): id is string => !!id)));
-  const out = new Map<string, VinculoAula>();
+  const out = new Map<string, { vinculo: VinculoAula; inicio: string }>();
   if (ids.length === 0) return out;
-  const { data, error } = await client().from("bookings").select("id, status").in("id", ids);
+  const { data, error } = await client().from("bookings").select("id, status, start_time").in("id", ids);
   if (error) throw new Error(error.message);
-  for (const r of data ?? []) out.set(r.id, r.status === "rescheduled" ? "remarcacao" : "reposicao");
+  for (const r of data ?? [])
+    out.set(r.id, {
+      vinculo: r.status === "rescheduled" ? "remarcacao" : r.status === "scheduled" ? "pedido_remarcacao" : "reposicao",
+      inicio: r.start_time,
+    });
   return out;
 }
 
@@ -754,7 +1067,10 @@ export async function getAdminAgendaForDay(adminId: string, date: Date): Promise
       // `rescheduled` sai junto com `cancelled`: a aula foi MOVIDA, não vai acontecer nesse
       // horário — deixá-la aqui mantinha o horário antigo ocupado na agenda do professor depois
       // de remarcar. A linha continua existindo como registro, só não bloqueia mais a hora.
-      .not("status", "in", "(cancelled,rescheduled)")
+      // Recusadas também saem: o pedido não vai acontecer, e o horário pode ter sido pedido de novo
+      // por outro aluno — como a agenda mostra UMA aula por hora, a recusada podia esconder a aula
+      // de verdade daquele horário.
+      .not("status", "in", "(cancelled,rescheduled,rejected,rejected_with_suggestion)")
       .gte("start_time", startIso)
       .lt("start_time", endIso),
     adminStudents(adminId),
@@ -764,7 +1080,7 @@ export async function getAdminAgendaForDay(adminId: string, date: Date): Promise
 
   const nameOf = new Map(students.map((s) => [s.id, s.name]));
   const bookings = bookingsRes.data ?? [];
-  const vinculos = await vinculoPorAntecessor(bookings.map((b) => b.replacement_for_booking_id));
+  const antes = await antecessores(bookings.map((b) => b.replacement_for_booking_id));
 
   const hours = new Set<number>();
   for (const s of slotsRes.data ?? []) hours.add(brtHour(s.start_time));
@@ -773,7 +1089,10 @@ export async function getAdminAgendaForDay(adminId: string, date: Date): Promise
   return Array.from(hours)
     .sort((a, b) => a - b)
     .map((h) => {
-      const booking = bookings.find((b) => brtHour(b.start_time) === h);
+      // Se sobrar mais de uma na mesma hora (ex.: uma concluída e outra agendada), a que ainda vai
+      // acontecer ou pede ação ganha o lugar.
+      const daHora = bookings.filter((b) => brtHour(b.start_time) === h);
+      const booking = daHora.find((b) => ACTIVE_STATUSES.includes(b.status)) ?? daHora[0];
       if (!booking) return { hour: hhmm(h), free: true };
       return {
         hour: hhmm(h),
@@ -781,13 +1100,37 @@ export async function getAdminAgendaForDay(adminId: string, date: Date): Promise
         booking: mapBooking(booking),
         studentName: nameOf.get(booking.student_id) ?? "Aluno",
         vinculo: booking.replacement_for_booking_id
-          ? (vinculos.get(booking.replacement_for_booking_id) ?? "reposicao")
+          ? (antes.get(booking.replacement_for_booking_id)?.vinculo ?? "reposicao")
+          : null,
+        antecessorInicio: booking.replacement_for_booking_id
+          ? (antes.get(booking.replacement_for_booking_id)?.inicio ?? null)
           : null,
       };
     });
 }
 
+/**
+ * Um pendente com antecessor é um PEDIDO DE REMARCAÇÃO do aluno (0033), não um agendamento novo.
+ * Aprovar/recusar precisa passar pela RPC: só mudar o status deixaria a aula original E a nova
+ * agendadas ao mesmo tempo (aprovar), ou o pedido recusado pendurado na cadeia e o saldo errado
+ * (recusar).
+ */
+async function isPedidoRemarcacao(bookingId: string): Promise<boolean> {
+  const { data, error } = await client()
+    .from("bookings")
+    .select("status, replacement_for_booking_id")
+    .eq("id", bookingId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.status === "pending_confirmation" && !!data.replacement_for_booking_id;
+}
+
 export async function approveBooking(bookingId: string) {
+  if (await isPedidoRemarcacao(bookingId)) {
+    const { error } = await client().rpc("aprovar_remarcacao", { p_pedido_id: bookingId });
+    if (error) throw remarcacaoError(error.message, "Não foi possível aprovar a remarcação.");
+    return;
+  }
   const { data, error } = await client()
     .from("bookings")
     .update({ status: "scheduled" })
@@ -798,7 +1141,30 @@ export async function approveBooking(bookingId: string) {
   return mapBooking(data);
 }
 
+/**
+ * Desfaz a aprovação de um agendamento comum (não de remarcação): volta a aula a "aguardando
+ * aprovação". Só age se ela continuar `scheduled` e sem antecessor.
+ */
+export async function devolverParaPendente(bookingId: string) {
+  const { data, error } = await client()
+    .from("bookings")
+    .update({ status: "pending_confirmation" })
+    .eq("id", bookingId)
+    .eq("status", "scheduled")
+    .is("replacement_for_booking_id", null)
+    .select("id")
+    .maybeSingle();
+  if (error || !data) throw new Error("Não foi possível desfazer. A aula já mudou.");
+}
+
 export async function rejectBooking(bookingId: string, note: string, suggestedStart?: string | null, suggestedEnd?: string | null) {
+  if (await isPedidoRemarcacao(bookingId)) {
+    // Num pedido de remarcação não cabe "sugerir outro horário": a aula original continua valendo
+    // e o aluno pode pedir outro. A sugestão, se vier, é ignorada; a observação vai junto.
+    const { error } = await client().rpc("recusar_remarcacao", { p_pedido_id: bookingId, p_nota: note || null });
+    if (error) throw remarcacaoError(error.message, "Não foi possível recusar a remarcação.");
+    return;
+  }
   const withSuggestion = !!(suggestedStart && suggestedEnd);
   const { data, error } = await client()
     .from("bookings")
@@ -824,6 +1190,42 @@ export async function completeBooking(bookingId: string) {
 export async function markNoShow(bookingId: string) {
   const { error } = await client().rpc("mark_no_show", { p_booking_id: bookingId });
   if (error) throw new Error(error.message);
+}
+
+export interface RegraDeConsumo {
+  /** Marcar falta desconta 1 aula do aluno? */
+  falta: boolean;
+  /** Cancelar dizendo que foi o aluno desconta 1 aula? */
+  cancelamentoPeloAluno: boolean;
+  /** De onde veio a regra — a janela diz isso ao professor. */
+  origem: "pacote" | "configuracao" | "reposicao" | "sem_pacote";
+}
+
+/**
+ * O que a falta (ou o cancelamento pelo aluno) faz com a aula do aluno — a MESMA regra que o banco
+ * aplica, pra janela de confirmação não prometer outra coisa. Antes a janela lia só a configuração
+ * do professor, mas numa aula de pacote de recorrência quem manda é a regra gravada no pacote no dia
+ * em que ele foi criado (decisão 3 do CLAUDE.md) — se o professor mudou a configuração depois, a
+ * janela dizia o contrário do que acontecia.
+ * - Aula com `pacote_id`: `coalesce(pacote.falta_consome_credito, configuração)` pros dois casos
+ *   (`calcular_saldo_pacote`, 0013).
+ * - Sem pacote (autosserviço): falta segue a configuração, reposição nunca desconta
+ *   (`mark_no_show`, 0020); cancelar nunca desconta (`cancelar_aula` não lança nada no ledger).
+ */
+export async function getRegraDeConsumo(booking: Booking, padraoDoProfessor: boolean): Promise<RegraDeConsumo> {
+  if (booking.pacoteId) {
+    const { data, error } = await client()
+      .from("packages")
+      .select("falta_consome_credito")
+      .eq("id", booking.pacoteId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    const snapshot = data?.falta_consome_credito as boolean | null | undefined;
+    const consome = snapshot ?? padraoDoProfessor;
+    return { falta: consome, cancelamentoPeloAluno: consome, origem: snapshot == null ? "configuracao" : "pacote" };
+  }
+  if (booking.isReplacement) return { falta: false, cancelamentoPeloAluno: false, origem: "reposicao" };
+  return { falta: padraoDoProfessor, cancelamentoPeloAluno: false, origem: "sem_pacote" };
 }
 
 /**
@@ -876,25 +1278,53 @@ export async function getReplaceableBookingsForStudent(studentId: string): Promi
 // admin · alunos
 // ---------------------------------------------------------------------------
 
+/** Mesma lista do painel ("Alunos em risco"), completa — pro filtro "Em risco" da lista de alunos. */
+export async function getAlunosEmRisco(adminId: string): Promise<AlunoEmRisco[]> {
+  return alunosEmRisco(await adminStudents(adminId));
+}
+
+/**
+ * Lista de alunos do professor. O número de cada aluno é AULAS RESTANTES nos pacotes ativos (total −
+ * usadas), não "créditos para agendar": essa conta desconta as aulas já marcadas, e na recorrência
+ * todas as restantes nascem marcadas — todo aluno de recorrência aparecia com 0 em vermelho (mesmo
+ * problema já corrigido no cartão do aluno e em "Alunos em risco"). Pacote de recorrência lê
+ * `saldo_pacotes` (a autoridade, decisão 4), não o `used_classes` materializado.
+ */
 export async function getAdminStudents(adminId: string, search: string) {
   const students = await adminStudents(adminId);
   const ids = students.map((s) => s.id);
-  const [credits, pkgRes] = await Promise.all([
-    creditsByStudent(ids),
-    ids.length
-      ? client().from("packages").select("*").in("student_id", ids).eq("status", "active")
-      : Promise.resolve({ data: [], error: null } as const),
-  ]);
+  const pkgRes = ids.length
+    ? await client().from("packages").select("*").in("student_id", ids).eq("status", "active")
+    : ({ data: [], error: null } as const);
   if (pkgRes.error) throw new Error(pkgRes.error.message);
+  const pkgs = pkgRes.data ?? [];
 
+  const recIds = pkgs.filter((p) => p.origin === "recurrence").map((p) => p.id as string);
+  const saldoRes = recIds.length
+    ? await client().from("saldo_pacotes").select("pacote_id, consumidas, restantes").in("pacote_id", recIds)
+    : { data: [], error: null };
+  if (saldoRes.error) throw new Error(saldoRes.error.message);
+  const saldo = new Map((saldoRes.data ?? []).map((r) => [r.pacote_id as string, r as { consumidas: number; restantes: number }]));
+
+  const restantes = new Map<string, number>();
   const pkgByStudent = new Map<string, PackageRecord>();
-  for (const row of pkgRes.data ?? []) pkgByStudent.set(row.student_id, mapPackage(row));
+  for (const row of pkgs) {
+    const s = row.origin === "recurrence" ? saldo.get(row.id) : undefined;
+    const r = s ? s.restantes : Math.max(0, row.total_classes - row.used_classes);
+    restantes.set(row.student_id, (restantes.get(row.student_id) ?? 0) + r);
+    // O pacote que aparece no subtítulo: o pago/recorrência antes da experimental (os dois podem
+    // estar ativos juntos). Na recorrência, "usadas" vem do saldo, não da cópia materializada.
+    const pkg = { ...mapPackage(row), usedClasses: s ? s.consumidas : row.used_classes };
+    const atual = pkgByStudent.get(row.student_id);
+    if (!atual || atual.origin === "trial") pkgByStudent.set(row.student_id, pkg);
+  }
 
   const q = search.trim().toLowerCase();
   return students
     .map((student) => ({
       student,
-      credits: credits[student.id] ?? 0,
+      /** null = sem pacote ativo. */
+      restantes: restantes.has(student.id) ? restantes.get(student.id)! : null,
       package: pkgByStudent.get(student.id) ?? null,
     }))
     .filter((e) => !q || e.student.name.toLowerCase().includes(q));
@@ -1187,22 +1617,46 @@ export async function getPurchaseRequests(adminId: string) {
   const rows = data ?? [];
 
   const templateIds = Array.from(new Set(rows.map((r) => r.template_id).filter(Boolean)));
-  const [students, templatesRes] = await Promise.all([
+  const studentIds = Array.from(new Set(rows.map((r) => r.student_id)));
+  const [students, templatesRes, activePkgsRes] = await Promise.all([
     adminStudents(adminId),
     templateIds.length
       ? client().from("package_templates").select("*").in("id", templateIds)
       : Promise.resolve({ data: [], error: null } as const),
+    // Pacotes ativos de quem pediu — pra avisar o professor do que a aprovação encerra.
+    studentIds.length
+      ? client().from("packages").select("*").in("student_id", studentIds).eq("status", "active")
+      : Promise.resolve({ data: [], error: null } as const),
   ]);
   if (templatesRes.error) throw new Error(templatesRes.error.message);
+  if (activePkgsRes.error) throw new Error(activePkgsRes.error.message);
+
+  // O que `approve_purchase_request` encerra ao aprovar: os pacotes ativos NÃO-trial, nos dois
+  // tipos de pedido (pacote -> assign_package_from_template; aula avulsa -> _create_package, desde
+  // a 0031 — antes a aula avulsa fechava também a experimental).
+  // As aulas já agendadas não se perdem (a conclusão debita do pacote novo pela busca "mais antigo
+  // ativo com vaga"); o que se perde é o que sobrava pra agendar. Aqui só se conta total − usadas
+  // de cada pacote que seria fechado.
+  const activeByStudent = new Map<string, PackageRecord[]>();
+  for (const row of activePkgsRes.data ?? []) {
+    const p = mapPackage(row);
+    activeByStudent.set(p.studentId, [...(activeByStudent.get(p.studentId) ?? []), p]);
+  }
 
   const nameOf = new Map(students.map((s) => [s.id, s.name]));
   const templates = new Map((templatesRes.data ?? []).map((t) => [t.id, mapTemplate(t)]));
 
-  return rows.map((r) => ({
-    request: mapRequest(r),
-    studentName: nameOf.get(r.student_id) ?? "Aluno",
-    template: r.template_id ? (templates.get(r.template_id) ?? null) : null,
-  }));
+  return rows.map((r) => {
+    const request = mapRequest(r);
+    const closed = (activeByStudent.get(r.student_id) ?? []).filter((p) => p.origin !== "trial");
+    return {
+      request,
+      studentName: nameOf.get(r.student_id) ?? "Aluno",
+      template: r.template_id ? (templates.get(r.template_id) ?? null) : null,
+      /** Aulas que o aluno ainda tinha pra usar e que a aprovação encerra. 0 = aprovar não tira nada. */
+      classesLostOnApprove: closed.reduce((acc, p) => acc + Math.max(0, p.totalClasses - p.usedClasses), 0),
+    };
+  });
 }
 
 export async function approvePurchaseRequest(requestId: string) {
@@ -1448,7 +1902,7 @@ export async function restoreAvailabilityInterval(interval: AvailabilityInterval
 export async function getAdminSettings(adminId: string): Promise<AdminSettings | null> {
   const { data, error } = await client()
     .from("profiles")
-    .select("id, no_show_consumes_class, modo_agendamento")
+    .select("id, no_show_consumes_class, modo_agendamento, whatsapp")
     .eq("id", adminId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -1457,6 +1911,7 @@ export async function getAdminSettings(adminId: string): Promise<AdminSettings |
         adminId: data.id,
         noShowConsumesClass: data.no_show_consumes_class,
         modoAgendamento: (data.modo_agendamento as ModoAgendamento | null) ?? "autosservico",
+        whatsapp: data.whatsapp ?? null,
       }
     : null;
 }
@@ -1469,6 +1924,21 @@ export async function updateNoShowConsumesClass(adminId: string, value: boolean)
 export async function updateModoAgendamento(adminId: string, value: ModoAgendamento) {
   const { error } = await client().from("profiles").update({ modo_agendamento: value }).eq("id", adminId);
   if (error) throw new Error(error.message);
+}
+
+export async function updateWhatsapp(adminId: string, whatsapp: string | null) {
+  const { error } = await client().from("profiles").update({ whatsapp }).eq("id", adminId);
+  if (error) throw new Error("Não foi possível salvar o WhatsApp. Confira o número e tente de novo.");
+}
+
+/**
+ * WhatsApp do professor, lido pelo aluno. Por RPC pelo mesmo motivo de
+ * `getModoAgendamentoEfetivo` logo abaixo: o aluno não lê a linha de `profiles` do professor.
+ */
+export async function getWhatsappDoProfessor(professorId: string): Promise<string | null> {
+  const { data, error } = await client().rpc("whatsapp_do_professor", { p_professor_id: professorId });
+  if (error) throw new Error(error.message);
+  return (data as string | null) ?? null;
 }
 
 /**
@@ -1630,7 +2100,56 @@ async function deriveNotifications(userId: string): Promise<AppNotification[]> {
         .order("completed_at", { ascending: false })
         .limit(20),
     ]);
+    // Uma aula `scheduled` com antecessor não é "confirmada" do nada: ou o professor remarcou
+    // (antecessor `rescheduled`) ou marcou uma reposição (antecessor `no_show`/`cancelled`) — mesmo
+    // discriminador de `antecessores` (CLAUDE.md, decisão 2). Sem isso, remarcar gerava um
+    // "Aula confirmada · Seu horário está garantido" e o aluno não ficava sabendo que o horário
+    // MUDOU. Antecessores buscados numa consulta só — podem estar fora da janela de 40 acima.
+    const predecessorIds = Array.from(
+      new Set(
+        (bookingsRes.data ?? [])
+          .filter((b) => b.status === "scheduled" && b.start_time > nowIso && b.replacement_for_booking_id)
+          .map((b) => b.replacement_for_booking_id as string),
+      ),
+    );
+    const predecessors = new Map<string, { status: string; start_time: string }>();
+    if (predecessorIds.length) {
+      const { data: predRows } = await client()
+        .from("bookings")
+        .select("id, status, start_time")
+        .in("id", predecessorIds);
+      for (const r of predRows ?? []) predecessors.set(r.id, { status: r.status, start_time: r.start_time });
+    }
+    const when = (iso: string) => `${formatDate(iso)} · ${formatTime(iso)}`;
+
     for (const b of bookingsRes.data ?? []) {
+      const pred = b.replacement_for_booking_id ? predecessors.get(b.replacement_for_booking_id) : undefined;
+      if (b.status === "scheduled" && b.start_time > nowIso && pred?.status === "rescheduled") {
+        items.push({
+          id: `booking:${b.id}:rescheduled`,
+          userId,
+          kind: "confirm",
+          title: "Aula remarcada",
+          description: `De ${when(pred.start_time)} para ${when(b.start_time)}.`,
+          createdAt: b.created_at,
+          read: false,
+          entity: { type: "booking", id: b.id },
+        });
+        continue;
+      }
+      if (b.status === "scheduled" && b.start_time > nowIso && pred) {
+        items.push({
+          id: `booking:${b.id}:replacement`,
+          userId,
+          kind: "confirm",
+          title: "Reposição marcada",
+          description: `Sua aula de reposição é ${when(b.start_time)}.`,
+          createdAt: b.created_at,
+          read: false,
+          entity: { type: "booking", id: b.id },
+        });
+        continue;
+      }
       if (b.status === "rejected" || b.status === "rejected_with_suggestion") {
         items.push({
           id: `booking:${b.id}:${b.status}`,
@@ -1661,7 +2180,7 @@ async function deriveNotifications(userId: string): Promise<AppNotification[]> {
         userId,
         kind: "system",
         title: r.status === "approved" ? "Pedido aprovado" : "Pedido recusado",
-        description: r.status === "approved" ? "Seus créditos já estão disponíveis." : "Fale com seu professor para entender o motivo.",
+        description: r.status === "approved" ? "Suas aulas já estão disponíveis para agendar." : "Fale com seu professor para entender o motivo.",
         createdAt: r.decided_at ?? r.created_at,
         read: false,
         entity: { type: "purchase_requests" },

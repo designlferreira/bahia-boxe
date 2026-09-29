@@ -254,7 +254,7 @@ export default function AdminOrientacoesAula() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="card-dark p-4 mb-3.5">
-      <div className="font-display text-lg tracking-wide text-foreground mb-3">{title.toUpperCase()}</div>
+      <h2 className="section-title mb-3">{title}</h2>
       {children}
     </div>
   );

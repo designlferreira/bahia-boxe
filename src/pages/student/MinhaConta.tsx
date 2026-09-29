@@ -41,7 +41,7 @@ export default function StudentMinhaConta() {
         />
       </div>
 
-      <PWAInstallBanner />
+      <PWAInstallBanner placement="settings" />
 
       <Button variant="destructive" size="lg" className="w-full" onClick={() => setConfirmLogout(true)}>
         Sair da conta

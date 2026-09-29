@@ -39,7 +39,7 @@ export default function AdminMinhaConta() {
         <AccountRow label="Alterar senha" icon={KeyRound} onClick={() => navigate("/admin/minha-conta/alterar-senha")} last />
       </div>
 
-      <PWAInstallBanner />
+      <PWAInstallBanner placement="settings" />
 
       <Button variant="destructive" size="lg" className="w-full" onClick={() => setConfirmLogout(true)}>
         Sair da conta

@@ -27,6 +27,9 @@
        on top), not enough for small text set directly in the color (WCAG AA needs 4.5:1 under
        18px). Used for the active bottom-nav label/icon, which is exactly that case. */
     --nav-active: 0 85% 68%;
+    /* Mesmo problema, em selos: vermelho puro sobre fundo vermelho/20 dá ~3:1 ("Agendada",
+       "Faltou"). Este tom dá 5,3–5,7:1 sobre esses fundos. */
+    --red-text: 0 85% 72%;
 
     --gradient-hero: linear-gradient(135deg, hsl(0 72% 51%), hsl(0 72% 35%));
     --gradient-gold: linear-gradient(135deg, hsl(45 93% 58%), hsl(35 93% 45%));
@@ -37,6 +40,16 @@
   * {
     @apply border-border;
     -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Seleção de texto e cursor no tom do app, não o azul padrão do navegador. */
+  ::selection {
+    background-color: hsl(var(--accent) / 0.3);
+    color: hsl(var(--foreground));
+  }
+  input,
+  textarea {
+    caret-color: hsl(var(--accent));
   }
 
   html,
@@ -56,6 +69,12 @@
 }
 
 @layer components {
+  /* Rótulo de seção dentro de uma página. Inter, não Bebas: o spec (§12.1) reserva o display pra
+     título de página e número grande — em rótulo pequeno ele competia com os dois. */
+  .section-title {
+    @apply text-[15px] font-semibold leading-snug text-foreground;
+  }
+
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-primary text-primary-foreground font-semibold shadow-glow transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
   }
@@ -77,8 +96,18 @@
     @apply w-full rounded-xl border border-border bg-input px-3.5 text-base text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors;
   }
 
+  /* O app é desenhado pro celular. Em tablet/computador o conteúdo parava de ter forma — cartões e
+     o botão principal esticavam de ponta a ponta. O padding lateral cresce pra centralizar uma
+     coluna de no máximo 30rem, mas a área de rolagem continua da largura toda (a roda do mouse
+     funciona em qualquer ponto da tela). No celular, max() cai no 1.25rem de sempre. */
   .page-container {
-    @apply flex-1 overflow-y-auto px-5 pt-14 pb-28 animate-bb-in;
+    @apply flex-1 overflow-y-auto pt-14 pb-28 animate-bb-in;
+    /* "backwards", não "both": com "both" a transformação final da animação (identidade) ficava
+       aplicada pra sempre, e qualquer transform — mesmo neutro — faz o container virar a referência
+       de elementos `position: fixed` dentro dele. A barra "Confirmar" do Agendar ficava presa ao
+       conteúdo e rolava junto, em vez de ficar parada na tela. Visualmente o fim é idêntico. */
+    animation-fill-mode: backwards;
+    padding-inline: max(1.25rem, calc((100% - 30rem) / 2));
   }
 
   .page-title {
@@ -90,5 +119,39 @@
   .scroll-fade-x {
     mask-image: linear-gradient(to right, black 0, black calc(100% - 28px), transparent 100%);
     -webkit-mask-image: linear-gradient(to right, black 0, black calc(100% - 28px), transparent 100%);
+  }
+}
+
+/* Quem pediu ao sistema "reduzir movimento" não vê nada se deslocando: as entradas (que sobem e
+   escalam) viram um esmaecimento curto — a tela ainda mostra que mudou, só sem o movimento — e o
+   que se mexe sem informar nada (pulso, brilho do skeleton, barra crescendo) para no estado final.
+   Transições de cor/opacidade continuam: são resposta ao toque, não movimento. */
+@media (prefers-reduced-motion: reduce) {
+  .page-container,
+  .animate-bb-in,
+  .animate-bb-up,
+  .animate-bb-toast {
+    animation: bb-fade 0.2s ease-out both !important;
+  }
+  .animate-bb-pulse,
+  .animate-bb-shimmer,
+  .animate-bb-bar {
+    animation: none !important;
+  }
+  .active\:scale-95:active,
+  .active\:scale-\[0\.98\]:active {
+    transform: none !important;
+  }
+  html {
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes bb-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }

@@ -79,6 +79,6 @@ cortou os corpos das funções em 900 caracteres e duas ficaram pela metade:
   vira `completed`/`no_show`, mas não o ramo inverso. Se ele devolve o crédito ao reverter o
   status, "desfazer uma aula concluída" volta a ser possível na tela de histórico, sem precisar de
   coluna nova.
-- **`schedule_booking`** — não dá para ver com que status a aula nasce (`scheduled` ou
-  `pending_confirmation`). Hoje o app trata os dois, mas os textos ("Aguarde a aprovação do
-  professor") dependem da resposta.
+- **`schedule_booking`** — ~~não dá para ver com que status a aula nasce~~ **Respondido
+  (2026-09-28):** nasce `scheduled` (migration 0025, que substituiu esta versão) e `bookings` não tem
+  gatilho de INSERT — conferido no banco. Ver "Agendar (aluno)" no CLAUDE.md.

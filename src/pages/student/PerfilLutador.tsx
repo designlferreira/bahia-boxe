@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Sparkles, TrendingUp } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
@@ -13,7 +13,8 @@ import { BoxingProfileResultView } from "@/components/BoxingProfileResultView";
 import { BoxingProfileScoresSummary } from "@/components/BoxingProfileScoresSummary";
 import { BoxingProfileComparisonView } from "@/components/BoxingProfileComparisonView";
 import { BoxingProfilePartialNotice } from "@/components/BoxingProfilePartialNotice";
-import { getBoxingProfileAssessment, getBoxingProfileHistory, studentIdForProfile } from "@/integrations/backend/api";
+import { getBoxingProfileAssessment, getBoxingProfileHistory, markNotificationRead, studentIdForProfile } from "@/integrations/backend/api";
+import { coachAssessmentNotificationId } from "@/components/BoxingProfileHomeCard";
 
 /** Abaixo disso, refazer o teste mostra um aviso (não bloqueante) antes de seguir. */
 const RECENT_ASSESSMENT_HOURS = 24;
@@ -45,6 +46,15 @@ export default function StudentPerfilLutador() {
   // de assumir a linha mais recente.
   const latest = history?.find((a) => a.assessmentType === "self");
   const latestCoach = history?.find((a) => a.assessmentType === "coach");
+  // Abrir esta tela = ver a avaliação do professor. Marca o aviso como lido pra Home parar de
+  // destacar "Seu professor te avaliou" (e o sino junto — é o mesmo aviso).
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!latestCoach || !profile) return;
+    markNotificationRead(coachAssessmentNotificationId(latestCoach.id)).then(() =>
+      queryClient.invalidateQueries({ queryKey: ["notifications", profile.id] }),
+    );
+  }, [latestCoach?.id, profile?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const isRecent = latest
     ? Date.now() - new Date(latest.completedAt).getTime() < RECENT_ASSESSMENT_HOURS * 60 * 60 * 1000
     : false;
@@ -107,7 +117,7 @@ export default function StudentPerfilLutador() {
           pra comparar ainda) em vez de escondê-la atrás de um botão. */}
       {!isLoading && !isError && !latest && latestCoach && (
         <>
-          <BoxingProfileScoresSummary assessment={latestCoach} heroLabel="Leitura do seu professor" radarHeading="RADAR" />
+          <BoxingProfileScoresSummary assessment={latestCoach} heroLabel="Leitura do seu professor" radarHeading="Radar" />
           <BoxingProfilePartialNotice text="Por enquanto, este resultado usa só a avaliação do seu professor. Assim que você fizer sua autoavaliação, o combinado passa a considerar as duas leituras." />
           <Button className="w-full" onClick={goToQuestionnaire}>
             <Sparkles className="h-4 w-4 mr-1.5" /> Descobrir meu perfil

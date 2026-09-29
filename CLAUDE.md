@@ -46,6 +46,26 @@ Portanto:
 
 ## Fluxo de branches
 
+**O Lucas não é dev.** Nunca assumir que ele sabe quando/como rodar um
+comando local. Toda vez que uma tarefa exigir uma ação na máquina dele (`git
+pull`, `git push`, `npm install`, `npm run dev`, copiar `.env`, etc.), dar o
+passo a passo explícito e completo — qual comando, em qual pasta, o que
+esperar de resultado — nunca só dizer "dá um pull" ou "roda o install" sem o
+comando pronto pra copiar.
+
+**Cópia local CONCLUÍDA (2026-09-28).** Duas pastas, um `.git` compartilhado
+via worktree:
+- `C:\Users\lfluc\Projetos\BahiaBoxe` — branch `dev`, com `.env` configurado
+  (projeto Supabase `jduthhmobwxhqamiepax`) e `npm run dev` já testado
+  rodando em `http://localhost:5173/`. É aqui que o trabalho local acontece.
+- `C:\Users\lfluc\Projetos\BahiaBoxe-main` — branch `main`, sem servidor
+  local, só para consulta/comparação.
+
+A partir de agora existem DUAS origens possíveis de mudança — esta sessão e
+a máquina do Lucas — e ele é quem decide quando sincronizar uma com a outra,
+mas só decide bem se o comando exato (`git pull`/`git push`, em qual das
+duas pastas) vier junto, seguindo a regra acima.
+
 - Trabalhe sempre na branch "dev". Antes de começar qualquer tarefa, confirme
   com "git branch" que está nela.
 - Nunca faça commit, push ou merge direto na "main".
@@ -110,10 +130,13 @@ Existem DOIS fluxos de agendamento coexistindo, selecionados pela flag
   - **Onde se calcula "aulas restantes" hoje**: RPC
     `available_credits_for_student` (canônica, soma todos os pacotes `active`
     do aluno menos reservas futuras) via `creditsAvailableFor()` em `api.ts`;
-    espelhada em lote por `creditsByStudent()` no mesmo arquivo (mesma
-    fórmula, evita N chamadas de RPC em listas); progresso de UM pacote
-    (`total_classes - used_classes`) via `packageProgressPct()` em
-    `packageUtils.ts`.
+    progresso de UM pacote (`total_classes - used_classes`) via
+    `packageProgressPct()` em `packageUtils.ts`. **Atualização (2026-09-28):**
+    isso é "créditos para AGENDAR", não "aulas restantes" — na recorrência dá 0
+    por construção. As telas de professor (painel, "Alunos em risco", lista de
+    alunos) mostram aulas RESTANTES (total − usadas, `saldo_pacotes` na
+    recorrência); `creditsByStudent()` foi removida (ver seção "Painel do
+    professor" no fim do arquivo).
 
 - **RECORRENCIA** (novo): o professor define dias e horários fixos no perfil de
   cada aluno e gera pacotes de aulas a partir disso.
@@ -2200,6 +2223,368 @@ esse arquivo-base, não o conceito em si.
 Nada disso chegou a ser commitado — toda a implementação (Story B incluso) foi revertida do working
 tree antes de qualquer commit, sem impacto em produção. Nenhuma migration foi criada em nenhum
 momento (a feature era 100% front-end desde o plano original).
+
+### Home do aluno: rodadas de crítica de design, sugestão de horário e segurança de `bookings` (2026-09-28)
+
+Sessão de design da Home do aluno (`src/pages/student/Home.tsx`) com o skill `/impeccable`: 6
+críticas (nota 23 → 25 → 25 → 27 → 26 → 27 de 40), cada achado corrigido em um commit próprio na
+`dev`, um passo por vez, com push só depois do ok do Lucas. Relatórios em `.impeccable/critique/`
+(um por rodada); contexto de produto em `PRODUCT.md` (raiz). Não repetir aqui o que os commits já
+contam — só o que é decisão, fato do banco ou armadilha.
+
+**Página de amostras `/dev/amostras` (`src/dev/Amostras.tsx`).** Renderiza a Home real em ~10
+situações com dados inventados, sem login e sem Supabase (QueryClient pré-preenchido + perfil falso
+via `AuthContext`, exportado só pra isso). Só existe em `npm run dev`: `main.tsx` a importa atrás
+de `import.meta.env.DEV` — conferido que não entra no build. É o jeito de revisar UI sem credencial.
+**Armadilha já paga:** amostra precisa imitar o que o banco produz de verdade. Uma amostra "pacote
+ativo com 0 aulas" (estado que o banco nunca gera — usar a última aula muda o pacote pra
+`finished`, 0001:498) escondeu uma regressão: aluno veterano com pacote terminado via as
+boas-vindas de aluno novo. Corrigido com `lastPackage` em `getStudentHome`.
+
+**Decisões do Lucas nesta sessão (não reabrir sem ele):**
+- Cartão de saldo: número grande = **aulas restantes no pacote** (total − usadas), não "créditos
+  para agendar". Pro aluno, a frase de baixo só diz o que ainda dá pra agendar.
+- Arquétipos do Perfil de Boxe: nome em inglês **com tradução em português embaixo**
+  (`FIGHTER_PROFILE_GLOSS_PT`, traduções sugeridas pelo Claude, aceitas sem ajuste).
+- Um verbo só pro aluno pedir aulas: **"Pedir"**. Link "Pedir mais aulas" no alerta de poucas aulas,
+  mesmo antes de acabar — o professor é avisado na aprovação (ver abaixo).
+- Recusar sugestão de horário **registra a recusa** (aula fica `rejected`) e tem "Desfazer".
+- Brilho vermelho dos botões primários mantido: é identidade definida no spec.
+- Canal do aluno com o professor: **WhatsApp**, guardado por professor (0032, ver abaixo).
+
+**Fato do banco: `approve_purchase_request`** (lida via `pg_get_functiondef` — não está nas
+migrations deste repo). Aprovar um pedido **encerra o pacote ativo do aluno**:
+- pedido de pacote → `assign_package_from_template` → fecha os ativos **não-trial**;
+- pedido de **aula avulsa** → `update packages set status='finished' where status='active'`,
+  **sem filtro de origem: fecha também a aula experimental**, e insere um pacote de 1 aula sem
+  passar por `_create_package`.
+As aulas já agendadas não se perdem (a conclusão debita do pacote novo pela busca "mais antigo
+ativo com vaga"); o que se perde é o que sobrava pra agendar. `Pedidos.tsx` agora mostra quantas
+aulas o aluno perderia e pede confirmação antes de aprovar (`classesLostOnApprove`).
+**Decidido pelo Lucas e corrigido na 0031:** aprovar aula avulsa **não** encerra a aula experimental (ver abaixo).
+
+**Fato do banco: o que o aluno pode alterar em `bookings`** (`pg_policies`,
+`information_schema.column_privileges`, lidos em 2026-09-28). Única policy de UPDATE do aluno,
+`bookings_student_update`: USING = aula dele, `status = 'scheduled'`, início ≥ 6h; WITH CHECK =
+status novo `scheduled`/`cancelled` e, se não for cancelamento, horário igual a um
+`availability_slot` publicado. O grant de UPDATE pra `authenticated` cobre **todas** as colunas.
+Dois problemas saíram disso:
+1. **Aceitar/recusar sugestão nunca funcionaram** pro aluno: eram UPDATE direto numa aula
+   `rejected_with_suggestion`, fora do USING — 0 linhas afetadas, sem erro, e o app mostrava uma
+   mensagem enganosa. (A spec original listava essa tela como débito; ela foi construída sem
+   nunca ter passado pela RLS.)
+2. **Furo de crédito:** o aluno podia cancelar gravando `cancelado_por = 'professor'` (nunca
+   consome na recorrência), mover a aula de horário sem aprovação, ou mexer em
+   `pacote_id`/`cadeia_id`/`teacher_note` — tudo pelo cliente, fora do app.
+
+**Migration 0030 (`0030_sugestao_rpcs_e_guarda_update_aluno.sql`) — APLICADA e VERIFICADA
+(2026-09-28), 8/8 OK em `supabase/verify_0030_sugestao_e_guarda.sql`** (transação com rollback,
+testa como aluno e como professor trocando `role` e `request.jwt.claims`):
+- RPCs `aceitar_sugestao` / `recusar_sugestao` / `desfazer_recusa_sugestao`, `security definer`,
+  com checagem de posse e de estado. Aceitar exige aula disponível
+  (`available_credits_for_student`) e traduz a colisão da 0028 em `slot_taken`. Recusar guarda o
+  horário sugerido nas colunas `suggested_*` (a aula fica `rejected` com elas preenchidas), então
+  desfazer não recebe horário do cliente.
+- Trigger `_guarda_update_booking_pelo_cliente` (BEFORE UPDATE): quando a escrita vem direto do
+  cliente (`current_user` ∈ `authenticated`/`anon`) e quem escreve **não** é o professor dono da
+  aula, só aceita cancelar (`scheduled` → `cancelled`, sem mexer em outra coluna) e **carimba
+  `cancelado_por = 'aluno'`**. RPCs passam direto porque, em `security definer`, `current_user` é
+  o dono da função.
+- **Consequência de crédito, deliberada:** cancelamento pelo aluno deixa de gravar NULL. No
+  autosserviço não muda nada (quem manda é o ledger); na recorrência, cancelar passa a consumir
+  crédito se `falta_consome_credito` — que é a regra documentada em "Crédito — regra única". O NULL
+  anterior caía no `else 0` da whitelist da 0013 (fail-open). **Se o aluno de recorrência deveria
+  poder cancelar é a decisão da Etapa 8 — continua em aberto; a 0030 manteve o comportamento de
+  permitir.**
+- Os dois triggers antigos de `bookings` (`trg_validate_booking_status_time`,
+  `trg_prevent_future_completed`) não estão neste repo e não foram lidos; o script de verificação
+  passou por eles sem erro nas transições usadas.
+
+**Lição pra próxima sessão:** toda escrita do aluno em `bookings` precisa ir por RPC — desde a
+0034 inclusive cancelar. Um UPDATE direto novo do lado do aluno vai ser barrado pela guarda da 0030
+(erro `not_allowed`) — isso é intencional, não um bug a contornar abrindo a guarda.
+
+**Migrations 0031–0034 (2026-09-28) — todas APLICADAS e VERIFICADAS por script com rollback.**
+Mesmo formato da 0030: arquivo em `supabase/migrations/`, script `supabase/verify_00NN_*.sql` que
+testa como aluno e como professor trocando `role`/`request.jwt.claims`. **Atenção ao aplicar:**
+duas vezes nesta sessão o script de verificação foi rodado antes da migration (erro "function ...
+does not exist"); a migration fica em `supabase/migrations/`, o script direto em `supabase/`.
+
+- **0031 — aula avulsa preserva a experimental.** Decisão do Lucas. `approve_purchase_request` (corpo
+  copiado do banco) passa o ramo de aula avulsa por `_create_package(..., 'purchase', 'single')`, o
+  caminho único da decisão 6, que fecha só os ativos não-trial. A linha criada é a mesma de antes.
+  `Pedidos.tsx` deixa de contar a experimental como aula perdida. Verify: 4/4 OK.
+- **0032 — WhatsApp do professor.** Decisão do Lucas: o canal do aluno com o professor é o WhatsApp,
+  **por professor** (produto multi-professor, cada um com a própria marca — nunca fixo no código).
+  `profiles.whatsapp` (só dígitos, CHECK 10–15), RPC `whatsapp_do_professor` no padrão de
+  `modo_agendamento_efetivo` (o aluno não lê `profiles` do professor), preenchido com
+  +55 11 94703-4983 só porque havia um único professor sem número. Editável em Configurações
+  (`src/lib/whatsapp.ts` normaliza). Aparece na Home do aluno como "Falar com o professor" (link
+  wa.me com o primeiro nome do aluno, sem citar marca) e no detalhe da aula quando faltam < 24h.
+  Sem número cadastrado, nada aparece.
+- **0033 — aluno de recorrência pede remarcação.** Decisões do Lucas: pode pedir pra **qualquer**
+  hora cheia livre do professor entre **06h e 22h** (São Paulo), **todos os dias**, com **24h** de
+  antecedência (da aula e do horário novo); o pedido fica **pendente até o professor aprovar**; **um
+  pedido pendente por aula**; o aluno **pode cancelar o próprio pedido**.
+  - O pedido é uma linha nova `pending_confirmation` ligada à original (replacement_for_booking_id,
+    cadeia_id e pacote_id herdados) — reserva o horário na constraint da 0028. A original segue
+    `scheduled` até a decisão.
+  - `aprovar_remarcacao` = o que `reagendar_aula` faz (original -> `rescheduled`, pedido ->
+    `scheduled`, ressincroniza `used_classes`).
+  - **Recusar ou cancelar o pedido tira ele da cadeia** (replacement_for_booking_id = null,
+    cadeia_id = o próprio id, pacote_id = null). Obrigatório: ligado, ele viraria o terminal da
+    cadeia e `calcular_saldo_pacote` aplicaria a regra de crédito ao pedido, não à aula real.
+  - Funções auxiliares (`_desligar_pedido_da_cadeia`, `_original_para_remarcacao`,
+    `_inicio_hora_sp`) com REVOKE, como `_create_package` — `_desligar_...` não checa quem chama.
+  - No app: `approveBooking`/`rejectBooking` reconhecem "pendente com antecessor" e chamam as RPCs
+    (só mudar o status deixaria a original e a nova agendadas juntas). Numa recusa de remarcação a
+    sugestão de horário é ignorada. `VinculoAula` ganhou `pedido_remarcacao` ("Pedido de remarcação").
+  - O detalhe da aula do aluno (`getBookingDetail`) passou a ler a aula da TABELA: a view
+    `booking_history_app` não expõe `pacote_id`/`replacement_for_booking_id`.
+  - Verify: 11/11 OK.
+- **0034 — o aluno cancela a própria aula por RPC.** Bug anterior à sessão: a policy do aluno só
+  alcança `scheduled`, então cancelar uma aula **pendente** (autosserviço, antes da aprovação)
+  nunca funcionou e o app culpava o prazo de 6h. `cancelar_minha_aula`: pendente cancela até o
+  início; agendada até 6h antes; grava `cancelado_por = 'aluno'`; na recorrência ressincroniza o
+  pacote; se for pedido de remarcação, desiste do pedido. Verify: 3 OK + 1 AVISO (o caso "< 6h" não
+  montou a aula de teste porque o horário real estava ocupado).
+
+**Etapa 8, parcialmente decidida:** o aluno de recorrência **pode pedir remarcação** (0033) e
+**continua podendo cancelar** (comportamento de sempre, agora pela 0034, consumindo crédito se o
+pacote tiver `falta_consome_credito`). O `aviso_ausencia` original da Etapa 8 não foi implementado
+nem rediscutido.
+
+### Painel do professor: redesenho por crítica de design (2026-09-28) — sem migration nova
+
+Três críticas `/impeccable` do painel (`src/pages/admin/Dashboard.tsx`): **20 → 27 → 30 de 40**.
+Relatórios em `.impeccable/critique/*admin-dashboard*`. Tudo só de frontend (nenhuma migration),
+um passo por commit na `dev`, cada um testado pelo Lucas. Não repetir aqui o que os commits contam.
+
+**Estrutura do painel (decisões do Lucas — não reabrir sem ele):**
+- **"Hoje" primeiro**, como destaque: aula em andamento ou próxima (contagem "em 40 min", relógio de
+  1 min), resto do dia abaixo, passadas apagadas. "Dia livre" + "Próxima aula" quando não há mais
+  aula hoje. Os quadrinhos "Hoje N aulas"/"Alunos N ativos" **saíram** (decisão explícita).
+- **"Resolver agora" logo abaixo** (não acima — decisão explícita): grupos recolhíveis que lembram
+  na sessão se estavam abertos (`sessionStorage`, `painel.grupo.*`):
+  - pedidos de horário (Aprovar/Recusar via `usePendingActions`);
+  - aulas sem registro (Aconteceu/Faltou via `useLessonActions`) e **"Todas aconteceram"** (2+ aulas;
+    confirma listando; registra uma por vez — várias podem ser do mesmo pacote; um só "Desfazer");
+  - pedidos de aulas (link para Solicitações);
+  - o que **falta configurar** (WhatsApp sempre; horários e pacotes só no autosserviço) — continua
+    aparecendo depois do primeiro aluno. Sem aluno nenhum, os mesmos passos viram "Comece por aqui"
+    (+ "Convidar o primeiro aluno"), com "N de M passos feitos".
+- Tocar numa aula "Sem registro" na agenda de hoje **leva ao item** em "Resolver agora" (abre o
+  grupo, rola, destaca, foca "Aconteceu"); se o item não estiver lá, abre o detalhe.
+- Foco: resolver um item leva o foco pro próximo item/título do grupo/"Resolver agora"/"Hoje" —
+  nunca pro começo da página. Os avisos (Sonner) já são `aria-live`; Alt+T alcança o "Desfazer".
+- "Alunos em risco" = pacote acabando (≤2 restantes) ou 2 faltas seguidas; máx. 3 no painel;
+  "Ver todos" abre `/admin/alunos?filtro=risco` (filtro na URL).
+
+**Registrar aula (decisões do Lucas, valem no painel, na Agenda e no detalhe da aula):**
+- **"Aconteceu" registra direto, sem janela** — tem "Desfazer" no aviso e o botão permanente
+  "Desfazer conclusão" no detalhe. Não recolocar a confirmação.
+- **"Faltou" só confirma quando a falta DESCONTA aula** (ou quando a regra não pôde ser lida).
+- Botões se chamam **"Aconteceu"/"Faltou"** em todas as telas (antes "Concluir"/"Falta").
+
+**Bug de texto corrigido — a janela prometia a regra errada:** a janela de falta lia sempre
+`profiles.no_show_consumes_class`. A regra real (`getRegraDeConsumo`, `api.ts`) espelha o banco:
+- aula com `pacote_id` → `coalesce(pacote.falta_consome_credito, configuração)` (decisão 3) — vale
+  pra falta e pra "o aluno cancelou";
+- sem pacote: falta segue a configuração; **reposição nunca desconta** (`mark_no_show`, 0020);
+  **cancelamento nunca desconta** (`cancelar_aula` não lança nada no ledger).
+Qualquer texto novo sobre "desconta ou não" deve sair dessa função, nunca da configuração direto.
+
+**Cor com significado (decisão do Lucas) e selo único:**
+- `StatusBadge` (`src/components/StatusBadge.tsx`) é o ÚNICO selo de status — as 9 telas que
+  montavam o seu passaram a usá-lo. Não montar `<Badge className={cfg.badgeClass}>` de novo.
+- **"Concluída" = neutro com ✓** (era dourado, quase igual ao âmbar no selo pequeno). **Âmbar = depende
+  do professor** ("Sem registro", "Pendente"). Vermelho = falta/recusa. **Dourado = ação positiva**
+  (botão `variant="soft"`: Aconteceu/Aprovar — sem o brilho vermelho, que fica pra UMA ação
+  principal por tela). Horários futuros em branco, não dourado.
+- **"Sem registro"** é o nome de aula `scheduled` que já passou, em todas as telas (antes a Agenda
+  dizia "Aguardando confirmação").
+
+**"Restantes", não "créditos", nas telas do professor:** "créditos para agendar"
+(`available_credits_for_student`) desconta as aulas já marcadas — na recorrência dá 0 por
+construção e todo aluno aparecia em vermelho. Lista de alunos, "Alunos em risco" e cartão do aluno
+mostram **aulas restantes** (total − usadas; `saldo_pacotes` na recorrência, número e "usadas").
+`creditsByStudent()` foi removida (único uso era a lista).
+
+**Página de amostras:** ganhou o painel em 4 situações e a lista de alunos. Em dev, cada conjunto de
+dados de exemplo fica em `window.__amostrasAdmin` (o StrictMode cria dois por conjunto — usar o que
+tem observador) para simular "item resolvido" pelo console.
+
+**Deixado para depois (registrado, não pedido):** desfazer uma remarcação aprovada (precisaria de
+RPC nova); "há N dias" ao lado de aula sem registro; "Convidar o primeiro aluno" abrir o convite
+direto em vez da lista.
+
+### Agenda do professor: duas rodadas de crítica (2026-09-28) — sem migration nova
+
+`src/pages/admin/Agenda.tsx`: críticas **22 → 27 de 40**, depois mais 5 correções (relatórios em
+`.impeccable/critique/*admin-agenda*`). Mesma disciplina do painel: um passo por commit, testado
+pelo Lucas. As regras de cor, `StatusBadge`, "Aconteceu"/"Faltou" e `getRegraDeConsumo` da seção
+anterior valem aqui igualmente.
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Semana de segunda a domingo** (`startOfWeek`, `weekStartsOn: 1`), não "os próximos 7 dias". Botão
+  **"Hoje"** quando fora de hoje; trocar de semana mantém o dia da semana. Setas e período numa linha
+  própria, pros 7 dias caberem na largura (44px cada) sem rolagem.
+- **Botões no cartão só quando a aula pede ação:** pedido pendente (Aprovar/Recusar) e aula passada
+  sem registro (Aconteceu/Faltou). Aula futura ou já registrada só mostra (nome, horário, selo, ›);
+  Remarcar, Cancelar e "Marcar como reposição" ficam no **detalhe da aula** (`AulaDetalhe.tsx`).
+- **Pendência fora da semana na tela vira uma linha com atalho** acima dos dias ("1 aula sem registro
+  na semana passada ›" / "… depois desta semana ›") — resolve o ponto cego da segunda-feira.
+
+**Estrutura e armadilhas:**
+- O cartão **não é um botão** — só o cabeçalho (nome/horário/selo) abre o detalhe. Antes o cartão
+  inteiro era `<button>` com as ações dentro (HTML inválido). Não voltar a envolver ações num botão.
+- Coluna do cartão e bloco de texto precisam de `min-w-0`: sem isso uma etiqueta de vínculo ou a linha
+  "de → para" empurrava o cartão pra fora da tela (regressão real, corrigida no mesmo dia).
+- `getAdminAgendaForDay` mostra **uma aula por hora** e agora **exclui recusadas**
+  (`rejected`/`rejected_with_suggestion`, além de `cancelled`/`rescheduled`): uma recusada podia
+  esconder a aula real do mesmo horário. Havendo mais de uma na hora, a ativa ganha.
+- Bolinhas marcam aula sem registro **e** pedido pendente (`getPedidosPendentes`, chave
+  `agenda-pedidos-pendentes` — invalidada também pelo painel).
+- Estados de tempo: `StatusBadge` ganhou **"Agora"** (aula em andamento); pedido cujo horário já
+  começou mostra "O horário deste pedido já passou."; horários livres que já começaram (hoje) ou de
+  dias passados não aparecem.
+- Dia vazio: aviso próprio; "Publicar horários" só no autosserviço e em dia que não passou.
+- `formatQuando` (`dateUtils.ts`) é a data de começo de linha ("Amanhã, 07:00" / "Terça-feira,
+  06 out · 07:00"), usada pelo painel e pela agenda. Variant `destructive` do botão usa `--red-text`
+  (o vermelho puro dava 4,0:1).
+
+**Página de amostras:** a agenda está lá com ±3 semanas de dados (hoje com todos os estados, amanhã
+com pedidos, depois de amanhã sem horários). Os horários de hoje são relativos à hora atual — tarde da
+noite, as aulas "futuras" aparecem como passadas.
+
+**Deixado para depois (sugerido pela crítica, não pedido):** "Todas aconteceram" também na agenda;
+"ir para data"; tocar num horário livre pra marcar aula ali.
+
+### Agendar (aluno): rodada de crítica (2026-09-28) — sem migration nova
+
+`src/pages/student/Agendar.tsx`: crítica **24/40** (relatório em `.impeccable/critique/*student-agendar*`),
+seis passos na `dev`, testados pelo Lucas.
+
+**FATO DO BANCO (conferido pelo Lucas em 2026-09-28, não é suposição): a aula do autosserviço já
+nasce CONFIRMADA.** `schedule_booking` (0025) grava `status = 'scheduled'`, e `bookings` não tem
+nenhum gatilho de INSERT — os três gatilhos (`trg_guarda_update_booking_pelo_cliente`,
+`trg_prevent_future_completed`, `trg_validate_booking_status_time`) são todos BEFORE UPDATE. Todas as
+aulas com `slot_id` estavam `completed`, nenhuma `pending_confirmation`. Consequências:
+- O aviso depois de confirmar NÃO fala em aprovação ("Aula agendada · Amanhã, 19:00").
+- Hoje o "Aprovar/Recusar" do painel e da agenda só recebe **pedido de remarcação** (0033). O caminho
+  de aprovar um "novo horário" do autosserviço continua no código, mas nada o alimenta — não remover
+  sem decisão; só não escrever texto novo supondo que o aluno espera aprovação.
+- Resolve a dúvida registrada em `supabase/README.md` ("não dá para ver com que status a aula nasce").
+
+**Decisões do Lucas:**
+- A tela **abre no primeiro dia com horário livre** (senão, amanhã). Antes abria sempre em depois de
+  amanhã (`useState(1)` com a lista já começando amanhã).
+- **Horários ocupados não aparecem** pro aluno — só os livres.
+- Vocabulário: "Você pode agendar mais N aulas" (nunca "crédito(s) disponível(is)").
+
+**O que mudou e armadilhas:**
+- Horários da semana numa busca só: `getAvailableSlotsForDays` (chave `available-slots-semana`,
+  agrupado por dia "yyyy-MM-dd" em São Paulo). A faixa de dias é a mesma da agenda do professor
+  (7 dias na largura, ponto nos dias com horário, número apagado nos sem), com o dia por extenso e a
+  contagem embaixo.
+- Sem aula para agendar (`credits === 0`), a tela inteira vira um aviso com o motivo — todas
+  agendadas / aulas acabaram ("Pedir mais aulas"), nunca teve pacote ("Pedir pacote"), pedido já com
+  o professor (sem botão). Antes deixava escolher e só errava no "Confirmar".
+- Dia sem horário aponta o próximo dia que tem ("Ver Quinta-feira, 01 out"), em botão secundário
+  (`EmptyState` ganhou `ctaVariant`).
+- **Armadilha resolvida, vale pro app inteiro:** `.page-container` usava `animation-fill-mode: both`;
+  a transformação final (identidade) ficava aplicada e transformava o container na referência de
+  qualquer `position: fixed` dentro dele — a barra "Confirmar" rolava junto com a lista. Agora é
+  `backwards` (`index.css`). Não voltar pra `both`, e desconfiar de qualquer `transform`/`filter`
+  permanente num ancestral de elemento fixo.
+- `PageHeader`: foco visível no voltar; subtítulo 13px (vale pra todas as telas que o usam).
+
+### Detalhe da aula (professor e aluno): rodada de crítica (2026-09-29) — migration 0035
+
+`src/pages/admin/AulaDetalhe.tsx` (crítica **24/40**) e `src/pages/student/AulaDetalhe.tsx` (**25/40**),
+relatórios em `.impeccable/critique/*auladetalhe*`. Sete passos na `dev`, testados pelo Lucas. As duas
+telas estão na página de amostras (professor: 4 situações; aluno: 4).
+
+**Migration 0035 (`0035_cancelar_desconta_aula.sql`) — APLICADA e VERIFICADA (4/4 OK,
+`supabase/verify_0035_cancelamento_desconta.sql`):** `cancelamento_desconta_aula(p_booking_id)`,
+`security definer`, só leitura, só a aula do aluno logado (`not_allowed` pra outro). Aula com
+`pacote_id`: `coalesce(pacote.falta_consome_credito, profiles.no_show_consumes_class, true)` — o que
+`calcular_saldo_pacote` aplica a "cancelada pelo aluno"; sem pacote (autosserviço): `false` (cancelar
+nunca lança nada no ledger). O aluno não lê `profiles` nem a cópia da regra, por isso uma função só com
+a resposta (mesmo padrão de `whatsapp_do_professor`).
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Aluno a menos de 6h de aula agendada:** o botão "Cancelar aula" **sai** e entra o quadro "Faltam
+  menos de 6 horas" com o botão do **WhatsApp** do professor — recorrência **e** autosserviço.
+  `cancelar_minha_aula` (0034) já recusava; o botão só errava depois de confirmar. Pedido pendente
+  continua cancelável até o início.
+- **Janela de cancelar do aluno (recorrência) diz a consequência:** "Pela regra do seu pacote, cancelar
+  desconta 1 aula" / "não desconta aula" (0035).
+- **Detalhe do professor, aula passada sem registro:** só **Aconteceu/Faltou** + botão **"Outras
+  ações"** (abre Remarcar, Cancelar aula e "Marcar como reposição"). Aula futura mantém as três à vista.
+- **Pedido pendente no detalhe do professor tem Aprovar/Recusar** (`usePendingActions`, com o "Antes:"
+  riscado) — antes era beco sem saída pra quem chegava por notificação.
+- **Detalhe do aluno segue o momento da aula:** com pedido de outro horário pendente o quadro sobe pra
+  logo abaixo da data e o selo ganha "Pedido em análise"; depois da aula o recado do professor vem
+  primeiro e endereço/chegada/equipamento/orientações saem.
+
+**Armadilhas e detalhes:**
+- `getAdminBookingDetail` devolve `antecessorInicio` e **não conta o pedido ainda pendente** em
+  "Remarcada Nx" (o pedido entra na cadeia ao ser feito — 0033 —, contá-lo mostrava "Remarcada 1x"
+  antes de qualquer aprovação). `vinculoPorAntecessor` foi removida; use `antecessores()`.
+- `RescheduleSheet` (professor) abre no primeiro dia em que a hora da aula ainda é futura e não é a
+  própria aula ("Atual: …"), rola até o dia/hora escolhidos, apaga as horas passadas de hoje. **Não**
+  marca horários livres/ocupados (exigiria consulta por dia; o banco já recusa colisão com mensagem
+  legível) — ficou de fora.
+- Avisos do professor sem a palavra "crédito" ("o aluno não perde a aula", "não desconta outra aula").
+- Seções do detalhe do aluno são `<h2>` de verdade; `RemarcacaoSheet` tem "Tentar de novo" no erro.
+- O `CancelLessonSheet` e o botão "Cancelar aula" usam a variant `destructive` (não `!text-destructive`).
+
+**Deixado para depois (registrado, não pedido):** marcar horários livres/ocupados na janela Remarcar do
+professor; pontos nos dias com horário livre na janela "Pedir outro horário" do aluno; confirmação em
+"Cancelar pedido" do aluno.
+
+### Entrada: convite e criar conta — rodada de crítica (2026-09-29) — sem migration nova
+
+`Convite.tsx`, `CriarConta.tsx`, `ConfirmarEmail.tsx`: crítica **~18/40** no caminho do convite (a revisão
+leu só o código; a varredura mediu as telas). Relatório em `.impeccable/critique/*convite*`. Cinco passos
+na `dev`. As quatro telas estão na página de amostras ("Entrada"), sem sessão (`SemLogin`).
+
+**FATO DO PAINEL DO SUPABASE (informado pelo Lucas em 2026-09-29): "Confirm email" está ATIVO.** Toda
+conta nova nasce **sem sessão** até o aluno abrir o link do e-mail. Consequência que era um erro real: o
+Convite chamava `supabase.auth.signUp` direto e seguia para `accept_invite` (que exige usuário logado)
+sem sessão — falhava no meio, deixando **conta criada e convite não usado** (e "já cadastrado" na segunda
+tentativa). Corrigido:
+- `Convite` usa `signUpWithPassword` (o mesmo de Criar conta, que já tratava `needs_confirmation`).
+- Sem sessão: o token vai para `localStorage` (`src/lib/convitePendente.ts`) e o aluno segue para
+  `/confirmar-email?…&convite=1`. **O `AuthProvider` conclui o convite** (`acceptInvite`) assim que há
+  usuário logado — pelo link do e-mail ou por login normal —, e limpa o token de qualquer jeito (convite
+  usado/expirado não tenta de novo a cada abertura).
+- Aluno que já tem conta: erro "Já existe uma conta…" + "Entrar com esta conta"; o convite fica guardado e
+  conclui no login.
+- **Não desfazer:** qualquer fluxo que dependa de sessão logo depois de `signUp` está errado neste
+  projeto.
+- ⚠️ Alunos convidados ANTES da correção podem ter conta sem vínculo com o professor. Se aparecerem,
+  preparar uma consulta para achá-los e ligá-los (não foi feito; nenhum caso relatado até agora).
+
+**Decisões do Lucas:**
+- **Sem o nome do professor no convite** ("seguir só com o texto"): `validate_invite` devolve só
+  `(is_valid, reason)` e quem abre o link não tem login (`supabase/README.md`). Texto: "Seu professor
+  convidou você… agende suas aulas e acompanhe seu pacote por aqui."
+- Convite e Criar conta usam **um formulário só** (`ContaForm`): regras da senha ao vivo com ✓ e texto
+  pro leitor de tela, "Mostrar senha", confirmar, erro por campo, autocomplete, e o botão desativado
+  explica o porquê. Não voltar a duplicar o formulário.
+- Convite inválido diz o que fazer ("Peça um novo link ao seu professor" + "Já tenho conta · Entrar"),
+  usa `reason` só para escolher a frase (o valor vem do banco, não está no repositório — genérica quando
+  não reconhece) e **falha de conexão é "SEM CONEXÃO" com "Tentar de novo"**, nunca "CONVITE INVÁLIDO".
+- "Confirme seu e-mail": instrução + dica do spam desde o início; **"Já confirmei, entrar" é o botão
+  principal**, "Reenviar" o secundário; vindo de convite, avisa que conclui sozinho e esconde "Usar outro
+  e-mail".
+- Botão desativado mantém a aparência global (opacity 50%): controles desativados são isentos de
+  contraste e agora a explicação é por texto. Não mexer no `Button` por causa disso.
+
+**Deixado para depois:** WhatsApp do professor na tela de convite inválido (não dá: exige login);
+"Já confirmei" verificar a confirmação de fato antes de mandar ao login.
 
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 

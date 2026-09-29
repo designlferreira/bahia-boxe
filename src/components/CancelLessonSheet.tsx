@@ -8,8 +8,11 @@ interface CancelLessonSheetProps {
   onOpenChange: (open: boolean) => void;
   booking: Booking;
   studentName: string;
-  /** Config do professor — muda só o texto, a regra quem aplica é `calcular_saldo_pacote`. */
-  noShowConsumesClass: boolean;
+  /**
+   * Se "o aluno cancelou" desconta aula — a regra DESTA aula (`getRegraDeConsumo`), não a
+   * configuração geral do professor. Muda só o texto; quem aplica é o banco. null = não deu pra ler.
+   */
+  alunoCancelarConsome: boolean | null;
   pending?: boolean;
   onConfirm: (canceladoPor: "professor" | "aluno") => void;
 }
@@ -27,7 +30,7 @@ export function CancelLessonSheet({
   onOpenChange,
   booking,
   studentName,
-  noShowConsumesClass,
+  alunoCancelarConsome,
   pending,
   onConfirm,
 }: CancelLessonSheetProps) {
@@ -50,7 +53,7 @@ export function CancelLessonSheet({
           >
             <div className="text-[15px] font-semibold text-foreground">Eu cancelei</div>
             <div className="text-[12.5px] text-muted-foreground mt-0.5">
-              O crédito do aluno é preservado — cancelamento pelo professor nunca consome aula.
+              O aluno não perde a aula — cancelamento pelo professor nunca desconta.
             </div>
           </button>
 
@@ -61,10 +64,12 @@ export function CancelLessonSheet({
             className="w-full text-left card-dark p-4 active:scale-[0.98] transition-transform disabled:opacity-50"
           >
             <div className="text-[15px] font-semibold text-foreground">O aluno cancelou</div>
-            <div className={`text-[12.5px] mt-0.5 ${noShowConsumesClass ? "text-amber" : "text-muted-foreground"}`}>
-              {noShowConsumesClass
-                ? "Pela configuração atual, o crédito desta aula será consumido."
-                : "Pela configuração atual, o crédito desta aula será preservado."}
+            <div className={`text-[12.5px] mt-0.5 ${alunoCancelarConsome ? "text-amber" : "text-muted-foreground"}`}>
+              {alunoCancelarConsome === null
+                ? "O que acontece com a aula segue a regra do pacote do aluno."
+                : alunoCancelarConsome
+                  ? "Desconta 1 aula do aluno, pela regra do pacote."
+                  : "Não desconta aula do aluno."}
             </div>
           </button>
         </div>

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Inbox } from "lucide-react";
+import { AlertTriangle, Inbox } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
@@ -21,6 +21,7 @@ export default function AdminPedidos() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [rejectTarget, setRejectTarget] = useState<{ id: string; student: string } | null>(null);
+  const [approveTarget, setApproveTarget] = useState<{ id: string; student: string; lost: number } | null>(null);
 
   const key = ["purchase-requests", profile?.id];
   const { data, isLoading, isError, refetch } = useQuery({
@@ -66,7 +67,7 @@ export default function AdminPedidos() {
 
       {!isLoading && !isError && data && data.length > 0 && (
         <div className="flex flex-col gap-2.5">
-          {data.map(({ request, studentName, template }) => (
+          {data.map(({ request, studentName, template, classesLostOnApprove }) => (
             <div key={request.id} className="card-dark p-[15px]">
               <div className="flex items-center gap-2.5 mb-3">
                 <div className="flex-1">
@@ -84,8 +85,29 @@ export default function AdminPedidos() {
                   {request.kind === "package" ? "Pacote" : "Aula avulsa"}
                 </Badge>
               </div>
+              {classesLostOnApprove > 0 && (
+                // Aprovar encerra o pacote ativo do aluno (regra do banco — ver getPurchaseRequests).
+                // Sem este aviso, o professor aprovava sem saber que o aluno perdia o que sobrava.
+                <p className="flex gap-2 items-start text-sm text-amber mb-3">
+                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
+                  <span>
+                    {studentName.split(" ")[0]} ainda tem {classesLostOnApprove}{" "}
+                    {classesLostOnApprove === 1 ? "aula" : "aulas"} no pacote atual. Aprovar agora encerra esse
+                    pacote.
+                  </span>
+                </p>
+              )}
               <div className="flex gap-2">
-                <Button size="sm" className="flex-1" onClick={() => approve.mutate(request.id)} disabled={approve.isPending}>
+                <Button
+                  size="sm"
+                  className="flex-1"
+                  onClick={() =>
+                    classesLostOnApprove > 0
+                      ? setApproveTarget({ id: request.id, student: studentName, lost: classesLostOnApprove })
+                      : approve.mutate(request.id)
+                  }
+                  disabled={approve.isPending}
+                >
                   Aprovar
                 </Button>
                 <Button
@@ -105,6 +127,20 @@ export default function AdminPedidos() {
       {!isLoading && !isError && data && data.length === 0 && (
         <EmptyState icon={Inbox} title="Nenhum pedido pendente" description="Tudo em dia por aqui." />
       )}
+
+      <ConfirmDialog
+        open={!!approveTarget}
+        onOpenChange={(o) => !o && setApproveTarget(null)}
+        title="APROVAR E ENCERRAR O PACOTE ATUAL?"
+        description={
+          approveTarget
+            ? `${approveTarget.student} ainda tem ${approveTarget.lost} ${approveTarget.lost === 1 ? "aula" : "aulas"} para usar no pacote atual. Aprovar agora encerra esse pacote e ${approveTarget.lost === 1 ? "essa aula deixa" : "essas aulas deixam"} de valer. As aulas já agendadas continuam de pé. Se preferir, aprove quando o pacote atual acabar.`
+            : ""
+        }
+        confirmLabel="Aprovar mesmo assim"
+        tone="destructive"
+        onConfirm={() => approveTarget && approve.mutate(approveTarget.id)}
+      />
 
       <ConfirmDialog
         open={!!rejectTarget}

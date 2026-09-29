@@ -63,7 +63,7 @@ function CategoryCard<T extends string>({
   return (
     <div className="card-dark p-4">
       <div className="flex items-baseline justify-between mb-3">
-        <div className="font-display text-lg tracking-wide text-foreground">{title.toUpperCase()}</div>
+        <h2 className="section-title">{title}</h2>
         <div className="text-[11.5px] text-muted-foreground">
           {stats.filled} de {total} preencheram
         </div>
@@ -98,7 +98,7 @@ function NumericCard({ title, unit, stats, total }: { title: string; unit: strin
   return (
     <div className="card-dark p-4">
       <div className="flex items-baseline justify-between mb-2">
-        <div className="font-display text-lg tracking-wide text-foreground">{title.toUpperCase()}</div>
+        <h2 className="section-title">{title}</h2>
         <div className="text-[11.5px] text-muted-foreground">
           {stats.filled} de {total} preencheram
         </div>

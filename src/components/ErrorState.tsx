@@ -13,9 +13,9 @@ export function ErrorState({
 }: ErrorStateProps) {
   return (
     <div role="alert" className="rounded-2xl border border-destructive/35 bg-destructive/10 p-6 text-center">
-      <div className="text-[14.5px] font-semibold text-destructive/90 mb-1">{title}</div>
-      <div className="text-[12.5px] text-muted-foreground mb-3.5">{description}</div>
-      <Button size="sm" onClick={onRetry}>
+      <div className="text-[15px] font-semibold text-[hsl(var(--red-text))] mb-1">{title}</div>
+      <div className="text-sm text-muted-foreground mb-4">{description}</div>
+      <Button size="sm" variant="secondary" onClick={onRetry}>
         Tentar novamente
       </Button>
     </div>
