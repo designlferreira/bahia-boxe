@@ -2760,6 +2760,38 @@ Recorrência sem WhatsApp, "Não carregou").
 professor ficam em "Minha conta" (decisão de deixar lá); campo do WhatsApp pode ser sobrescrito se outra gravação
 atualizar a tela enquanto o professor digita; nome da tela igual ao item de menu.
 
+### Disponibilidade (professor): rodada de crítica (2026-09-29) — sem migration nova
+
+`src/pages/admin/Disponibilidade.tsx` (rota `/admin/disponibilidade`; acessível por "Minha conta" e pela Agenda):
+crítica **19/40**, relatório em `.impeccable/critique/*disponibilidade*`. Seis passos na `dev`, testados pelo Lucas.
+Na página de amostras ("Disponibilidade (professor)": semana em uso, nada publicado, professor em Recorrência).
+O horizonte real é **12 semanas** (`HORIZON_WEEKS`), não 8.
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Dias sem horário viram uma LINHA compacta** (nome, "Sem horários", botão +), sem interruptor (não há o que
+  ligar; antes ligar um dia vazio dava erro) e sem o quadro tracejado repetido. Dias com horários seguem como cartões.
+- **Resumo em uma frase** ("Seg, ter e sex abertos para agendamento. Aulas já marcadas não são afetadas por
+  mudanças aqui."), no lugar do cartão dourado com "N intervalos".
+- **Em modo Recorrência, uma FAIXA âmbar explica** que a grade só vale no Autosserviço, com "Abrir Configurações";
+  **não bloqueia nada** (regra "bloquear a criação, nunca o acesso"; a decisão de não ter gate nesta tela continua).
+
+**O que mudou / armadilhas:**
+- **Falha de gravação agora avisa** (P0 da crítica): `saveSlot` não tinha `onError` (o sheet ficava aberto sem aviso),
+  `deleteSlot` também não, e o "Desfazer" (`restoreAvailabilityInterval`) não tratava erro. Agora: mensagem
+  `role="alert"` dentro do sheet, `toast.error` ao remover, e "Desfazer" com sucesso/erro.
+- **Sheet de horário:** rola até o horário escolhido ao abrir (antes o valor atual abria fora da tela), faixa 05h–22h
+  início / 06h–23h fim (madrugada só aparece se o horário JÁ existe), fins inválidos apagados, fim acompanha o
+  início (+1h), resumo vivo ("Segunda, 06:00 às 09:00 (3 horas)"), `aria-pressed`, foco visível, "Todo domingo/sábado".
+- **A lista vai de segunda a domingo** (`ordenados`), como a Agenda; o banco devolve começando no domingo.
+- Acessibilidade: nome do dia é `<h2>`; interruptor "Receber agendamentos na segunda"; lápis/lixeira com dia e
+  horário; contornos com `muted-foreground/70` e `destructive/70` (eram 1,2–1,6:1); esmaecimento do dia pausado só no
+  horário (o texto "Pausado…" tinha 3,02:1).
+- Texto: plural de verdade (`plural()`), "horário" em vez de "intervalo", "Repete toda semana · próximas 12 semanas".
+
+**Deixado para depois (registrado, não pedido):** o trilho do `Switch` desligado tem 1,28:1 (componente global; muda o
+app inteiro, então foi deixado); "copiar para outros dias" / escolher vários dias no mesmo sheet; quantas vagas
+restam por horário; traduzir mensagens cruas de erro do servidor no sheet; confirmar o anel de foco com Tab real.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
