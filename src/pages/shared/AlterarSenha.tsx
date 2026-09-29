@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { PasswordRule } from "@/components/PasswordRule";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -76,13 +77,17 @@ export default function AlterarSenha({ backTo, amostra }: { backTo: string; amos
             <Label htmlFor="current" className="mb-0">
               Senha atual
             </Label>
+            {/* Vale para os TRÊS campos, então o nome diz "senhas". Alvo de 44px (margem negativa mantém a linha do rótulo compacta),
+                foco visível e estado anunciado, como na tela de Nova senha. */}
             <button
               type="button"
               onClick={() => setShow((v) => !v)}
-              className="text-accent text-xs font-semibold flex items-center gap-1"
+              aria-label={show ? "Ocultar senhas" : "Mostrar senhas"}
+              aria-pressed={show}
+              className="text-accent text-xs font-semibold flex items-center gap-1 min-h-11 -my-3 px-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              {show ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-              {show ? "Ocultar" : "Mostrar"}
+              {show ? <EyeOff className="h-3.5 w-3.5" aria-hidden /> : <Eye className="h-3.5 w-3.5" aria-hidden />}
+              {show ? "Ocultar senhas" : "Mostrar senhas"}
             </button>
           </div>
           <Input
@@ -118,11 +123,12 @@ export default function AlterarSenha({ backTo, amostra }: { backTo: string; amos
             }}
             placeholder="Mínimo 8 caracteres"
             className="mb-3"
+            aria-describedby="regras-senha"
           />
-          <div className="flex flex-col gap-1.5 mb-3.5">
-            <Rule ok={ruleLen} label="Pelo menos 8 caracteres" />
-            <Rule ok={ruleNum} label="Pelo menos 1 número" />
-            <Rule ok={ruleUp} label="Pelo menos 1 letra maiúscula" />
+          <div id="regras-senha" className="flex flex-col gap-1.5 mb-3.5">
+            <PasswordRule ok={ruleLen} label="Pelo menos 8 caracteres" />
+            <PasswordRule ok={ruleNum} label="Pelo menos 1 número" />
+            <PasswordRule ok={ruleUp} label="Pelo menos 1 letra maiúscula" />
           </div>
 
           <Label htmlFor="confirm">Confirmar nova senha</Label>
@@ -180,15 +186,6 @@ export default function AlterarSenha({ backTo, amostra }: { backTo: string; amos
           </Button>
         </div>
       )}
-    </div>
-  );
-}
-
-function Rule({ ok, label }: { ok: boolean; label: string }) {
-  return (
-    <div className={`flex items-center gap-1.5 text-xs ${ok ? "text-accent" : "text-muted-foreground"}`}>
-      <span className="h-[5px] w-[5px] rounded-full bg-current" />
-      {label}
     </div>
   );
 }
