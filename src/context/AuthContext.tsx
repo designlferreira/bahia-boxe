@@ -7,6 +7,7 @@ import {
   signInWithPassword,
   signOut as apiSignOut,
 } from "@/integrations/backend/auth";
+import { toast } from "sonner";
 import { acceptInvite } from "@/integrations/backend/api";
 import { lerConvitePendente, limparConvitePendente } from "@/lib/convitePendente";
 import type { Profile } from "@/integrations/backend/types";
@@ -17,6 +18,9 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<Profile>;
   signOut: () => Promise<void>;
   refreshProfile: () => void;
+  /** A sessão existe mas o perfil não carregou (sem rede, servidor fora): as rotas mostram "tentar de novo" em vez de mandar para o login. */
+  loadError?: boolean;
+  retry?: () => void;
 }
 
 // Exportado só pra página de amostras de desenvolvimento (`src/dev/Amostras.tsx`) injetar um
@@ -26,24 +30,44 @@ export const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [tentativa, setTentativa] = useState(0);
+  // Para distinguir "a sessão terminou sozinha" (vencida/revogada/outra aba) de "a pessoa tocou em Sair".
+  const profileRef = useRef<Profile | null>(null);
+  const saidaManual = useRef(false);
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
     getCurrentProfile()
       .then((p) => {
-        if (active) setProfile(p);
+        if (!active) return;
+        setLoadError(false);
+        setProfile(p);
+      })
+      .catch(() => {
+        // Sessão existe mas o perfil não veio (sem rede, servidor fora): NÃO é "deslogado". Sem isto, abrir o app sem rede caía no login.
+        if (active) setLoadError(true);
       })
       .finally(() => {
         if (active) setLoading(false);
       });
     const unsubscribe = onAuthStateChange((p) => {
-      if (active) setProfile(p);
+      if (!active) return;
+      if (!p && profileRef.current && !saidaManual.current) {
+        toast("Sua sessão terminou. Entre de novo para continuar.", { id: "sessao-terminou" });
+      }
+      if (p) setLoadError(false);
+      setProfile(p);
     });
     return () => {
       active = false;
       unsubscribe();
     };
-  }, []);
+  }, [tentativa]);
 
   // Convite guardado porque a conta foi criada sem sessão (confirmação de e-mail): assim que existe um
   // usuário logado — pelo link do e-mail ou por um login normal —, conclui o convite. Limpa o token
@@ -83,11 +107,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return p;
     },
     signOut: async () => {
-      await apiSignOut();
-      setProfile(null);
+      saidaManual.current = true;
+      try {
+        await apiSignOut();
+        setProfile(null);
+        setLoadError(false);
+      } finally {
+        saidaManual.current = false;
+      }
     },
+    loadError,
+    retry: () => setTentativa((n) => n + 1),
     refreshProfile: () => {
-      getCurrentProfile().then(setProfile);
+      getCurrentProfile()
+        .then(setProfile)
+        .catch(() => {});
     },
   };
 

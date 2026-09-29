@@ -15,6 +15,7 @@ import Convite from "@/pages/auth/Convite";
 import NotFound from "@/pages/NotFound";
 import { TelaDeAbertura } from "@/components/TelaDeAbertura";
 import { FaixaSemInternet } from "@/components/FaixaSemInternet";
+import { TelaSessaoNaoCarregou } from "@/components/TelaSessaoNaoCarregou";
 
 import StudentHome from "@/pages/student/Home";
 import StudentAgendar from "@/pages/student/Agendar";
@@ -54,9 +55,10 @@ const queryClient = new QueryClient({
 });
 
 function PostLoginRedirect() {
-  const { profile, loading } = useAuth();
+  const { profile, loading, loadError } = useAuth();
   // Espera a sessão: sem isso, abrir o app já logado mandava para /login (o formulário piscava) antes da home.
   if (loading) return <TelaDeAbertura />;
+  if (!profile && loadError) return <TelaSessaoNaoCarregou />;
   if (!profile) return <Navigate to="/login" replace />;
   return <Navigate to={profile.role === "admin" ? "/admin/dashboard" : "/app/home"} replace />;
 }

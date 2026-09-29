@@ -23,7 +23,10 @@ async function loadProfile(userId: string, email: string | undefined): Promise<P
     .select("id, name, role, created_at")
     .eq("id", userId)
     .maybeSingle();
-  if (error || !data) return null;
+  // Falha (sem rede, servidor fora, token em renovação) NÃO é "sem perfil": tratar as duas como null jogava a pessoa
+  // para o login a cada oscilação de conexão, com a sessão ainda válida. Só a ausência da linha devolve null.
+  if (error) throw new AuthError("Não foi possível carregar sua conta agora.", "profile_load_failed");
+  if (!data) return null;
   return {
     id: data.id,
     name: data.name,
@@ -239,7 +242,10 @@ export function onAuthStateChange(cb: Listener): () => void {
       cb(null);
       return;
     }
-    loadProfile(session.user.id, session.user.email ?? undefined).then(cb);
+    // Se o perfil não carregar (rede oscilando durante a renovação do login), mantém a pessoa como está em vez de deslogá-la.
+    loadProfile(session.user.id, session.user.email ?? undefined)
+      .then(cb)
+      .catch(() => {});
   });
   return () => sub.subscription.unsubscribe();
 }
