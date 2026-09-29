@@ -3693,6 +3693,28 @@ O que a tentativa mostrou, para quem retomar:
 - Foi testado de ponta a ponta contra um servidor de mentira (senha errada, login, sessão na mesma chave e sobrevivendo a recarregar, token nas 17 consultas, sair), **mas NÃO contra o Supabase real**: o teste com a conta do Lucas era o passo que faltava.
 - `postgrest-js` tem um `urlLengthLimit` de 8000 por padrão, o que confirma o motivo dos lotes de 100 ids do `harden` das listas grandes.
 
+### Movimento (`animate`): três momentos de confirmação (2026-09-30) — sem migration nova
+
+Um passo na `dev`, testado pelo Lucas. Escopo escolhido por ele: **momentos de confirmação** (o app já confirma ações com `toast`; aqui o movimento liga a AÇÃO ao RESULTADO). Os três foram aprovados um a um. **Não há biblioteca de animação:** só CSS (`tailwind.config.ts` + `index.css`) e duas peças pequenas.
+O movimento que já existia (entrada de tela `bb-in`, `bb-up`, `bb-toast`, `bb-pulse`, `bb-shimmer`, `bb-bar`) NÃO foi mexido.
+
+1. **A aula agendada acende na Home (`animate-bb-acende`).** `Agendar.tsx` calcula o instante da aula (`fromZonedTime(dia + hora, TIMEZONE)`) e navega para `/app/home` com `state: { agendadaEm }`. `Home.tsx` guarda isso num `useState` do primeiro render (senão limpar o estado cortaria a animação no meio),
+   limpa o `state` com `navigate(..., { replace: true, state: null })` e, **só se `nextBooking.startTime` for o mesmo instante**, põe `animate-bb-acende` no cartão "Próxima aula". Se a aula nova não for a próxima, nada acende (o `toast` já a confirma).
+   Contorno dourado (só `box-shadow`) que aparece e some: 1,6 s, com 0,4 s de espera para não competir com a entrada da tela, 1 vez. Nada se desloca.
+2. **Item resolvido sai suave no "Resolver agora" do Painel (`animate-bb-sai`, `src/hooks/useSaidaSuave.ts`).** Os dados continuam mandando: o item JÁ saiu da lista de verdade; o hook o segura na tela por `SAIDA_MS = 220` ms, na mesma posição, marcado `saindo`.
+   `ItemResolver` (`Dashboard.tsx`) virou uma grade de uma linha (`grid` + `min-h-0`): ao sair, a linha vai de `1fr` a `0fr` e o conteúdo esmaece, sem salto. **O item que está saindo é INERTE** (`inert`, `aria-hidden`, sem `data-primario`): a lógica de foco de `ResolverAgora` (que procura `#grupo [data-primario]` por posição) NÃO o enxerga e continua olhando as listas REAIS `pending`/`awaiting`.
+   Só o desenho usa `pendingV`/`awaitingV`. Quando o ÚLTIMO item de um grupo sai, o grupo inteiro some de uma vez como antes (o hook só segura itens de listas que continuam existindo). `inert` não existe nos tipos do React 18: passado por espalhamento (`{...({ inert: saindo ? "" : undefined } as Record<string, string | undefined>)}`).
+3. **O selo de status estala ao mudar (`animate-bb-pop`, `src/components/EstaloAoMudar.tsx`).** Envolve o `StatusBadge` nos dois detalhes de aula (`admin/AulaDetalhe.tsx`, `student/AulaDetalhe.tsx`): quando `valor` (status + "sem registro") muda NA MESMA TELA, o selo é recriado (`key` novo) e dá uma pulsada de escala (0,86 → 1,08 → 1) em 0,38 s.
+   **Não anima na primeira montagem.**
+
+**Reduzir movimento (`index.css`):** o estalo vira o mesmo esmaecimento curto (`bb-fade`); a saída de item perde o fechar do espaço e fica só no esmaecer (`bb-sai-suave`, 0,15 s); **o "acende" continua** (é só sombra, nada se desloca, e é o que liga a ação ao resultado). Regra que já valia: efeito que só muda cor/sombra fica; o que se desloca vira esmaecimento.
+
+**Verificado:** tsc, 97 testes, e na galeria: a saída do item (animação `bb-sai`, `inert`, `aria-hidden`, sem `data-primario`, removido depois de ~0,5 s) e o estalo só no selo que mudou. **O caminho completo Agendar → Home não roda na galeria**: só foi conferido que a classe/animação existem (1,6 s, 0,4 s de espera, 1 vez); o resto foi o teste do Lucas no preview.
+
+**Não conferido:** desempenho em aparelho de entrada (a saída anima `grid-template-rows`, que é layout; são poucos itens e 220 ms, mas não foi medido); leitor de tela com a saída do item.
+
+**Deixado para depois (registrado, não pedido):** a mesma saída suave na Agenda e em Pedidos; "Todas aconteceram" com saída em cascata; transição entre telas (hoje só há o fade de entrada); aula avulsa/pacote pedido também "acender" na Home.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
