@@ -3654,9 +3654,9 @@ Um passo na `dev`, testado pelo Lucas (o teste principal era o ícone na tela in
 - **Detector:** 1 ocorrência, `overused-font` para "Inter" em `src/index.css`. **É gosto de design, não defeito, e NÃO foi mexida:** Inter é a fonte do corpo do app desde o início e nenhuma decisão do Lucas pediu para trocá-la. Se ele quiser outra, é um pedido de `typeset`, não um conserto.
 - **Aberto, na ordem combinada com o Lucas ("um por vez"):**
   1. ~~[P2] título por tela~~ e ~~[P3] link "pular para o conteúdo"~~ — FEITOS (abaixo).
-  2. **[P2] `@supabase/supabase-js` = 220 kB** dos ~620 kB de JS da primeira abertura (traz realtime, storage e functions que o app não usa). Reduzir = usar só as partes de auth e consultas (`@supabase/auth-js` + `@supabase/postgrest-js`): mudança maior, exige teste. **Próximo passo combinado.**
-  3. [P3] sem `<meta name="description">` no `index.html` (só afeta compartilhamento do endereço).
-  4. Fora das cinco dimensões: `vercel.json` só tem o redirecionamento (sem cabeçalhos de segurança: política de conteúdo, proteção contra ser embutido em outro site). A chave pública do Supabase fica exposta por desenho; é higiene, não brecha.
+  2. **[P2] `@supabase/supabase-js` = 220 kB** — TENTADO E DESFEITO (ver "Cliente Supabase enxuto" abaixo). dos ~620 kB de JS da primeira abertura (traz realtime, storage e functions que o app não usa). Reduzir = usar só as partes de auth e consultas (`@supabase/auth-js` + `@supabase/postgrest-js`): mudança maior, exige teste. **Próximo passo combinado.**
+  3. ~~[P3] sem `<meta name="description">`~~ FEITO (ver "Cabeçalhos de segurança" abaixo).
+  4. ~~Fora das cinco dimensões: `vercel.json` só tem o redirecionamento~~ FEITO (ver "Cabeçalhos de segurança" abaixo): (sem cabeçalhos de segurança: política de conteúdo, proteção contra ser embutido em outro site). A chave pública do Supabase fica exposta por desenho; é higiene, não brecha.
 
 **`polish` de acessibilidade — feito e testado pelo Lucas:**
 - **Título por tela** (`src/lib/titulosDeRota.ts`, `tituloDaRota(pathname)`, com `titulosDeRota.test.ts`): lista `[regex, título]` onde a primeira regra que casa vale, então as específicas vêm antes das gerais (ex.: `/admin/alunos/:id/recorrencia` antes de `/admin/alunos/:id`).
@@ -3666,6 +3666,32 @@ Um passo na `dev`, testado pelo Lucas (o teste principal era o ícone na tela in
 - Verificado no navegador com o app real ligado a um Supabase falso (porta 5175): títulos de `/login` e `/criar-conta`, aviso de leitor de tela e a 404 preservada.
 
 **Não conferido:** o aviso com leitor de tela de verdade (só a região `aria-live` e o texto foram vistos); o link "pular" fora do teste manual do Lucas.
+
+### Cabeçalhos de segurança e descrição da página (2026-09-30) — sem migration nova
+
+Um passo na `dev`, testado pelo Lucas no preview (console sem "Refused to…", login, gravação, CEP, aluno). Fecha os dois itens pequenos que sobraram da segunda auditoria.
+
+- **`<meta name="description">` no `index.html`:** "Suas aulas de boxe: veja e agende horários, acompanhe seu pacote e sua evolução no Perfil de Boxe." (texto meu, aprovado).
+- **`vercel.json` ganhou `headers` para `/(.*)`:**
+  - **`Content-Security-Policy`:** `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://viacep.com.br; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`.
+    `'unsafe-inline'` só em `style-src`, porque o React usa `style={{…}}` (atributo de estilo); script inline NÃO é permitido (o build não tem nenhum).
+  - `X-Frame-Options: DENY` (junto do `frame-ancestors 'none'`), `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()` (conferido por grep: o app não usa nenhum).
+- **A política tem uma lista de destinos de propósito: qualquer chamada NOVA para um endereço de fora (outro serviço, outra API, imagem de outro site, fonte externa) é BLOQUEADA até entrar em `connect-src`/`img-src`/`font-src`.** Hoje só existem o Supabase e o ViaCEP (busca de CEP em `OrientacoesAula.tsx`).
+  Links de navegação (`wa.me`, Google Maps) não passam pela política. Se aparecer uma funcionalidade "que funciona em desenvolvimento e quebra em produção", olhe o console por "Refused to…" primeiro.
+  Se o projeto do Supabase mudar para um domínio próprio (fora de `supabase.co`), `connect-src` precisa acompanhar.
+- **Como foi testado:** build de produção servido por um servidor local com os cabeçalhos do `vercel.json` (CSP com o host do Supabase trocado pelo de um servidor de mentira) e login pelo navegador: sem violações. **O cache offline do app (service worker) NÃO pôde ser exercitado**: o navegador embutido desta sessão não registra service worker, nem sem os cabeçalhos.
+  A política permite `worker-src 'self'` e o `workbox` só importa arquivos do mesmo endereço.
+- **Reverter:** apagar a seção `headers` do `vercel.json`.
+
+### Cliente Supabase enxuto — tentado e DESFEITO a pedido do Lucas (2026-09-30)
+
+Tentativa de reduzir o `@supabase/supabase-js` (220 kB, ~35% do JS da primeira abertura), que traz realtime, storage e functions que o app não usa. **Foi para a `dev` (commit `ff7544b`), o Lucas decidiu não mexer no Supabase agora e ela foi revertida (commit `2c9391b`); nunca chegou à `main`.**
+O que a tentativa mostrou, para quem retomar:
+- Trocar `createClient` por `AuthClient` (`@supabase/auth-js`) + `PostgrestClient` (`@supabase/postgrest-js`) num `client.ts` de ~60 linhas derrubou o arquivo do Supabase de **220,9 kB para 119,6 kB** (~100 kB a menos; primeira abertura de ~620 para ~520 kB de JS).
+- Para não deslogar todo mundo, é obrigatório reproduzir o que o `createClient` faz por dentro (lido em `supabase-js` 2.112): chave da sessão `sb-<primeiro pedaço do host>-auth-token`, `flowType: "implicit"`, `autoRefreshToken`, `persistSession`, `detectSessionInUrl`, e em cada consulta `apikey` + `Authorization: Bearer <token da sessão, ou a chave pública sem sessão>`.
+  O app só usa `auth`, `from` e `rpc` (`client().auth.*` 15 chamadas, `from` 43, `rpc` 33; nada de storage, realtime, channel nem functions).
+- Foi testado de ponta a ponta contra um servidor de mentira (senha errada, login, sessão na mesma chave e sobrevivendo a recarregar, token nas 17 consultas, sair), **mas NÃO contra o Supabase real**: o teste com a conta do Lucas era o passo que faltava.
+- `postgrest-js` tem um `urlLengthLimit` de 8000 por padrão, o que confirma o motivo dos lotes de 100 ids do `harden` das listas grandes.
 
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
