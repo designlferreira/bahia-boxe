@@ -916,6 +916,18 @@ async function alunosEmRisco(students: StudentRecord[]): Promise<AlunoEmRisco[]>
  * (CLAUDE.md, "Agenda com navegação livre"), e o banner do Dashboard precisa da mais antiga (`[0]`,
  * já vem ordenada por `start_time` ascendente) pra navegar direto pra ela.
  */
+/** Pedidos ainda sem resposta do professor (novo horário ou remarcação) — pra marcar os dias na Agenda. */
+export async function getPedidosPendentes(adminId: string): Promise<Booking[]> {
+  const { data, error } = await client()
+    .from("bookings")
+    .select("*")
+    .eq("admin_id", adminId)
+    .eq("status", "pending_confirmation")
+    .order("start_time", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapBooking);
+}
+
 export async function getAwaitingConfirmationBookings(adminId: string): Promise<Booking[]> {
   const nowIso = new Date().toISOString();
   const { data, error } = await client()

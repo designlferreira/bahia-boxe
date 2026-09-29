@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { addDays, isSameDay } from "date-fns";
+import { addDays, isSameDay, startOfWeek } from "date-fns";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -7,19 +7,24 @@ import { useAuth } from "@/context/AuthContext";
 import { ErrorState } from "@/components/ErrorState";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { formatDate, formatDayNumber, formatWeekdayLong, formatWeekdayShort, isoDateOnly } from "@/lib/dateUtils";
+import { formatDate, formatDateShort, formatDayNumber, formatWeekdayLong, formatWeekdayShort, isoDateOnly } from "@/lib/dateUtils";
 import { isAwaitingConfirmation } from "@/lib/bookingStatus";
 import { useLessonActions } from "@/hooks/useLessonActions";
 import { usePendingActions, type PendenteAlvo } from "@/hooks/usePendingActions";
 import {
   getAdminAgendaForDay,
   getAwaitingConfirmationBookings,
+  getPedidosPendentes,
   type TimelineEntry,
   VINCULO_LABEL,
 } from "@/integrations/backend/api";
 import { StatusBadge } from "@/components/StatusBadge";
 
 const DAY_COUNT = 7;
+
+/** A semana de verdade, de segunda a domingo (decisão do Lucas, 2026-09-28). Antes era "os próximos
+ *  7 dias a partir de hoje" — ontem só aparecia voltando uma semana inteira. */
+const inicioDaSemana = (d: Date) => startOfWeek(d, { weekStartsOn: 1 });
 
 /** Estado de navegação vindo do banner "aula(s) aguardando confirmação" do Dashboard — leva direto
  *  pra semana/dia da pendência mais antiga, em vez de sempre abrir em "hoje" (CLAUDE.md, "Agenda
@@ -56,25 +61,18 @@ export default function AdminAgenda() {
   // Data-alvo vinda do banner de pendência do Dashboard, ou "hoje" por padrão — lida só na
   // primeira renderização (inicializador preguiçoso do useState), nunca mais depois: navegar
   // dentro da própria Agenda não deve reagir a um location.state que só existe nesse primeiro salto.
-  const [weekStart, setWeekStart] = useState<Date>(() => {
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
     const target = (location.state as AgendaNavState | null)?.date;
     return target ? new Date(target) : new Date();
   });
-  const [selectedDate, setSelectedDate] = useState<Date>(weekStart);
+  const weekStart = inicioDaSemana(selectedDate);
+  const hoje = new Date();
 
   const days = Array.from({ length: DAY_COUNT }, (_, i) => addDays(weekStart, i));
 
-  function goToPreviousWeek() {
-    const next = addDays(weekStart, -DAY_COUNT);
-    setWeekStart(next);
-    setSelectedDate(next);
-  }
-
-  function goToNextWeek() {
-    const next = addDays(weekStart, DAY_COUNT);
-    setWeekStart(next);
-    setSelectedDate(next);
-  }
+  // Trocar de semana mantém o mesmo dia da semana (quarta → quarta), em vez de pular pro 1º dia.
+  const goToPreviousWeek = () => setSelectedDate((d) => addDays(d, -DAY_COUNT));
+  const goToNextWeek = () => setSelectedDate((d) => addDays(d, DAY_COUNT));
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["admin-agenda", profile?.id, selectedDate.toDateString()],
@@ -93,12 +91,23 @@ export default function AdminAgenda() {
     queryFn: () => getAwaitingConfirmationBookings(profile!.id),
     enabled: !!profile,
   });
-  const awaitingDateKeys = new Set((awaitingQuery.data ?? []).map((b) => isoDateOnly(b.startTime)));
+  // Pedidos sem resposta também marcam o dia — antes só a aula sem registro marcava, e o pedido de
+  // amanhã ficava sem sinal nenhum na faixa da semana.
+  const pedidosQuery = useQuery({
+    queryKey: ["agenda-pedidos-pendentes", profile?.id],
+    queryFn: () => getPedidosPendentes(profile!.id),
+    enabled: !!profile,
+  });
+  const diasComPendencia = new Set(
+    [...(awaitingQuery.data ?? []), ...(pedidosQuery.data ?? [])].map((b) => isoDateOnly(b.startTime)),
+  );
+  const nAulas = data?.filter((t) => !t.free).length ?? 0;
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["admin-agenda"] });
     queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
     queryClient.invalidateQueries({ queryKey: ["awaiting-confirmation-bookings"] });
+    queryClient.invalidateQueries({ queryKey: ["agenda-pedidos-pendentes"] });
   }
 
   const actions = useLessonActions(invalidate);
@@ -110,73 +119,81 @@ export default function AdminAgenda() {
 
   return (
     <div className="page-container">
-      <h1 className="font-display text-3xl tracking-wide text-foreground leading-none mb-1">AGENDA DO DIA</h1>
+      <h1 className="font-display text-3xl tracking-wide text-foreground leading-none mb-1">AGENDA</h1>
       <div className="flex items-center gap-2.5 mb-3.5">
-        <div className="flex-1 text-[12.5px] text-muted-foreground">
-          {formatDate(selectedDate)} · {data?.filter((t) => !t.free).length ?? 0} aulas
+        <div className="flex-1 text-[13px] text-muted-foreground">
+          {formatDate(selectedDate)} · {nAulas === 1 ? "1 aula" : `${nAulas} aulas`}
         </div>
         <Button variant="secondary" size="sm" onClick={() => navigate("/admin/disponibilidade")}>
           Disponibilidade
         </Button>
       </div>
 
-      <div className="flex items-center gap-1.5 mb-4">
+      {/* Setas e "Hoje" numa linha própria: assim os 7 dias cabem na largura toda (cada um com
+          ~45px de toque) sem rolagem lateral — antes só uns 4 dos 7 apareciam no celular. */}
+      <div className="flex items-center gap-2 mb-2">
         <button
           type="button"
           onClick={goToPreviousWeek}
           aria-label="Semana anterior"
-          className="h-9 w-9 shrink-0 rounded-xl bg-secondary border border-border flex items-center justify-center active:scale-95 transition-transform"
+          className="h-11 w-11 shrink-0 rounded-xl bg-secondary border border-border flex items-center justify-center active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <ChevronLeft className="h-4 w-4 text-foreground" />
+          <ChevronLeft className="h-4 w-4 text-foreground" aria-hidden />
         </button>
-
-        <div className="flex-1 flex gap-2 overflow-x-auto px-0.5 pb-1 scroll-fade-x">
-          {days.map((d) => {
-            const on = isSameDay(selectedDate, d);
-            const pending = awaitingDateKeys.has(isoDateOnly(d));
-            return (
-              <button
-                key={d.toISOString()}
-                type="button"
-                onClick={() => setSelectedDate(d)}
-                aria-label={`${formatWeekdayLong(d)}, dia ${formatDayNumber(d)}${pending ? " — tem aula aguardando confirmação" : ""}`}
-                aria-pressed={on}
-                className={cn(
-                  "relative shrink-0 w-14 py-2 rounded-2xl border transition-all active:scale-95",
-                  on ? "bg-primary border-primary" : "bg-secondary border-border",
-                )}
-              >
-                {pending && (
-                  <span aria-hidden className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-amber ring-1 ring-background" />
-                )}
-                <div
-                  aria-hidden
-                  className={cn(
-                    "text-[10.5px] uppercase tracking-wide whitespace-nowrap",
-                    on ? "text-primary-foreground/80" : "text-muted-foreground",
-                  )}
-                >
-                  {formatWeekdayShort(d)}
-                </div>
-                <div
-                  aria-hidden
-                  className={cn("font-display text-[23px] leading-tight", on ? "text-primary-foreground" : "text-foreground")}
-                >
-                  {formatDayNumber(d)}
-                </div>
-              </button>
-            );
-          })}
+        <div className="flex-1 text-center text-sm text-muted-foreground tabular-nums">
+          {formatDateShort(days[0])} – {formatDateShort(days[DAY_COUNT - 1])}
         </div>
-
+        {!isSameDay(selectedDate, hoje) && (
+          <Button variant="secondary" size="sm" className="px-3" onClick={() => setSelectedDate(new Date())}>
+            Hoje
+          </Button>
+        )}
         <button
           type="button"
           onClick={goToNextWeek}
           aria-label="Próxima semana"
-          className="h-9 w-9 shrink-0 rounded-xl bg-secondary border border-border flex items-center justify-center active:scale-95 transition-transform"
+          className="h-11 w-11 shrink-0 rounded-xl bg-secondary border border-border flex items-center justify-center active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <ChevronRight className="h-4 w-4 text-foreground" />
+          <ChevronRight className="h-4 w-4 text-foreground" aria-hidden />
         </button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 mb-4">
+        {days.map((d) => {
+          const on = isSameDay(selectedDate, d);
+          const ehHoje = isSameDay(hoje, d);
+          const pendencia = diasComPendencia.has(isoDateOnly(d));
+          return (
+            <button
+              key={d.toISOString()}
+              type="button"
+              onClick={() => setSelectedDate(d)}
+              aria-label={`${formatWeekdayLong(d)}, dia ${formatDayNumber(d)}${ehHoje ? ", hoje" : ""}${pendencia ? " — tem algo para resolver" : ""}`}
+              aria-pressed={on}
+              className={cn(
+                "relative min-w-0 py-2 rounded-2xl border transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                on ? "bg-primary border-primary" : ehHoje ? "bg-secondary border-foreground/50" : "bg-secondary border-border",
+              )}
+            >
+              {/* No dia selecionado (fundo vermelho) a bolinha âmbar sumia (2,25:1) — vira branca. */}
+              {pendencia && (
+                <span
+                  aria-hidden
+                  className={cn("absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full", on ? "bg-primary-foreground" : "bg-amber")}
+                />
+              )}
+              <div aria-hidden className={cn("text-xs", on ? "text-primary-foreground" : "text-muted-foreground")}>
+                {formatWeekdayShort(d)}
+              </div>
+              <div
+                aria-hidden
+                className={cn("font-display text-[22px] leading-tight", on ? "text-primary-foreground" : "text-foreground")}
+              >
+                {formatDayNumber(d)}
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       {isError && <ErrorState title="Não foi possível carregar a agenda" onRetry={() => refetch()} />}

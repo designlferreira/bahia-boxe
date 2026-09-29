@@ -64,6 +64,7 @@ export default function AdminDashboard() {
     queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
     queryClient.invalidateQueries({ queryKey: ["admin-agenda"] });
     queryClient.invalidateQueries({ queryKey: ["awaiting-confirmation-bookings"] });
+    queryClient.invalidateQueries({ queryKey: ["agenda-pedidos-pendentes"] });
   };
   const pendentes = usePendingActions(profile?.id ?? "", invalidate);
   // Aconteceu/Faltou: o mesmo hook da Agenda e do detalhe da aula (confirmação + desfazer no aviso).

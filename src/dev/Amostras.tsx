@@ -511,12 +511,13 @@ function semearAgenda(qc: QueryClient) {
   porDia.set(-1, [aula(-1, 18, "Gustavo Alves", "scheduled"), aula(-1, 19, "Helena Costa", "completed"), livre(20)]);
   porDia.set(1, [aula(1, 7, "Marina Costa", "pending_confirmation"), aula(1, 18, "Karina Duarte", "scheduled"), livre(19), livre(20)]);
   porDia.set(2, []);
-  for (let d = -7; d <= 14; d++) {
+  for (let d = -21; d <= 21; d++) {
     const dia = addDays(new Date(), d);
     const entradas = porDia.get(d) ?? (d % 2 ? [livre(18), aula(d, 19, "Leonardo Prado", d < 0 ? "completed" : "scheduled"), livre(20)] : [livre(7), livre(8)]);
     qc.setQueryData(["admin-agenda", ADMIN_ID, dia.toDateString()], entradas);
   }
   qc.setQueryData(["awaiting-confirmation-bookings", ADMIN_ID], [aulaNa(-1, 18, "scheduled"), aulaNa(0, h0 - 1, "scheduled")]);
+  qc.setQueryData(["agenda-pedidos-pendentes", ADMIN_ID], [aulaNa(0, h0 + 2, "pending_confirmation"), aulaNa(1, 7, "pending_confirmation")]);
 }
 
 /** Lista de alunos: 6 alunos, 4 deles em risco (os mesmos do painel). */
