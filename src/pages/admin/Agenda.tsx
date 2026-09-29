@@ -270,8 +270,9 @@ export default function AdminAgenda() {
                           {awaiting && (
                             <div className="flex gap-2">
                               <Button
+                                variant="soft"
                                 size="sm"
-                                className="flex-1 h-10 !bg-accent/10 !text-accent !border !border-accent/40 !shadow-none"
+                                className="flex-1 h-10"
                                 disabled={actions.isBusy(booking.id)}
                                 onClick={() => actions.openComplete(booking, entry.studentName ?? "Aluno")}
                               >

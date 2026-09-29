@@ -110,8 +110,9 @@ export default function AdminAulaDetalhe() {
           {awaiting && (
             <div className="flex gap-2.5">
               <Button
+                variant="soft"
                 size="lg"
-                className="flex-1 !bg-accent/10 !text-accent !border !border-accent/40 !shadow-none"
+                className="flex-1"
                 disabled={actions.isBusy(booking.id)}
                 onClick={() => actions.openComplete(booking, studentName)}
               >

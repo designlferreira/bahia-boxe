@@ -11,6 +11,9 @@ const buttonVariants = cva(
         default: "bg-primary text-primary-foreground shadow-glow hover:brightness-110",
         secondary: "border border-border bg-secondary text-foreground hover:border-muted-foreground/40",
         accent: "bg-gradient-gold text-accent-foreground font-bold",
+        /** Ação positiva dentro de uma lista (Aconteceu, Aprovar): dourado discreto, sem o brilho
+         *  vermelho — o vermelho fica pra UMA ação principal por tela. */
+        soft: "border border-accent/40 bg-accent/10 text-accent hover:bg-accent/15",
         destructive: "border border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/15",
         ghost: "text-foreground hover:bg-secondary",
         link: "text-accent underline-offset-4 hover:underline",

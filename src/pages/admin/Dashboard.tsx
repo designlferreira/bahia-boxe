@@ -96,19 +96,23 @@ export default function AdminDashboard() {
 
       {data && (
         <>
-          <ResolverAgora
-            pending={data.pending}
-            awaiting={data.awaitingConfirmation}
-            purchaseRequests={data.purchaseRequests}
-            pendentes={pendentes}
-            aulas={aulas}
-          />
+          {/* O dia primeiro (decisão do Lucas, 2026-09-28): é o que o professor abre o app pra ver.
+              As pendências vêm logo abaixo, ainda à vista sem rolar na maioria dos dias. */}
+          <div className="flex flex-col gap-4 mb-6">
+            {semAlunos && data.primeirosPassos ? (
+              <ComecePorAqui passos={data.primeirosPassos} />
+            ) : (
+              <Hoje today={data.today} nextAfterToday={data.nextAfterToday} agora={agora} />
+            )}
 
-          {semAlunos && data.primeirosPassos ? (
-            <ComecePorAqui passos={data.primeirosPassos} />
-          ) : (
-            <Hoje today={data.today} nextAfterToday={data.nextAfterToday} agora={agora} />
-          )}
+            <ResolverAgora
+              pending={data.pending}
+              awaiting={data.awaitingConfirmation}
+              purchaseRequests={data.purchaseRequests}
+              pendentes={pendentes}
+              aulas={aulas}
+            />
+          </div>
 
           {!semAlunos && (
             <section aria-labelledby="em-risco">
@@ -199,7 +203,7 @@ function ResolverAgora({
       : "Diga se aconteceram ou se o aluno faltou";
 
   return (
-    <section aria-labelledby="resolver" className="rounded-[20px] bg-card border border-amber/40 px-4 pt-3.5 pb-1 mb-4 animate-bb-up">
+    <section aria-labelledby="resolver" className="rounded-[20px] bg-card border border-amber/40 px-4 pt-3.5 pb-1 animate-bb-up">
       <h2 id="resolver" className="text-[13px] font-semibold text-amber mb-1">
         Resolver agora
       </h2>
@@ -349,7 +353,14 @@ function ItemResolver({
         {etiqueta && <span className="shrink-0 text-xs text-amber pt-1">{etiqueta}</span>}
       </div>
       <div className="flex gap-2">
-        <Button size="sm" className="flex-1" onClick={primario.onClick} disabled={busy} aria-label={`${primario.label}: ${nome}, ${quando}`}>
+        <Button
+          variant="soft"
+          size="sm"
+          className="flex-1"
+          onClick={primario.onClick}
+          disabled={busy}
+          aria-label={`${primario.label}: ${nome}, ${quando}`}
+        >
           {primario.label}
         </Button>
         <Button
@@ -390,7 +401,7 @@ function Hoje({ today, nextAfterToday, agora }: { today: AulaComNome[]; nextAfte
   }
 
   return (
-    <section aria-labelledby="hoje" className="card-dark rounded-[20px] p-4 mb-6">
+    <section aria-labelledby="hoje" className="card-dark rounded-[20px] p-4">
       <div className="flex justify-between items-baseline gap-3">
         <h2 id="hoje" className="section-title">
           {today.length ? `Hoje · ${plural(today.length, "aula", "aulas")}` : "Hoje"}
@@ -411,7 +422,7 @@ function Hoje({ today, nextAfterToday, agora }: { today: AulaComNome[]; nextAfte
         <button
           type="button"
           onClick={() => navigate(`/admin/aula/${proxima.id}`)}
-          className="w-full text-left mt-3 rounded-2xl border border-primary/40 bg-primary/10 p-3.5 active:scale-[0.99] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="w-full text-left mt-3 rounded-2xl bg-primary/10 p-3.5 active:scale-[0.99] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <div className="text-[13px] font-semibold text-[hsl(var(--red-text))]">{rotulo}</div>
           <div className="flex items-baseline gap-3 flex-wrap">
@@ -438,7 +449,7 @@ function Hoje({ today, nextAfterToday, agora }: { today: AulaComNome[]; nextAfte
                   onClick={() => navigate(`/admin/aula/${b.id}`)}
                   className="w-full text-left min-h-11 py-2 flex items-center gap-3 border-b border-border last:border-b-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
                 >
-                  <span className={cn("font-display text-xl w-[52px] shrink-0", passou ? "text-muted-foreground" : "text-accent")}>
+                  <span className={cn("font-display text-xl w-[52px] shrink-0", passou ? "text-muted-foreground" : "text-foreground")}>
                     {formatTime(b.startTime)}
                   </span>
                   <span className={cn("flex-1 min-w-0 text-[15px] truncate", passou ? "text-muted-foreground" : "text-foreground font-semibold")}>
@@ -493,7 +504,7 @@ function ComecePorAqui({ passos }: { passos: PrimeirosPassos }) {
     { feito: false, titulo: "Convidar o primeiro aluno", rota: "/admin/alunos" },
   ];
   return (
-    <section aria-labelledby="comece" className="card-dark rounded-[20px] p-4 mb-6">
+    <section aria-labelledby="comece" className="card-dark rounded-[20px] p-4">
       <h2 id="comece" className="font-display text-[28px] leading-tight tracking-wide text-foreground uppercase">
         Comece por aqui
       </h2>
