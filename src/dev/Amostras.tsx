@@ -729,7 +729,7 @@ function semearAlunos(qc: QueryClient) {
   const nomes = ["Ana Beatriz Souza", "Helena Costa", "Igor Nascimento", "Julia Pereira", "Karina Duarte", "Leonardo Prado"];
   const ids = ["s1", "s6", "s7", "s8", "s9", "s10"];
   qc.setQueryData(
-    ["admin-students", ADMIN_ID, ""],
+    ["admin-students", ADMIN_ID],
     ids.map((id, i) => ({
       student: aluno(id, nomes[i]),
       restantes: id === "s6" ? null : id === "s9" ? 1 : id === "s7" ? 2 : 3,

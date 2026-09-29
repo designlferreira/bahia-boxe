@@ -1626,7 +1626,7 @@ export interface HistoricoItem {
 }
 
 /** "João" e "joao" são a mesma busca (sem acento, sem maiúscula). */
-const semAcento = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+export const semAcento = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
 /**
  * Uma página do histórico do professor. A busca por aluno e o filtro de status são aplicados NA CONSULTA (antes eram

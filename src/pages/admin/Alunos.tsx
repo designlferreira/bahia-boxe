@@ -7,7 +7,7 @@ import { BookingFilters } from "@/components/BookingFilters";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/SkeletonCard";
-import { getAdminStudents, getAlunosEmRisco } from "@/integrations/backend/api";
+import { getAdminStudents, getAlunosEmRisco, semAcento } from "@/integrations/backend/api";
 
 const FILTROS = [
   { value: "todos", label: "Todos" },
@@ -23,11 +23,15 @@ export default function AdminAlunos() {
   const [params, setParams] = useSearchParams();
   const soRisco = params.get("filtro") === "risco";
 
-  const { data: todos, isLoading: carregandoTodos, isError: erroTodos, refetch } = useQuery({
-    queryKey: ["admin-students", profile?.id, search],
-    queryFn: () => getAdminStudents(profile!.id, search),
+  // A lista é buscada UMA vez e a busca filtra em memória: com o texto na chave da consulta, cada letra digitada trocava a
+  // chave, a lista inteira virava esqueleto e o app refazia 3 consultas por tecla. Sem acento nem maiúscula ("jose" acha "José").
+  const { data: lista, isLoading: carregandoTodos, isError: erroTodos, refetch } = useQuery({
+    queryKey: ["admin-students", profile?.id],
+    queryFn: () => getAdminStudents(profile!.id, ""),
     enabled: !!profile,
   });
+  const termo = semAcento(search);
+  const todos = lista && termo ? lista.filter((e) => semAcento(e.student.name).includes(termo)) : lista;
   const { data: risco, isLoading: carregandoRisco, isError: erroRisco, refetch: refetchRisco } = useQuery({
     queryKey: ["alunos-em-risco", profile?.id],
     queryFn: () => getAlunosEmRisco(profile!.id),
