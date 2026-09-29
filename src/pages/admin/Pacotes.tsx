@@ -33,6 +33,14 @@ function priceError(priceCents: number | null): string | null {
 
 type PriceMode = "defined" | "tbd";
 
+const MAX_AULAS = 99;
+function aulasError(texto: string): string | null {
+  if (!texto) return "Informe quantas aulas tem o pacote.";
+  const n = parseInt(texto, 10);
+  if (!(n >= 1 && n <= MAX_AULAS)) return `Use de 1 a ${MAX_AULAS} aulas.`;
+  return null;
+}
+
 export default function AdminPacotes() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
@@ -42,6 +50,10 @@ export default function AdminPacotes() {
   const [deleteTarget, setDeleteTarget] = useState<PackageTemplate | null>(null);
   const [priceTouched, setPriceTouched] = useState(false);
   const [priceMode, setPriceMode] = useState<PriceMode>("defined");
+  // Texto do campo (não número): apagar e digitar de novo funciona, e vazio/0/negativo/decimal não passam.
+  const [aulasTexto, setAulasTexto] = useState(String(empty.totalClasses));
+  const [aulasTouched, setAulasTouched] = useState(false);
+  const aulasValidation = aulasError(aulasTexto);
   const priceValidation = priceMode === "tbd" ? null : priceError(form.priceCents);
 
   const key = ["package-templates", profile?.id];
@@ -62,10 +74,13 @@ export default function AdminPacotes() {
         validityDays: editing.validityDays,
       });
       setPriceMode(editing.priceCents === null ? "tbd" : "defined");
+      setAulasTexto(String(editing.totalClasses));
     } else {
       setForm(empty);
       setPriceMode("defined");
+      setAulasTexto(String(empty.totalClasses));
     }
+    setAulasTouched(false);
   }, [editing]);
 
   function invalidate() {
@@ -74,7 +89,7 @@ export default function AdminPacotes() {
 
   const save = useMutation({
     mutationFn: () => {
-      const payload = { ...form, priceCents: priceMode === "tbd" ? null : (form.priceCents ?? 0) };
+      const payload = { ...form, totalClasses: parseInt(aulasTexto, 10), priceCents: priceMode === "tbd" ? null : (form.priceCents ?? 0) };
       return editing ? updatePackageTemplate(editing.id, payload) : createPackageTemplate(profile!.id, payload);
     },
     onSuccess: () => {
@@ -110,6 +125,15 @@ export default function AdminPacotes() {
     // Antes uma falha aqui não mostrava nada: o professor achava que tinha removido.
     onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível remover o modelo."),
   });
+
+  // O botão desativado diz por quê (antes só ficava apagado).
+  const motivoBloqueio = !form.name.trim()
+    ? "Dê um nome ao modelo para salvar."
+    : aulasValidation
+      ? aulasValidation
+      : priceValidation
+        ? priceValidation
+        : null;
 
   function openCreate() {
     setEditing(null);
@@ -192,11 +216,20 @@ export default function AdminPacotes() {
                 <Label htmlFor="total">Nº de aulas</Label>
                 <Input
                   id="total"
-                  type="number"
-                  min={1}
-                  value={form.totalClasses}
-                  onChange={(e) => setForm((f) => ({ ...f, totalClasses: Number(e.target.value) }))}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={2}
+                  value={aulasTexto}
+                  onChange={(e) => setAulasTexto(e.target.value.replace(/\D/g, ""))}
+                  onBlur={() => setAulasTouched(true)}
+                  aria-invalid={!!(aulasTouched && aulasValidation)}
+                  aria-describedby={aulasTouched && aulasValidation ? "total-error" : undefined}
                 />
+                {aulasTouched && aulasValidation && (
+                  <div id="total-error" role="alert" className="text-[12.5px] text-[hsl(var(--red-text))] mt-1.5">
+                    {aulasValidation}
+                  </div>
+                )}
               </div>
               <div>
                 <Label htmlFor="validity">Prazo sugerido (dias)</Label>
@@ -264,7 +297,17 @@ export default function AdminPacotes() {
               )}
             </div>
           </div>
-          <div className="flex gap-2.5 mt-5">
+          {editing && (
+            <p className="text-[12.5px] text-muted-foreground mt-4">
+              A mudança vale para os próximos pedidos. Pedidos que já foram aprovados não mudam.
+            </p>
+          )}
+          {motivoBloqueio && (
+            <p id="salvar-motivo" className="text-[12.5px] text-muted-foreground mt-4">
+              {motivoBloqueio}
+            </p>
+          )}
+          <div className="flex gap-2.5 mt-3">
             <Button variant="secondary" size="lg" className="flex-1" onClick={() => setSheetOpen(false)}>
               Voltar
             </Button>
@@ -272,7 +315,8 @@ export default function AdminPacotes() {
               size="lg"
               className="flex-[1.4]"
               onClick={() => save.mutate()}
-              disabled={!form.name.trim() || !!priceValidation || save.isPending}
+              disabled={!!motivoBloqueio || save.isPending}
+              aria-describedby={motivoBloqueio ? "salvar-motivo" : undefined}
             >
               {save.isPending ? "Salvando…" : editing ? "Salvar alterações" : "Criar modelo"}
             </Button>
