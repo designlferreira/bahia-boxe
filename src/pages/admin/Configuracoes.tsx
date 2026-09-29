@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ChevronRight, MapPin } from "lucide-react";
+import { Check, ChevronRight, MapPin } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -19,6 +19,8 @@ import {
   updateWhatsapp,
 } from "@/integrations/backend/api";
 import type { ModoAgendamento } from "@/integrations/backend/types";
+
+const FOCO = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 const MODO_OPTIONS: { value: ModoAgendamento; label: string }[] = [
   { value: "autosservico", label: "Autosserviço" },
@@ -106,12 +108,12 @@ export default function AdminConfiguracoes() {
         <>
           <h2 className="section-title mb-2.5">Como os alunos agendam</h2>
         <div className="card-dark p-4">
-          <div className="text-[14.5px] font-semibold text-foreground">Modo de agendamento</div>
-          <div className="text-[12.5px] text-muted-foreground mt-0.5">
+          <div id="modo-titulo" className="text-[14.5px] font-semibold text-foreground">Modo de agendamento</div>
+          <div id="modo-descricao" className="text-[12.5px] text-muted-foreground mt-0.5">
             Autosserviço: o aluno escolhe o horário entre os que você publicou. Recorrência: você combina horários fixos com
             cada aluno e gera as aulas.
           </div>
-          <div className="flex gap-2 mt-3">
+          <div role="group" aria-labelledby="modo-titulo" aria-describedby="modo-descricao" className="flex gap-2 mt-3">
             {MODO_OPTIONS.map((opt) => {
               const active = (data?.modoAgendamento ?? "autosservico") === opt.value;
               return (
@@ -123,10 +125,13 @@ export default function AdminConfiguracoes() {
                   // Tocar no modo que já está ativo não faz nada (antes gravava de novo à toa).
                   onClick={() => !active && setModoPendente(opt.value)}
                   className={cn(
-                    "flex-1 h-10 rounded-xl text-[13px] font-semibold transition-colors",
-                    active ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground",
+                    `flex-1 h-11 rounded-xl text-[13px] font-semibold transition-colors flex items-center justify-center gap-1.5 ${FOCO}`,
+                    // Selecionado é neutro (invertido) com ✓: o vermelho fica para a ação principal de cada tela,
+                    // e a marca não depende só da cor.
+                    active ? "bg-foreground text-background" : "bg-secondary text-muted-foreground",
                   )}
                 >
+                  {active && <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden />}
                   {opt.label}
                 </button>
               );
@@ -165,10 +170,10 @@ export default function AdminConfiguracoes() {
         <>
           <h2 className="section-title mt-6 mb-2.5">Contato</h2>
         <div className="card-dark p-4">
-          <label htmlFor="whatsapp" className="text-[15px] font-semibold text-foreground">
+          <label htmlFor="whatsapp" className="text-[14.5px] font-semibold text-foreground">
             WhatsApp para os alunos
           </label>
-          <div className="text-sm text-muted-foreground mt-0.5">
+          <div id="whatsapp-descricao" className="text-[12.5px] text-muted-foreground mt-0.5">
             Aparece na tela inicial do aluno como "Falar com o professor". Deixe em branco para não mostrar.
           </div>
           <input
@@ -180,11 +185,11 @@ export default function AdminConfiguracoes() {
             value={whatsappInput}
             onChange={(e) => setWhatsappInput(e.target.value)}
             aria-invalid={whatsappInvalido}
-            aria-describedby={whatsappInvalido ? "whatsapp-erro" : undefined}
+            aria-describedby={whatsappInvalido ? "whatsapp-descricao whatsapp-erro" : "whatsapp-descricao"}
             className="input-dark h-12 mt-3"
           />
           {whatsappInvalido && (
-            <div id="whatsapp-erro" className="text-sm text-[hsl(var(--red-text))] mt-2">
+            <div id="whatsapp-erro" role="alert" className="text-[13px] text-[hsl(var(--red-text))] mt-2">
               Número incompleto. Use DDD + número, por exemplo (11) 94703-4983.
             </div>
           )}
@@ -204,16 +209,16 @@ export default function AdminConfiguracoes() {
       <button
         type="button"
         onClick={() => navigate("/admin/orientacoes")}
-        className="w-full text-left card-dark p-4 flex items-center gap-3 active:scale-[0.99] transition-transform"
+        className={`w-full text-left card-dark p-4 flex items-center gap-3 active:scale-[0.99] transition-transform ${FOCO}`}
       >
         <div className="h-10 w-10 shrink-0 rounded-xl bg-secondary flex items-center justify-center">
-          <MapPin className="h-[18px] w-[18px] text-foreground/80" />
+          <MapPin className="h-[18px] w-[18px] text-foreground/80" aria-hidden />
         </div>
         <div className="flex-1">
           <div className="text-[14.5px] font-semibold text-foreground">Orientações da aula</div>
           <div className="text-[12.5px] text-muted-foreground mt-0.5">Local, antecedência e equipamento — mostrados ao aluno</div>
         </div>
-        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
       </button>
 
 
