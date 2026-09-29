@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
@@ -30,6 +30,12 @@ export default function ResetPassword({ amostra }: { amostra?: Fase }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const linkInvalidoRef = useRef<HTMLDivElement>(null);
+
+  // Ao descobrir que o link não vale, leva o foco ao aviso: quem usa teclado ou leitor de tela não fica num corpo de página vazio.
+  useEffect(() => {
+    if (fase === "invalido") linkInvalidoRef.current?.focus();
+  }, [fase]);
 
   useEffect(() => {
     if (amostra) return;
@@ -76,9 +82,14 @@ export default function ResetPassword({ amostra }: { amostra?: Fase }) {
 
   if (fase === "verificando") {
     return (
-      <main className="min-h-dvh flex flex-col bg-background px-6 pt-14">
+      <main className="min-h-dvh flex flex-col bg-background px-6 pt-14" aria-busy="true">
         <PageHeader title="NOVA SENHA" />
-        <SkeletonCard height={200} />
+        <p role="status" className="sr-only">
+          Verificando o link…
+        </p>
+        <div aria-hidden>
+          <SkeletonCard height={200} />
+        </div>
       </main>
     );
   }
@@ -87,8 +98,8 @@ export default function ResetPassword({ amostra }: { amostra?: Fase }) {
     return (
       <main className="min-h-dvh flex flex-col bg-background px-6 pt-14">
         <PageHeader title="LINK EXPIRADO" />
-        <div className="card-dark p-6 text-center">
-          <p className="text-[13.5px] text-muted-foreground mb-5">
+        <div ref={linkInvalidoRef} tabIndex={-1} className="card-dark p-6 text-center focus:outline-none">
+          <p role="alert" className="text-[13.5px] text-muted-foreground mb-5">
             Este link de recuperação expirou ou já foi usado. Peça um novo link para redefinir sua senha.
           </p>
           <Button asChild size="lg" className="w-full">
