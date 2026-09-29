@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
 import { BoxingProfileHeading, BoxingProfileQuestionnaire } from "@/components/BoxingProfileQuestionnaire";
@@ -12,6 +12,7 @@ import { studentIdForProfile, submitBoxingProfileAssessment } from "@/integratio
 export default function StudentPerfilLutadorQuestionario() {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [length, setLength] = useState<AssessmentLength | null>(null);
 
   const { data: studentId } = useQuery({
@@ -62,7 +63,12 @@ export default function StudentPerfilLutadorQuestionario() {
         questions={getQuestions("self", length)}
         draftKey={`bb.boxing-profile-draft.self.${profile.id}.${length}`}
         onSubmit={(answers) => submitBoxingProfileAssessment(studentId, answers, length)}
-        onSuccess={(assessment) => navigate(`/app/perfil-lutador/resultado/${assessment.id}`, { replace: true })}
+        // Depois de enviar, o aluno vai para o Perfil de Boxe (que já mostra o resultado mais recente, o combinado com o professor, o selo de
+        // parcial e os botões) com um aviso de "enviada". Antes caía numa tela "RESULTADO" sem nenhuma confirmação de envio e sem essas camadas.
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["boxing-profile-history"] });
+          navigate("/app/perfil-lutador", { replace: true, state: { avaliacaoEnviada: true } });
+        }}
         onExit={() => navigate("/app/perfil-lutador")}
       />
     </div>

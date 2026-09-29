@@ -3208,6 +3208,33 @@ do aluno e do professor, pergunta de escala, pergunta de escolha, última pergun
 um texto de que "não existe resposta certa"; "usar a mesma versão da última vez" para o professor; trocar de versão sem sair; uma frase de "o que vem depois" ao concluir; a escala
 "Quase nunca…Quase sempre" mistura capacidade e frequência ("Consigo iniciar ataques…") — é conteúdo do questionário, não da interface; medir o tempo real das duas versões.
 
+### Resultado do Perfil de Boxe (aluno, logo depois de responder): rodada de crítica (2026-09-29) — sem migration nova
+
+`src/pages/student/PerfilLutadorResultado.tsx` (rota `/app/perfil-lutador/resultado/:id`) e os componentes compartilhados `BoxingProfileResultView` /
+`BoxingProfileScoresSummary`: crítica **20/40**, relatório em `.impeccable/critique/*perfillutadorresultado*`. Seis passos na `dev`, testados pelo Lucas. Na página de
+amostras ("Resultado do Perfil de Boxe (aluno, logo depois de responder)": completa, rápida, fórmula anterior, não encontrada, erro; e o quadro "Perfil de Boxe · recém-enviado").
+
+**Problema de fundo (dois papéis numa tela só):** a rota era ao mesmo tempo "acabei de enviar" e "abri uma avaliação antiga pelo histórico", sem confirmar o envio (nenhum
+`toast.success` em lugar nenhum), sem data, e chamando `BoxingProfileResultView` SEM `notice`, sem combinado e sem botões — quem acabou de concluir e cujo professor JÁ avaliou via só a
+autoavaliação (contradizia "o combinado abre a tela"). **Correção estrutural:**
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Depois de enviar o questionário o aluno vai para `/app/perfil-lutador` (a tela principal), NÃO para `/resultado/:id`.** Ela já mostra o resultado mais recente, o combinado, o selo de parcial
+  e os botões. Vai `navigate(…, { replace: true, state: { avaliacaoEnviada: true } })` e uma faixa `role="status"` "Avaliação enviada — ela já está salva no seu histórico" aparece uma vez; o `state`
+  é limpo para não reaparecer ao recarregar; `["boxing-profile-history"]` é invalidado no envio. **A rota `/resultado/:id` ficou só para abrir uma avaliação ESPECÍFICA** (pelo histórico).
+- **A avaliação específica diz DE QUANDO é:** subtítulo "20 ago 2026 · versão completa" (`formatDateWithYear`, novo em `dateUtils.ts` — o `formatDateShort` não mostra o ano) e, se existe uma
+  avaliação `self` mais recente, o cartão "Esta é uma avaliação antiga. Seu resultado atual pode ser diferente." com "Ver resultado atual". Fim da tela: **"Ver minha evolução" (principal),
+  "Ir para o meu Perfil de Boxe" (secundário), "Falar com o professor sobre isso" (discreto, só com WhatsApp cadastrado)**.
+- **"82% de afinidade" não é uma nota:** frase neutra "Quanto as respostas se parecem com esse estilo. Não é uma nota." (vale para aluno e professor). **O aviso de autopercepção subiu para logo depois do
+  cartão do estilo**, em convite: "É como você se vê hoje, não uma avaliação técnica. Se não se reconheceu, converse com o seu professor: o resultado muda com você." (antes ficava no fim, a mais de 2.000px, em 12px,
+  dizendo "treinador"). Só na voz do aluno (`BoxingProfileResultView`); vem ANTES do selo de parcial.
+
+**O que mudou / armadilhas:** o nome do estilo é um `<h2>` (era `<div>`; visualmente idêntico), troféu `aria-hidden`; "Avaliação não encontrada" tem botão ("Ver meu Perfil de Boxe"); erro com texto específico; esqueleto com a forma
+do resultado e `role="status"` ("Carregando o resultado…"). `PerfilLutador` ganhou a prop `amostraEnviada` só para a galeria (sem efeito no app). `BoxingProfileScoresSummary` é compartilhado com a tela do professor (`AlunoPerfilBoxe`).
+
+**Deixado para depois (registrado, não pedido):** **a tela ainda tem ~2.500px (quase três telas)** — encurtar exige decidir o que recolher (pontos fortes/prioridades/foco); "Prioridades de evolução" soa técnico ("No que trabalhar"?);
+`FIGHTER_PROFILE_DESCRIPTIONS` abre sempre com "Seu perfil atual demonstra…" (soa diagnóstico); explicar o selo "Versão rápida" ("menos preciso que a completa"); compartilhar o resultado (a arte compartilhável foi cancelada, ver acima); caminho para quem discorda do estilo além de refazer.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa

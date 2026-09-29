@@ -72,13 +72,16 @@ export function BoxingProfileScoresSummary({
       )}
       <div className="rounded-[20px] p-5 mb-4 bg-[linear-gradient(150deg,#1F1B0C,#171717_60%)] border border-amber/30">
         <div className="flex items-center gap-1.5 text-amber text-xs font-bold uppercase tracking-wide mb-2">
-          <Trophy className="h-3.5 w-3.5" /> {heroLabel}
+          <Trophy className="h-3.5 w-3.5" aria-hidden /> {heroLabel}
         </div>
-        <div className="font-display text-[28px] tracking-wide text-foreground leading-none mb-1">
+        {/* Título de verdade (visualmente igual): o leitor de tela pulava o item mais importante da página — o nome do estilo era um <div>. */}
+        <h2 className="font-display text-[28px] font-normal tracking-wide text-foreground leading-none mb-1">
           {FIGHTER_PROFILE_LABELS[primaryProfile]}
-        </div>
+        </h2>
         <FighterProfileGloss profile={primaryProfile} className="text-[13.5px] text-foreground/70 mb-2" />
-        <div className="text-accent text-[15px] font-semibold mb-3">{profileScores[primaryProfile]}% de afinidade com esse estilo</div>
+        <div className="text-accent text-[15px] font-semibold">{profileScores[primaryProfile]}% de afinidade com esse estilo</div>
+        {/* "82%" lido sozinho parece uma nota. Não é: é o quanto as respostas se parecem com o estilo (texto neutro: vale para aluno e professor). */}
+        <div className="text-xs text-muted-foreground mt-0.5 mb-3">Quanto as respostas se parecem com esse estilo. Não é uma nota.</div>
         {description && <p className="text-[13.5px] text-foreground/85 leading-relaxed">{description}</p>}
       </div>
       {notice}

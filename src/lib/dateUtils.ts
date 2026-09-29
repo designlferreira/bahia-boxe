@@ -13,6 +13,11 @@ export function formatDateTime(date: string | Date) {
   return formatInTimeZone(date, TIMEZONE, "EEE, dd MMM · HH:mm", { locale: ptBR });
 }
 
+/** "29 set 2026" — para datas que podem ser de outro ano (o `formatDateShort` não mostra o ano). */
+export function formatDateWithYear(date: string | Date) {
+  return formatInTimeZone(date, TIMEZONE, "dd MMM yyyy", { locale: ptBR });
+}
+
 /** "01 set" */
 export function formatDateShort(date: string | Date) {
   return formatInTimeZone(date, TIMEZONE, "dd MMM", { locale: ptBR });
