@@ -62,7 +62,7 @@ export default function ConfirmarEmail() {
             className={`rounded-2xl border p-3.5 text-[13px] mb-4 ${
               feedback.kind === "success"
                 ? "border-accent/30 bg-accent/10 text-accent"
-                : "border-destructive/35 bg-destructive/10 text-destructive"
+                : "border-destructive/35 bg-destructive/10 text-[hsl(var(--red-text))]"
             }`}
           >
             {feedback.message}

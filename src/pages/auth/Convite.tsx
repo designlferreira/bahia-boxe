@@ -34,7 +34,7 @@ export default function Convite() {
       // confirmação de e-mail (a conta nasce SEM sessão) e traduz os erros. Antes o convite chamava o
       // Supabase direto e seguia para `accept_invite` sem sessão — falhava no meio, deixando conta
       // criada e convite não usado.
-      const result = await signUpWithPassword(name, email, password);
+      const result = await signUpWithPassword(name, email, password, token);
       if (result.status === "needs_confirmation") {
         // Guarda o convite: quem o conclui é o AuthProvider, quando a sessão existir.
         guardarConvitePendente(token);
