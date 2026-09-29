@@ -20,6 +20,9 @@ import AdminAgenda from "@/pages/admin/Agenda";
 import StudentAgendar from "@/pages/student/Agendar";
 import AdminAulaDetalhe from "@/pages/admin/AulaDetalhe";
 import StudentAulaDetalhe from "@/pages/student/AulaDetalhe";
+import Convite from "@/pages/auth/Convite";
+import CriarConta from "@/pages/auth/CriarConta";
+import ConfirmarEmail from "@/pages/auth/ConfirmarEmail";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
 import { RemarcacaoSheet } from "@/components/RemarcacaoSheet";
@@ -564,6 +567,26 @@ function ComRota({ path, url, children }: { path: string; url: string; children:
   );
 }
 
+/** Telas de entrada: sem sessão (profile null) e, no convite, com a validação do link pré-preenchida. */
+function SemLogin({ convite, children }: { convite?: { valid: boolean; reason: string }; children: ReactNode }) {
+  const [client] = useState(() => {
+    const qc = new QueryClient({
+      defaultOptions: { queries: { staleTime: Infinity, retry: false, queryFn: () => Promise.reject(new Error("amostra: consulta não simulada")) } },
+    });
+    if (convite) qc.setQueryData(["invite", "amostra"], convite);
+    return qc;
+  });
+  return (
+    <QueryClientProvider client={client}>
+      <AuthContext.Provider
+        value={{ profile: null, loading: false, signIn: () => Promise.reject(new Error("amostra")), signOut: async () => {}, refreshProfile: () => {} }}
+      >
+        {children}
+      </AuthContext.Provider>
+    </QueryClientProvider>
+  );
+}
+
 const ORIENTACOES = {
   adminId: ADMIN_ID,
   cep: "40000-000",
@@ -716,6 +739,38 @@ export default function Amostras() {
               </SeededAdmin>
             </Frame>
           ))}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Entrada (convite e criar conta)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          <Frame title="Convite válido" note="link de convite do professor">
+            <SemLogin convite={{ valid: true, reason: "ok" }}>
+              <ComRota path="/convite/:token" url="/convite/amostra">
+                <Convite />
+              </ComRota>
+            </SemLogin>
+          </Frame>
+          <Frame title="Convite inválido" note="link expirado ou já usado">
+            <SemLogin convite={{ valid: false, reason: "expired" }}>
+              <ComRota path="/convite/:token" url="/convite/amostra">
+                <Convite />
+              </ComRota>
+            </SemLogin>
+          </Frame>
+          <Frame title="Criar conta" note="cadastro por conta própria">
+            <SemLogin>
+              <ComRota path="/criar-conta" url="/criar-conta">
+                <CriarConta />
+              </ComRota>
+            </SemLogin>
+          </Frame>
+          <Frame title="Confirme seu e-mail" note="depois de criar a conta">
+            <SemLogin>
+              <ComRota path="/confirmar-email" url="/confirmar-email?email=aluno@exemplo.com">
+                <ConfirmarEmail />
+              </ComRota>
+            </SemLogin>
+          </Frame>
         </div>
 
         <h2 className="text-lg font-semibold mb-4">Detalhe da aula (professor)</h2>

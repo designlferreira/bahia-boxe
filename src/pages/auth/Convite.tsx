@@ -1,16 +1,20 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { acceptInvite, validateInvite } from "@/integrations/backend/api";
-import { supabase } from "@/integrations/supabase/client";
+import { AuthError, signUpWithPassword } from "@/integrations/backend/auth";
+import { guardarConvitePendente, limparConvitePendente } from "@/lib/convitePendente";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Convite() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
+  const { refreshProfile } = useAuth();
+  const [contaExiste, setContaExiste] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,20 +29,33 @@ export default function Convite() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!token || !supabase) return;
+    if (!token || loading) return;
     setLoading(true);
     setError(null);
+    setContaExiste(false);
     try {
-      const { error: signUpError } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: { data: { name: name.trim() } },
-      });
-      if (signUpError) throw signUpError;
+      // O MESMO cadastro da tela "Criar conta": ele sabe o que fazer quando o Supabase exige
+      // confirmação de e-mail (a conta nasce SEM sessão) e traduz os erros. Antes o convite chamava o
+      // Supabase direto e seguia para `accept_invite` sem sessão — falhava no meio, deixando conta
+      // criada e convite não usado.
+      const result = await signUpWithPassword(name, email, password);
+      if (result.status === "needs_confirmation") {
+        // Guarda o convite: quem o conclui é o AuthProvider, quando a sessão existir.
+        guardarConvitePendente(token);
+        navigate(`/confirmar-email?email=${encodeURIComponent(result.email)}&convite=1`, { replace: true });
+        return;
+      }
       await acceptInvite(token);
+      limparConvitePendente();
+      refreshProfile();
       navigate("/app/home", { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Não foi possível aceitar o convite.");
+      if (err instanceof AuthError && err.message.startsWith("Já existe uma conta")) {
+        // Quem já tem conta entra e o convite é concluído no login (mesmo mecanismo).
+        guardarConvitePendente(token);
+        setContaExiste(true);
+      }
+      setError(err instanceof AuthError ? err.message : "Não foi possível aceitar o convite. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -89,12 +106,20 @@ export default function Convite() {
           />
         </div>
         {error && (
-          <div role="alert" className="text-[12.5px] text-destructive">
+          <div role="alert" className="rounded-2xl border border-destructive/35 bg-destructive/10 p-3.5 text-[13px] text-destructive">
             {error}
+            {contaExiste && (
+              <>
+                {" "}
+                <Link to="/login" className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4">
+                  Entrar com esta conta
+                </Link>
+              </>
+            )}
           </div>
         )}
         <Button type="submit" size="lg" className="mt-1.5" disabled={loading || !name.trim() || !email.trim() || password.length < 8}>
-          {loading ? "Entrando…" : "Aceitar convite"}
+          {loading ? "Criando conta…" : "Aceitar convite"}
         </Button>
       </form>
     </main>
