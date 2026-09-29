@@ -69,20 +69,26 @@ export default function AdminPerfilAlunos() {
       )}
 
       {!isLoading && !isError && data && data.totalStudents > 0 && !ninguemPreencheu && (
-        <div className="flex flex-col gap-3.5">
-          <CategoryCard title="Lateralidade" stats={data.laterality} labels={LATERALITY_LABELS} total={data.totalStudents} order={["right", "left", "ambidextrous"] as Laterality[]} />
-          <CategoryCard
-            title="Guarda"
-            stats={data.guard}
-            labels={GUARD_LABELS}
-            total={data.totalStudents}
-            order={["orthodox", "southpaw", "switch", "peekaboo", "cross_arm", "philly_shell", "long_guard"] as Guard[]}
-          />
-          <CategoryCard title="Sexo" stats={data.sex} labels={SEX_LABELS} total={data.totalStudents} order={["female", "male", "other"] as Sex[]} />
-          <NumericCard title="Altura" unit="cm" stats={data.heightCm} total={data.totalStudents} />
-          <NumericCard title="Envergadura" unit="cm" stats={data.wingspanCm} total={data.totalStudents} />
-          <NumericCard title="Peso" unit="kg" stats={data.weightKg} total={data.totalStudents} />
-        </div>
+        <>
+          <p className="text-[13px] text-muted-foreground leading-snug mb-3.5">
+            {data.totalStudents} {data.totalStudents === 1 ? "aluno" : "alunos"}. Cada cartão diz quantos preencheram aquele dado.
+          </p>
+          {/* Ordem pelo uso: luvas e peso, alcance (altura, envergadura), duplas (lateralidade, guarda) e, por último, sexo. */}
+          <div className="flex flex-col gap-3.5">
+            <NumericCard title="Peso" unit="kg" casas={1} stats={data.weightKg} total={data.totalStudents} />
+            <NumericCard title="Altura" unit="cm" casas={0} stats={data.heightCm} total={data.totalStudents} />
+            <NumericCard title="Envergadura" unit="cm" casas={0} stats={data.wingspanCm} total={data.totalStudents} />
+            <CategoryCard title="Lateralidade" stats={data.laterality} labels={LATERALITY_LABELS} total={data.totalStudents} order={["right", "left", "ambidextrous"] as Laterality[]} />
+            <CategoryCard
+              title="Guarda"
+              stats={data.guard}
+              labels={GUARD_LABELS}
+              total={data.totalStudents}
+              order={["orthodox", "southpaw", "switch", "peekaboo", "cross_arm", "philly_shell", "long_guard"] as Guard[]}
+            />
+            <CategoryCard title="Sexo" stats={data.sex} labels={SEX_LABELS} total={data.totalStudents} order={["female", "male", "other"] as Sex[]} />
+          </div>
+        </>
       )}
     </div>
   );
@@ -105,14 +111,18 @@ function CategoryCard<T extends string>({
     <div className="card-dark p-4">
       <div className="flex items-baseline justify-between mb-3">
         <h2 className="section-title">{title}</h2>
-        <div className="text-[11.5px] text-muted-foreground">
+        <div className="text-xs text-muted-foreground">
           {stats.filled} de {total} preencheram
         </div>
       </div>
       {stats.filled < MIN_ALUNOS_NA_ESTATISTICA ? (
         <PoucosAlunos filled={stats.filled} total={total} />
       ) : (
-        <Linhas linhas={order.map((key) => ({ label: labels[key], count: stats.breakdown[key] ?? 0 }))} base={stats.filled} />
+        // Do grupo maior para o menor (a ordem fixa dos enums escondia o que mais importa).
+        <Linhas
+          linhas={order.map((key) => ({ label: labels[key], count: stats.breakdown[key] ?? 0 })).sort((a, b) => b.count - a.count)}
+          base={stats.filled}
+        />
       )}
     </div>
   );
@@ -139,7 +149,8 @@ function Linhas({ linhas, base }: { linhas: { label: string; count: number }[]; 
                 </span>
               </div>
               <div aria-hidden className="h-1.5 rounded-full bg-secondary overflow-hidden">
-                <div className="h-full rounded-full bg-gradient-gold origin-left animate-bb-bar" style={{ width: `${pct}%` }} />
+                {/* Neutra: o dourado do app é "ação positiva" (botão Aprovar/Aconteceu); um dado não deve competir com os botões. */}
+                <div className="h-full rounded-full bg-foreground/70 origin-left animate-bb-bar" style={{ width: `${pct}%` }} />
               </div>
             </li>
           );
@@ -156,12 +167,25 @@ function Linhas({ linhas, base }: { linhas: { label: string; count: number }[]; 
   );
 }
 
-function NumericCard({ title, unit, stats, total }: { title: string; unit: string; stats: NumericStats; total: number }) {
+function NumericCard({
+  title,
+  unit,
+  casas,
+  stats,
+  total,
+}: {
+  title: string;
+  unit: string;
+  /** Casas decimais da média: altura e envergadura são medidas declaradas (falsa precisão com decimal); o peso mantém uma casa. */
+  casas: number;
+  stats: NumericStats;
+  total: number;
+}) {
   return (
     <div className="card-dark p-4">
       <div className="flex items-baseline justify-between mb-2">
         <h2 className="section-title">{title}</h2>
-        <div className="text-[11.5px] text-muted-foreground">
+        <div className="text-xs text-muted-foreground">
           {stats.filled} de {total} preencheram
         </div>
       </div>
@@ -171,7 +195,7 @@ function NumericCard({ title, unit, stats, total }: { title: string; unit: strin
         // Só a MÉDIA: o mínimo e o máximo são, por definição, o dado de um aluno (o mais baixo, o mais pesado), mesmo com muita gente.
         <>
           <div className="flex gap-4 mb-3.5">
-            <Stat label="Média" value={`${stats.avg!.toFixed(1).replace(".", ",")} ${unit}`} />
+            <Stat label="Média" value={`${stats.avg!.toFixed(casas).replace(".", ",")} ${unit}`} />
           </div>
           <Linhas linhas={stats.faixas} base={stats.filled} />
         </>
@@ -197,8 +221,8 @@ function PoucosAlunos({ filled, total }: { filled: number; total: number }) {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-[10.5px] uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="text-[15px] font-semibold text-foreground">{value}</div>
+      <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-xl font-semibold text-foreground tabular-nums">{value}</div>
     </div>
   );
 }
