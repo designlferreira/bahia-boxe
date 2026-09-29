@@ -1014,7 +1014,10 @@ export async function getAdminAgendaForDay(adminId: string, date: Date): Promise
       // `rescheduled` sai junto com `cancelled`: a aula foi MOVIDA, não vai acontecer nesse
       // horário — deixá-la aqui mantinha o horário antigo ocupado na agenda do professor depois
       // de remarcar. A linha continua existindo como registro, só não bloqueia mais a hora.
-      .not("status", "in", "(cancelled,rescheduled)")
+      // Recusadas também saem: o pedido não vai acontecer, e o horário pode ter sido pedido de novo
+      // por outro aluno — como a agenda mostra UMA aula por hora, a recusada podia esconder a aula
+      // de verdade daquele horário.
+      .not("status", "in", "(cancelled,rescheduled,rejected,rejected_with_suggestion)")
       .gte("start_time", startIso)
       .lt("start_time", endIso),
     adminStudents(adminId),
@@ -1033,7 +1036,10 @@ export async function getAdminAgendaForDay(adminId: string, date: Date): Promise
   return Array.from(hours)
     .sort((a, b) => a - b)
     .map((h) => {
-      const booking = bookings.find((b) => brtHour(b.start_time) === h);
+      // Se sobrar mais de uma na mesma hora (ex.: uma concluída e outra agendada), a que ainda vai
+      // acontecer ou pede ação ganha o lugar.
+      const daHora = bookings.filter((b) => brtHour(b.start_time) === h);
+      const booking = daHora.find((b) => ACTIVE_STATUSES.includes(b.status)) ?? daHora[0];
       if (!booking) return { hour: hhmm(h), free: true };
       return {
         hour: hhmm(h),

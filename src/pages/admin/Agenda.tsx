@@ -255,17 +255,17 @@ export default function AdminAgenda() {
                 <div className="w-11 shrink-0 text-right pt-0.5">
                   <div className="text-xs text-muted-foreground tabular-nums">{entry.hour}</div>
                 </div>
-                <div className="w-0.5 bg-[#262626] shrink-0 relative">
+                <div className="w-0.5 bg-border shrink-0 relative">
                   <span
                     className={cn(
                       "absolute -left-[3px] top-1.5 h-2 w-2 rounded-full transition-colors",
-                      entry.free ? "bg-[#2E2E2E]" : dotClassFor(entry),
+                      entry.free ? "bg-muted-foreground/50" : dotClassFor(entry),
                     )}
                   />
                 </div>
                 <div className="flex-1 pb-3">
                   {entry.free ? (
-                    <div className="border border-dashed border-[#2E2E2E] rounded-2xl p-3.5 text-[12.5px] text-muted-foreground">
+                    <div className="border border-dashed border-muted-foreground/40 rounded-2xl p-3.5 text-[13px] text-muted-foreground">
                       Horário livre
                     </div>
                   ) : (
@@ -281,13 +281,13 @@ export default function AdminAgenda() {
                       <button
                         type="button"
                         onClick={() => navigate(`/admin/aula/${booking!.id}`)}
-                        className="w-full text-left flex justify-between items-start gap-2 mb-2 rounded-md active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="w-full min-h-11 text-left flex justify-between items-start gap-2 mb-2 rounded-md active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         <div>
                           <div className="text-[14.5px] font-semibold text-foreground flex items-center gap-1.5">
                             {entry.studentName}
                             {entry.vinculo && (
-                              <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-secondary text-muted-foreground whitespace-nowrap">
                                 {VINCULO_LABEL[entry.vinculo]}
                               </span>
                             )}
@@ -321,7 +321,7 @@ export default function AdminAgenda() {
                             className="flex-1"
                             onClick={() => pendentes.requestApprove(alvoDe(entry))}
                             disabled={pendentes.isBusy(booking.id)}
-                            aria-label={`Aprovar ${entry.studentName}, ${entry.hour}`}
+                            aria-label={`Aprovar: ${entry.studentName}, ${entry.hour}`}
                           >
                             Aprovar
                           </Button>
@@ -331,7 +331,7 @@ export default function AdminAgenda() {
                             className="flex-1"
                             onClick={() => pendentes.requestReject(alvoDe(entry))}
                             disabled={pendentes.isBusy(booking.id)}
-                            aria-label={`Recusar ${entry.studentName}, ${entry.hour}`}
+                            aria-label={`Recusar: ${entry.studentName}, ${entry.hour}`}
                           >
                             Recusar
                           </Button>
@@ -345,18 +345,20 @@ export default function AdminAgenda() {
                               <Button
                                 variant="soft"
                                 size="sm"
-                                className="flex-1 h-10"
+                                className="flex-1"
                                 disabled={actions.isBusy(booking.id)}
                                 onClick={() => actions.openComplete(booking, entry.studentName ?? "Aluno")}
+                                aria-label={`Aconteceu: ${entry.studentName}, ${entry.hour}`}
                               >
                                 Aconteceu
                               </Button>
                               <Button
                                 variant="secondary"
                                 size="sm"
-                                className="flex-1 h-10"
+                                className="flex-1"
                                 disabled={actions.isBusy(booking.id)}
                                 onClick={() => actions.openNoShow(booking, entry.studentName ?? "Aluno")}
+                                aria-label={`Faltou: ${entry.studentName}, ${entry.hour}`}
                               >
                                 Faltou
                               </Button>
@@ -371,18 +373,20 @@ export default function AdminAgenda() {
                                 <Button
                                   variant="secondary"
                                   size="sm"
-                                  className="flex-1 h-10"
+                                  className="flex-1"
                                   disabled={actions.isBusy(booking.id)}
                                   onClick={() => actions.openReagendar(booking, entry.studentName ?? "Aluno")}
+                                  aria-label={`Remarcar: ${entry.studentName}, ${entry.hour}`}
                                 >
                                   Remarcar
                                 </Button>
                                 <Button
                                   variant="destructive"
                                   size="sm"
-                                  className="flex-1 h-10"
+                                  className="flex-1"
                                   disabled={actions.isBusy(booking.id)}
                                   onClick={() => actions.openCancelar(booking, entry.studentName ?? "Aluno")}
+                                  aria-label={`Cancelar: ${entry.studentName}, ${entry.hour}`}
                                 >
                                   Cancelar
                                 </Button>
@@ -391,7 +395,8 @@ export default function AdminAgenda() {
                                 <button
                                   type="button"
                                   onClick={() => actions.openReplacement(booking, entry.studentName ?? "Aluno")}
-                                  className="self-start text-[12px] text-muted-foreground underline underline-offset-2 min-h-11 flex items-center"
+                                  aria-label={`Marcar como reposição: ${entry.studentName}, ${entry.hour}`}
+                                  className="self-start text-[13px] text-muted-foreground underline underline-offset-2 min-h-11 flex items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 >
                                   Marcar como reposição
                                 </button>
