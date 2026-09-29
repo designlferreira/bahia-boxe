@@ -9,13 +9,12 @@ import { BookingFilters } from "@/components/BookingFilters";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/SkeletonCard";
-import { TIMEZONE, formatTime, formatWeekdayLong } from "@/lib/dateUtils";
+import { TIMEZONE, formatQuando, formatTime, formatWeekdayLong } from "@/lib/dateUtils";
 import { Button } from "@/components/ui/button";
-import { getAdminBookingHistoryPage } from "@/integrations/backend/api";
+import { VINCULO_LABEL, getAdminBookingHistoryPage } from "@/integrations/backend/api";
 import { CalendarX } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
 import { isAwaitingConfirmation } from "@/lib/bookingStatus";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 type Periodo = "proximas" | "anteriores";
@@ -48,6 +47,19 @@ function tituloDoDia(iso: string): string {
   if (alvo === diaChave(new Date(agora - 86_400_000).toISOString())) return "Ontem";
   const mesmoAno = formatInTimeZone(iso, TIMEZONE, "yyyy") === formatInTimeZone(new Date(agora), TIMEZONE, "yyyy");
   return `${formatWeekdayLong(iso)}, ${formatInTimeZone(iso, TIMEZONE, mesmoAno ? "dd MMM" : "dd MMM yyyy", { locale: ptBR })}`;
+}
+
+/** A linha extra do cartão: quem cancelou, de onde a aula veio ou para onde foi. */
+function contextoDaAula(e: { booking: { status: string; canceladoPor?: string | null }; vinculo: string | null; deInicio: string | null; paraInicio: string | null }): string | null {
+  if (e.booking.status === "cancelled") {
+    if (e.booking.canceladoPor === "professor") return "Cancelada por você";
+    if (e.booking.canceladoPor === "aluno") return "Cancelada pelo aluno";
+    if (e.booking.canceladoPor === "regeneracao") return "Substituída ao gerar novas aulas";
+    return null;
+  }
+  if (e.booking.status === "rescheduled" && e.paraInicio) return `Remarcada para ${formatQuando(e.paraInicio)}`;
+  if ((e.vinculo === "remarcacao" || e.vinculo === "reposicao") && e.deInicio) return `Veio de ${formatQuando(e.deInicio)}`; // a etiqueta acima já diz se é remarcação ou reposição
+  return null;
 }
 
 export default function AdminHistorico() {
@@ -129,7 +141,9 @@ export default function AdminHistorico() {
                 {dia.titulo}
               </h2>
               <div className="flex flex-col gap-2.5">
-                {dia.itens.map(({ booking, studentName }) => (
+                {dia.itens.map(({ booking, studentName, vinculo, deInicio, paraInicio }) => (
+                  // Motivo/contexto numa linha curta: quem cancelou, de onde a aula veio ou para onde foi.
+
                   <button
                     key={booking.id}
                     type="button"
@@ -138,12 +152,20 @@ export default function AdminHistorico() {
                   >
                     <div className="flex items-center gap-2.5">
                       <div className="flex-1 min-w-0">
-                        <div className="text-[14.5px] font-semibold text-foreground">{studentName}</div>
+                        <div className="text-[14.5px] font-semibold text-foreground line-clamp-2 break-words">{studentName}</div>
+                        {/* Etiqueta numa linha própria (ao lado do nome ela espremia o cartão), como na Agenda. */}
+                        {vinculo && vinculo !== "pedido_remarcacao" && (
+                          <span className="inline-block mt-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                            {VINCULO_LABEL[vinculo]}
+                          </span>
+                        )}
                         <div className="text-[12.5px] text-muted-foreground mt-0.5">
                           {formatTime(booking.startTime)} – {formatTime(booking.endTime)}
                         </div>
+                        {contextoDaAula({ booking, vinculo, deInicio, paraInicio }) && (
+                          <div className="text-[12.5px] text-muted-foreground mt-0.5">{contextoDaAula({ booking, vinculo, deInicio, paraInicio })}</div>
+                        )}
                       </div>
-                      {booking.isReplacement && <Badge className="bg-secondary text-muted-foreground">Reposição</Badge>}
                       <StatusBadge
                         status={booking.status}
                         semRegistro={isAwaitingConfirmation(booking.status, booking.endTime)}

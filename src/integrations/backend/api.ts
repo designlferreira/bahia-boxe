@@ -1600,6 +1600,17 @@ export async function getAulasCancelaveisRecorrencia(studentId: string): Promise
 
 export const HISTORICO_PAGINA = 30;
 
+/** Uma linha do histórico: a aula + o contexto da cadeia (de onde veio / para onde foi). */
+export interface HistoricoItem {
+  booking: Booking;
+  studentName: string;
+  vinculo: VinculoAula | null;
+  /** Início da aula da qual esta veio (remarcação/reposição). */
+  deInicio: string | null;
+  /** Início da aula para a qual esta foi remarcada (só quando `booking.status === "rescheduled"`). */
+  paraInicio: string | null;
+}
+
 /** "João" e "joao" são a mesma busca (sem acento, sem maiúscula). */
 const semAcento = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
@@ -1614,7 +1625,7 @@ export async function getAdminBookingHistoryPage(
   statusFilter: string,
   periodo: "proximas" | "anteriores",
   page: number,
-): Promise<{ items: { booking: Booking; studentName: string }[]; hasMore: boolean }> {
+): Promise<{ items: HistoricoItem[]; hasMore: boolean }> {
   const students = await adminStudents(adminId);
   const nameOf = new Map(students.map((s) => [s.id, s.name]));
 
@@ -1637,10 +1648,39 @@ export async function getAdminBookingHistoryPage(
     .order("start_time", { ascending: periodo === "proximas" })
     .range(from, from + HISTORICO_PAGINA);
   if (error) throw new Error(error.message);
-  const rows = data ?? [];
+  const rows = (data ?? []).slice(0, HISTORICO_PAGINA);
+  const hasMore = (data ?? []).length > HISTORICO_PAGINA;
+
+  // Contexto da cadeia, em DUAS consultas para a página inteira (nunca uma por linha): de onde veio a aula
+  // (antecessor) e, nas remarcadas, para onde foi (sucessor).
+  const [ante, sucessores] = await Promise.all([
+    antecessores(rows.map((r) => r.replacement_for_booking_id)),
+    (async () => {
+      const idsRemarcadas = rows.filter((r) => r.status === "rescheduled").map((r) => r.id);
+      const out = new Map<string, string>();
+      if (idsRemarcadas.length === 0) return out;
+      const { data: suc, error: sucError } = await client()
+        .from("bookings")
+        .select("replacement_for_booking_id, start_time")
+        .in("replacement_for_booking_id", idsRemarcadas);
+      if (sucError) throw new Error(sucError.message);
+      for (const r of suc ?? []) if (r.replacement_for_booking_id) out.set(r.replacement_for_booking_id, r.start_time);
+      return out;
+    })(),
+  ]);
+
   return {
-    items: rows.slice(0, HISTORICO_PAGINA).map((r) => ({ booking: mapBooking(r), studentName: nameOf.get(r.student_id) ?? "Aluno" })),
-    hasMore: rows.length > HISTORICO_PAGINA,
+    items: rows.map((r) => {
+      const a = r.replacement_for_booking_id ? ante.get(r.replacement_for_booking_id) : undefined;
+      return {
+        booking: mapBooking(r),
+        studentName: nameOf.get(r.student_id) ?? "Aluno",
+        vinculo: a?.vinculo ?? (r.is_replacement ? ("reposicao" as VinculoAula) : null),
+        deInicio: a?.inicio ?? null,
+        paraInicio: sucessores.get(r.id) ?? null,
+      };
+    }),
+    hasMore,
   };
 }
 

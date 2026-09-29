@@ -827,9 +827,19 @@ const PACOTES_CASOS: { title: string; note: string; lista: unknown[] }[] = [
 
 /** Histórico do professor: aulas de vários alunos e estados; os filtros (busca/status) funcionam de verdade sobre esta lista. */
 function historicoAmostra() {
-  const n = (nome: string, dias: number, hora: number, status: Booking["status"], extra: Partial<Booking> = {}) => ({
+  const n = (
+    nome: string,
+    dias: number,
+    hora: number,
+    status: Booking["status"],
+    extra: Partial<Booking> = {},
+    ctx: { vinculo?: "remarcacao" | "reposicao" | null; deInicio?: string | null; paraInicio?: string | null } = {},
+  ) => ({
     booking: booking(dias, status, { id: `h-${nome}-${dias}-${hora}`, startTime: at(dias, hora), endTime: at(dias, hora + 1), ...extra }),
     studentName: nome,
+    vinculo: ctx.vinculo ?? null,
+    deInicio: ctx.deInicio ?? null,
+    paraInicio: ctx.paraInicio ?? null,
   });
   return [
     n("Diego Martins", 2, 19, "scheduled"),
@@ -840,16 +850,18 @@ function historicoAmostra() {
     n("Diego Martins", -1, 19, "no_show"),
     n("Helena Costa", -1, 7, "scheduled"),
     n("Karina Duarte", -3, 18, "scheduled"),
-    n("Marina Costa", -2, 7, "completed", { isReplacement: true }),
-    n("Carlos Henrique Lima", -3, 19, "cancelled"),
-    n("Igor Nascimento", -4, 12, "rescheduled"),
+    n("Marina Costa", -2, 7, "completed", { isReplacement: true }, { vinculo: "reposicao", deInicio: at(-9, 7) }),
+    n("Carlos Henrique Lima", -3, 19, "cancelled", { canceladoPor: "professor" }),
+    n("Igor Nascimento", -4, 12, "rescheduled", {}, { paraInicio: at(-1, 12) }),
     n("Fernanda Rocha de Albuquerque Cavalcanti Neto", -5, 18, "completed"),
     n("Julia Pereira", -6, 6, "completed"),
     n("Helena Costa", -8, 20, "no_show"),
     n("Igor Nascimento", -9, 12, "completed"),
     n("Ana Beatriz Souza", -12, 18, "completed"),
     n("Diego Martins", -20, 19, "completed"),
-    n("Marina Costa", -35, 7, "cancelled"),
+    n("Marina Costa", -35, 7, "cancelled", { canceladoPor: "regeneracao" }),
+    n("Helena Costa", -14, 20, "cancelled", { canceladoPor: "aluno" }),
+    n("Diego Martins", -7, 19, "completed", {}, { vinculo: "remarcacao", deInicio: at(-10, 19) }),
   ];
 }
 
