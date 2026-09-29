@@ -1,7 +1,14 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Profile, Role } from "./types";
 
-export class AuthError extends Error {}
+export class AuthError extends Error {
+  /** Motivo tratado pela tela (ex.: "email_not_confirmed" — o Login oferece reenviar o e-mail). */
+  code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.code = code;
+  }
+}
 
 type Listener = (profile: Profile | null) => void;
 
@@ -100,6 +107,12 @@ export async function signInWithPassword(email: string, password: string): Promi
     // (no status) or a server/gateway problem (403/5xx) would otherwise tell users their
     // password is wrong when it isn't.
     const status = error?.status;
+    // "Email not confirmed" chega como 400, igual a uma senha errada. Com "Confirm email" ativo é o
+    // caminho de todo aluno novo que tenta entrar antes de abrir o link do e-mail: dizer "senha
+    // incorreta" o fazia redefinir a senha em círculos sem nunca saber o problema real.
+    if (error?.code === "email_not_confirmed" || /email not confirmed/i.test(error?.message ?? "")) {
+      throw new AuthError("Seu e-mail ainda não foi confirmado. Abra o link que enviamos para você.", "email_not_confirmed");
+    }
     const isCredentialRejection = status === 400 || status === 401 || status === 422;
     throw new AuthError(
       isCredentialRejection

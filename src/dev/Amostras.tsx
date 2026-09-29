@@ -13,6 +13,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { addDays, subDays } from "date-fns";
 import { AuthContext } from "@/context/AuthContext";
+import { AuthError } from "@/integrations/backend/auth";
 import StudentHome from "@/pages/student/Home";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminAlunos from "@/pages/admin/Alunos";
@@ -21,6 +22,7 @@ import AdminAgenda from "@/pages/admin/Agenda";
 import StudentAgendar from "@/pages/student/Agendar";
 import AdminAulaDetalhe from "@/pages/admin/AulaDetalhe";
 import StudentAulaDetalhe from "@/pages/student/AulaDetalhe";
+import Login from "@/pages/auth/Login";
 import Convite from "@/pages/auth/Convite";
 import CriarConta from "@/pages/auth/CriarConta";
 import ConfirmarEmail from "@/pages/auth/ConfirmarEmail";
@@ -580,7 +582,19 @@ function SemLogin({ convite, children }: { convite?: { valid: boolean; reason: s
   return (
     <QueryClientProvider client={client}>
       <AuthContext.Provider
-        value={{ profile: null, loading: false, signIn: () => Promise.reject(new Error("amostra")), signOut: async () => {}, refreshProfile: () => {} }}
+        value={{
+          profile: null,
+          loading: false,
+          // Amostra do Login: e-mail com "naoconfirmado" simula o erro de e-mail não confirmado.
+          signIn: (email: string) =>
+            Promise.reject(
+              /naoconfirmado/i.test(email)
+                ? new AuthError("Seu e-mail ainda não foi confirmado. Abra o link que enviamos para você.", "email_not_confirmed")
+                : new Error("amostra"),
+            ),
+          signOut: async () => {},
+          refreshProfile: () => {},
+        }}
       >
         {children}
       </AuthContext.Provider>
@@ -798,6 +812,13 @@ export default function Amostras() {
 
         <h2 className="text-lg font-semibold mb-4">Entrada (convite e criar conta)</h2>
         <div className="flex flex-wrap gap-6 mb-12">
+          <Frame title="Login" note="tela de entrada de quem já tem conta">
+            <SemLogin>
+              <ComRota path="/login" url="/login">
+                <Login />
+              </ComRota>
+            </SemLogin>
+          </Frame>
           <Frame title="Convite válido" note="link de convite do professor">
             <SemLogin convite={{ valid: true, reason: "ok" }}>
               <ComRota path="/convite/:token" url="/convite/amostra">

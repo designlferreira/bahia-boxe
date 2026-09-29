@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { AuthError } from "@/integrations/backend/auth";
+import { AuthError, resendConfirmationEmail } from "@/integrations/backend/auth";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -16,6 +16,10 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // E-mail não confirmado: a tela oferece reenviar o link (o mesmo do "Confirme seu e-mail").
+  const [naoConfirmado, setNaoConfirmado] = useState(false);
+  const [reenvio, setReenvio] = useState<{ ok: boolean; texto: string } | null>(null);
+  const [reenviando, setReenviando] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -35,14 +39,31 @@ export default function Login() {
     return Object.keys(errors).length === 0;
   }
 
+  async function reenviar() {
+    if (reenviando) return;
+    setReenviando(true);
+    setReenvio(null);
+    try {
+      await resendConfirmationEmail(email);
+      setReenvio({ ok: true, texto: "E-mail reenviado. Confira sua caixa de entrada e o spam." });
+    } catch (err) {
+      setReenvio({ ok: false, texto: err instanceof AuthError ? err.message : "Não foi possível reenviar agora. Tente de novo." });
+    } finally {
+      setReenviando(false);
+    }
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setNaoConfirmado(false);
+    setReenvio(null);
     if (!validate()) return;
     setLoading(true);
     try {
       await signIn(email, password);
     } catch (err) {
+      setNaoConfirmado(err instanceof AuthError && err.code === "email_not_confirmed");
       setError(err instanceof AuthError ? err.message : "Não foi possível entrar. Tente novamente.");
     } finally {
       setLoading(false);
@@ -130,8 +151,20 @@ export default function Login() {
         </div>
 
         {error && (
-          <div role="alert" className="text-[13px] text-destructive">
+          <div role="alert" className="rounded-2xl border border-destructive/35 bg-destructive/10 p-3.5 text-[13px] text-destructive">
             {error}
+            {naoConfirmado && (
+              <div className="mt-2.5">
+                <Button type="button" variant="secondary" size="sm" onClick={reenviar} disabled={reenviando}>
+                  {reenviando ? "Reenviando…" : "Reenviar e-mail de confirmação"}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+        {reenvio && (
+          <div role="status" className={`text-[13px] ${reenvio.ok ? "text-accent" : "text-destructive"}`}>
+            {reenvio.texto}
           </div>
         )}
 
