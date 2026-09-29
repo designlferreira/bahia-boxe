@@ -23,6 +23,7 @@ export default function RecuperarSenha({ amostraEnviado }: { amostraEnviado?: st
   const [reenviando, setReenviando] = useState(false);
   const [reenvioMsg, setReenvioMsg] = useState<string | null>(null);
   const tituloEnviadoRef = useRef<HTMLHeadingElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
 
   // Ao trocar o formulário pelo "LINK ENVIADO" o botão que tinha o foco some: sem isso o foco caía no <body> e o leitor de tela
   // não anunciava nada. Leva o foco ao título do cartão.
@@ -39,12 +40,15 @@ export default function RecuperarSenha({ amostraEnviado }: { amostraEnviado?: st
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    // Erro de e-mail leva o foco ao campo (o leitor de tela anuncia o erro e a pessoa já está onde corrigir).
     if (!email.trim()) {
       setEmailError("Informe seu e-mail.");
+      emailRef.current?.focus();
       return;
     }
     if (!EMAIL_RE.test(email.trim())) {
       setEmailError("Informe um e-mail válido.");
+      emailRef.current?.focus();
       return;
     }
     setEmailError(null);
@@ -82,7 +86,10 @@ export default function RecuperarSenha({ amostraEnviado }: { amostraEnviado?: st
       <PageHeader title="RECUPERAR SENHA" back={false} />
       {/* Só no formulário: no cartão de "enviado" já há o botão "Voltar para o login" (eram dois iguais na mesma tela). */}
       {!sent && (
-        <Link to="/login" className="inline-flex min-h-11 items-center text-[13px] text-muted-foreground -mt-2 mb-1 -ml-1 pl-1">
+        <Link
+          to="/login"
+          className="inline-flex min-h-11 items-center text-[13px] text-muted-foreground -mt-2 mb-1 -ml-1 pl-1 pr-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
           ← Voltar para o login
         </Link>
       )}
@@ -96,7 +103,12 @@ export default function RecuperarSenha({ amostraEnviado }: { amostraEnviado?: st
             <Label htmlFor="email">E-mail</Label>
             <Input
               id="email"
+              ref={emailRef}
               type="email"
+              autoComplete="email"
+              inputMode="email"
+              autoCapitalize="none"
+              spellCheck={false}
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
@@ -108,7 +120,7 @@ export default function RecuperarSenha({ amostraEnviado }: { amostraEnviado?: st
               aria-describedby={emailError ? "email-error" : undefined}
             />
             {emailError && (
-              <div id="email-error" role="alert" className="text-[12.5px] text-destructive mt-1.5">
+              <div id="email-error" role="alert" className="text-[12.5px] text-[hsl(var(--red-text))] mt-1.5">
                 {emailError}
               </div>
             )}
