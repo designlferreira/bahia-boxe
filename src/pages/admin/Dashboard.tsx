@@ -243,6 +243,7 @@ function ResolverAgora({
           {pending.map((b) => (
             <ItemResolver
               key={b.id}
+              itemId={b.id}
               nome={b.studentName}
               etiqueta={b.antecessorInicio ? "Remarcação" : "Novo horário"}
               horario={
@@ -292,6 +293,7 @@ function ResolverAgora({
           {awaiting.map((b) => (
             <ItemResolver
               key={b.id}
+              itemId={b.id}
               nome={b.studentName}
               horario={quando(b.startTime)}
               quando={quando(b.startTime)}
@@ -360,6 +362,28 @@ function ResolverAgora({
  * agenda do dia (o destaque) ia pra baixo da dobra justo no dia mais cheio. Lembra, na sessão, se o
  * professor deixou aberto — ir pra agenda e voltar não fecha o que ele estava resolvendo.
  */
+const EVENTO_ABRIR_GRUPO = "painel:abrir-grupo";
+
+/**
+ * Aula de hoje "Sem registro" aparecia duas vezes: na agenda (só abria o detalhe) e em "Resolver
+ * agora" (com os botões). Tocar nela na agenda agora abre o grupo e leva até o item, com destaque
+ * breve. Se o item não estiver lá (a aula acabou depois do painel carregar), abre o detalhe.
+ */
+function irParaRegistro(bookingId: string, fallback: () => void) {
+  window.dispatchEvent(new CustomEvent(EVENTO_ABRIR_GRUPO, { detail: { grupo: "aulas-sem-registro" } }));
+  // Timer, não requestAnimationFrame: o rAF fica parado com a aba em segundo plano. 50ms basta pro
+  // React abrir o grupo (o estado muda no mesmo clique).
+  window.setTimeout(() => {
+    const item = document.querySelector<HTMLElement>(`#aulas-sem-registro [data-item-id="${bookingId}"]`);
+    if (!item) return fallback();
+    const reduzir = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    item.scrollIntoView({ block: "center", behavior: reduzir ? "auto" : "smooth" });
+    item.querySelector<HTMLElement>("[data-primario]")?.focus({ preventScroll: true });
+    item.classList.add("ring-2", "ring-amber/60");
+    window.setTimeout(() => item.classList.remove("ring-2", "ring-amber/60"), 1600);
+  }, 50);
+}
+
 function Grupo({
   id,
   titulo,
@@ -391,6 +415,16 @@ function Grupo({
       }
       return novo;
     });
+
+  // A agenda de hoje pede pra abrir este grupo quando o professor toca numa aula "Sem registro".
+  useEffect(() => {
+    const abrir = (e: Event) => {
+      if ((e as CustomEvent<{ grupo: string }>).detail?.grupo === id) setAberto(() => true);
+    };
+    window.addEventListener(EVENTO_ABRIR_GRUPO, abrir);
+    return () => window.removeEventListener(EVENTO_ABRIR_GRUPO, abrir);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
   return (
     <div className={cn(borda && "border-t border-border")}>
       <button
@@ -417,6 +451,7 @@ function Grupo({
 }
 
 function ItemResolver({
+  itemId,
   nome,
   etiqueta,
   horario,
@@ -425,6 +460,7 @@ function ItemResolver({
   primario,
   secundario,
 }: {
+  itemId: string;
   nome: string;
   etiqueta?: string;
   horario: ReactNode;
@@ -435,7 +471,7 @@ function ItemResolver({
   secundario: { label: string; onClick: () => void };
 }) {
   return (
-    <div className="py-3 border-t border-border">
+    <div data-item-id={itemId} className="py-3 border-t border-border rounded-md transition-shadow">
       <div className="flex justify-between items-start gap-3 mb-2.5">
         <div className="min-w-0">
           <div className="text-[15px] font-semibold text-foreground">{nome}</div>
@@ -539,7 +575,12 @@ function Hoje({ today, nextAfterToday, agora }: { today: AulaComNome[]; nextAfte
               <li key={b.id}>
                 <button
                   type="button"
-                  onClick={() => navigate(`/admin/aula/${b.id}`)}
+                  onClick={() =>
+                    semRegistro ? irParaRegistro(b.id, () => navigate(`/admin/aula/${b.id}`)) : navigate(`/admin/aula/${b.id}`)
+                  }
+                  aria-label={
+                    semRegistro ? `${formatTime(b.startTime)}, ${b.studentName}, sem registro. Registrar agora` : undefined
+                  }
                   className="w-full text-left min-h-11 py-2 flex items-center gap-3 border-b border-border last:border-b-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
                 >
                   <span className={cn("font-display text-xl w-[52px] shrink-0", passou ? "text-muted-foreground" : "text-foreground")}>
