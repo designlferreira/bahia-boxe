@@ -33,6 +33,7 @@ import AdminConfiguracoes from "@/pages/admin/Configuracoes";
 import AdminDisponibilidade from "@/pages/admin/Disponibilidade";
 import AdminPacotes from "@/pages/admin/Pacotes";
 import StudentMinhaConta from "@/pages/student/MinhaConta";
+import AdminHistorico from "@/pages/admin/Historico";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
 import { RemarcacaoSheet } from "@/components/RemarcacaoSheet";
@@ -824,6 +825,46 @@ const PACOTES_CASOS: { title: string; note: string; lista: unknown[] }[] = [
   { title: "Nenhum modelo", note: "primeira vez", lista: [] },
 ];
 
+/** Histórico do professor: aulas de vários alunos e estados; os filtros (busca/status) funcionam de verdade sobre esta lista. */
+function historicoAmostra() {
+  const n = (
+    nome: string,
+    dias: number,
+    hora: number,
+    status: Booking["status"],
+    extra: Partial<Booking> = {},
+    ctx: { vinculo?: "remarcacao" | "reposicao" | null; deInicio?: string | null; paraInicio?: string | null } = {},
+  ) => ({
+    booking: booking(dias, status, { id: `h-${nome}-${dias}-${hora}`, startTime: at(dias, hora), endTime: at(dias, hora + 1), ...extra }),
+    studentName: nome,
+    vinculo: ctx.vinculo ?? null,
+    deInicio: ctx.deInicio ?? null,
+    paraInicio: ctx.paraInicio ?? null,
+  });
+  return [
+    n("Diego Martins", 2, 19, "scheduled"),
+    n("Ana Beatriz Souza", 1, 18, "scheduled"),
+    n("Carlos Henrique Lima", 1, 7, "pending_confirmation"),
+    n("Julia Pereira", 0, 6, "scheduled"),
+    n("Ana Beatriz Souza", -1, 18, "completed"),
+    n("Diego Martins", -1, 19, "no_show"),
+    n("Helena Costa", -1, 7, "scheduled"),
+    n("Karina Duarte", -3, 18, "scheduled"),
+    n("Marina Costa", -2, 7, "completed", { isReplacement: true }, { vinculo: "reposicao", deInicio: at(-9, 7) }),
+    n("Carlos Henrique Lima", -3, 19, "cancelled", { canceladoPor: "professor" }),
+    n("Igor Nascimento", -4, 12, "rescheduled", {}, { paraInicio: at(-1, 12) }),
+    n("Fernanda Rocha de Albuquerque Cavalcanti Neto", -5, 18, "completed"),
+    n("Julia Pereira", -6, 6, "completed"),
+    n("Helena Costa", -8, 20, "no_show"),
+    n("Igor Nascimento", -9, 12, "completed"),
+    n("Ana Beatriz Souza", -12, 18, "completed"),
+    n("Diego Martins", -20, 19, "completed"),
+    n("Marina Costa", -35, 7, "cancelled", { canceladoPor: "regeneracao" }),
+    n("Helena Costa", -14, 20, "cancelled", { canceladoPor: "aluno" }),
+    n("Diego Martins", -7, 19, "completed", {}, { vinculo: "remarcacao", deInicio: at(-10, 19) }),
+  ];
+}
+
 function SeededAdmin({ data, children, seed }: { data: unknown; children: ReactNode; seed?: (qc: QueryClient) => void }) {
   const [client] = useState(() => {
     const qc = new QueryClient({
@@ -1143,6 +1184,58 @@ export default function Amostras() {
             <Seeded data={base} modo="recorrencia">
               <StudentMinhaConta />
             </Seeded>
+          </Frame>
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Histórico (professor)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          <Frame title="Aulas de vários alunos" note="busca por aluno e filtro por status funcionam sobre estes dados">
+            <SeededAdmin
+              data={null}
+              seed={(qc) => {
+                const lista = historicoAmostra();
+                // A tela passa o próprio `queryFn` (que vence o padrão do QueryClient), então cada consulta nova
+                // (uma busca, um chip) é preenchida assim que entra no cache.
+                const norm = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+                const filtrar = (busca: string, status: string, periodo: string) => {
+                  const agora = Date.now();
+                  const ok = lista.filter((e) => {
+                    const acabou = new Date(e.booking.endTime).getTime() < agora;
+                    const doPeriodo = periodo === "proximas" ? !acabou : acabou;
+                    const okStatus =
+                      status === "todas" ||
+                      ((status === "sem_registro" || status === "scheduled") ? e.booking.status === "scheduled" : e.booking.status === status);
+                    return doPeriodo && okStatus && (!norm(busca) || norm(e.studentName).includes(norm(busca)));
+                  });
+                  return ok.sort((x, y) => (periodo === "proximas" ? 1 : -1) * (new Date(x.booking.startTime).getTime() - new Date(y.booking.startTime).getTime()));
+                };
+                // Consulta paginada: `pages` guarda { items, hasMore } (a amostra não pagina: "Ver mais" chamaria a consulta real).
+                const POR_PAGINA = 100;
+                qc.getQueryCache().subscribe((ev) => {
+                  if (ev.type === "added" && ev.query.queryKey[0] === "admin-history") {
+                    const todas = filtrar(String(ev.query.queryKey[2] ?? ""), String(ev.query.queryKey[3] ?? "todas"), String(ev.query.queryKey[4] ?? "anteriores"));
+                    qc.setQueryData(ev.query.queryKey, {
+                      pages: [{ items: todas.slice(0, POR_PAGINA), hasMore: todas.length > POR_PAGINA }],
+                      pageParams: [0],
+                    });
+                  }
+                });
+              }}
+            >
+              <AdminHistorico />
+            </SeededAdmin>
+          </Frame>
+          <Frame title="Sem aulas" note="nenhuma aula registrada">
+            <SeededAdmin
+              data={null}
+              seed={(qc) => {
+                qc.getQueryCache().subscribe((ev) => {
+                  if (ev.type === "added" && ev.query.queryKey[0] === "admin-history") qc.setQueryData(ev.query.queryKey, { pages: [{ items: [], hasMore: false }], pageParams: [0] });
+                });
+              }}
+            >
+              <AdminHistorico />
+            </SeededAdmin>
           </Frame>
         </div>
 

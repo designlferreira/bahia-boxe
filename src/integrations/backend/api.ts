@@ -1598,23 +1598,90 @@ export async function getAulasCancelaveisRecorrencia(studentId: string): Promise
 // admin · histórico
 // ---------------------------------------------------------------------------
 
-export async function getAdminBookingHistory(
+export const HISTORICO_PAGINA = 30;
+
+/** Uma linha do histórico: a aula + o contexto da cadeia (de onde veio / para onde foi). */
+export interface HistoricoItem {
+  booking: Booking;
+  studentName: string;
+  vinculo: VinculoAula | null;
+  /** Início da aula da qual esta veio (remarcação/reposição). */
+  deInicio: string | null;
+  /** Início da aula para a qual esta foi remarcada (só quando `booking.status === "rescheduled"`). */
+  paraInicio: string | null;
+}
+
+/** "João" e "joao" são a mesma busca (sem acento, sem maiúscula). */
+const semAcento = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+/**
+ * Uma página do histórico do professor. A busca por aluno e o filtro de status são aplicados NA CONSULTA (antes eram
+ * aplicados no aparelho sobre as 200 aulas mais recentes: um aluno antigo, ou "Faltas", podia sumir sem aviso).
+ * `hasMore` vem de pedir uma linha a mais que a página.
+ */
+export async function getAdminBookingHistoryPage(
   adminId: string,
   search: string,
   statusFilter: string,
-): Promise<{ booking: Booking; studentName: string }[]> {
-  const [bookingsRes, students] = await Promise.all([
-    client().from("bookings").select("*").eq("admin_id", adminId).order("start_time", { ascending: false }).limit(200),
-    adminStudents(adminId),
-  ]);
-  if (bookingsRes.error) throw new Error(bookingsRes.error.message);
-
+  periodo: "proximas" | "anteriores",
+  page: number,
+): Promise<{ items: HistoricoItem[]; hasMore: boolean }> {
+  const students = await adminStudents(adminId);
   const nameOf = new Map(students.map((s) => [s.id, s.name]));
-  const q = search.trim().toLowerCase();
-  return (bookingsRes.data ?? [])
-    .filter((r) => statusFilter === "todas" || r.status === statusFilter)
-    .map((r) => ({ booking: mapBooking(r), studentName: nameOf.get(r.student_id) ?? "Aluno" }))
-    .filter((e) => !q || e.studentName.toLowerCase().includes(q));
+
+  let query = client().from("bookings").select("*").eq("admin_id", adminId);
+  const q = semAcento(search);
+  if (q) {
+    const ids = students.filter((s) => semAcento(s.name).includes(q)).map((s) => s.id);
+    if (ids.length === 0) return { items: [], hasMore: false };
+    query = query.in("student_id", ids);
+  }
+  // Próximas = ainda não terminaram (em ordem crescente); anteriores = já terminaram (da mais recente para a mais
+  // antiga). "Sem registro" é uma agendada que já terminou, então só existe entre as anteriores.
+  const agora = new Date().toISOString();
+  query = periodo === "proximas" ? query.gte("end_time", agora) : query.lt("end_time", agora);
+  if (statusFilter === "sem_registro" || statusFilter === "scheduled") query = query.eq("status", "scheduled");
+  else if (statusFilter !== "todas") query = query.eq("status", statusFilter);
+
+  const from = page * HISTORICO_PAGINA;
+  const { data, error } = await query
+    .order("start_time", { ascending: periodo === "proximas" })
+    .range(from, from + HISTORICO_PAGINA);
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []).slice(0, HISTORICO_PAGINA);
+  const hasMore = (data ?? []).length > HISTORICO_PAGINA;
+
+  // Contexto da cadeia, em DUAS consultas para a página inteira (nunca uma por linha): de onde veio a aula
+  // (antecessor) e, nas remarcadas, para onde foi (sucessor).
+  const [ante, sucessores] = await Promise.all([
+    antecessores(rows.map((r) => r.replacement_for_booking_id)),
+    (async () => {
+      const idsRemarcadas = rows.filter((r) => r.status === "rescheduled").map((r) => r.id);
+      const out = new Map<string, string>();
+      if (idsRemarcadas.length === 0) return out;
+      const { data: suc, error: sucError } = await client()
+        .from("bookings")
+        .select("replacement_for_booking_id, start_time")
+        .in("replacement_for_booking_id", idsRemarcadas);
+      if (sucError) throw new Error(sucError.message);
+      for (const r of suc ?? []) if (r.replacement_for_booking_id) out.set(r.replacement_for_booking_id, r.start_time);
+      return out;
+    })(),
+  ]);
+
+  return {
+    items: rows.map((r) => {
+      const a = r.replacement_for_booking_id ? ante.get(r.replacement_for_booking_id) : undefined;
+      return {
+        booking: mapBooking(r),
+        studentName: nameOf.get(r.student_id) ?? "Aluno",
+        vinculo: a?.vinculo ?? (r.is_replacement ? ("reposicao" as VinculoAula) : null),
+        deInicio: a?.inicio ?? null,
+        paraInicio: sucessores.get(r.id) ?? null,
+      };
+    }),
+    hasMore,
+  };
 }
 
 // ---------------------------------------------------------------------------
