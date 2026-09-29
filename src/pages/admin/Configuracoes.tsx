@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SkeletonCard } from "@/components/SkeletonCard";
+import { ErrorState } from "@/components/ErrorState";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -49,7 +50,7 @@ export default function AdminConfiguracoes() {
   // Modo escolhido, esperando confirmação: só grava depois do "Trocar" (decisão do Lucas).
   const [modoPendente, setModoPendente] = useState<ModoAgendamento | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: key,
     queryFn: () => getAdminSettings(profile!.id),
     enabled: !!profile,
@@ -61,6 +62,8 @@ export default function AdminConfiguracoes() {
       queryClient.invalidateQueries({ queryKey: key });
       toast(value ? "Falta passa a consumir crédito" : "Falta não consome mais crédito");
     },
+    // Antes uma falha de gravação sumia em silêncio (só o WhatsApp avisava) e o switch voltava sozinho.
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível salvar. Tente de novo."),
   });
 
   const toggleModo = useMutation({
@@ -69,6 +72,7 @@ export default function AdminConfiguracoes() {
       queryClient.invalidateQueries({ queryKey: key });
       toast(value === "recorrencia" ? "Modo Recorrência ativado" : "Modo Autosserviço ativado");
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível trocar o modo. Tente de novo."),
   });
 
   // WhatsApp que os alunos usam pra falar com o professor (0032).
@@ -108,10 +112,12 @@ export default function AdminConfiguracoes() {
         <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
       </button>
 
+      {isError && !isLoading && <ErrorState onRetry={() => refetch()} />}
+
       {isLoading && <SkeletonCard height={80} />}
       {isLoading && <SkeletonCard height={120} className="mt-3.5" />}
 
-      {!isLoading && (
+      {!isLoading && !isError && (
         <div className="card-dark p-4 flex items-center gap-3">
           <div className="flex-1">
             <div className="text-[14.5px] font-semibold text-foreground">Falta consome crédito</div>
@@ -122,12 +128,13 @@ export default function AdminConfiguracoes() {
           <Switch
             aria-label="Alternar consumo de crédito na falta"
             checked={data?.noShowConsumesClass ?? true}
+            disabled={toggle.isPending}
             onCheckedChange={(v) => toggle.mutate(v)}
           />
         </div>
       )}
 
-      {!isLoading && (
+      {!isLoading && !isError && (
         <div className="card-dark p-4 mt-3.5">
           <div className="text-[14.5px] font-semibold text-foreground">Modo de agendamento</div>
           <div className="text-[12.5px] text-muted-foreground mt-0.5">
@@ -162,7 +169,7 @@ export default function AdminConfiguracoes() {
         </div>
       )}
 
-      {!isLoading && (
+      {!isLoading && !isError && (
         <div className="card-dark p-4 mt-3.5">
           <label htmlFor="whatsapp" className="text-[15px] font-semibold text-foreground">
             WhatsApp para os alunos

@@ -790,7 +790,7 @@ function SeededAdmin({ data, children, seed }: { data: unknown; children: ReactN
     (w.__amostrasAdmin ??= []).push(qc);
     // Professor configurado pra falta NÃO descontar, mas o pacote de recorrência do Diego foi criado
     // quando descontava: a janela de falta tem que seguir o pacote (regra da aula, não a geral).
-    if (!qc.getQueryData(["admin-settings", ADMIN_ID])) {
+    if (!qc.getQueryState(["admin-settings", ADMIN_ID])) {
       qc.setQueryData(["admin-settings", ADMIN_ID], { adminId: ADMIN_ID, noShowConsumesClass: false, modoAgendamento: "autosservico", whatsapp: null });
     }
     qc.setQueryData(["regra-consumo", "a-s3--1-19", false], { falta: true, cancelamentoPeloAluno: true, origem: "pacote" });
@@ -1028,11 +1028,18 @@ export default function Amostras() {
           {[
             { title: "Autosserviço, com WhatsApp", note: "falta não consome aula; número cadastrado", modo: "autosservico", noShow: false, whatsapp: "5511947034983" },
             { title: "Recorrência, sem WhatsApp", note: "falta consome aula; sem número (alunos não veem o botão)", modo: "recorrencia", noShow: true, whatsapp: null },
+            { title: "Não carregou", note: "a busca das configurações falhou", modo: "erro", noShow: true, whatsapp: null },
           ].map((c) => (
             <Frame key={c.title} title={c.title} note={c.note}>
               <SeededAdmin
                 data={null}
-                seed={(qc) => qc.setQueryData(["admin-settings", ADMIN_ID], { adminId: ADMIN_ID, noShowConsumesClass: c.noShow, modoAgendamento: c.modo, whatsapp: c.whatsapp })}
+                seed={(qc) => {
+                  if (c.modo === "erro") {
+                    qc.fetchQuery({ queryKey: ["admin-settings", ADMIN_ID], queryFn: () => Promise.reject(new Error("amostra")), retry: false }).catch(() => {});
+                  } else {
+                    qc.setQueryData(["admin-settings", ADMIN_ID], { adminId: ADMIN_ID, noShowConsumesClass: c.noShow, modoAgendamento: c.modo, whatsapp: c.whatsapp });
+                  }
+                }}
               >
                 <AdminConfiguracoes />
               </SeededAdmin>
