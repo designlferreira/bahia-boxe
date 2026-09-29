@@ -86,6 +86,12 @@ function HoraChips({ label, horas, selecionada, desabilitada, onPick }: HoraChip
   );
 }
 
+/** ["seg", "ter", "sex"] -> "Seg, ter e sex" */
+function listaDias(dias: string[]): string {
+  const txt = dias.length <= 1 ? dias.join("") : `${dias.slice(0, -1).join(", ")} e ${dias[dias.length - 1]}`;
+  return txt.charAt(0).toUpperCase() + txt.slice(1);
+}
+
 /** "Toda segunda", "Todo domingo" — Domingo e Sábado são masculinos. */
 const todo = (weekday: number) => (weekday === 0 || weekday === 6 ? "Todo" : "Toda");
 
@@ -187,24 +193,27 @@ export default function AdminDisponibilidade() {
 
   if (!profile) return null;
 
-  const totalSlots = data?.reduce((n, d) => n + d.slots.length, 0) ?? 0;
-  const totalDays = data?.filter((d) => d.active && d.slots.length > 0).length ?? 0;
+  // Segunda a domingo, como na Agenda (a lista do banco começa no domingo).
+  const ordenados = [...(data ?? [])].sort((a, b) => ((a.weekday + 6) % 7) - ((b.weekday + 6) % 7));
+  const diasAbertos = ordenados.filter((d) => d.active && d.slots.length > 0).map((d) => d.name.slice(0, 3).toLowerCase());
 
   return (
     <div className="page-container">
       <PageHeader title="MINHA DISPONIBILIDADE" subtitle={`Grade semanal · próximas ${HORIZON_WEEKS} semanas`} back />
 
-      <div className="rounded-[18px] px-4 py-3.5 mb-4 bg-[linear-gradient(150deg,#1F1B0C,#171717_62%)] border border-[#35301A] flex items-center gap-3.5">
-        <div>
-          <div className="font-display text-[34px] leading-[0.9] text-accent">{totalSlots}</div>
-          <div className="text-[11px] uppercase tracking-wide text-accent/70">intervalos</div>
-        </div>
-        <div className="w-px h-9 bg-[#2E2A1A]" />
-        <div className="flex-1 text-[12.5px] text-foreground/80 leading-snug">
-          Alunos podem agendar em <strong className="text-foreground">{totalDays} dias</strong> da semana. Aulas já
-          marcadas não são afetadas por mudanças aqui.
-        </div>
-      </div>
+      {/* A semana num relance: quais dias estão abertos (antes um cartão dourado com "N intervalos" que repetia a lista). */}
+      {!isLoading && !isError && data && (
+        <p className="text-[13.5px] text-foreground/85 leading-snug mb-4">
+          {diasAbertos.length === 0 ? (
+            <>Nenhum dia aberto ainda. Toque em + no dia em que você quer receber alunos.</>
+          ) : (
+            <>
+              <strong className="text-foreground">{listaDias(diasAbertos)}</strong> {diasAbertos.length === 1 ? "aberto" : "abertos"} para agendamento.
+            </>
+          )}{" "}
+          Aulas já marcadas não são afetadas por mudanças aqui.
+        </p>
+      )}
 
       {emRecorrencia && (
         <div className="rounded-xl border border-amber/40 bg-amber/10 p-3.5 mb-4 text-[13px] leading-snug">
@@ -225,7 +234,26 @@ export default function AdminDisponibilidade() {
 
       {!isLoading && !isError && data && (
         <div className="flex flex-col gap-3">
-          {data.map((day) => (
+          {ordenados.map((day) => day.slots.length === 0 ? (
+            // Dia sem horários: uma linha só. Sem interruptor (não há o que ligar) e sem o quadro tracejado repetido.
+            <div key={day.weekday} className="card-dark px-[15px] py-2.5 flex items-center gap-3">
+              <div className="flex-1">
+                <div className="text-[15px] font-semibold text-muted-foreground">{day.name}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">Sem horários — alunos não agendam neste dia</div>
+              </div>
+              <button
+                type="button"
+                aria-label={`Adicionar horário na ${day.name.toLowerCase()}`}
+                onClick={() => {
+                  setEditor({ weekday: day.weekday, dayName: day.name, interval: null, start: "06:00", end: "09:00" });
+                  setEditorError(null);
+                }}
+                className={`h-11 w-11 shrink-0 rounded-[10px] border border-border bg-secondary flex items-center justify-center active:scale-95 ${FOCO}`}
+              >
+                <Plus className="h-4 w-4 text-foreground/85" aria-hidden />
+              </button>
+            </div>
+          ) : (
             <div key={day.weekday} className="card-dark p-[15px]">
               <div className="flex items-center gap-3 mb-3">
                 <div className="flex-1">
@@ -300,14 +328,6 @@ export default function AdminDisponibilidade() {
                       </div>
                     );
                   })}
-                </div>
-              )}
-
-              {day.slots.length === 0 && (
-                <div className="border border-dashed border-[#2E2E2E] rounded-[13px] p-4 text-center mb-2.5">
-                  <div className="text-[12.5px] text-muted-foreground">
-                    Nenhum intervalo — alunos não conseguem agendar neste dia.
-                  </div>
                 </div>
               )}
 
