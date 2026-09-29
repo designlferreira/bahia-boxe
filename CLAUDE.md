@@ -130,10 +130,13 @@ Existem DOIS fluxos de agendamento coexistindo, selecionados pela flag
   - **Onde se calcula "aulas restantes" hoje**: RPC
     `available_credits_for_student` (canônica, soma todos os pacotes `active`
     do aluno menos reservas futuras) via `creditsAvailableFor()` em `api.ts`;
-    espelhada em lote por `creditsByStudent()` no mesmo arquivo (mesma
-    fórmula, evita N chamadas de RPC em listas); progresso de UM pacote
-    (`total_classes - used_classes`) via `packageProgressPct()` em
-    `packageUtils.ts`.
+    progresso de UM pacote (`total_classes - used_classes`) via
+    `packageProgressPct()` em `packageUtils.ts`. **Atualização (2026-09-28):**
+    isso é "créditos para AGENDAR", não "aulas restantes" — na recorrência dá 0
+    por construção. As telas de professor (painel, "Alunos em risco", lista de
+    alunos) mostram aulas RESTANTES (total − usadas, `saldo_pacotes` na
+    recorrência); `creditsByStudent()` foi removida (ver seção "Painel do
+    professor" no fim do arquivo).
 
 - **RECORRENCIA** (novo): o professor define dias e horários fixos no perfil de
   cada aluno e gera pacotes de aulas a partir disso.
@@ -2350,6 +2353,70 @@ does not exist"); a migration fica em `supabase/migrations/`, o script direto em
 **continua podendo cancelar** (comportamento de sempre, agora pela 0034, consumindo crédito se o
 pacote tiver `falta_consome_credito`). O `aviso_ausencia` original da Etapa 8 não foi implementado
 nem rediscutido.
+
+### Painel do professor: redesenho por crítica de design (2026-09-28) — sem migration nova
+
+Três críticas `/impeccable` do painel (`src/pages/admin/Dashboard.tsx`): **20 → 27 → 30 de 40**.
+Relatórios em `.impeccable/critique/*admin-dashboard*`. Tudo só de frontend (nenhuma migration),
+um passo por commit na `dev`, cada um testado pelo Lucas. Não repetir aqui o que os commits contam.
+
+**Estrutura do painel (decisões do Lucas — não reabrir sem ele):**
+- **"Hoje" primeiro**, como destaque: aula em andamento ou próxima (contagem "em 40 min", relógio de
+  1 min), resto do dia abaixo, passadas apagadas. "Dia livre" + "Próxima aula" quando não há mais
+  aula hoje. Os quadrinhos "Hoje N aulas"/"Alunos N ativos" **saíram** (decisão explícita).
+- **"Resolver agora" logo abaixo** (não acima — decisão explícita): grupos recolhíveis que lembram
+  na sessão se estavam abertos (`sessionStorage`, `painel.grupo.*`):
+  - pedidos de horário (Aprovar/Recusar via `usePendingActions`);
+  - aulas sem registro (Aconteceu/Faltou via `useLessonActions`) e **"Todas aconteceram"** (2+ aulas;
+    confirma listando; registra uma por vez — várias podem ser do mesmo pacote; um só "Desfazer");
+  - pedidos de aulas (link para Solicitações);
+  - o que **falta configurar** (WhatsApp sempre; horários e pacotes só no autosserviço) — continua
+    aparecendo depois do primeiro aluno. Sem aluno nenhum, os mesmos passos viram "Comece por aqui"
+    (+ "Convidar o primeiro aluno"), com "N de M passos feitos".
+- Tocar numa aula "Sem registro" na agenda de hoje **leva ao item** em "Resolver agora" (abre o
+  grupo, rola, destaca, foca "Aconteceu"); se o item não estiver lá, abre o detalhe.
+- Foco: resolver um item leva o foco pro próximo item/título do grupo/"Resolver agora"/"Hoje" —
+  nunca pro começo da página. Os avisos (Sonner) já são `aria-live`; Alt+T alcança o "Desfazer".
+- "Alunos em risco" = pacote acabando (≤2 restantes) ou 2 faltas seguidas; máx. 3 no painel;
+  "Ver todos" abre `/admin/alunos?filtro=risco` (filtro na URL).
+
+**Registrar aula (decisões do Lucas, valem no painel, na Agenda e no detalhe da aula):**
+- **"Aconteceu" registra direto, sem janela** — tem "Desfazer" no aviso e o botão permanente
+  "Desfazer conclusão" no detalhe. Não recolocar a confirmação.
+- **"Faltou" só confirma quando a falta DESCONTA aula** (ou quando a regra não pôde ser lida).
+- Botões se chamam **"Aconteceu"/"Faltou"** em todas as telas (antes "Concluir"/"Falta").
+
+**Bug de texto corrigido — a janela prometia a regra errada:** a janela de falta lia sempre
+`profiles.no_show_consumes_class`. A regra real (`getRegraDeConsumo`, `api.ts`) espelha o banco:
+- aula com `pacote_id` → `coalesce(pacote.falta_consome_credito, configuração)` (decisão 3) — vale
+  pra falta e pra "o aluno cancelou";
+- sem pacote: falta segue a configuração; **reposição nunca desconta** (`mark_no_show`, 0020);
+  **cancelamento nunca desconta** (`cancelar_aula` não lança nada no ledger).
+Qualquer texto novo sobre "desconta ou não" deve sair dessa função, nunca da configuração direto.
+
+**Cor com significado (decisão do Lucas) e selo único:**
+- `StatusBadge` (`src/components/StatusBadge.tsx`) é o ÚNICO selo de status — as 9 telas que
+  montavam o seu passaram a usá-lo. Não montar `<Badge className={cfg.badgeClass}>` de novo.
+- **"Concluída" = neutro com ✓** (era dourado, quase igual ao âmbar no selo pequeno). **Âmbar = depende
+  do professor** ("Sem registro", "Pendente"). Vermelho = falta/recusa. **Dourado = ação positiva**
+  (botão `variant="soft"`: Aconteceu/Aprovar — sem o brilho vermelho, que fica pra UMA ação
+  principal por tela). Horários futuros em branco, não dourado.
+- **"Sem registro"** é o nome de aula `scheduled` que já passou, em todas as telas (antes a Agenda
+  dizia "Aguardando confirmação").
+
+**"Restantes", não "créditos", nas telas do professor:** "créditos para agendar"
+(`available_credits_for_student`) desconta as aulas já marcadas — na recorrência dá 0 por
+construção e todo aluno aparecia em vermelho. Lista de alunos, "Alunos em risco" e cartão do aluno
+mostram **aulas restantes** (total − usadas; `saldo_pacotes` na recorrência, número e "usadas").
+`creditsByStudent()` foi removida (único uso era a lista).
+
+**Página de amostras:** ganhou o painel em 4 situações e a lista de alunos. Em dev, cada conjunto de
+dados de exemplo fica em `window.__amostrasAdmin` (o StrictMode cria dois por conjunto — usar o que
+tem observador) para simular "item resolvido" pelo console.
+
+**Deixado para depois (registrado, não pedido):** desfazer uma remarcação aprovada (precisaria de
+RPC nova); "há N dias" ao lado de aula sem registro; "Convidar o primeiro aluno" abrir o convite
+direto em vez da lista.
 
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
