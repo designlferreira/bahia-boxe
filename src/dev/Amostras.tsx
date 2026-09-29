@@ -36,6 +36,7 @@ import StudentMinhaConta from "@/pages/student/MinhaConta";
 import StudentHistorico from "@/pages/student/Historico";
 import StudentPacotes from "@/pages/student/Pacotes";
 import StudentPerfil from "@/pages/student/Perfil";
+import AdminMinhaConta from "@/pages/admin/MinhaConta";
 import AdminHistorico from "@/pages/admin/Historico";
 import AdminAlunoDetalhe from "@/pages/admin/AlunoDetalhe";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
@@ -1347,6 +1348,15 @@ export default function Amostras() {
               </Seeded>
             </Frame>
           ))}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Minha conta (professor)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          <Frame title="Minha conta (professor)" note="professor logado">
+            <SeededAdmin data={null}>
+              <AdminMinhaConta />
+            </SeededAdmin>
+          </Frame>
         </div>
 
         <h2 className="text-lg font-semibold mb-4">Histórico (professor)</h2>
