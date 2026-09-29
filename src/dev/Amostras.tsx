@@ -1185,19 +1185,23 @@ export default function Amostras() {
                 // A tela passa o próprio `queryFn` (que vence o padrão do QueryClient), então cada consulta nova
                 // (uma busca, um chip) é preenchida assim que entra no cache.
                 const norm = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-                const filtrar = (busca: string, status: string) =>
-                  lista.filter((e) => {
-                    const acabou = new Date(e.booking.endTime).getTime() < Date.now();
+                const filtrar = (busca: string, status: string, periodo: string) => {
+                  const agora = Date.now();
+                  const ok = lista.filter((e) => {
+                    const acabou = new Date(e.booking.endTime).getTime() < agora;
+                    const doPeriodo = periodo === "proximas" ? !acabou : acabou;
                     const okStatus =
                       status === "todas" ||
-                      (status === "sem_registro" ? e.booking.status === "scheduled" && acabou : status === "scheduled" ? e.booking.status === "scheduled" && !acabou : e.booking.status === status);
-                    return okStatus && (!norm(busca) || norm(e.studentName).includes(norm(busca)));
+                      ((status === "sem_registro" || status === "scheduled") ? e.booking.status === "scheduled" : e.booking.status === status);
+                    return doPeriodo && okStatus && (!norm(busca) || norm(e.studentName).includes(norm(busca)));
                   });
+                  return ok.sort((x, y) => (periodo === "proximas" ? 1 : -1) * (new Date(x.booking.startTime).getTime() - new Date(y.booking.startTime).getTime()));
+                };
                 // Consulta paginada: `pages` guarda { items, hasMore } (a amostra não pagina: "Ver mais" chamaria a consulta real).
                 const POR_PAGINA = 100;
                 qc.getQueryCache().subscribe((ev) => {
                   if (ev.type === "added" && ev.query.queryKey[0] === "admin-history") {
-                    const todas = filtrar(String(ev.query.queryKey[2] ?? ""), String(ev.query.queryKey[3] ?? "todas"));
+                    const todas = filtrar(String(ev.query.queryKey[2] ?? ""), String(ev.query.queryKey[3] ?? "todas"), String(ev.query.queryKey[4] ?? "anteriores"));
                     qc.setQueryData(ev.query.queryKey, {
                       pages: [{ items: todas.slice(0, POR_PAGINA), hasMore: todas.length > POR_PAGINA }],
                       pageParams: [0],

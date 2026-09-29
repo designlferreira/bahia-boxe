@@ -1612,6 +1612,7 @@ export async function getAdminBookingHistoryPage(
   adminId: string,
   search: string,
   statusFilter: string,
+  periodo: "proximas" | "anteriores",
   page: number,
 ): Promise<{ items: { booking: Booking; studentName: string }[]; hasMore: boolean }> {
   const students = await adminStudents(adminId);
@@ -1624,15 +1625,17 @@ export async function getAdminBookingHistoryPage(
     if (ids.length === 0) return { items: [], hasMore: false };
     query = query.in("student_id", ids);
   }
-  // "Sem registro" = agendada que já terminou (o professor ainda não disse se aconteceu); "Agendadas" = as que ainda vão
-  // acontecer (ou estão acontecendo). Antes "Agendadas" misturava as duas.
+  // Próximas = ainda não terminaram (em ordem crescente); anteriores = já terminaram (da mais recente para a mais
+  // antiga). "Sem registro" é uma agendada que já terminou, então só existe entre as anteriores.
   const agora = new Date().toISOString();
-  if (statusFilter === "sem_registro") query = query.eq("status", "scheduled").lt("end_time", agora);
-  else if (statusFilter === "scheduled") query = query.eq("status", "scheduled").gte("end_time", agora);
+  query = periodo === "proximas" ? query.gte("end_time", agora) : query.lt("end_time", agora);
+  if (statusFilter === "sem_registro" || statusFilter === "scheduled") query = query.eq("status", "scheduled");
   else if (statusFilter !== "todas") query = query.eq("status", statusFilter);
 
   const from = page * HISTORICO_PAGINA;
-  const { data, error } = await query.order("start_time", { ascending: false }).range(from, from + HISTORICO_PAGINA);
+  const { data, error } = await query
+    .order("start_time", { ascending: periodo === "proximas" })
+    .range(from, from + HISTORICO_PAGINA);
   if (error) throw new Error(error.message);
   const rows = data ?? [];
   return {
