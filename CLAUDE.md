@@ -2792,6 +2792,40 @@ O horizonte real é **12 semanas** (`HORIZON_WEEKS`), não 8.
 app inteiro, então foi deixado); "copiar para outros dias" / escolher vários dias no mesmo sheet; quantas vagas
 restam por horário; traduzir mensagens cruas de erro do servidor no sheet; confirmar o anel de foco com Tab real.
 
+### Modelos de pacote (Pacotes do professor): rodada de crítica (2026-09-29) — sem migration nova
+
+`src/pages/admin/Pacotes.tsx` (rota `/admin/pacotes`; chega-se por "Minha conta > Modelos de pacote" e pelo passo
+"Criar um pacote de aulas" do painel; **não está na barra inferior**): crítica **19/40**, relatório em
+`.impeccable/critique/*pacotes*`. Cinco passos na `dev`, testados pelo Lucas. Na página de amostras ("Pacotes
+(professor)": com modelos e pedidos pendentes, e sem nenhum). A tela do ALUNO (`student/Pacotes.tsx`) não foi criticada.
+
+**FATO (não desfazer sem decisão): `package_templates.validity_days` NÃO é aplicado por nada.** Não é copiado para
+`packages` e o banco não tem data de expiração (`supabase/README.md:45-46`). O campo "Validade (dias)" prometia um
+vencimento que não existe (e a edição gravava 60 em modelo sem prazo).
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **O prazo fica, como INFORMATIVO:** rótulo **"Prazo sugerido (dias)"**, opcional (vazio = `null`), com a frase "o
+  pacote não vence sozinho"; o aluno vê "Sugestão: use em até N dias" em `student/Pacotes.tsx`. Nada expira. A
+  alternativa "tirar o campo" foi oferecida e recusada. Se um dia a validade valer de verdade, precisa de regra no
+  banco (coluna em `packages` + função), e o texto muda.
+- **Remover mantém a lixeira e a confirmação, e ganha "Desfazer" de 8s + aviso de erro.** É exclusão lógica
+  (`is_active = false`); `restorePackageTemplate` reativa. A alternativa "Ocultar com lista de ocultos" foi recusada.
+
+**O que mudou / armadilhas:**
+- **Nº de aulas** é texto numérico de 1 a 99 (vazio, 0, negativo e decimal não passam; erro no blur com
+  `role="alert"`); o botão "Criar/Salvar" explica por que está apagado (`motivoBloqueio`); ao editar, avisa que "vale
+  para os próximos pedidos, os já aprovados não mudam".
+- **Cartão:** mostra "N aulas" (do dado, não do nome), descrição só se houver, nome com `line-clamp-2` (`min-w-0`) e
+  "N pedidos esperando" em âmbar (âmbar = depende do professor) que leva a Pedidos — usa a mesma consulta e o mesmo
+  cache de `Pedidos.tsx` (`["purchase-requests", id]`), sem consulta nova.
+- **Cabeçalho padrão** (`PageHeader`, "MODELOS DE PACOTE" com voltar); "Novo modelo" fica ABAIXO do cabeçalho: ao lado
+  do título ele quebrava em 3 linhas no celular. No estado vazio quem convida é o `EmptyState`.
+- Acessibilidade: nomes por modelo ("Editar Pacote 8 aulas"), nome do modelo é `<h2>`, foco visível, contornos
+  legíveis, ícone da lixeira em `--red-text`, quadrado de "Preço a combinar" 20px.
+
+**Deixado para depois (registrado, não pedido):** ocultar/reativar modelos sem apagar; duplicar modelo; ordenar; a tela
+do aluno (`student/Pacotes.tsx`); em modo Recorrência esta tela continua igual (o aluno nem chega a pedir pacote).
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
