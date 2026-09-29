@@ -1,10 +1,12 @@
 import { BoxingProfileScoresSummary } from "@/components/BoxingProfileScoresSummary";
+import type { ReactNode } from "react";
 import { BoxingProfileNextSteps } from "@/components/BoxingProfileNextSteps";
 import { FIGHTER_PROFILE_DESCRIPTIONS } from "@/lib/boxingProfile";
 import type { BoxingProfileAssessmentSummary } from "@/integrations/backend/types";
 
 interface BoxingProfileResultViewProps {
   assessment: BoxingProfileAssessmentSummary;
+  notice?: ReactNode;
 }
 
 /**
@@ -13,11 +15,11 @@ interface BoxingProfileResultViewProps {
  * serve (professor lendo sobre o aluno, comparação Aluno×Professor), usar `BoxingProfileScoresSummary`
  * direto, sem a prosa de pontos fortes/prioridades/recomendação daqui.
  */
-export function BoxingProfileResultView({ assessment }: BoxingProfileResultViewProps) {
+export function BoxingProfileResultView({ assessment, notice }: BoxingProfileResultViewProps) {
   const { primaryProfile, dimensionScores } = assessment;
   return (
     <div>
-      <BoxingProfileScoresSummary assessment={assessment} description={FIGHTER_PROFILE_DESCRIPTIONS[primaryProfile]} />
+      <BoxingProfileScoresSummary assessment={assessment} description={FIGHTER_PROFILE_DESCRIPTIONS[primaryProfile]} notice={notice} />
 
       <BoxingProfileNextSteps primaryProfile={primaryProfile} dimensionScores={dimensionScores} />
       <p className="text-[11.5px] text-muted-foreground leading-relaxed">

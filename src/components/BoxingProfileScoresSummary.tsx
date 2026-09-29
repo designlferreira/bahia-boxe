@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Trophy } from "lucide-react";
 import { BoxingRadarChart } from "@/components/BoxingRadarChart";
 import { FighterProfileGloss } from "@/components/FighterProfileGloss";
@@ -14,6 +15,8 @@ interface BoxingProfileScoresSummaryProps {
    */
   description?: string;
   radarHeading?: string;
+  /** Aviso (ex.: "resultado parcial") — sempre logo abaixo do destaque, em todos os estados. */
+  notice?: ReactNode;
 }
 
 /**
@@ -27,6 +30,7 @@ export function BoxingProfileScoresSummary({
   heroLabel = "Perfil predominante",
   description,
   radarHeading = "Seu radar",
+  notice,
 }: BoxingProfileScoresSummaryProps) {
   const { primaryProfile, secondaryProfile, dimensionScores, profileScores, assessmentLength, scoringVersion } = assessment;
   const isOldFormula = scoringVersion !== SCORING_VERSION;
@@ -58,6 +62,7 @@ export function BoxingProfileScoresSummary({
         <div className="text-accent text-[15px] font-semibold mb-3">{profileScores[primaryProfile]}% de afinidade com esse estilo</div>
         {description && <p className="text-[13.5px] text-foreground/85 leading-relaxed">{description}</p>}
       </div>
+      {notice}
 
       <div className="card-dark p-4 mb-5">
         <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">Perfil secundário</div>

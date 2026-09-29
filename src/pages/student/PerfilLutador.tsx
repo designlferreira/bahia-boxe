@@ -21,6 +21,7 @@ import {
   markNotificationRead,
   studentIdForProfile,
 } from "@/integrations/backend/api";
+import { getQuestions } from "@/lib/boxingProfile";
 import { coachAssessmentNotificationId } from "@/components/BoxingProfileHomeCard";
 
 /** Abaixo disso, refazer o teste mostra um aviso (não bloqueante) antes de seguir. */
@@ -122,7 +123,7 @@ export default function StudentPerfilLutador() {
           <EmptyState
             icon={Sparkles}
             title="Descubra seu Perfil de Boxe"
-            description="Responda 32 perguntas rápidas sobre como você se enxerga dentro do ringue e descubra qual estilo de luta mais combina com o seu jeito de lutar."
+            description={`Responda ${getQuestions("self", "short").length} perguntas (versão rápida) ou ${getQuestions("self", "full").length} (versão completa) sobre como você se enxerga dentro do ringue e descubra qual estilo de luta mais combina com o seu jeito de lutar.`}
             ctaLabel="Descobrir meu perfil"
             onCta={goToQuestionnaire}
           />
@@ -138,8 +139,12 @@ export default function StudentPerfilLutador() {
           pra comparar ainda) em vez de escondê-la atrás de um botão. */}
       {!isLoading && !isError && !latest && latestCoach && (
         <>
-          <BoxingProfileScoresSummary assessment={latestCoach} heroLabel="Leitura do seu professor" radarHeading="Radar" />
-          <BoxingProfilePartialNotice text="Por enquanto, este resultado usa só a avaliação do seu professor. Assim que você fizer sua autoavaliação, o combinado passa a considerar as duas leituras." />
+          <BoxingProfileScoresSummary
+            assessment={latestCoach}
+            heroLabel="Leitura do seu professor"
+            radarHeading="Radar"
+            notice={<BoxingProfilePartialNotice waiting="student" text="Por enquanto, este resultado usa só a avaliação do seu professor. Assim que você fizer sua autoavaliação, o combinado passa a considerar as duas leituras." />}
+          />
           <Button className="w-full" onClick={goToQuestionnaire}>
             <Sparkles className="h-4 w-4 mr-1.5" /> Descobrir meu perfil
           </Button>
@@ -176,8 +181,10 @@ export default function StudentPerfilLutador() {
 
       {!isLoading && !isError && latest && !latestCoach && (
         <>
-          <BoxingProfilePartialNotice text="Por enquanto, este resultado usa só a sua autoavaliação. Assim que seu professor avaliar você, o combinado passa a considerar as duas leituras." />
-          <BoxingProfileResultView assessment={latest} />
+          <BoxingProfileResultView
+            assessment={latest}
+            notice={<BoxingProfilePartialNotice waiting="coach" text="Por enquanto, este resultado usa só a sua autoavaliação. Assim que seu professor avaliar você, o combinado passa a considerar as duas leituras." />}
+          />
         </>
       )}
 

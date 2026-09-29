@@ -96,8 +96,12 @@ export default function AdminAlunoPerfilBoxe() {
           atrás do estado vazio genérico (CLAUDE.md, "Resultado combinado de Perfil de Boxe"). */}
       {!isLoading && !isError && !latestCoach && latestSelf && (
         <>
-          <BoxingProfileScoresSummary assessment={latestSelf} heroLabel="Autoavaliação do aluno" radarHeading="Radar" />
-          <BoxingProfilePartialNotice text="Por enquanto, este resultado usa só a autoavaliação do aluno. Assim que você avaliar como professor, o combinado passa a considerar as duas leituras." />
+          <BoxingProfileScoresSummary
+            assessment={latestSelf}
+            heroLabel="Autoavaliação do aluno"
+            radarHeading="Radar"
+            notice={<BoxingProfilePartialNotice waiting="coach" text="Por enquanto, este resultado usa só a autoavaliação do aluno. Assim que você avaliar como professor, o combinado passa a considerar as duas leituras." />}
+          />
           <Button className="w-full" onClick={goToQuestionnaire}>
             <Sparkles className="h-4 w-4 mr-1.5" /> Avaliar como professor
           </Button>
@@ -121,8 +125,12 @@ export default function AdminAlunoPerfilBoxe() {
 
       {!isLoading && !isError && latestCoach && !latestSelf && (
         <>
-          <BoxingProfileScoresSummary assessment={latestCoach} heroLabel="Sua leitura sobre o aluno" radarHeading="Radar" />
-          <BoxingProfilePartialNotice text="Por enquanto, este resultado usa só a sua avaliação como professor. Assim que o aluno fizer a autoavaliação, o combinado passa a considerar as duas leituras." />
+          <BoxingProfileScoresSummary
+            assessment={latestCoach}
+            heroLabel="Sua leitura sobre o aluno"
+            radarHeading="Radar"
+            notice={<BoxingProfilePartialNotice waiting="student" text="Por enquanto, este resultado usa só a sua avaliação como professor. Assim que o aluno fizer a autoavaliação, o combinado passa a considerar as duas leituras." />}
+          />
         </>
       )}
 
