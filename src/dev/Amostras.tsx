@@ -32,6 +32,7 @@ import AdminAlunoPerfilBoxe from "@/pages/admin/AlunoPerfilBoxe";
 import AdminConfiguracoes from "@/pages/admin/Configuracoes";
 import AdminDisponibilidade from "@/pages/admin/Disponibilidade";
 import AdminPacotes from "@/pages/admin/Pacotes";
+import StudentMinhaConta from "@/pages/student/MinhaConta";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
 import { RemarcacaoSheet } from "@/components/RemarcacaoSheet";
@@ -1129,6 +1130,20 @@ export default function Amostras() {
               </SeededAdmin>
             </Frame>
           ))}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Minha conta (aluno)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          <Frame title="Minha conta" note="aluno logado, com professor cadastrado">
+            <Seeded data={base} modo="autosservico">
+              <StudentMinhaConta />
+            </Seeded>
+          </Frame>
+          <Frame title="Minha conta · Recorrência" note="professor em Recorrência: a linha Meu pacote some">
+            <Seeded data={base} modo="recorrencia">
+              <StudentMinhaConta />
+            </Seeded>
+          </Frame>
         </div>
 
         <h2 className="text-lg font-semibold mb-4">Lista de alunos</h2>

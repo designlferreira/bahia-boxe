@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, KeyRound, User } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ChevronRight, KeyRound, Package, Ruler, Trophy, UserRound } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -8,12 +9,28 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 import { EditProfileDialog } from "@/components/EditProfileDialog";
 import { formatDateShort } from "@/lib/dateUtils";
+import { getModoAgendamentoEfetivo, getStudentAdminId } from "@/integrations/backend/api";
 
 export default function StudentMinhaConta() {
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+
+  // Em Recorrência o aluno não pede pacote (a tela de pacotes redireciona): a linha "Meu pacote" não aparece.
+  const { data: adminId } = useQuery({
+    queryKey: ["student-admin-id", profile?.id],
+    queryFn: () => getStudentAdminId(profile!.id),
+    enabled: !!profile,
+    staleTime: Infinity,
+  });
+  const { data: modo } = useQuery({
+    queryKey: ["modo-agendamento-efetivo", adminId],
+    queryFn: () => getModoAgendamentoEfetivo(adminId!),
+    enabled: !!adminId,
+    staleTime: Infinity,
+  });
+  const mostraPacote = modo !== "recorrencia";
 
   if (!profile) return null;
   const initials = profile.name.split(" ").map((n) => n[0]).slice(0, 2).join("");
@@ -31,8 +48,12 @@ export default function StudentMinhaConta() {
       </div>
 
       <div className="flex flex-col rounded-2xl bg-card border border-border overflow-hidden mb-3.5">
-        <AccountRow label="Editar perfil" onClick={() => setEditOpen(true)} />
-        <AccountRow label="Perfil físico e de boxe" icon={User} onClick={() => navigate("/app/minha-conta/perfil")} />
+        {/* Nomes que dizem o que abre (antes: "Editar perfil" só editava o nome e "Perfil físico e de boxe"
+            parecia o "Perfil de Boxe" da Home, que é o resultado do estilo de luta). */}
+        <AccountRow label="Meu nome" icon={UserRound} onClick={() => setEditOpen(true)} />
+        <AccountRow label="Meu Perfil de Boxe" icon={Trophy} onClick={() => navigate("/app/perfil-lutador")} />
+        <AccountRow label="Meus dados físicos" icon={Ruler} onClick={() => navigate("/app/minha-conta/perfil")} />
+        {mostraPacote && <AccountRow label="Meu pacote" icon={Package} onClick={() => navigate("/app/pacotes")} />}
         <AccountRow
           label="Alterar senha"
           icon={KeyRound}
@@ -67,7 +88,7 @@ function AccountRow({
   last,
 }: {
   label: string;
-  icon?: typeof KeyRound;
+  icon: typeof KeyRound;
   onClick: () => void;
   last?: boolean;
 }) {
@@ -79,9 +100,9 @@ function AccountRow({
         last ? "" : "border-b border-[#232323]"
       }`}
     >
-      {Icon && <Icon className="h-[17px] w-[17px] text-muted-foreground" />}
+      <Icon className="h-[17px] w-[17px] text-muted-foreground" aria-hidden />
       <span className="flex-1">{label}</span>
-      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+      <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden />
     </button>
   );
 }
