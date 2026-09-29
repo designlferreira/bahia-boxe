@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { Trophy } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { ChevronDown, Trophy } from "lucide-react";
 import { BoxingRadarChart } from "@/components/BoxingRadarChart";
 import { FighterProfileGloss } from "@/components/FighterProfileGloss";
 import { DIMENSIONS, DIMENSION_LABELS, FIGHTER_PROFILES, FIGHTER_PROFILE_LABELS, SCORING_VERSION } from "@/lib/boxingProfile";
@@ -19,6 +19,22 @@ interface BoxingProfileScoresSummaryProps {
   notice?: ReactNode;
 }
 
+/** Botão de mostrar/esconder: o detalhe fica recolhido para a página não virar uma parede de números. */
+function Disclosure({ label, open, onToggle, controls }: { label: string; open: boolean; onToggle: () => void; controls: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      aria-controls={controls}
+      className="mb-5 flex w-full min-h-11 items-center justify-between rounded-xl border border-border px-4 text-[14px] font-semibold text-foreground active:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {label}
+      <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} aria-hidden />
+    </button>
+  );
+}
+
 /**
  * Bloco numérico/neutro de um resultado (perfil principal, secundário, distribuição dos 6,
  * radar + lista textual) — sem nenhuma prosa de "pontos fortes"/"prioridades"/recomendação, que
@@ -34,6 +50,9 @@ export function BoxingProfileScoresSummary({
 }: BoxingProfileScoresSummaryProps) {
   const { primaryProfile, secondaryProfile, dimensionScores, profileScores, assessmentLength, scoringVersion } = assessment;
   const isOldFormula = scoringVersion !== SCORING_VERSION;
+  // Estilo predominante e secundário respondem "quem sou eu"; os outros 4 e as 8 notas são detalhe.
+  const [showAllProfiles, setShowAllProfiles] = useState(false);
+  const [showScores, setShowScores] = useState(false);
 
   return (
     <div>
@@ -75,8 +94,14 @@ export function BoxingProfileScoresSummary({
         </div>
       </div>
 
-      <div className="card-dark p-4 mb-5">
-        <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-2.5">Distribuição completa</div>
+      <Disclosure
+        label={showAllProfiles ? "Esconder os outros perfis" : "Ver todos os perfis"}
+        open={showAllProfiles}
+        onToggle={() => setShowAllProfiles((v) => !v)}
+        controls="perfis-distribuicao"
+      />
+      <div id="perfis-distribuicao" hidden={!showAllProfiles} className="card-dark p-4 mb-5">
+        <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2.5">Distribuição completa</div>
         <div className="flex flex-col gap-2">
           {[...FIGHTER_PROFILES]
             .sort((a, b) => profileScores[b] - profileScores[a])
@@ -99,8 +124,15 @@ export function BoxingProfileScoresSummary({
       <div className="card-dark p-4 mb-3.5 flex justify-center">
         <BoxingRadarChart scores={dimensionScores} />
       </div>
-      {/* Representação textual — o radar é decorativo (aria-hidden), esta lista é a informação real. */}
-      <div className="card-dark p-4 mb-5">
+      {/* Representação textual — o radar é decorativo (aria-hidden), esta lista é a informação real;
+          o botão acima dela é o que leitores de tela encontram no lugar do radar. */}
+      <Disclosure
+        label={showScores ? "Esconder as notas" : "Ver a nota de cada competência"}
+        open={showScores}
+        onToggle={() => setShowScores((v) => !v)}
+        controls="notas-competencias"
+      />
+      <div id="notas-competencias" hidden={!showScores} className="card-dark p-4 mb-5">
         <div className="flex flex-col gap-2">
           {DIMENSIONS.map((dim) => (
             <div key={dim} className="flex items-center justify-between text-[13px]">
