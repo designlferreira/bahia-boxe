@@ -11,7 +11,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/SkeletonCard";
 import { TIMEZONE, formatQuando, formatTime, formatWeekdayLong } from "@/lib/dateUtils";
 import { Button } from "@/components/ui/button";
-import { VINCULO_LABEL, getAdminBookingHistoryPage } from "@/integrations/backend/api";
+import { BUSCA_AMPLA_DEMAIS, VINCULO_LABEL, getAdminBookingHistoryPage } from "@/integrations/backend/api";
 import { CalendarX } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
 import { isAwaitingConfirmation } from "@/lib/bookingStatus";
@@ -85,7 +85,7 @@ export default function AdminHistorico() {
   }
 
   const key = ["admin-history", profile?.id, buscaAplicada, statusFilter, periodo];
-  const { data, isLoading, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+  const { data, isLoading, isError, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: key,
     queryFn: ({ pageParam }) => getAdminBookingHistoryPage(profile!.id, buscaAplicada, statusFilter, periodo, pageParam as number),
     initialPageParam: 0,
@@ -133,7 +133,14 @@ export default function AdminHistorico() {
         onFilterChange={setStatusFilter}
       />
 
-      {isError && <ErrorState title="Não foi possível carregar as aulas" onRetry={() => refetch()} />}
+      {isError && (
+        <ErrorState
+          title="Não foi possível carregar as aulas"
+          // A busca ampla demais é a única falha cujo texto é para a pessoa (diz o que fazer); as outras seguem no texto padrão.
+          description={error instanceof Error && error.message === BUSCA_AMPLA_DEMAIS ? error.message : undefined}
+          onRetry={() => refetch()}
+        />
+      )}
       {isLoading && !isError && <SkeletonList count={3} height={72} />}
 
       {!isLoading && !isError && data && dias.length > 0 && (
