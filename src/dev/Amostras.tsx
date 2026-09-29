@@ -10,7 +10,7 @@
  */
 import { useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { addDays, subDays } from "date-fns";
 import { AuthContext } from "@/context/AuthContext";
 import StudentHome from "@/pages/student/Home";
@@ -18,6 +18,8 @@ import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminAlunos from "@/pages/admin/Alunos";
 import AdminAgenda from "@/pages/admin/Agenda";
 import StudentAgendar from "@/pages/student/Agendar";
+import AdminAulaDetalhe from "@/pages/admin/AulaDetalhe";
+import StudentAulaDetalhe from "@/pages/student/AulaDetalhe";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
 import { RemarcacaoSheet } from "@/components/RemarcacaoSheet";
@@ -550,6 +552,94 @@ function horariosAgendar(): [unknown[], unknown][] {
   return [[["available-slots-semana", ADMIN_ID, addDays(new Date(), 1).toDateString()], semana]];
 }
 
+/**
+ * Detalhe da aula: as telas leem o id da URL (useParams), então cada amostra monta a sua própria
+ * rota com `<Routes location=...>` — funciona dentro do BrowserRouter da página, sem mexer na URL.
+ */
+function ComRota({ path, url, children }: { path: string; url: string; children: ReactNode }) {
+  return (
+    <Routes location={url}>
+      <Route path={path} element={children} />
+    </Routes>
+  );
+}
+
+const ORIENTACOES = {
+  adminId: ADMIN_ID,
+  cep: "40000-000",
+  street: "Rua das Laranjeiras",
+  number: "120",
+  complement: "Sala 2",
+  neighborhood: "Pelourinho",
+  city: "Salvador",
+  state: "BA",
+  referencePoint: "Em frente à praça",
+  arrivalMinutes: 10,
+  equipment: { gloves: { level: "required", sizes: ["12oz", "14oz"] }, wraps: { level: "recommended", lengths: ["3m"] }, mouthguard: true },
+  notes: "Traga água e uma toalha.",
+};
+
+const DETALHE_PROF: { title: string; note: string; id: string; valor: unknown }[] = [
+  {
+    title: "Pedido de remarcação",
+    note: "aluno pediu pra mudar a aula de amanhã",
+    id: "dp-0",
+    valor: {
+      booking: booking(2, "pending_confirmation", { id: "dp-0", pacoteId: "pkg-rec", replacementForBookingId: "orig" }),
+      studentName: "Carlos Henrique Lima",
+      remarcacoes: 0,
+      vinculo: "pedido_remarcacao",
+      antecessorInicio: at(1, 19),
+    },
+  },
+  {
+    title: "Sem registro",
+    note: "aula de ontem, ainda sem Aconteceu/Faltou",
+    id: "dp-1",
+    valor: { booking: booking(-1, "scheduled", { id: "dp-1", pacoteId: "pkg-rec" }), studentName: "Diego Martins", remarcacoes: 0, vinculo: null },
+  },
+  {
+    title: "Futura, remarcada 2x",
+    note: "aula de recorrência daqui a 3 dias, já remarcada duas vezes",
+    id: "dp-2",
+    valor: { booking: booking(3, "scheduled", { id: "dp-2", pacoteId: "pkg-rec", isReplacement: true, replacementForBookingId: "x" }), studentName: "Carlos Henrique Lima", remarcacoes: 2, vinculo: "remarcacao" },
+  },
+  {
+    title: "Concluída",
+    note: "com botão permanente de desfazer",
+    id: "dp-3",
+    valor: { booking: booking(-3, "completed", { id: "dp-3" }), studentName: "Ana Beatriz Souza", remarcacoes: 0, vinculo: null },
+  },
+];
+
+const DETALHE_ALUNO: { title: string; note: string; id: string; valor: unknown; pedido?: unknown }[] = [
+  {
+    title: "Recorrência, daqui a 3 dias",
+    note: "pode pedir outro horário; orientações do professor",
+    id: "da-1",
+    valor: { booking: booking(3, "scheduled", { id: "da-1", pacoteId: "pkg-rec" }), adminName: "Lucas Ferreira" },
+  },
+  {
+    title: "Pedido de outro horário",
+    note: "pedido de remarcação esperando o professor",
+    id: "da-2",
+    valor: { booking: booking(3, "scheduled", { id: "da-2", pacoteId: "pkg-rec" }), adminName: "Lucas Ferreira" },
+    pedido: booking(4, "pending_confirmation", { id: "da-2-pedido", replacementForBookingId: "da-2" }),
+  },
+  {
+    title: "Autosserviço, amanhã",
+    note: "aula agendada pelo aluno (menos de 24h)",
+    id: "da-3",
+    valor: { booking: { ...booking(1, "scheduled", { id: "da-3", slotId: "s" }), startTime: new Date(Date.now() + 5 * 3600_000).toISOString(), endTime: new Date(Date.now() + 6 * 3600_000).toISOString() }, adminName: "Lucas Ferreira" },
+  },
+  {
+    title: "Concluída com recado",
+    note: "aula passada com observação do professor",
+    id: "da-4",
+    valor: { booking: booking(-2, "completed", { id: "da-4", teacherNote: "Ótima evolução no jab. Próxima aula: esquivas." }), adminName: "Lucas Ferreira" },
+  },
+];
+
 /** Lista de alunos: 6 alunos, 4 deles em risco (os mesmos do painel). */
 function semearAlunos(qc: QueryClient) {
   const nomes = ["Ana Beatriz Souza", "Helena Costa", "Igor Nascimento", "Julia Pereira", "Karina Duarte", "Leonardo Prado"];
@@ -624,6 +714,40 @@ export default function Amostras() {
               <SeededAdmin data={c.data}>
                 <AdminDashboard />
               </SeededAdmin>
+            </Frame>
+          ))}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Detalhe da aula (professor)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {DETALHE_PROF.map((c) => (
+            <Frame key={c.id} title={c.title} note={c.note}>
+              <SeededAdmin data={null} seed={(qc) => qc.setQueryData(["admin-booking", c.id], c.valor)}>
+                <ComRota path="/admin/aula/:id" url={`/admin/aula/${c.id}`}>
+                  <AdminAulaDetalhe />
+                </ComRota>
+              </SeededAdmin>
+            </Frame>
+          ))}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Detalhe da aula (aluno)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {DETALHE_ALUNO.map((c) => (
+            <Frame key={c.id} title={c.title} note={c.note}>
+              <Seeded
+                data={base}
+                modo="autosservico"
+                extra={[
+                  [["booking", c.id], c.valor],
+                  [["pedido-remarcacao", c.id], c.pedido ?? null],
+                  [["class-guidelines", ADMIN_ID], ORIENTACOES],
+                ]}
+              >
+                <ComRota path="/app/aula/:id" url={`/app/aula/${c.id}`}>
+                  <StudentAulaDetalhe />
+                </ComRota>
+              </Seeded>
             </Frame>
           ))}
         </div>

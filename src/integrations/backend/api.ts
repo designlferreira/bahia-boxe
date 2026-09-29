@@ -667,7 +667,10 @@ export async function getPedidoRemarcacaoPendente(bookingId: string): Promise<Bo
  */
 export async function getAdminBookingDetail(
   bookingId: string,
-): Promise<{ booking: Booking; studentName: string; remarcacoes: number; vinculo: VinculoAula | null } | undefined> {
+): Promise<
+  | { booking: Booking; studentName: string; remarcacoes: number; vinculo: VinculoAula | null; antecessorInicio: string | null }
+  | undefined
+> {
   const [viewRes, rowRes] = await Promise.all([
     client().from("booking_history_app").select("*").eq("id", bookingId).maybeSingle(),
     client().from("bookings").select("*").eq("id", bookingId).maybeSingle(),
@@ -679,18 +682,23 @@ export async function getAdminBookingDetail(
   const cadeiaId = rowRes.data.cadeia_id as string | null;
   let remarcacoes = 0;
   if (cadeiaId) {
+    // Sem o pedido de remarcação ainda pendente (0033: ele entra na cadeia ao ser pedido): contá-lo
+    // mostrava "Remarcada 1x" antes de o professor aprovar qualquer coisa.
     const { count, error } = await client()
       .from("bookings")
       .select("id", { count: "exact", head: true })
-      .eq("cadeia_id", cadeiaId);
+      .eq("cadeia_id", cadeiaId)
+      .neq("status", "pending_confirmation");
     if (error) throw new Error(error.message);
     remarcacoes = Math.max((count ?? 1) - 1, 0);
   }
 
   const antecessorId = rowRes.data.replacement_for_booking_id as string | null;
-  const vinculo = antecessorId ? ((await vinculoPorAntecessor([antecessorId])).get(antecessorId) ?? "reposicao") : null;
+  const antes = antecessorId ? (await antecessores([antecessorId])).get(antecessorId) : undefined;
+  const vinculo = antecessorId ? (antes?.vinculo ?? "reposicao") : null;
 
-  return { booking: mapBooking(rowRes.data), studentName, remarcacoes, vinculo };
+  // antecessorInicio: num pedido de remarcação, o horário original — pra tela mostrar "de → para".
+  return { booking: mapBooking(rowRes.data), studentName, remarcacoes, vinculo, antecessorInicio: antes?.inicio ?? null };
 }
 
 /** Etapa 6 — remarcar não edita a aula: marca a original como `rescheduled` e cria a sucessora. */
@@ -986,7 +994,7 @@ export interface TimelineEntry {
   free: boolean;
   booking?: Booking;
   studentName?: string;
-  /** Só quando a aula tem antecessor — ver `vinculoPorAntecessor`. */
+  /** Só quando a aula tem antecessor — ver `antecessores`. */
   vinculo?: VinculoAula | null;
   /** Horário da aula original — mostrado num pedido de remarcação ("de ... para ..."). */
   antecessorInicio?: string | null;
@@ -1030,11 +1038,6 @@ async function antecessores(
       inicio: r.start_time,
     });
   return out;
-}
-
-async function vinculoPorAntecessor(antecessorIds: (string | null | undefined)[]): Promise<Map<string, VinculoAula>> {
-  const full = await antecessores(antecessorIds);
-  return new Map(Array.from(full, ([id, v]) => [id, v.vinculo]));
 }
 
 export async function getAdminAgendaForDay(adminId: string, date: Date): Promise<TimelineEntry[]> {
@@ -2089,7 +2092,7 @@ async function deriveNotifications(userId: string): Promise<AppNotification[]> {
     ]);
     // Uma aula `scheduled` com antecessor não é "confirmada" do nada: ou o professor remarcou
     // (antecessor `rescheduled`) ou marcou uma reposição (antecessor `no_show`/`cancelled`) — mesmo
-    // discriminador de `vinculoPorAntecessor` (CLAUDE.md, decisão 2). Sem isso, remarcar gerava um
+    // discriminador de `antecessores` (CLAUDE.md, decisão 2). Sem isso, remarcar gerava um
     // "Aula confirmada · Seu horário está garantido" e o aluno não ficava sabendo que o horário
     // MUDOU. Antecessores buscados numa consulta só — podem estar fora da janela de 40 acima.
     const predecessorIds = Array.from(

@@ -10,8 +10,10 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { isAwaitingConfirmation } from "@/lib/bookingStatus";
-import { formatDate, formatTime } from "@/lib/dateUtils";
+import { formatDate, formatQuando, formatTime } from "@/lib/dateUtils";
 import { useLessonActions } from "@/hooks/useLessonActions";
+import { usePendingActions } from "@/hooks/usePendingActions";
+import { useAuth } from "@/context/AuthContext";
 import { getAdminBookingDetail, VINCULO_LABEL } from "@/integrations/backend/api";
 import { StatusBadge } from "@/components/StatusBadge";
 
@@ -30,12 +32,20 @@ export default function AdminAulaDetalhe() {
   const studentName = detail?.studentName ?? "Aluno";
   const remarcacoes = detail?.remarcacoes ?? 0;
   const vinculo = detail?.vinculo ?? null;
+  const antecessorInicio = detail?.antecessorInicio ?? null;
+  const { profile } = useAuth();
 
-  const actions = useLessonActions(() => {
+  const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["admin-booking", id] });
     queryClient.invalidateQueries({ queryKey: ["admin-agenda"] });
     queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
-  });
+    queryClient.invalidateQueries({ queryKey: ["agenda-pedidos-pendentes"] });
+  };
+  const actions = useLessonActions(invalidate);
+  // Pedido pendente (novo horário ou remarcação): o mesmo Aprovar/Recusar do painel e da agenda.
+  // Antes o detalhe não tinha botão nenhum pra esse estado — quem chegava por uma notificação
+  // ficava num beco sem saída.
+  const pendentes = usePendingActions(profile?.id ?? "", invalidate);
 
   if (isLoading) {
     return (
@@ -82,6 +92,12 @@ export default function AdminAulaDetalhe() {
         <div className="text-[15px] text-muted-foreground mt-0.5">
           {formatTime(booking.startTime)} – {formatTime(booking.endTime)}
         </div>
+        {booking.status === "pending_confirmation" && antecessorInicio && (
+          // Pedido de remarcação: de onde pra onde, como no painel.
+          <div className="text-sm text-muted-foreground mt-2">
+            Antes: <span className="line-through">{formatQuando(antecessorInicio)}</span>
+          </div>
+        )}
         <div className="h-px bg-border my-4" />
         <button
           type="button"
@@ -100,6 +116,45 @@ export default function AdminAulaDetalhe() {
         <div className="rounded-2xl p-4 bg-amber/[0.08] border border-amber/25 mb-3.5">
           <div className="text-[11.5px] uppercase tracking-wide text-amber/80 font-semibold mb-1.5">Sua observação</div>
           <div className="text-[13.5px] text-foreground/85 leading-relaxed">{booking.teacherNote}</div>
+        </div>
+      )}
+
+      {booking.status === "pending_confirmation" && (
+        <div className="flex gap-2.5">
+          <Button
+            variant="soft"
+            size="lg"
+            className="flex-1"
+            disabled={pendentes.isBusy(booking.id)}
+            onClick={() =>
+              pendentes.requestApprove({
+                id: booking.id,
+                studentName,
+                startTime: booking.startTime,
+                endTime: booking.endTime,
+                antecessorInicio,
+              })
+            }
+          >
+            Aprovar
+          </Button>
+          <Button
+            variant="secondary"
+            size="lg"
+            className="flex-1"
+            disabled={pendentes.isBusy(booking.id)}
+            onClick={() =>
+              pendentes.requestReject({
+                id: booking.id,
+                studentName,
+                startTime: booking.startTime,
+                endTime: booking.endTime,
+                antecessorInicio,
+              })
+            }
+          >
+            Recusar
+          </Button>
         </div>
       )}
 
@@ -191,6 +246,7 @@ export default function AdminAulaDetalhe() {
       />
 
       {actions.dialogs}
+      {pendentes.dialogs}
     </div>
   );
 }
