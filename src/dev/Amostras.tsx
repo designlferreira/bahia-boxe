@@ -10,6 +10,7 @@
  */
 import { useState, type ReactNode } from "react";
 import { FaixaSemInternet } from "@/components/FaixaSemInternet";
+import { TelaSessaoNaoCarregou } from "@/components/TelaSessaoNaoCarregou";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { addDays, subDays } from "date-fns";
@@ -1648,6 +1649,11 @@ export default function Amostras() {
           </Frame>
           <Frame title="Abertura do app" note="enquanto a sessão carrega (no lugar do formulário de login que piscava)">
             <TelaDeAbertura />
+          </Frame>
+          <Frame title="Sessão sem perfil" note="o login existe mas o perfil não carregou (sem rede): fica aqui em vez de ir ao login">
+            <SemLogin>
+              <TelaSessaoNaoCarregou />
+            </SemLogin>
           </Frame>
           <Frame title="404 · deslogado" note="botão 'Entrar'">
             <SemLogin>
