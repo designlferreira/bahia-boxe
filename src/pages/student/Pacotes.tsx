@@ -7,7 +7,10 @@ import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SkeletonList } from "@/components/SkeletonCard";
+import { CalendarClock } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { EmptyState } from "@/components/EmptyState";
+import { ErrorState } from "@/components/ErrorState";
 import { formatPriceLabel, packageProgressPct } from "@/lib/packageUtils";
 import { formatDateShort } from "@/lib/dateUtils";
 import {
@@ -15,6 +18,7 @@ import {
   getPackageTemplates,
   getStudentAdminId,
   getStudentHome,
+  getWhatsappDoProfessor,
   requestPackage,
   requestSingleClass,
 } from "@/integrations/backend/api";
@@ -27,7 +31,7 @@ export default function StudentPacotes() {
   // Tocar em "Pedir" só ESCOLHE o modelo: quem envia é a janela de confirmação (antes um toque já criava o pedido).
   const [escolhido, setEscolhido] = useState<PackageTemplate | null>(null);
 
-  const { data: home } = useQuery({
+  const { data: home, isError: erroHome, refetch: recarregarHome } = useQuery({
     queryKey: ["student-home", profile?.id],
     queryFn: () => getStudentHome(profile!.id),
     enabled: !!profile,
@@ -58,10 +62,18 @@ export default function StudentPacotes() {
     }
   }, [modoEfetivo, navigate]);
 
-  const { data: templates, isLoading } = useQuery({
+  const { data: templates, isLoading, isError: erroModelos, refetch: recarregarModelos } = useQuery({
     queryKey: ["package-templates", adminId],
     queryFn: () => getPackageTemplates(adminId!),
     enabled: !!adminId && modoEfetivo !== "recorrencia",
+  });
+
+  // Canal do aluno com o professor (mesmo da Home): sem número cadastrado, o botão do vazio não aparece.
+  const { data: whatsapp } = useQuery({
+    queryKey: ["whatsapp-professor", adminId],
+    queryFn: () => getWhatsappDoProfessor(adminId!),
+    enabled: !!adminId,
+    staleTime: 60 * 60 * 1000,
   });
 
   const request = useMutation({
@@ -145,6 +157,33 @@ export default function StudentPacotes() {
       )}
 
       {isLoading && <SkeletonList count={3} height={90} />}
+
+      {/* Antes uma falha nas consultas deixava a tela em branco (a lista vazia) — o aluno concluía que não há pacotes. Sem o `home`
+          os "Pedir" ficam desativados (não dá para saber se há pedido pendente), então o erro dele também precisa de saída. */}
+      {(erroModelos || erroHome) && (
+        <ErrorState
+          title="Não foi possível carregar os pacotes"
+          onRetry={() => {
+            if (erroModelos) recarregarModelos();
+            if (erroHome) recarregarHome();
+          }}
+        />
+      )}
+
+      {!isLoading && !erroModelos && templates && templates.length === 0 && (
+        <EmptyState
+          icon={CalendarClock}
+          title="Seu professor ainda não cadastrou pacotes"
+          description="Fale com ele para combinar suas próximas aulas."
+          ctaLabel={whatsapp ? "Falar com o professor" : undefined}
+          ctaVariant="secondary"
+          onCta={
+            whatsapp
+              ? () => window.open(`https://wa.me/${whatsapp}?text=${encodeURIComponent(`Olá! Aqui é ${profile?.name.split(" ")[0] ?? ""}.`)}`, "_blank", "noopener")
+              : undefined
+          }
+        />
+      )}
 
       <div className="flex flex-col gap-2.5">
         {templates?.map((t) => (
