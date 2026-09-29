@@ -107,6 +107,10 @@ export default function StudentPacotes() {
             <div className="flex-1">
               <div className="text-[15px] font-semibold text-foreground">{t.name}</div>
               <div className="text-[12.5px] text-muted-foreground mt-0.5">{t.description}</div>
+              {t.validityDays ? (
+                // Só informativo: o pacote não vence sozinho (não há data de expiração no banco).
+                <div className="text-[12.5px] text-muted-foreground mt-0.5">Sugestão: use em até {t.validityDays} dias</div>
+              ) : null}
               <div className="text-base text-accent font-semibold mt-1.5">{formatPriceLabel(t.priceCents)}</div>
             </div>
             <Button
