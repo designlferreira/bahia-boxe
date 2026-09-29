@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
@@ -187,6 +187,34 @@ function ResolverAgora({
   aulas: ReturnType<typeof useLessonActions>;
 }) {
   const navigate = useNavigate();
+  const secaoRef = useRef<HTMLElement>(null);
+  /** Último item em que o professor agiu: quando ele sumir da lista, o foco vai pro vizinho. */
+  const ultimo = useRef<{ grupo: string; id: string; posicao: number } | null>(null);
+  const idsVisiveis = [...pending, ...awaiting].map((b) => b.id).join(",");
+
+  // Resolver um item desmonta a linha (e o grupo, se era o último) — sem isto o foco caía no
+  // começo da página e o leitor de tela perdia o lugar. Vai pro próximo item do mesmo grupo; senão,
+  // pro título do grupo; senão, pro título "Resolver agora"; senão (tudo resolvido), pro "Hoje".
+  useEffect(() => {
+    const u = ultimo.current;
+    if (!u || idsVisiveis.split(",").includes(u.id)) return;
+    ultimo.current = null;
+    const ativo = document.activeElement;
+    const perdido = !ativo || ativo === document.body || !!secaoRef.current?.contains(ativo);
+    if (!perdido) return; // o professor já foi pra outro lugar: não roubar o foco
+    const alvo =
+      document.querySelectorAll<HTMLElement>(`#${u.grupo} [data-primario]`)[u.posicao] ??
+      Array.from(document.querySelectorAll<HTMLElement>(`#${u.grupo} [data-primario]`)).at(-1) ??
+      document.querySelector<HTMLElement>(`[aria-controls="${u.grupo}"]`) ??
+      document.getElementById("resolver") ??
+      document.getElementById("hoje");
+    alvo?.focus();
+  }, [idsVisiveis]);
+
+  const marcar = (grupo: string, lista: { id: string }[], id: string) => {
+    ultimo.current = { grupo, id, posicao: lista.findIndex((b) => b.id === id) };
+  };
+
   if (pending.length === 0 && awaiting.length === 0 && purchaseRequests === 0) return null;
 
   const remarcacoes = pending.filter((b) => b.antecessorInicio).length;
@@ -203,8 +231,8 @@ function ResolverAgora({
       : "Diga se aconteceram ou se o aluno faltou";
 
   return (
-    <section aria-labelledby="resolver" className="rounded-[20px] bg-card border border-amber/40 px-4 pt-3.5 pb-1 animate-bb-up">
-      <h2 id="resolver" className="section-title !text-amber mb-1">
+    <section ref={secaoRef} aria-labelledby="resolver" className="rounded-[20px] bg-card border border-amber/40 px-4 pt-3.5 pb-1 animate-bb-up">
+      <h2 id="resolver" tabIndex={-1} className="section-title !text-amber mb-1 outline-none">
         Resolver agora
       </h2>
 
@@ -232,8 +260,20 @@ function ResolverAgora({
               }
               quando={quando(b.startTime)}
               busy={pendentes.isBusy(b.id)}
-              primario={{ label: "Aprovar", onClick: () => pendentes.requestApprove(b) }}
-              secundario={{ label: "Recusar", onClick: () => pendentes.requestReject(b) }}
+              primario={{
+                label: "Aprovar",
+                onClick: () => {
+                  marcar("pedidos-pendentes", pending, b.id);
+                  pendentes.requestApprove(b);
+                },
+              }}
+              secundario={{
+                label: "Recusar",
+                onClick: () => {
+                  marcar("pedidos-pendentes", pending, b.id);
+                  pendentes.requestReject(b);
+                },
+              }}
             />
           ))}
         </Grupo>
@@ -254,8 +294,20 @@ function ResolverAgora({
               horario={quando(b.startTime)}
               quando={quando(b.startTime)}
               busy={aulas.isBusy(b.id)}
-              primario={{ label: "Aconteceu", onClick: () => aulas.openComplete(b, b.studentName) }}
-              secundario={{ label: "Faltou", onClick: () => aulas.openNoShow(b, b.studentName) }}
+              primario={{
+                label: "Aconteceu",
+                onClick: () => {
+                  marcar("aulas-sem-registro", awaiting, b.id);
+                  aulas.openComplete(b, b.studentName);
+                },
+              }}
+              secundario={{
+                label: "Faltou",
+                onClick: () => {
+                  marcar("aulas-sem-registro", awaiting, b.id);
+                  aulas.openNoShow(b, b.studentName);
+                },
+              }}
             />
           ))}
         </Grupo>
@@ -378,6 +430,8 @@ function ItemResolver({
           className="flex-1"
           onClick={primario.onClick}
           disabled={busy}
+          aria-busy={busy}
+          data-primario
           aria-label={`${primario.label}: ${nome}, ${quando}`}
         >
           {primario.label}
@@ -388,6 +442,7 @@ function ItemResolver({
           className="flex-1"
           onClick={secundario.onClick}
           disabled={busy}
+          aria-busy={busy}
           aria-label={`${secundario.label}: ${nome}, ${quando}`}
         >
           {secundario.label}
@@ -422,7 +477,7 @@ function Hoje({ today, nextAfterToday, agora }: { today: AulaComNome[]; nextAfte
   return (
     <section aria-labelledby="hoje" className="card-dark rounded-[20px] p-4">
       <div className="flex justify-between items-baseline gap-3">
-        <h2 id="hoje" className="section-title">
+        <h2 id="hoje" tabIndex={-1} className="section-title outline-none">
           {today.length ? `Hoje · ${plural(today.length, "aula", "aulas")}` : "Hoje"}
         </h2>
         {registradas > 0 && (

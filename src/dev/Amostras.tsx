@@ -494,6 +494,10 @@ function SeededAdmin({ data, children, seed }: { data: unknown; children: ReactN
     });
     qc.setQueryData(["admin-dashboard", ADMIN_ID], data);
     seed?.(qc);
+    // Pra testar pelo console o que acontece quando um item some (ex.: foco depois de resolver):
+    // window.__amostrasAdmin[i].setQueryData(["admin-dashboard", "<ADMIN_ID>"], ...).
+    const w = window as unknown as { __amostrasAdmin?: QueryClient[] };
+    (w.__amostrasAdmin ??= []).push(qc);
     // Professor configurado pra falta NÃO descontar, mas o pacote de recorrência do Diego foi criado
     // quando descontava: a janela de falta tem que seguir o pacote (regra da aula, não a geral).
     qc.setQueryData(["admin-settings", ADMIN_ID], { adminId: ADMIN_ID, noShowConsumesClass: false, modoAgendamento: "autosservico", whatsapp: null });
