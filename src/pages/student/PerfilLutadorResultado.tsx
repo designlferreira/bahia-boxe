@@ -75,10 +75,22 @@ export default function StudentPerfilLutadorResultado() {
     <div className="page-container">
       <PageHeader title="RESULTADO" subtitle={subtitulo} back />
 
-      {isError && <ErrorState onRetry={() => refetch()} />}
+      {isError && (
+        <ErrorState
+          title="Não conseguimos abrir essa avaliação"
+          description="Verifique sua conexão e tente novamente. Seus resultados continuam salvos."
+          onRetry={() => refetch()}
+        />
+      )}
       {isLoading && !isError && <SkeletonList count={4} height={110} />}
       {!isLoading && !isError && !assessment && (
-        <EmptyState title="Avaliação não encontrada" description="Essa avaliação pode ter sido removida ou o link está incorreto." />
+        <EmptyState
+          title="Avaliação não encontrada"
+          description="Essa avaliação pode ter sido removida ou o link está incorreto."
+          ctaLabel="Ver meu Perfil de Boxe"
+          ctaVariant="secondary"
+          onCta={() => navigate("/app/perfil-lutador")}
+        />
       )}
       {!isLoading && !isError && assessment && antiga && (
         <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 mb-4">
