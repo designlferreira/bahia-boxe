@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
+import { ErrorState } from "@/components/ErrorState";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,7 +51,7 @@ export default function AdminOrientacoesAula() {
   // formulário local é a fonte da verdade até "Salvar".
   const loadedRef = useRef(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isSuccess, isError, refetch } = useQuery({
     queryKey: ["class-guidelines", profile?.id],
     queryFn: () => getClassGuidelines(profile!.id),
     enabled: !!profile,
@@ -111,7 +112,23 @@ export default function AdminOrientacoesAula() {
     setForm((f) => ({ ...f, equipment: { ...f.equipment, ...patch } }));
   }
 
-  if (isLoading) {
+  // Antes só existia `isLoading`: se a consulta FALHAVA o formulário abria VAZIO (indistinguível de "nunca preencheu") e o "Salvar
+  // orientações" gravava tudo em branco por cima do endereço, equipamento e recado que os alunos veem no detalhe da aula. Agora, sem a
+  // resposta do servidor (`isSuccess`; `data === null` é "nunca salvou" e é uma resposta válida) a tela não mostra formulário.
+  if (isError) {
+    return (
+      <div className="page-container">
+        <PageHeader title="ORIENTAÇÕES DA AULA" subtitle="Padrão mostrado aos alunos" back />
+        <ErrorState
+          title="Não foi possível carregar as orientações"
+          description="O que você já salvou não foi alterado. Verifique sua conexão e tente novamente."
+          onRetry={() => refetch()}
+        />
+      </div>
+    );
+  }
+
+  if (!isSuccess) {
     return (
       <div className="page-container">
         <PageHeader title="ORIENTAÇÕES DA AULA" subtitle="Padrão mostrado aos alunos" back />
@@ -244,7 +261,7 @@ export default function AdminOrientacoesAula() {
         />
       </Section>
 
-      <Button size="lg" className="w-full mt-2" onClick={() => save.mutate()} disabled={save.isPending}>
+      <Button size="lg" className="w-full mt-2" onClick={() => save.mutate()} disabled={save.isPending || !isSuccess}>
         {save.isPending ? "Salvando…" : "Salvar orientações"}
       </Button>
     </div>
