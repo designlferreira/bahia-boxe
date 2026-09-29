@@ -1065,10 +1065,24 @@ export default function Amostras() {
               </ComRota>
             </SemLogin>
           </Frame>
-          <Frame title="Nova senha" note="a tela aberta pelo link do e-mail">
+          <Frame title="Nova senha" note="a tela aberta pelo link do e-mail (link válido)">
             <SemLogin>
               <ComRota path="/auth/reset-password" url="/auth/reset-password">
-                <ResetPassword />
+                <ResetPassword amostra="pronto" />
+              </ComRota>
+            </SemLogin>
+          </Frame>
+          <Frame title="Nova senha · link expirado" note="link vencido, já usado ou aberto sem o e-mail">
+            <SemLogin>
+              <ComRota path="/auth/reset-password" url="/auth/reset-password">
+                <ResetPassword amostra="invalido" />
+              </ComRota>
+            </SemLogin>
+          </Frame>
+          <Frame title="Nova senha · verificando" note="enquanto o link vira sessão (instantes)">
+            <SemLogin>
+              <ComRota path="/auth/reset-password" url="/auth/reset-password">
+                <ResetPassword amostra="verificando" />
               </ComRota>
             </SemLogin>
           </Frame>

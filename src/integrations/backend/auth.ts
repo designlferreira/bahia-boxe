@@ -126,6 +126,57 @@ export async function sendPasswordResetEmail(email: string): Promise<void> {
   throw new AuthError("Não foi possível enviar o e-mail agora. Tente novamente em instantes.");
 }
 
+/**
+ * Como a página `/auth/reset-password` foi aberta. O Supabase (fluxo implícito) troca o `#access_token…&type=recovery` do link por
+ * uma sessão e LIMPA o hash logo depois — por isso isto é lido UMA vez, quando este módulo é avaliado (antes de qualquer espera):
+ * - "recovery": veio de um link de recuperação válido (ainda precisa haver sessão para redefinir);
+ * - "error": o link chegou com erro (`#error=access_denied&error_code=otp_expired…`: expirado ou já usado);
+ * - "none": aberta sem link (digitando o endereço, ou recarregando depois de o hash ser limpo).
+ * Uma sessão comum NÃO basta para redefinir sem a senha atual: quem está logado troca a senha em "Alterar senha", que a exige.
+ */
+export type EstadoLinkRecuperacao = "recovery" | "error" | "none";
+const ESTADO_LINK: EstadoLinkRecuperacao = (() => {
+  if (typeof window === "undefined" || window.location.pathname !== "/auth/reset-password") return "none";
+  const hash = window.location.hash;
+  if (/[#&]error(_code|_description)?=/.test(hash)) return "error";
+  if (/[#&]type=recovery/.test(hash)) return "recovery";
+  return "none";
+})();
+export function estadoDoLinkDeRecuperacao(): EstadoLinkRecuperacao {
+  return ESTADO_LINK;
+}
+
+/** O link de recuperação já virou sessão (o cliente do Supabase termina de processar o hash de forma assíncrona). */
+export async function temSessaoDeRecuperacao(): Promise<boolean> {
+  const { data } = await client().auth.getSession();
+  return !!data.session;
+}
+
+/**
+ * Define a nova senha da pessoa que abriu o link do e-mail. Diferente de `changePassword`, NÃO pede a senha atual (ela não a tem).
+ * Depois de definir, encerra a sessão de recuperação: a pessoa entra no Login com a senha nova (decisão do Lucas, 2026-09-29).
+ */
+export async function redefinirSenhaPeloLink(newPassword: string): Promise<void> {
+  const { error } = await client().auth.updateUser({ password: newPassword });
+  if (error) {
+    const message = error.message.toLowerCase();
+    if (error.code === "same_password" || message.includes("different from the old")) {
+      throw new AuthError("Escolha uma senha diferente da anterior.", "same_password");
+    }
+    if (error.code === "weak_password" || message.includes("password")) {
+      throw new AuthError("A senha não atende aos requisitos mínimos. Use pelo menos 8 caracteres.");
+    }
+    if (message.includes("session") || error.status === 401 || error.status === 403) {
+      throw new AuthError("Este link expirou ou já foi usado.", "link_expired");
+    }
+    if (!error.status) {
+      throw new AuthError("Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.");
+    }
+    throw new AuthError("Não foi possível redefinir a senha. Tente novamente.");
+  }
+  await client().auth.signOut();
+}
+
 export async function signInWithPassword(email: string, password: string): Promise<Profile> {
   const { data, error } = await client().auth.signInWithPassword({ email: email.trim(), password });
   if (error || !data.user) {
