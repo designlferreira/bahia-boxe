@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { formatDayNumber, formatWeekdayLong, formatWeekdayShort, isoDateOnly } from "@/lib/dateUtils";
+import { formatDateShort, formatDayNumber, formatRelativeDay, formatWeekdayLong, formatWeekdayShort, isoDateOnly } from "@/lib/dateUtils";
 import {
   getAvailableSlotsForDays,
   getModoAgendamentoEfetivo,
@@ -98,18 +98,28 @@ export default function StudentAgendar() {
 
   const schedule = useMutation({
     // The slot id is what the database books against — no client-side time arithmetic.
-    mutationFn: () => scheduleBooking(selected!.slotId),
-    onSuccess: () => {
+    mutationFn: (_quando: string) => scheduleBooking(selected!.slotId),
+    // A aula já nasce confirmada (`schedule_booking` grava `scheduled` — conferido no banco em
+    // 2026-09-28: nenhum gatilho de INSERT em `bookings`), então o aviso não fala em aprovação.
+    // Diz dia e hora: "Aula agendada!" sozinho não deixava o aluno conferir o que marcou.
+    onSuccess: (_r, quando) => {
       queryClient.invalidateQueries({ queryKey: ["student-home"] });
       queryClient.invalidateQueries({ queryKey: ["student-history"] });
       navigate("/app/home");
-      toast.success("Aula agendada!");
+      toast.success(`Aula agendada · ${quando}`);
     },
     onError: (err) => {
       toast.error(scheduleBookingErrorMessage(err));
       queryClient.invalidateQueries({ queryKey: ["available-slots-semana"] });
     },
   });
+
+  /** "Amanhã, 19:00" / "Quinta-feira, 01 out · 19:00" — pro aviso depois de confirmar. */
+  const quandoEscolhido = () => {
+    const dia = formatRelativeDay(selectedDate);
+    const hora = selected?.time ?? "";
+    return dia === "Hoje" || dia === "Amanhã" ? `${dia}, ${hora}` : `${dia}, ${formatDateShort(selectedDate)} · ${hora}`;
+  };
 
   // Sem aula para agendar: antes a grade continuava ativa e o erro só aparecia depois de "Confirmar".
   // Agora a tela diz logo o motivo e o que fazer — com o mesmo verbo da Home ("Pedir").
@@ -248,7 +258,7 @@ export default function StudentAgendar() {
 
       {selected && (
         <div className="fixed inset-x-0 bottom-[84px] px-5 pb-3 pt-6 bg-[linear-gradient(180deg,transparent,hsl(var(--background))_34%)] z-20 animate-bb-toast">
-          <Button size="lg" className="w-full h-14" onClick={() => schedule.mutate()} disabled={schedule.isPending}>
+          <Button size="lg" className="w-full h-14" onClick={() => schedule.mutate(quandoEscolhido())} disabled={schedule.isPending}>
             {schedule.isPending ? "Confirmando…" : `Confirmar ${selected.time}`}
           </Button>
         </div>
