@@ -3,7 +3,7 @@ import { Bell, CalendarClock, XCircle, CheckCircle2, Info, X } from "lucide-reac
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Sheet, SheetClose, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
@@ -98,8 +98,9 @@ export function NotificationBell({ userId }: NotificationBellProps) {
       >
         <Bell className="h-[18px] w-[18px] text-foreground/90" aria-hidden />
         {unread > 0 && (
-          <span aria-hidden className="absolute -top-1.5 -right-1.5 min-w-[19px] h-[19px] px-1 rounded-full bg-primary text-primary-foreground text-[10.5px] font-bold flex items-center justify-center border-2 border-background">
-            {unread}
+          // 12px (antes 10,5px) e "99+": o número, com mais de dois dígitos, estourava o círculo.
+          <span aria-hidden className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center border-2 border-background">
+            {unread > 99 ? "99+" : unread}
           </span>
         )}
       </button>
@@ -109,9 +110,16 @@ export function NotificationBell({ userId }: NotificationBellProps) {
           <div className="flex items-center gap-2.5 mb-3.5">
             <div className="flex-1">
               <SheetTitle>NOTIFICAÇÕES</SheetTitle>
-              <div className="text-xs text-muted-foreground mt-0.5">{unread} não lida(s)</div>
+              <SheetDescription className="sr-only">Avisos sobre suas aulas e pedidos. Toque em um aviso para abri-lo.</SheetDescription>
+              {/* Só com a lista carregada: durante a falha ou o carregamento "0 não lidas" seria mentira. Anunciado ao mudar. */}
+              {!isLoading && !isError && notifs.length > 0 && (
+                <div aria-live="polite" className="text-xs text-muted-foreground mt-0.5">
+                  {unread === 0 ? "Tudo lido" : unread === 1 ? "1 não lida" : `${unread} não lidas`}
+                </div>
+              )}
             </div>
-            {notifs.length > 0 && (
+            {/* Sem nada para marcar o botão some (antes ficava ativo com tudo já lido). */}
+            {unread > 0 && (
               <Button variant="secondary" size="sm" disabled={markAll.isPending} onClick={() => markAll.mutate()}>
                 Marcar todas
               </Button>
@@ -120,9 +128,9 @@ export function NotificationBell({ userId }: NotificationBellProps) {
               <button
                 type="button"
                 aria-label="Fechar"
-                className="h-11 w-11 shrink-0 rounded-[11px] border border-border bg-secondary flex items-center justify-center active:scale-95 transition-transform"
+                className="h-11 w-11 shrink-0 rounded-[11px] border border-border bg-secondary flex items-center justify-center active:scale-95 motion-reduce:active:scale-100 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <X className="h-[15px] w-[15px] text-foreground/80" />
+                <X className="h-[15px] w-[15px] text-foreground/80" aria-hidden />
               </button>
             </SheetClose>
           </div>
@@ -147,45 +155,53 @@ export function NotificationBell({ userId }: NotificationBellProps) {
                 }
               />
             )}
-            {notifs.map((n) => {
-              const Icon = KIND_ICON[n.kind];
-              return (
-                <button
-                  key={n.id}
-                  type="button"
-                  onClick={() => openNotif.mutate(n)}
-                  className={cn(
-                    "w-full text-left flex gap-2.5 items-start p-3.5 rounded-2xl border transition-all active:scale-[0.985]",
-                    n.read ? "bg-card border-border/60" : "bg-primary/[0.07] border-primary/30",
-                  )}
-                >
-                  <Icon
-                    className={cn(
-                      "h-4 w-4 mt-0.5 shrink-0",
-                      n.kind === "cancel"
-                        ? "text-destructive"
-                        : n.kind === "confirm"
-                          ? "text-accent"
-                          : n.kind === "system"
-                            ? "text-muted-foreground"
-                            : "text-amber",
-                    )}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className={cn("text-sm font-semibold", n.read ? "text-muted-foreground" : "text-foreground")}>
-                      {n.title}
-                    </div>
-                    <div className="text-[13px] text-muted-foreground mt-0.5 leading-snug">{n.description}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{relativeTime(n.createdAt)}</div>
-                  </div>
-                  {!n.read && (
-                    <span className="shrink-0 text-xs font-bold px-2 py-1 rounded-full bg-primary/20 text-[hsl(var(--red-text))]">
-                      Nova
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+            {notifs.length > 0 && (
+              <ul aria-label="Notificações" className="flex flex-col gap-2.5">
+                {notifs.map((n) => {
+                  const Icon = KIND_ICON[n.kind];
+                  return (
+                    <li key={n.id}>
+                      <button
+                        type="button"
+                        onClick={() => openNotif.mutate(n)}
+                        className={cn(
+                          "w-full text-left flex gap-2.5 items-start p-3.5 rounded-2xl border transition-all active:scale-[0.985] motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          n.read ? "bg-card border-border/60" : "bg-primary/[0.07] border-primary/30",
+                        )}
+                      >
+                        <Icon
+                          aria-hidden
+                          className={cn(
+                            "h-4 w-4 mt-0.5 shrink-0",
+                            n.kind === "cancel"
+                              ? "text-[hsl(var(--red-text))]"
+                              : n.kind === "confirm"
+                                ? "text-accent"
+                                : n.kind === "system"
+                                  ? "text-muted-foreground"
+                                  : "text-amber",
+                          )}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className={cn("text-sm font-semibold", n.read ? "text-muted-foreground" : "text-foreground")}>
+                            {/* "Nova" também por texto: o selo e o fundo tingido só existem para quem enxerga. */}
+                            {!n.read && <span className="sr-only">Nova. </span>}
+                            {n.title}
+                          </div>
+                          <div className="text-[13px] text-muted-foreground mt-0.5 leading-snug">{n.description}</div>
+                          <div className="text-xs text-muted-foreground mt-1">{relativeTime(n.createdAt)}</div>
+                        </div>
+                        {!n.read && (
+                          <span aria-hidden className="shrink-0 text-xs font-bold px-2 py-1 rounded-full bg-primary/20 text-[hsl(var(--red-text))]">
+                            Nova
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
 
           {notifs.length > 0 && (
