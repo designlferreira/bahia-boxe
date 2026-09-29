@@ -173,7 +173,14 @@ export default function StudentAgendar() {
       <PageHeader
         title="AGENDAR AULA"
         back
-        subtitle={home ? `${home.credits} crédito(s) disponível(is)` : undefined}
+        // Mesmo vocabulário da Home: aulas, não "crédito(s) disponível(is)" (decisão do Lucas).
+        subtitle={
+          home
+            ? home.credits === 1
+              ? "Você pode agendar mais 1 aula"
+              : `Você pode agendar mais ${home.credits} aulas`
+            : undefined
+        }
       />
 
       {/* Mesma faixa da agenda do professor: os 7 dias cabem na tela (sem rolagem) e cada dia diz se
