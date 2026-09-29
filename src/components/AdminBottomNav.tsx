@@ -1,60 +1,53 @@
-import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, CalendarDays, Users, History, Inbox, UserRound } from "lucide-react";
+import { LayoutDashboard, CalendarDays, Users, History, UserRound } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { cn } from "@/lib/utils";
-import { getPurchaseRequests } from "@/integrations/backend/api";
+import { countPendenciasDoProfessor } from "@/integrations/backend/api";
 import { useAuth } from "@/context/AuthContext";
+import { BottomNavItem } from "@/components/BottomNavItem";
+import { BottomNavShell } from "@/components/BottomNavShell";
 
-const items = [
-  { to: "/admin/dashboard", label: "Painel", icon: LayoutDashboard },
-  { to: "/admin/agenda", label: "Agenda", icon: CalendarDays },
-  { to: "/admin/alunos", label: "Alunos", icon: Users },
-  { to: "/admin/historico", label: "Aulas", icon: History },
-  { to: "/admin/solicitacoes", label: "Pedidos", icon: Inbox, badge: true },
-  { to: "/admin/minha-conta", label: "Conta", icon: UserRound },
-];
-
+/**
+ * Cinco abas (eram seis, com "Pedidos"): com seis, cada aba tinha 49-58px e o rótulo era de 9,5px. "Pedidos" saiu da barra — o Painel
+ * ("Resolver agora") e o sino já avisam, e a tela continua em /admin/solicitacoes. O número de pendências vive na aba Painel.
+ */
 export function AdminBottomNav() {
   const { profile } = useAuth();
-  const location = useLocation();
+  // A chave começa com "admin-dashboard" DE PROPÓSITO: Pedidos, Painel, Agenda e o detalhe da aula já invalidam esse prefixo quando o
+  // professor decide algo, então o número acompanha sem cada tela precisar conhecer esta chave. A cada 60s (era 15s, com uma consulta que
+  // trazia alunos, modelos e pacotes), e só com o app visível (`refetchIntervalInBackground` é falso por padrão).
   const { data } = useQuery({
-    queryKey: ["purchase-requests", profile?.id],
-    queryFn: () => getPurchaseRequests(profile!.id),
+    queryKey: ["admin-dashboard", "pendencias", profile?.id],
+    queryFn: () => countPendenciasDoProfessor(profile!.id),
     enabled: !!profile,
-    refetchInterval: 15000,
+    refetchInterval: 60000,
+    staleTime: 30000,
   });
-  const count = data?.length ?? 0;
+  const count = data ?? 0;
 
   return (
-    <nav
-      aria-label="Navegação principal"
-      className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-0.5 border-t border-border bg-background/92 pt-2.5 pb-[22px] backdrop-blur-xl"
-      // Mesma coluna centralizada do `.page-container`: no tablet as abas não se espalham.
-      style={{ height: 84, paddingInline: "max(0.5rem, calc((100% - 30rem) / 2))" }}
-    >
-      {items.map(({ to, label, icon: Icon, badge }) => (
-        <NavLink
-          key={to}
-          to={to}
-          aria-label={label}
-          className={({ isActive }) =>
-            cn(
-              "relative flex-1 h-[52px] flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform",
-              isActive || (to === "/admin/alunos" && location.pathname.startsWith("/admin/alunos/"))
-                ? "text-[hsl(var(--nav-active))]"
-                : "text-muted-foreground/70",
-            )
-          }
-        >
-          <Icon className="h-5 w-5" strokeWidth={2} />
-          <span className="text-[9.5px] font-semibold">{label}</span>
-          {badge && count > 0 && (
-            <span className="absolute top-0.5 right-4 min-w-[17px] h-[17px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
-              {count}
+    <BottomNavShell>
+      <BottomNavItem to="/admin/dashboard" label="Painel" icon={LayoutDashboard} prefixos={["/admin/solicitacoes"]}>
+        {count > 0 && (
+          <>
+            <span aria-hidden className="absolute top-0.5 right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">
+              {count > 9 ? "9+" : count}
             </span>
-          )}
-        </NavLink>
-      ))}
-    </nav>
+            <span className="sr-only">
+              , {count} {count === 1 ? "pendência" : "pendências"}
+            </span>
+          </>
+        )}
+      </BottomNavItem>
+      {/* O detalhe de uma aula acende a Agenda (de onde o professor mais chega a ele); as telas de Minha conta, a aba Conta. Antes só
+          `/admin/alunos/` tinha exceção e, nas outras telas de segundo nível, nenhuma aba acendia. */}
+      <BottomNavItem to="/admin/agenda" label="Agenda" icon={CalendarDays} prefixos={["/admin/aula"]} />
+      <BottomNavItem to="/admin/alunos" label="Alunos" icon={Users} />
+      <BottomNavItem to="/admin/historico" label="Aulas" icon={History} />
+      <BottomNavItem
+        to="/admin/minha-conta"
+        label="Conta"
+        icon={UserRound}
+        prefixos={["/admin/pacotes", "/admin/disponibilidade", "/admin/orientacoes", "/admin/perfil-alunos", "/admin/configuracoes"]}
+      />
+    </BottomNavShell>
   );
 }
