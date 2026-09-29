@@ -452,6 +452,46 @@ export async function getAvailableSlotsForDay(adminId: string, date: Date): Prom
   }));
 }
 
+/**
+ * Os horários de vários dias numa busca só (a tela Agendar mostra 7): a tela precisa saber QUAIS dias
+ * têm horário livre pra abrir no primeiro deles e marcar os dias na faixa. Mesma lógica de
+ * `getAvailableSlotsForDay`, agrupada por dia (chave "yyyy-MM-dd" no fuso de São Paulo).
+ */
+export async function getAvailableSlotsForDays(adminId: string, days: Date[]): Promise<Record<string, DaySlot[]>> {
+  if (days.length === 0) return {};
+  const { startIso } = dayBoundsUtcIso(days[0]);
+  const { endIso } = dayBoundsUtcIso(days[days.length - 1]);
+  const nowIso = new Date().toISOString();
+  const [slotsRes, freeRes] = await Promise.all([
+    client()
+      .from("availability_slots")
+      .select("id, start_time")
+      .eq("admin_id", adminId)
+      .eq("is_active", true)
+      .gt("start_time", nowIso)
+      .gte("start_time", startIso)
+      .lt("start_time", endIso)
+      .order("start_time"),
+    client()
+      .from("available_slots")
+      .select("slot_id")
+      .eq("admin_id", adminId)
+      .gte("start_time", startIso)
+      .lt("start_time", endIso),
+  ]);
+  if (slotsRes.error) throw new Error(slotsRes.error.message);
+  if (freeRes.error) throw new Error(freeRes.error.message);
+
+  const free = new Set((freeRes.data ?? []).map((r) => r.slot_id));
+  const out: Record<string, DaySlot[]> = {};
+  for (const d of days) out[brtDateKey(d)] = [];
+  for (const s of slotsRes.data ?? []) {
+    const key = brtDateKey(new Date(s.start_time));
+    (out[key] ??= []).push({ slotId: s.id, time: hhmm(brtHour(s.start_time)), status: free.has(s.id) ? "free" : "booked" });
+  }
+  return out;
+}
+
 /** `schedule_booking` validates credits, ownership and slot availability server-side. */
 export async function scheduleBooking(slotId: string) {
   const { error } = await client().rpc("schedule_booking", { p_slot_id: slotId });

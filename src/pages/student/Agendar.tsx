@@ -8,9 +8,9 @@ import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { formatDayNumber, formatWeekdayLong, formatWeekdayShort } from "@/lib/dateUtils";
+import { formatDayNumber, formatWeekdayLong, formatWeekdayShort, isoDateOnly } from "@/lib/dateUtils";
 import {
-  getAvailableSlotsForDay,
+  getAvailableSlotsForDays,
   getModoAgendamentoEfetivo,
   getStudentAdminId,
   getStudentHome,
@@ -45,11 +45,13 @@ export default function StudentAgendar() {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [dayOffset, setDayOffset] = useState(1);
+  // null = o aluno ainda não escolheu um dia: a tela abre no primeiro dia com horário livre
+  // (decisão do Lucas, 2026-09-28). Antes abria sempre em depois de amanhã (useState(1) com a lista
+  // já começando amanhã) — muitas vezes num dia vazio, com horário livre amanhã.
+  const [escolhido, setEscolhido] = useState<number | null>(null);
   const [selected, setSelected] = useState<DaySlot | null>(null);
 
   const days = Array.from({ length: DAY_COUNT }, (_, i) => addDays(new Date(), i + 1));
-  const selectedDate = days[dayOffset] ?? days[0];
 
   const { data: home } = useQuery({
     queryKey: ["student-home", profile?.id],
@@ -82,11 +84,17 @@ export default function StudentAgendar() {
     }
   }, [modoEfetivo, navigate]);
 
-  const { data: slots, isLoading } = useQuery({
-    queryKey: ["available-slots", adminId, selectedDate.toDateString()],
-    queryFn: () => getAvailableSlotsForDay(adminId!, selectedDate),
+  const { data: semana, isLoading } = useQuery({
+    queryKey: ["available-slots-semana", adminId, days[0].toDateString()],
+    queryFn: () => getAvailableSlotsForDays(adminId!, days),
     enabled: !!adminId && modoEfetivo !== "recorrencia",
   });
+  const livresNoDia = (i: number) => (semana?.[isoDateOnly(days[i])] ?? []).filter((s) => s.status === "free").length;
+  const primeiroComLivre = semana ? days.findIndex((_, i) => livresNoDia(i) > 0) : -1;
+  const dayOffset = escolhido ?? (primeiroComLivre >= 0 ? primeiroComLivre : 0);
+  const selectedDate = days[dayOffset];
+  const slots = semana?.[isoDateOnly(selectedDate)];
+  const setDayOffset = (f: (d: number) => number) => setEscolhido(f(dayOffset));
 
   const schedule = useMutation({
     // The slot id is what the database books against — no client-side time arithmetic.
@@ -99,7 +107,7 @@ export default function StudentAgendar() {
     },
     onError: (err) => {
       toast.error(scheduleBookingErrorMessage(err));
-      queryClient.invalidateQueries({ queryKey: ["available-slots"] });
+      queryClient.invalidateQueries({ queryKey: ["available-slots-semana"] });
     },
   });
 
@@ -119,7 +127,7 @@ export default function StudentAgendar() {
               key={d.toISOString()}
               type="button"
               onClick={() => {
-                setDayOffset(i);
+                setEscolhido(i);
                 setSelected(null);
               }}
               aria-label={`${formatWeekdayLong(d)}, dia ${formatDayNumber(d)}`}

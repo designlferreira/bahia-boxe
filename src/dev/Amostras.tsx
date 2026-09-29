@@ -17,6 +17,7 @@ import StudentHome from "@/pages/student/Home";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminAlunos from "@/pages/admin/Alunos";
 import AdminAgenda from "@/pages/admin/Agenda";
+import StudentAgendar from "@/pages/student/Agendar";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
 import { RemarcacaoSheet } from "@/components/RemarcacaoSheet";
@@ -520,6 +521,35 @@ function semearAgenda(qc: QueryClient) {
   qc.setQueryData(["agenda-pedidos-pendentes", ADMIN_ID], [aulaNa(0, h0 + 2, "pending_confirmation"), aulaNa(1, 7, "pending_confirmation")]);
 }
 
+/**
+ * Tela Agendar (aluno): os 7 dias que a tela mostra (amanhã em diante), cada um com a mesma chave da
+ * tela. Amanhã: livres e ocupados; depois de amanhã: sem horários; resto: poucos horários.
+ */
+function horariosAgendar(): [unknown[], unknown][] {
+  const semana: Record<string, unknown[]> = {};
+  for (let i = 1; i <= 7; i++) {
+    const dia = addDays(new Date(), i);
+    const slots =
+      i === 1
+        ? [
+            { slotId: `sl-${i}-7`, time: "07:00", status: "free" },
+            { slotId: `sl-${i}-8`, time: "08:00", status: "booked" },
+            { slotId: `sl-${i}-12`, time: "12:00", status: "free" },
+            { slotId: `sl-${i}-18`, time: "18:00", status: "booked" },
+            { slotId: `sl-${i}-19`, time: "19:00", status: "free" },
+            { slotId: `sl-${i}-20`, time: "20:00", status: "free" },
+          ]
+        : i === 2
+          ? []
+          : [
+              { slotId: `sl-${i}-18`, time: "18:00", status: "free" },
+              { slotId: `sl-${i}-19`, time: "19:00", status: i % 2 ? "booked" : "free" },
+            ];
+    semana[formatInTimeZone(dia, TIMEZONE, "yyyy-MM-dd")] = slots;
+  }
+  return [[["available-slots-semana", ADMIN_ID, addDays(new Date(), 1).toDateString()], semana]];
+}
+
 /** Lista de alunos: 6 alunos, 4 deles em risco (os mesmos do painel). */
 function semearAlunos(qc: QueryClient) {
   const nomes = ["Ana Beatriz Souza", "Helena Costa", "Igor Nascimento", "Julia Pereira", "Karina Duarte", "Leonardo Prado"];
@@ -596,6 +626,20 @@ export default function Amostras() {
               </SeededAdmin>
             </Frame>
           ))}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Agendar aula (aluno)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          <Frame title="Com aulas para agendar" note="6 livres no pacote; amanhã tem livres e ocupados, depois de amanhã sem horários">
+            <Seeded data={{ ...base, package: pkg(10, 3), credits: 6 }} modo="autosservico" extra={horariosAgendar()}>
+              <StudentAgendar />
+            </Seeded>
+          </Frame>
+          <Frame title="Nada para agendar" note="restantes todas já marcadas (crédito 0)">
+            <Seeded data={{ ...base, package: pkg(8, 6), credits: 0, nextBooking: booking(1) }} modo="autosservico" extra={horariosAgendar()}>
+              <StudentAgendar />
+            </Seeded>
+          </Frame>
         </div>
 
         <h2 className="text-lg font-semibold mb-4">Agenda do professor</h2>
