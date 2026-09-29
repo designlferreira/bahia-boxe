@@ -58,10 +58,14 @@ export default function StudentAulaDetalhe() {
     enabled: !!booking && booking.status === "scheduled" && isRecorrencia,
   });
   const faltaMaisDe24h = !!booking && new Date(booking.startTime).getTime() - Date.now() >= 24 * 60 * 60 * 1000;
+  // Aula agendada a menos de 6h: o banco recusa o cancelamento (`cancelar_minha_aula`, 0034). Antes o
+  // botão aparecia mesmo assim e o aluno só descobria o erro depois de confirmar.
+  const tarde6h = !!booking && booking.status === "scheduled" && new Date(booking.startTime).getTime() - Date.now() < 6 * 60 * 60 * 1000;
   const { data: whatsapp } = useQuery({
     queryKey: ["whatsapp-professor", booking?.adminId],
     queryFn: () => getWhatsappDoProfessor(booking!.adminId),
-    enabled: !!booking && isRecorrencia && !faltaMaisDe24h,
+    // Recorrência (< 24h) e qualquer aula agendada a menos de 6h (autosserviço inclusive).
+    enabled: !!booking && ((isRecorrencia && !faltaMaisDe24h) || tarde6h),
     staleTime: 60 * 60 * 1000,
   });
   const invalidateAulas = () => {
@@ -172,8 +176,11 @@ export default function StudentAulaDetalhe() {
     );
   }
 
-  const cancelable = (booking.status === "scheduled" || booking.status === "pending_confirmation") &&
-    new Date(booking.startTime).getTime() > Date.now();
+  const cancelable =
+    (booking.status === "scheduled" || booking.status === "pending_confirmation") &&
+    new Date(booking.startTime).getTime() > Date.now() &&
+    !tarde6h;
+  const aindaNaoComecou = new Date(booking.startTime).getTime() > Date.now();
   const arrival = guidelines ? arrivalMessage(guidelines.arrivalMinutes) : null;
   const equipment = guidelines ? equipmentItems(guidelines.equipment) : [];
   const address = guidelines && hasAddress(guidelines) ? formatAddress(guidelines) : null;
@@ -299,7 +306,7 @@ export default function StudentAulaDetalhe() {
         </div>
       )}
 
-      {booking.status === "scheduled" && isRecorrencia && !pedidoPendente && (
+      {booking.status === "scheduled" && isRecorrencia && !pedidoPendente && !tarde6h && (
         faltaMaisDe24h ? (
           <Button variant="secondary" size="lg" className="w-full mb-3" onClick={() => setPickerOpen(true)}>
             <CalendarClock className="h-5 w-5" aria-hidden />
@@ -325,6 +332,26 @@ export default function StudentAulaDetalhe() {
             )}
           </div>
         )
+      )}
+
+      {tarde6h && aindaNaoComecou && (
+        <div className="rounded-2xl border border-border bg-card p-4 mb-3">
+          <div className="text-[15px] font-semibold text-foreground mb-1">Faltam menos de 6 horas</div>
+          <div className="text-sm text-muted-foreground">
+            Não dá mais para cancelar ou mudar esta aula pelo app. Fale com o professor.
+          </div>
+          {whatsapp && (
+            <a
+              href={`https://wa.me/${whatsapp}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-xl border border-border bg-secondary text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Falar com o professor no WhatsApp
+              <span className="sr-only"> (abre em nova aba)</span>
+            </a>
+          )}
+        </div>
       )}
 
       {cancelable && !isPedido && (
