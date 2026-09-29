@@ -102,6 +102,11 @@
      funciona em qualquer ponto da tela). No celular, max() cai no 1.25rem de sempre. */
   .page-container {
     @apply flex-1 overflow-y-auto pt-14 pb-28 animate-bb-in;
+    /* "backwards", não "both": com "both" a transformação final da animação (identidade) ficava
+       aplicada pra sempre, e qualquer transform — mesmo neutro — faz o container virar a referência
+       de elementos `position: fixed` dentro dele. A barra "Confirmar" do Agendar ficava presa ao
+       conteúdo e rolava junto, em vez de ficar parada na tela. Visualmente o fim é idêntico. */
+    animation-fill-mode: backwards;
     padding-inline: max(1.25rem, calc((100% - 30rem) / 2));
   }
 

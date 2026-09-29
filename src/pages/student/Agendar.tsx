@@ -298,6 +298,12 @@ export default function StudentAgendar() {
         />
       )}
 
+      {/* Região sempre presente (live region só anuncia mudança de conteúdo, não um nó novo): avisa o
+          leitor de tela que o horário foi escolhido e que o botão de confirmar apareceu. */}
+      <div className="sr-only" aria-live="polite">
+        {selected ? `Horário ${selected.time} escolhido. Botão Confirmar no fim da tela.` : ""}
+      </div>
+
       {selected && (
         <div className="fixed inset-x-0 bottom-[84px] px-5 pb-3 pt-6 bg-[linear-gradient(180deg,transparent,hsl(var(--background))_34%)] z-20 animate-bb-toast">
           <Button size="lg" className="w-full h-14" onClick={() => schedule.mutate(quandoEscolhido())} disabled={schedule.isPending}>
