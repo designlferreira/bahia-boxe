@@ -2898,6 +2898,37 @@ recentes / N aulas no total". A busca é sem acento/maiúscula (`semAcento`) e s
 **Deixado para depois (registrado, não pedido):** filtro por período/mês e "faltas do aluno X em setembro" (contagens por
 filtro); cabeçalho por mês além do dia; atalho para o perfil do aluno; o filtro "Recusadas".
 
+### Detalhe do aluno (professor): rodada de crítica (2026-09-29) — migration 0036
+
+`src/pages/admin/AlunoDetalhe.tsx` (rota `/admin/alunos/:studentId`): crítica **20/40**. Seis passos na `dev`, testados
+pelo Lucas. Na página de amostras ("Detalhe do aluno (professor)": pacote comprado, em recorrência, aluno novo).
+
+**Migration 0036 (`0036_email_do_aluno.sql`) — APLICADA e VERIFICADA (4/4 OK, `supabase/verify_0036_email_do_aluno.sql`):**
+`email_do_aluno(p_student_id)`, `security definer`, só o professor dono do aluno (`only_admin`/`not_allowed`). O e-mail só
+existe em `auth.users`, que o cliente não lê. `revoke ... from public, anon; grant execute ... to authenticated`.
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Contato = e-mail do aluno** (link `mailto:` sob o nome). Se a consulta falha, a linha some (é um extra, não derruba a tela).
+  O app **não tem telefone do aluno**; WhatsApp do aluno só existiria com campo novo.
+- **Atribuir pacote tem confirmação:** tocar num modelo só ESCOLHE (`role="radio"`); quem atribui é o botão "Atribuir <modelo>".
+  Com pacote ativo não-experimental, faixa âmbar: "Atribuir um novo encerra o atual. As aulas já marcadas continuam valendo."
+- **Ações do pacote moram DENTRO do `ActivePackageCard`** (prop `actions`): "Atribuir novo pacote" (secundário) e "Encerrar pacote"
+  (ghost, `--red-text`); sem pacote, "Atribuir primeiro pacote" (o principal). O botão vermelho no topo saiu.
+- **"Encerrar pacote" some para o pacote experimental** (`remove_active_package` só encerra não-trial). A janela diz o que acontece
+  de verdade: aulas SEM data são perdidas, as JÁ MARCADAS continuam valendo (`descricaoEncerrar`).
+- **Próxima aula no topo** ("Próxima aula: Amanhã, 07:00" ou "Sem aula marcada") e a lista virou **Próximas aulas / Aulas anteriores**
+  (3 de cada, `getAdminStudentDetail` devolve `proximas`/`anteriores` no lugar de `history`), cada linha abre `/admin/aula/:id`, mais
+  "Ver todas as aulas de <nome>" → `/admin/historico?busca=<nome>` (a tela Aulas lê `?busca=`).
+- **Estatísticas sem alarme:** Frequência "—"/"Sem aulas ainda" para aluno novo, com base ("75% · 6 de 8 aulas"); Faltas em `--red-text`
+  só quando > 0 ("Nenhuma falta" / "N faltas registradas").
+
+**Armadilhas:** `ActivePackageCard` é compartilhado com a Home do aluno e Horários fixos; a prop `actions` só é usada aqui.
+`ConfirmDialog` continua global (não mexido).
+
+**Deixado para depois (registrado, não pedido):** telefone/WhatsApp do aluno; histórico de pacotes do aluno; "renovar com o mesmo
+modelo" em um toque; estado dentro do cartão do Perfil de Boxe ("Ainda não avaliado"); contraste do botão "Encerrar" do `ConfirmDialog`
+(global).
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
