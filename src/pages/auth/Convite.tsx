@@ -21,10 +21,11 @@ export default function Convite() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["invite", token],
     queryFn: () => validateInvite(token!),
     enabled: !!token,
+    retry: false,
   });
 
   async function handleSubmit(e: FormEvent) {
@@ -69,11 +70,40 @@ export default function Convite() {
     );
   }
 
+  // Falha de conexão NÃO é convite inválido: antes a query com erro caía aqui e o aluno lia
+  // "CONVITE INVÁLIDO" por causa de um sinal de internet ruim.
+  if (isError) {
+    return (
+      <main className="min-h-dvh flex flex-col items-center justify-center bg-background px-6 text-center">
+        <h1 className="font-display text-2xl tracking-wide text-foreground mb-1.5">SEM CONEXÃO</h1>
+        <p className="text-[13.5px] text-muted-foreground mb-5">Não conseguimos verificar seu convite agora.</p>
+        <Button size="lg" onClick={() => refetch()}>
+          Tentar de novo
+        </Button>
+      </main>
+    );
+  }
+
   if (!data || !data.valid) {
+    // `reason` vem do banco (validate_invite não está neste repositório): usado só pra escolher a
+    // frase, com uma genérica quando não reconhece o valor.
+    const motivo = data?.reason ?? "";
+    const frase = /expir/i.test(motivo)
+      ? "Esse link de convite expirou."
+      : /used|usad|accept|consum/i.test(motivo)
+        ? "Esse link de convite já foi utilizado."
+        : "Esse link de convite expirou ou já foi utilizado.";
     return (
       <main className="min-h-dvh flex flex-col items-center justify-center bg-background px-6 text-center">
         <h1 className="font-display text-2xl tracking-wide text-foreground mb-1.5">CONVITE INVÁLIDO</h1>
-        <p className="text-[13.5px] text-muted-foreground">Esse link de convite expirou ou já foi utilizado.</p>
+        <p className="text-[13.5px] text-muted-foreground mb-1">{frase}</p>
+        <p className="text-[13.5px] text-muted-foreground mb-5">Peça um novo link ao seu professor.</p>
+        <Link
+          to="/login"
+          className="inline-flex min-h-11 items-center rounded-md text-sm font-semibold text-foreground underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Já tenho conta · Entrar
+        </Link>
       </main>
     );
   }
