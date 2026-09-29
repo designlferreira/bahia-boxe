@@ -45,13 +45,23 @@ export default function StudentPerfilLutadorQuestionario() {
     );
   }
 
+  // O envio precisa do id do aluno (antes `studentId!`: se a consulta ainda não tinha voltado, o "Enviar" quebrava). Espera com esqueleto.
+  if (!studentId) {
+    return (
+      <div className="page-container">
+        <PageHeader title="PERFIL DE BOXE" back />
+        <SkeletonCard height={120} />
+      </div>
+    );
+  }
+
   return (
     <div className="page-container">
       <BoxingProfileQuestionnaire
         heading={<BoxingProfileHeading subtitle={`Sua autoavaliação · ${length === "short" ? "versão rápida" : "versão completa"}`} />}
         questions={getQuestions("self", length)}
         draftKey={`bb.boxing-profile-draft.self.${profile.id}.${length}`}
-        onSubmit={(answers) => submitBoxingProfileAssessment(studentId!, answers, length)}
+        onSubmit={(answers) => submitBoxingProfileAssessment(studentId, answers, length)}
         onSuccess={(assessment) => navigate(`/app/perfil-lutador/resultado/${assessment.id}`, { replace: true })}
         onExit={() => navigate("/app/perfil-lutador")}
       />

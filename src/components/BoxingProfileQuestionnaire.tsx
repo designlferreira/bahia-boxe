@@ -88,12 +88,22 @@ export function BoxingProfileQuestionnaire({
   onSuccess,
   onError,
   onExit,
-  exitDescription = "Suas respostas ficam salvas neste dispositivo — você pode continuar de onde parou depois.",
+  exitDescription = "Suas respostas ficam salvas neste aparelho. Você pode continuar de onde parou depois, por aqui.",
   heading,
   resumoInicial,
 }: BoxingProfileQuestionnaireProps) {
-  const [answers, setAnswers] = useState<Answers>({});
-  const [index, setIndex] = useState(0);
+  // O rascunho é lido ANTES do primeiro render. Antes um `useEffect` o restaurava depois: a tela abria na pergunta 1 por um instante e
+  // pulava para a certa (piscada), e esse pulo ainda tirava o foco do lugar.
+  const [rascunho] = useState(() => loadDraft(draftKey));
+  const [answers, setAnswers] = useState<Answers>(rascunho);
+  const [index, setIndex] = useState(() => {
+    // Retoma na primeira pergunta ainda sem resposta (`findIndex` cobre lacunas); tudo respondido = abre na última, para revisar/enviar.
+    const primeira = questions.findIndex((q) => rascunho[q.id] === undefined);
+    return primeira === -1 ? questions.length - 1 : primeira;
+  });
+  // Aviso "Continuando de onde você parou": só quando havia rascunho de verdade (e some ao responder a pergunta seguinte).
+  const [retomado, setRetomado] = useState(() => Object.keys(rascunho).length > 0);
+  const [confirmRecomecar, setConfirmRecomecar] = useState(false);
   const [confirmExit, setConfirmExit] = useState(false);
   // Tela final de conferência ("Você respondeu N de N"): antes "Concluir" na última pergunta ENVIAVA direto, sem a pessoa rever nada.
   const [resumo, setResumo] = useState(!!resumoInicial);
@@ -101,16 +111,15 @@ export function BoxingProfileQuestionnaire({
   const [deResumo, setDeResumo] = useState(false);
   const tituloResumoRef = useRef<HTMLHeadingElement>(null);
   const perguntaRef = useRef<HTMLFieldSetElement>(null);
-  const jaMontou = useRef(false);
+  const indiceAnterior = useRef(index);
   const avancoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Ao mudar de pergunta (avançar, voltar ou o avanço automático) o foco vai para a pergunta nova: antes ele caía no <body> (o botão
   // "Avançar" ficava desativado na pergunta seguinte) e o leitor de tela não ouvia a pergunta. Não na primeira montagem: não rouba o foco.
   useEffect(() => {
-    if (!jaMontou.current) {
-      jaMontou.current = true;
-      return;
-    }
+    // Compara com o índice anterior (e não com "já montou"): em desenvolvimento o React executa os efeitos duas vezes na montagem.
+    if (indiceAnterior.current === index) return;
+    indiceAnterior.current = index;
     perguntaRef.current?.focus();
   }, [index]);
 
@@ -126,21 +135,6 @@ export function BoxingProfileQuestionnaire({
   }, [index]);
 
   useEffect(() => {
-    const draft = loadDraft(draftKey);
-    setAnswers(draft);
-    // Retoma na primeira pergunta ainda sem resposta, não sempre em 0 — a versão anterior
-    // restaurava as respostas mas reabria em 0 incondicionalmente, então dava pra chegar na
-    // pergunta certa clicando "Avançar" várias vezes, sem perder nada, só com fricção. Gaps no
-    // meio (responder 5 sem ter respondido 3/4) não são possíveis pela UI hoje — `goNext` só anda
-    // uma pergunta por vez e exige a atual respondida — mas `findIndex` cobre esse caso também se
-    // um dia deixar de ser verdade. Se tudo já estiver respondido, abre na última (pra revisar/
-    // enviar), não fora do array.
-    const firstUnanswered = questions.findIndex((q) => draft[q.id] === undefined);
-    setIndex(firstUnanswered === -1 ? questions.length - 1 : firstUnanswered);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftKey]);
-
-  useEffect(() => {
     if (Object.keys(answers).length > 0) saveDraft(draftKey, answers);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answers, draftKey]);
@@ -153,7 +147,8 @@ export function BoxingProfileQuestionnaire({
     },
     onError: (err) => {
       if (onError) onError(err);
-      else toast.error(err instanceof Error ? err.message : "Não foi possível concluir a avaliação.");
+      // Frase em português (antes o texto cru do banco). As respostas continuam guardadas: só saem do aparelho quando o envio dá certo.
+      else toast.error("Não foi possível enviar sua avaliação. Verifique sua conexão e tente de novo — suas respostas continuam salvas.");
     },
   });
 
@@ -180,6 +175,16 @@ export function BoxingProfileQuestionnaire({
     setIndex((i) => Math.min(i + 1, questions.length - 1));
   }
 
+  function recomecar() {
+    if (avancoRef.current) clearTimeout(avancoRef.current);
+    clearDraft(draftKey);
+    setAnswers({});
+    setIndex(0);
+    setResumo(false);
+    setDeResumo(false);
+    setRetomado(false);
+  }
+
   /** Rótulo da resposta dada a uma pergunta (para o resumo). */
   function rotuloDa(q: Question): string {
     const v = answers[q.id];
@@ -194,6 +199,7 @@ export function BoxingProfileQuestionnaire({
    * última pergunta (concluir é uma decisão) nem nas de ESCOLHA entre situações (exigem ler opções longas).
    */
   function responde(value: Answers[string]) {
+    setRetomado(false);
     setAnswers((a) => ({ ...a, [question.id]: value }));
     if (avancoRef.current) clearTimeout(avancoRef.current);
     if (question.type === "likert" && (!isLast || deResumo)) {
@@ -268,6 +274,19 @@ export function BoxingProfileQuestionnaire({
           <X className="h-[18px] w-[18px] text-muted-foreground" aria-hidden />
         </button>
       </div>
+
+      {retomado && !resumo && (
+        <div role="status" className="flex items-center gap-3 rounded-xl border border-border bg-card px-3.5 py-2.5 mt-4 text-[13px] text-muted-foreground">
+          <span className="flex-1">Continuando de onde você parou.</span>
+          <button
+            type="button"
+            onClick={() => setConfirmRecomecar(true)}
+            className="shrink-0 min-h-11 px-2 -my-1 font-semibold text-accent underline underline-offset-4 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Recomeçar
+          </button>
+        </div>
+      )}
 
       {resumo ? (
         <section aria-labelledby="resumo-titulo" className="mt-6 mb-6">
@@ -363,9 +382,21 @@ export function BoxingProfileQuestionnaire({
           </p>
         )}
   
-        <Button size="lg" className="w-full" onClick={goNext} disabled={!answered}>
+        <Button
+          size="lg"
+          className="w-full"
+          onClick={goNext}
+          disabled={!answered}
+          aria-describedby={!answered ? "dica-resposta" : undefined}
+        >
           {deResumo ? "Voltar ao resumo" : isLast ? "Revisar respostas" : "Avançar"}
         </Button>
+        {/* Botão desativado explica o motivo. */}
+        {!answered && (
+          <p id="dica-resposta" className="text-center text-[13px] text-muted-foreground mt-2.5">
+            Escolha uma resposta para continuar.
+          </p>
+        )}
         </>
       )}
 
@@ -374,6 +405,16 @@ export function BoxingProfileQuestionnaire({
           {submit.isPending ? "Enviando…" : "Enviar avaliação"}
         </Button>
       ) : null}
+
+      <ConfirmDialog
+        open={confirmRecomecar}
+        onOpenChange={setConfirmRecomecar}
+        title="RECOMEÇAR?"
+        description="As respostas que você já deu serão apagadas e o questionário volta para a primeira pergunta."
+        confirmLabel="Recomeçar"
+        cancelLabel="Continuar de onde parei"
+        onConfirm={recomecar}
+      />
 
       <ConfirmDialog
         open={confirmExit}

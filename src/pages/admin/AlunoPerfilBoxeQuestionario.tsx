@@ -64,7 +64,7 @@ export default function AdminAlunoPerfilBoxeQuestionario() {
           onSubmit={(answers) => submitCoachBoxingProfileAssessment(studentId, profile.id, answers, length)}
           onSuccess={() => navigate(`/admin/alunos/${studentId}/perfil-lutador`, { replace: true })}
           onExit={() => navigate(`/admin/alunos/${studentId}/perfil-lutador`)}
-          exitDescription="Suas respostas ficam salvas neste dispositivo — você pode continuar de onde parou depois."
+          exitDescription="Suas respostas ficam salvas neste aparelho. Você pode continuar depois, avaliando o mesmo aluno por aqui."
         />
       )}
     </div>
