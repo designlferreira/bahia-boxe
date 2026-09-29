@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { AuthError, sendPasswordResetEmail } from "@/integrations/backend/auth";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -13,6 +14,7 @@ export default function RecuperarSenha() {
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -25,10 +27,16 @@ export default function RecuperarSenha() {
       return;
     }
     setEmailError(null);
+    setServerError(null);
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 600));
-    setLoading(false);
-    setSent(true);
+    try {
+      await sendPasswordResetEmail(email);
+      setSent(true);
+    } catch (err) {
+      setServerError(err instanceof AuthError ? err.message : "Não foi possível enviar o e-mail agora. Tente novamente em instantes.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -52,6 +60,7 @@ export default function RecuperarSenha() {
               onChange={(e) => {
                 setEmail(e.target.value);
                 if (emailError) setEmailError(null);
+                if (serverError) setServerError(null);
               }}
               placeholder="voce@email.com"
               aria-invalid={!!emailError}
@@ -63,6 +72,11 @@ export default function RecuperarSenha() {
               </div>
             )}
           </div>
+          {serverError && (
+            <div role="alert" className="rounded-xl border border-destructive/35 bg-destructive/10 px-3.5 py-3 text-[13px] text-[hsl(var(--red-text))]">
+              {serverError}
+            </div>
+          )}
           <Button type="submit" size="lg" className="mt-1.5" disabled={loading}>
             {loading ? "Enviando…" : "Enviar link"}
           </Button>

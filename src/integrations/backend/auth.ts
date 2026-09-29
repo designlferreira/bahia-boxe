@@ -100,6 +100,32 @@ export async function resendConfirmationEmail(email: string): Promise<void> {
   }
 }
 
+/**
+ * "Esqueci minha senha": pede ao Supabase o e-mail com o link de recuperação. O link abre `/auth/reset-password`.
+ * Sucesso é sempre neutro (o Supabase não diz se o e-mail existe — a tela também não). Falha de verdade (limite, conexão, servidor)
+ * NÃO é engolida: antes a tela só esperava 0,6s e dizia "LINK ENVIADO" sem enviar nada.
+ *
+ * Depende do painel do Supabase: `<origem do app>/auth/reset-password` precisa estar em Authentication → URL Configuration →
+ * Redirect URLs (senão o Supabase manda a pessoa para a Site URL), e o modelo "Reset Password" do e-mail precisa estar em português.
+ */
+export async function sendPasswordResetEmail(email: string): Promise<void> {
+  const { error } = await client().auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+    redirectTo: `${window.location.origin}/auth/reset-password`,
+  });
+  if (!error) return;
+  const message = error.message.toLowerCase();
+  if (error.status === 429 || message.includes("rate limit") || message.includes("security purposes")) {
+    throw new AuthError("Aguarde um momento antes de pedir outro e-mail.", "rate_limited");
+  }
+  if (message.includes("invalid") && message.includes("email")) {
+    throw new AuthError("Informe um e-mail válido.");
+  }
+  if (!error.status) {
+    throw new AuthError("Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.");
+  }
+  throw new AuthError("Não foi possível enviar o e-mail agora. Tente novamente em instantes.");
+}
+
 export async function signInWithPassword(email: string, password: string): Promise<Profile> {
   const { data, error } = await client().auth.signInWithPassword({ email: email.trim(), password });
   if (error || !data.user) {

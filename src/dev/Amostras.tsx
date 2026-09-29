@@ -26,6 +26,8 @@ import Login from "@/pages/auth/Login";
 import Convite from "@/pages/auth/Convite";
 import CriarConta from "@/pages/auth/CriarConta";
 import ConfirmarEmail from "@/pages/auth/ConfirmarEmail";
+import RecuperarSenha from "@/pages/auth/RecuperarSenha";
+import ResetPassword from "@/pages/auth/ResetPassword";
 import AdminAlunoRecorrencia from "@/pages/admin/AlunoRecorrencia";
 import StudentPerfilLutador from "@/pages/student/PerfilLutador";
 import AdminAlunoPerfilBoxe from "@/pages/admin/AlunoPerfilBoxe";
@@ -1053,6 +1055,20 @@ export default function Amostras() {
             <SemLogin>
               <ComRota path="/confirmar-email" url="/confirmar-email?email=aluno@exemplo.com">
                 <ConfirmarEmail />
+              </ComRota>
+            </SemLogin>
+          </Frame>
+          <Frame title="Recuperar senha" note="pede o e-mail (digite um e-mail válido e envie para ver o estado de enviado)">
+            <SemLogin>
+              <ComRota path="/recuperar-senha" url="/recuperar-senha">
+                <RecuperarSenha />
+              </ComRota>
+            </SemLogin>
+          </Frame>
+          <Frame title="Nova senha" note="a tela aberta pelo link do e-mail">
+            <SemLogin>
+              <ComRota path="/auth/reset-password" url="/auth/reset-password">
+                <ResetPassword />
               </ComRota>
             </SemLogin>
           </Frame>
