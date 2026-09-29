@@ -2544,6 +2544,48 @@ a resposta (mesmo padrão de `whatsapp_do_professor`).
 professor; pontos nos dias com horário livre na janela "Pedir outro horário" do aluno; confirmação em
 "Cancelar pedido" do aluno.
 
+### Entrada: convite e criar conta — rodada de crítica (2026-09-29) — sem migration nova
+
+`Convite.tsx`, `CriarConta.tsx`, `ConfirmarEmail.tsx`: crítica **~18/40** no caminho do convite (a revisão
+leu só o código; a varredura mediu as telas). Relatório em `.impeccable/critique/*convite*`. Cinco passos
+na `dev`. As quatro telas estão na página de amostras ("Entrada"), sem sessão (`SemLogin`).
+
+**FATO DO PAINEL DO SUPABASE (informado pelo Lucas em 2026-09-29): "Confirm email" está ATIVO.** Toda
+conta nova nasce **sem sessão** até o aluno abrir o link do e-mail. Consequência que era um erro real: o
+Convite chamava `supabase.auth.signUp` direto e seguia para `accept_invite` (que exige usuário logado)
+sem sessão — falhava no meio, deixando **conta criada e convite não usado** (e "já cadastrado" na segunda
+tentativa). Corrigido:
+- `Convite` usa `signUpWithPassword` (o mesmo de Criar conta, que já tratava `needs_confirmation`).
+- Sem sessão: o token vai para `localStorage` (`src/lib/convitePendente.ts`) e o aluno segue para
+  `/confirmar-email?…&convite=1`. **O `AuthProvider` conclui o convite** (`acceptInvite`) assim que há
+  usuário logado — pelo link do e-mail ou por login normal —, e limpa o token de qualquer jeito (convite
+  usado/expirado não tenta de novo a cada abertura).
+- Aluno que já tem conta: erro "Já existe uma conta…" + "Entrar com esta conta"; o convite fica guardado e
+  conclui no login.
+- **Não desfazer:** qualquer fluxo que dependa de sessão logo depois de `signUp` está errado neste
+  projeto.
+- ⚠️ Alunos convidados ANTES da correção podem ter conta sem vínculo com o professor. Se aparecerem,
+  preparar uma consulta para achá-los e ligá-los (não foi feito; nenhum caso relatado até agora).
+
+**Decisões do Lucas:**
+- **Sem o nome do professor no convite** ("seguir só com o texto"): `validate_invite` devolve só
+  `(is_valid, reason)` e quem abre o link não tem login (`supabase/README.md`). Texto: "Seu professor
+  convidou você… agende suas aulas e acompanhe seu pacote por aqui."
+- Convite e Criar conta usam **um formulário só** (`ContaForm`): regras da senha ao vivo com ✓ e texto
+  pro leitor de tela, "Mostrar senha", confirmar, erro por campo, autocomplete, e o botão desativado
+  explica o porquê. Não voltar a duplicar o formulário.
+- Convite inválido diz o que fazer ("Peça um novo link ao seu professor" + "Já tenho conta · Entrar"),
+  usa `reason` só para escolher a frase (o valor vem do banco, não está no repositório — genérica quando
+  não reconhece) e **falha de conexão é "SEM CONEXÃO" com "Tentar de novo"**, nunca "CONVITE INVÁLIDO".
+- "Confirme seu e-mail": instrução + dica do spam desde o início; **"Já confirmei, entrar" é o botão
+  principal**, "Reenviar" o secundário; vindo de convite, avisa que conclui sozinho e esconde "Usar outro
+  e-mail".
+- Botão desativado mantém a aparência global (opacity 50%): controles desativados são isentos de
+  contraste e agora a explicação é por texto. Não mexer no `Button` por causa disso.
+
+**Deixado para depois:** WhatsApp do professor na tela de convite inválido (não dá: exige login);
+"Já confirmei" verificar a confirmação de fato antes de mandar ao login.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
