@@ -176,7 +176,33 @@ export default function AdminHistorico() {
       )}
 
       {!isLoading && !isError && data && aulas.length === 0 && (
-        <EmptyState icon={CalendarX} title="Nenhuma aula nesse filtro" description="Ajuste a busca ou o status." />
+        // Dois vazios diferentes: "sem resultado para o que você pediu" (com saída: limpar) e "ainda não há aula"
+        // (antes os dois diziam "Ajuste a busca ou o status", que sem nenhum filtro ligado não fazia sentido).
+        buscaAplicada.trim() || statusFilter !== "todas" ? (
+          <EmptyState
+            icon={CalendarX}
+            title="Nenhuma aula encontrada"
+            description="Nada bate com a busca e o filtro escolhidos."
+            ctaLabel="Limpar busca e filtro"
+            ctaVariant="secondary"
+            onCta={() => {
+              setSearch("");
+              setBuscaAplicada("");
+              setStatusFilter("todas");
+            }}
+          />
+        ) : periodo === "proximas" ? (
+          <EmptyState
+            icon={CalendarX}
+            title="Nenhuma aula marcada"
+            description="As próximas aulas dos seus alunos aparecem aqui."
+            ctaLabel="Ver agenda"
+            ctaVariant="secondary"
+            onCta={() => navigate("/admin/agenda")}
+          />
+        ) : (
+          <EmptyState icon={CalendarX} title="Nenhuma aula anterior ainda" description="Quando as aulas acontecerem, elas ficam guardadas aqui." />
+        )
       )}
     </div>
   );
