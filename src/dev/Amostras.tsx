@@ -48,6 +48,7 @@ import AlterarSenha from "@/pages/shared/AlterarSenha";
 import { NotificationBell } from "@/components/NotificationBell";
 import AdminPerfilAlunos from "@/pages/admin/PerfilAlunos";
 import NotFound from "@/pages/NotFound";
+import { TelaDeAbertura } from "@/components/TelaDeAbertura";
 import { StudentBottomNav } from "@/components/StudentBottomNav";
 import { AdminBottomNav } from "@/components/AdminBottomNav";
 import { FAIXAS_ALTURA_CM, FAIXAS_PESO_KG, contarFaixas, type Faixa } from "@/lib/studentProfile";
@@ -1629,6 +1630,9 @@ export default function Amostras() {
                 <NotFound amostra />
               </ComRota>
             </Seeded>
+          </Frame>
+          <Frame title="Abertura do app" note="enquanto a sessão carrega (no lugar do formulário de login que piscava)">
+            <TelaDeAbertura />
           </Frame>
           <Frame title="404 · deslogado" note="botão 'Entrar'">
             <SemLogin>
