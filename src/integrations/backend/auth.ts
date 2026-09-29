@@ -40,6 +40,20 @@ export async function getCurrentProfile(): Promise<Profile | null> {
   return loadProfile(session.user.id, session.user.email ?? undefined);
 }
 
+const CHAVE_CONVITE_NA_CONTA = "convite_pendente";
+
+/** Convite gravado na conta no cadastro (ver `signUpWithPassword`). Lê da sessão local, sem chamada de rede. */
+export async function lerConviteDaConta(): Promise<string | null> {
+  const { data } = await client().auth.getSession();
+  const valor = data.session?.user.user_metadata?.[CHAVE_CONVITE_NA_CONTA];
+  return typeof valor === "string" && valor ? valor : null;
+}
+
+/** Tira o convite dos metadados da conta depois de tentado (usado, expirado ou concluído): não tenta de novo a cada abertura. */
+export async function limparConviteDaConta(): Promise<void> {
+  await client().auth.updateUser({ data: { [CHAVE_CONVITE_NA_CONTA]: null } });
+}
+
 export type SignUpResult =
   | { status: "signed_in"; profile: Profile }
   // Email confirmation is on for this project: the account exists but has no session yet.
@@ -48,12 +62,22 @@ export type SignUpResult =
   // missing or may not cover this role). Reported rather than silently half-working.
   | { status: "profile_missing"; email: string };
 
-export async function signUpWithPassword(name: string, email: string, password: string): Promise<SignUpResult> {
+/**
+ * `convite`: token do convite do professor. Vai gravado NA CONTA (metadados) e não só no aparelho: com "Confirm email" ligado, o
+ * aluno pode abrir o link do e-mail em outro navegador ou aparelho (o app instalado e o navegador do celular não dividem o
+ * `localStorage`), e o convite guardado só localmente se perderia em silêncio — conta criada, sem vínculo com o professor.
+ */
+export async function signUpWithPassword(
+  name: string,
+  email: string,
+  password: string,
+  convite?: string,
+): Promise<SignUpResult> {
   const normalizedEmail = email.trim().toLowerCase();
   const { data, error } = await client().auth.signUp({
     email: normalizedEmail,
     password,
-    options: { data: { name: name.trim() } },
+    options: { data: { name: name.trim(), ...(convite ? { [CHAVE_CONVITE_NA_CONTA]: convite } : {}) } },
   });
 
   if (error) {
