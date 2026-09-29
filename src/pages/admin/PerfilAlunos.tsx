@@ -6,7 +6,7 @@ import { SkeletonCard } from "@/components/SkeletonCard";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { getStudentProfileStats, type CategoryStats, type NumericStats } from "@/integrations/backend/api";
-import { GUARD_LABELS, LATERALITY_LABELS, MIN_ALUNOS_NA_ESTATISTICA, SEX_LABELS } from "@/lib/studentProfile";
+import { GUARD_LABELS, LATERALITY_LABELS, MIN_ALUNOS_NA_ESTATISTICA, MIN_ALUNOS_POR_GRUPO, SEX_LABELS } from "@/lib/studentProfile";
 import type { Guard, Laterality, Sex } from "@/integrations/backend/types";
 
 export default function AdminPerfilAlunos() {
@@ -26,7 +26,8 @@ export default function AdminPerfilAlunos() {
     data.guard.filled === 0 &&
     data.laterality.filled === 0 &&
     data.heightCm.filled === 0 &&
-    data.weightKg.filled === 0;
+    data.weightKg.filled === 0 &&
+    data.wingspanCm.filled === 0;
 
   return (
     <div className="page-container">
@@ -79,6 +80,7 @@ export default function AdminPerfilAlunos() {
           />
           <CategoryCard title="Sexo" stats={data.sex} labels={SEX_LABELS} total={data.totalStudents} order={["female", "male", "other"] as Sex[]} />
           <NumericCard title="Altura" unit="cm" stats={data.heightCm} total={data.totalStudents} />
+          <NumericCard title="Envergadura" unit="cm" stats={data.wingspanCm} total={data.totalStudents} />
           <NumericCard title="Peso" unit="kg" stats={data.weightKg} total={data.totalStudents} />
         </div>
       )}
@@ -110,26 +112,47 @@ function CategoryCard<T extends string>({
       {stats.filled < MIN_ALUNOS_NA_ESTATISTICA ? (
         <PoucosAlunos filled={stats.filled} total={total} />
       ) : (
-        <div className="flex flex-col gap-2">
-          {order.map((key) => {
-            const count = stats.breakdown[key] ?? 0;
-            if (count === 0) return null;
-            const pct = Math.round((count / stats.filled) * 100);
-            return (
-              <div key={key}>
-                <div className="flex justify-between text-[12.5px] mb-1">
-                  <span className="text-foreground/85">{labels[key]}</span>
-                  <span className="text-muted-foreground">{pct}% · {count}</span>
-                </div>
-                <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
-                  <div className="h-full rounded-full bg-gradient-gold origin-left animate-bb-bar" style={{ width: `${pct}%` }} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <Linhas linhas={order.map((key) => ({ label: labels[key], count: stats.breakdown[key] ?? 0 }))} base={stats.filled} />
       )}
     </div>
+  );
+}
+
+/**
+ * Barras por grupo (guarda, faixa de peso...). Um grupo com MENOS de `MIN_ALUNOS_POR_GRUPO` alunos não aparece: "10% · 1" é um aluno
+ * identificado mesmo numa turma grande. A tela diz quantos ficaram de fora, para as porcentagens não parecerem errar a conta.
+ */
+function Linhas({ linhas, base }: { linhas: { label: string; count: number }[]; base: number }) {
+  const visiveis = linhas.filter((l) => l.count >= MIN_ALUNOS_POR_GRUPO);
+  const ocultos = linhas.filter((l) => l.count > 0 && l.count < MIN_ALUNOS_POR_GRUPO).reduce((n, l) => n + l.count, 0);
+  return (
+    <>
+      <ul className="flex flex-col gap-2">
+        {visiveis.map((l) => {
+          const pct = Math.round((l.count / base) * 100);
+          return (
+            <li key={l.label}>
+              <div className="flex justify-between text-[12.5px] mb-1">
+                <span className="text-foreground">{l.label}</span>
+                <span className="text-muted-foreground">
+                  {pct}% · {l.count}
+                </span>
+              </div>
+              <div aria-hidden className="h-1.5 rounded-full bg-secondary overflow-hidden">
+                <div className="h-full rounded-full bg-gradient-gold origin-left animate-bb-bar" style={{ width: `${pct}%` }} />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      {ocultos > 0 && (
+        <p className="text-xs text-muted-foreground leading-snug mt-2.5">
+          {ocultos === 1
+            ? "1 aluno está num grupo sozinho e não aparece aqui, para não expor o dado dele."
+            : `${ocultos} alunos estão em grupos com menos de ${MIN_ALUNOS_POR_GRUPO} pessoas e não aparecem aqui, para não expor o dado de cada um.`}
+        </p>
+      )}
+    </>
   );
 }
 
@@ -146,9 +169,12 @@ function NumericCard({ title, unit, stats, total }: { title: string; unit: strin
         <PoucosAlunos filled={stats.filled} total={total} />
       ) : (
         // Só a MÉDIA: o mínimo e o máximo são, por definição, o dado de um aluno (o mais baixo, o mais pesado), mesmo com muita gente.
-        <div className="flex gap-4">
-          <Stat label="Média" value={`${stats.avg!.toFixed(1).replace(".", ",")} ${unit}`} />
-        </div>
+        <>
+          <div className="flex gap-4 mb-3.5">
+            <Stat label="Média" value={`${stats.avg!.toFixed(1).replace(".", ",")} ${unit}`} />
+          </div>
+          <Linhas linhas={stats.faixas} base={stats.filled} />
+        </>
       )}
     </div>
   );

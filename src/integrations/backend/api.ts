@@ -35,6 +35,7 @@ import {
   type Answers as BoxingAnswers,
   type AssessmentLength as BoxingAssessmentLength,
 } from "@/lib/boxingProfile";
+import { FAIXAS_ALTURA_CM, FAIXAS_PESO_KG, contarFaixas, type Faixa } from "@/lib/studentProfile";
 
 /**
  * This module talks to the pre-existing Bahia Boxe database (see supabase/README.md). Two of its
@@ -2519,6 +2520,8 @@ export interface NumericStats {
   avg: number | null;
   min: number | null;
   max: number | null;
+  /** Quantos alunos em cada faixa (a tela decide o que mostrar: mínimo, mínimo por grupo). */
+  faixas: { label: string; count: number }[];
 }
 
 export interface StudentProfileStats {
@@ -2528,6 +2531,7 @@ export interface StudentProfileStats {
   laterality: CategoryStats<Laterality>;
   heightCm: NumericStats;
   weightKg: NumericStats;
+  wingspanCm: NumericStats;
 }
 
 function categoryStats<T extends string>(values: (T | null)[], keys: T[]): CategoryStats<T> {
@@ -2542,14 +2546,15 @@ function categoryStats<T extends string>(values: (T | null)[], keys: T[]): Categ
   return { filled, breakdown };
 }
 
-function numericStats(values: (number | null)[]): NumericStats {
+function numericStats(values: (number | null)[], faixas: Faixa[]): NumericStats {
   const present = values.filter((v): v is number => v !== null);
-  if (present.length === 0) return { filled: 0, avg: null, min: null, max: null };
+  if (present.length === 0) return { filled: 0, avg: null, min: null, max: null, faixas: contarFaixas([], faixas) };
   return {
     filled: present.length,
     avg: present.reduce((a, b) => a + b, 0) / present.length,
     min: Math.min(...present),
     max: Math.max(...present),
+    faixas: contarFaixas(present, faixas),
   };
 }
 
@@ -2579,8 +2584,9 @@ export async function getStudentProfileStats(adminId: string): Promise<StudentPr
       "long_guard",
     ]),
     laterality: categoryStats(profiles.map((p) => p.laterality), ["right", "left", "ambidextrous"]),
-    heightCm: numericStats(profiles.map((p) => p.heightCm)),
-    weightKg: numericStats(profiles.map((p) => p.weightKg)),
+    heightCm: numericStats(profiles.map((p) => p.heightCm), FAIXAS_ALTURA_CM),
+    weightKg: numericStats(profiles.map((p) => p.weightKg), FAIXAS_PESO_KG),
+    wingspanCm: numericStats(profiles.map((p) => p.wingspanCm), FAIXAS_ALTURA_CM),
   };
 }
 

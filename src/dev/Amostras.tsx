@@ -47,6 +47,7 @@ import StudentPerfilLutadorHistorico from "@/pages/student/PerfilLutadorHistoric
 import AlterarSenha from "@/pages/shared/AlterarSenha";
 import { NotificationBell } from "@/components/NotificationBell";
 import AdminPerfilAlunos from "@/pages/admin/PerfilAlunos";
+import { FAIXAS_ALTURA_CM, FAIXAS_PESO_KG, contarFaixas, type Faixa } from "@/lib/studentProfile";
 import { BoxingProfileHeading, BoxingProfileQuestionnaire } from "@/components/BoxingProfileQuestionnaire";
 import { getQuestions, QUESTIONNAIRE_VERSION } from "@/lib/boxingProfile";
 import AdminHistorico from "@/pages/admin/Historico";
@@ -1620,6 +1621,13 @@ export default function Amostras() {
         <h2 className="text-lg font-semibold mb-4">Perfil dos alunos (professor)</h2>
         <div className="flex flex-wrap gap-6 mb-12">
           {(() => {
+            const num = (vals: number[], faixas: Faixa[]) => ({
+              filled: vals.length,
+              avg: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null,
+              min: vals.length ? Math.min(...vals) : null,
+              max: vals.length ? Math.max(...vals) : null,
+              faixas: contarFaixas(vals, faixas),
+            });
             const g = (o: Record<string, number>) => ({ orthodox: 0, southpaw: 0, switch: 0, peekaboo: 0, cross_arm: 0, philly_shell: 0, long_guard: 0, ...o });
             const casos: { title: string; note: string; stats: unknown }[] = [
               {
@@ -1630,8 +1638,10 @@ export default function Amostras() {
                   sex: { filled: 9, breakdown: { female: 4, male: 5, other: 0 } },
                   guard: { filled: 10, breakdown: g({ orthodox: 6, southpaw: 2, switch: 1, peekaboo: 1 }) },
                   laterality: { filled: 10, breakdown: { right: 8, left: 2, ambidextrous: 0 } },
-                  heightCm: { filled: 9, avg: 171.4, min: 158, max: 188 },
-                  weightKg: { filled: 8, avg: 72.3, min: 54, max: 98 },
+                  // 188 cm, 90+ kg e o único ambidestro/peek-a-boo ficam sozinhos no grupo: a tela os esconde e avisa.
+                  heightCm: num([158, 162, 165, 168, 170, 172, 175, 178, 188], FAIXAS_ALTURA_CM),
+                  weightKg: num([54, 58, 63, 68, 72, 75, 78, 82, 98], FAIXAS_PESO_KG),
+                  wingspanCm: num([160, 165, 168, 170, 173, 175, 178, 190], FAIXAS_ALTURA_CM),
                 },
               },
               {
@@ -1642,8 +1652,9 @@ export default function Amostras() {
                   sex: { filled: 2, breakdown: { female: 1, male: 1, other: 0 } },
                   guard: { filled: 2, breakdown: g({ orthodox: 2 }) },
                   laterality: { filled: 3, breakdown: { right: 3, left: 0, ambidextrous: 0 } },
-                  heightCm: { filled: 2, avg: 170, min: 165, max: 175 },
-                  weightKg: { filled: 0, avg: null, min: null, max: null },
+                  heightCm: num([165, 175], FAIXAS_ALTURA_CM),
+                  weightKg: num([], FAIXAS_PESO_KG),
+                  wingspanCm: num([], FAIXAS_ALTURA_CM),
                 },
               },
               {
@@ -1654,8 +1665,9 @@ export default function Amostras() {
                   sex: { filled: 0, breakdown: { female: 0, male: 0, other: 0 } },
                   guard: { filled: 0, breakdown: g({}) },
                   laterality: { filled: 0, breakdown: { right: 0, left: 0, ambidextrous: 0 } },
-                  heightCm: { filled: 0, avg: null, min: null, max: null },
-                  weightKg: { filled: 0, avg: null, min: null, max: null },
+                  heightCm: num([], FAIXAS_ALTURA_CM),
+                  weightKg: num([], FAIXAS_PESO_KG),
+                  wingspanCm: num([], FAIXAS_ALTURA_CM),
                 },
               },
               {
@@ -1666,8 +1678,9 @@ export default function Amostras() {
                   sex: { filled: 0, breakdown: { female: 0, male: 0, other: 0 } },
                   guard: { filled: 0, breakdown: g({}) },
                   laterality: { filled: 0, breakdown: { right: 0, left: 0, ambidextrous: 0 } },
-                  heightCm: { filled: 0, avg: null, min: null, max: null },
-                  weightKg: { filled: 0, avg: null, min: null, max: null },
+                  heightCm: num([], FAIXAS_ALTURA_CM),
+                  weightKg: num([], FAIXAS_PESO_KG),
+                  wingspanCm: num([], FAIXAS_ALTURA_CM),
                 },
               },
             ];

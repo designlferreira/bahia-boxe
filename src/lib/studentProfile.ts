@@ -20,6 +20,41 @@ export const LATERALITY_LABELS: Record<Laterality, string> = {
  */
 export const MIN_ALUNOS_NA_ESTATISTICA = 5;
 
+/** Uma faixa fechada embaixo e aberta em cima: [de, ate). O valor exato da divisa (60 kg, 1,70 m) cai na faixa de cima. */
+export interface Faixa {
+  label: string;
+  de: number;
+  ate: number;
+}
+
+/**
+ * Faixas de peso e de altura/envergadura para "Perfil dos alunos". CONVENÇÃO escolhida para o professor pensar em luvas, dupla de treino
+ * e alcance, não uma tabela técnica: os cortes (60/75/90 kg; 1,60/1,70/1,80 m) podem mudar sem afetar nenhum dado gravado.
+ */
+export const FAIXAS_PESO_KG: Faixa[] = [
+  { label: "Menos de 60 kg", de: 0, ate: 60 },
+  { label: "60 a 75 kg", de: 60, ate: 75 },
+  { label: "75 a 90 kg", de: 75, ate: 90 },
+  { label: "90 kg ou mais", de: 90, ate: Infinity },
+];
+
+export const FAIXAS_ALTURA_CM: Faixa[] = [
+  { label: "Menos de 1,60 m", de: 0, ate: 160 },
+  { label: "1,60 a 1,70 m", de: 160, ate: 170 },
+  { label: "1,70 a 1,80 m", de: 170, ate: 180 },
+  { label: "1,80 m ou mais", de: 180, ate: Infinity },
+];
+
+export function contarFaixas(values: number[], faixas: Faixa[]): { label: string; count: number }[] {
+  return faixas.map((f) => ({ label: f.label, count: values.filter((v) => v >= f.de && v < f.ate).length }));
+}
+
+/**
+ * Um grupo com menos de 2 alunos (uma barra "10% · 1") identifica UM aluno mesmo com muita gente preenchendo, então "Perfil dos alunos"
+ * não o mostra e avisa quantos ficaram de fora.
+ */
+export const MIN_ALUNOS_POR_GRUPO = 2;
+
 const NOT_INFORMED = "Não informado";
 
 export function sexLabel(v: Sex | null) {
