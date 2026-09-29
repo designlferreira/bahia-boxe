@@ -86,7 +86,7 @@ export default function Login() {
           </div>
           <div>
             <div className="font-display text-3xl leading-none tracking-wide text-foreground">BAHIA BOXE</div>
-            <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground mt-0.5">Gestão de aulas</div>
+            <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground mt-0.5">Suas aulas de boxe</div>
           </div>
         </div>
 
@@ -124,7 +124,7 @@ export default function Login() {
               setEmail(e.target.value);
               if (fieldErrors.email) setFieldErrors((f) => ({ ...f, email: undefined }));
             }}
-            placeholder="voce@bahiaboxe.com"
+            placeholder="voce@email.com"
             aria-invalid={!!fieldErrors.email}
             aria-describedby={fieldErrors.email ? "email-error" : undefined}
           />
