@@ -3370,6 +3370,47 @@ mensagem do Supabase para senha fraca/igual (`same_password`/`weak_password` nã
 **Deixado para depois (registrado, não pedido):** um formulário de senha ÚNICO para esta tela e a Nova senha (hoje só compartilham `PasswordRule`); "Sair dos outros aparelhos" (recusado);
 mapear `same_password`/`weak_password` em `changePassword`; placeholder "Sua senha de hoje" (informal).
 
+### Sino de notificações (aluno e professor): rodada de crítica (2026-09-29) — sem migration nova
+
+`src/components/NotificationBell.tsx` (sino com contador + folha "NOTIFICAÇÕES"; usado na Home do aluno e no painel do professor) e `deriveNotifications` em `api.ts`: crítica **22/40**,
+relatório em `.impeccable/critique/*notificationbell*`. Quatro passos na `dev`, testados pelo Lucas. Na página de amostras ("Sino de notificações": aluno com avisos, aluno sem avisos,
+professor com avisos, consulta falhada — **toque no sino** para abrir a folha).
+**Continuam SEM crítica:** Perfil dos alunos (`admin/PerfilAlunos.tsx`), as duas barras de navegação de baixo e a tela 404 (`NotFound`).
+
+**FATOS que mudam a leitura (não desfazer sem decisão):**
+- **Não existe tabela de notificações.** Tudo é DERIVADO na hora (`deriveNotifications`) de aulas, pedidos e avaliações do professor.
+- **"Lida" e "limpa" moram em `localStorage`** (`bb.notifications.<userId>`), POR APARELHO: não sincronizam entre celular e computador. **"Limpar" só esconde os ids neste aparelho**; em outro
+  aparelho os avisos continuam. Guardar "lido até <hora>" no servidor (uma coluna em `profiles`) resolveria os dois aparelhos, mas é mudança de banco: **dívida registrada, não feita**.
+- Para o aluno, notificação era sinônimo de ESTADO atual, não de evento: toda aula futura `scheduled` gerava "Aula confirmada".
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **"Aula confirmada" só para as aulas que o ALUNO agendou** (`!b.pacote_id`). As aulas que o professor gera na recorrência (têm `pacote_id`) deixam de virar uma notificação cada (o aluno de
+  recorrência abria o sino e via 12 "Nova" de uma vez, sem nada a fazer). **Remarcação ("Aula remarcada") e reposição continuam avisando em qualquer modo.** A descrição agora traz a
+  DATA da aula ("Sua aula é Sexta, 03 de outubro · 19:00.", no lugar de "Seu horário está garantido"): a hora do cartão é a de quando o aviso nasceu ("há 3 dias"). Notificações antigas de
+  "Aula confirmada" de recorrência simplesmente somem da lista (nada é apagado no banco).
+- **"Limpar central" virou "Limpar avisos", SEM janela de confirmação**, só com "Desfazer" (8s, `toast(...)` neutro — não `toast.warning`, âmbar é "depende do professor"): "Avisos limpos
+  neste aparelho". "Central" saiu do vocabulário. A alternativa de manter a confirmação foi oferecida e recusada.
+- Escopo: tudo, na ordem.
+
+**O que mudou / armadilhas:**
+- **Falhou ≠ vazio:** a folha mostra esqueleto ao carregar e `ErrorState` ("Não conseguimos carregar suas notificações" + "Tentar novamente") se a consulta falhar; o "Nenhuma notificação" só
+  aparece com a consulta OK e a lista vazia. O subtítulo ("N não lidas") só aparece com a lista carregada (na falha "0 não lidas" seria mentira).
+- **Tocar numa notificação SEMPRE leva ao destino:** `openNotif` navega em `onSettled` (antes só no `onSuccess`: se a marcação como lida falhasse, o toque não fazia nada). "Marcar todas", "Limpar" e o
+  "Desfazer" têm aviso de erro (o Desfazer não tinha `try/catch`) e travam o duplo toque (`isPending`).
+- **Estado vazio por papel:** aluno — "Avisos sobre suas aulas e pedidos aparecem aqui."; professor — "Pedidos e horários esperando a sua resposta aparecem aqui."
+- Acessibilidade: a lista é `<ul aria-label="Notificações">`/`<li>`; anel de foco nos avisos e no Fechar; ícones `aria-hidden`; ícone de cancelamento em `--red-text`; "Nova" também por
+  texto (`sr-only "Nova. "` no título; o selo visual é `aria-hidden`); `SheetDescription` (sr-only) — **`SheetDescription` é um export NOVO de `ui/sheet.tsx`**, só o sino o usa por enquanto;
+  `motion-reduce` desliga o encolher ao tocar; **contador do sino 12px (era 10,5px), 20px de altura e "99+"**; subtítulo "2 não lidas" / "1 não lida" / "Tudo lido"; "Marcar todas" SÓ com não
+  lidas (`unread > 0`).
+- **Galeria:** `SeededAdmin` agora só semeia `["notifications", ADMIN_ID]` = `[]` se a chave NÃO existe (antes sobrescrevia o que a amostra semeava); o erro da consulta é simulado com
+  `getQueryCache().build(...).setState({ status: "error", ... })`. O `Toaster` do Sonner não existe na galeria: o aviso "Avisos limpos…" e o "Desfazer" só se veem no app real.
+
+**Não conferido:** o aviso de limpar/desfazer e a marcação real de "lida" (dependem do `localStorage` do app); a regra nova de "Aula confirmada" com dados reais (a galeria não roda `deriveNotifications`);
+foco por Tab e leitor de tela (só a estrutura na galeria); o erro de consulta em aparelho real.
+
+**Deixado para depois (registrado, não pedido):** nome do aluno nos avisos do professor ("Um aluno pediu um horário" continua sem nome: exigiria uma consulta a mais); "Toque para ver os detalhes."
+genérico na recusa sem recado; "lido/limpo" no servidor (ver acima); agrupar/separar "novas" e antigas; o fundo da folha usa uma cor fixa (`#161616`), não o token do cartão.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
