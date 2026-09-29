@@ -223,13 +223,25 @@ export default function AdminAlunoDetalhe() {
       </div>
 
       <div className="flex gap-2.5 mb-4">
+        {/* Aluno novo não é "0%": sem aula que conte, mostra "—" e diz por quê. Com aulas, a base ("6 de 8"). */}
         <div className="flex-1 card-dark p-3.5">
-          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Frequência</div>
-          <div className="font-display text-[28px] text-foreground leading-tight">{freq}%</div>
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Frequência</div>
+          <div className={cn("font-display text-[28px] leading-tight", consideradas > 0 ? "text-foreground" : "text-muted-foreground")}>
+            {consideradas > 0 ? `${freq}%` : "—"}
+          </div>
+          <div className="text-[12.5px] text-muted-foreground">
+            {consideradas > 0 ? `${completedCount} de ${consideradas} ${consideradas === 1 ? "aula" : "aulas"}` : "Sem aulas ainda"}
+          </div>
         </div>
         <div className="flex-1 card-dark p-3.5">
-          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Faltas</div>
-          <div className="font-display text-[28px] text-destructive leading-tight">{faltas}</div>
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Faltas</div>
+          {/* Vermelho de texto só quando há falta; zero é neutro (antes o "0" vinha em vermelho puro). */}
+          <div className={cn("font-display text-[28px] leading-tight", faltas > 0 ? "text-[hsl(var(--red-text))]" : "text-foreground")}>
+            {faltas}
+          </div>
+          <div className="text-[12.5px] text-muted-foreground">
+            {faltas === 0 ? "Nenhuma falta" : faltas === 1 ? "1 falta registrada" : `${faltas} faltas registradas`}
+          </div>
         </div>
       </div>
 
