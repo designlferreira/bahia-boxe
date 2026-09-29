@@ -1,8 +1,7 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { ContaForm } from "@/components/ContaForm";
 import { Button } from "@/components/ui/button";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { acceptInvite, validateInvite } from "@/integrations/backend/api";
@@ -15,9 +14,6 @@ export default function Convite() {
   const navigate = useNavigate();
   const { refreshProfile } = useAuth();
   const [contaExiste, setContaExiste] = useState(false);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,8 +24,7 @@ export default function Convite() {
     retry: false,
   });
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function handleSubmit({ name, email, password }: { name: string; email: string; password: string }) {
     if (!token || loading) return;
     setLoading(true);
     setError(null);
@@ -114,44 +109,27 @@ export default function Convite() {
       <p className="text-[13.5px] text-muted-foreground mb-6">
         Seu professor está te convidando para gerenciar suas aulas no Bahia Boxe.
       </p>
-      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-3.5">
-        <div>
-          <Label htmlFor="name">Seu nome</Label>
-          <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome completo" />
-        </div>
-        <div>
-          <Label htmlFor="email">E-mail</Label>
-          <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@email.com" />
-        </div>
-        <div>
-          <Label htmlFor="password">Crie uma senha</Label>
-          <Input
-            id="password"
-            type="password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Mínimo 8 caracteres"
-          />
-        </div>
-        {error && (
-          <div role="alert" className="rounded-2xl border border-destructive/35 bg-destructive/10 p-3.5 text-[13px] text-destructive">
-            {error}
-            {contaExiste && (
-              <>
-                {" "}
-                <Link to="/login" className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4">
-                  Entrar com esta conta
-                </Link>
-              </>
-            )}
-          </div>
-        )}
-        <Button type="submit" size="lg" className="mt-1.5" disabled={loading || !name.trim() || !email.trim() || password.length < 8}>
-          {loading ? "Criando conta…" : "Aceitar convite"}
-        </Button>
-      </form>
+      <ContaForm
+        submitLabel="Aceitar convite"
+        loadingLabel="Criando conta…"
+        loading={loading}
+        onSubmit={handleSubmit}
+        error={
+          error && (
+            <>
+              {error}
+              {contaExiste && (
+                <>
+                  {" "}
+                  <Link to="/login" className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4">
+                    Entrar com esta conta
+                  </Link>
+                </>
+              )}
+            </>
+          )
+        }
+      />
     </main>
   );
 }
