@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const root = createRoot(document.getElementById("root")!);
 
@@ -18,7 +19,9 @@ if (import.meta.env.DEV && window.location.pathname.startsWith("/dev/amostras"))
 } else {
   root.render(
     <StrictMode>
-      <App />
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     </StrictMode>,
   );
 }

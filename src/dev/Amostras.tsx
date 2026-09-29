@@ -49,6 +49,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import AdminPerfilAlunos from "@/pages/admin/PerfilAlunos";
 import NotFound from "@/pages/NotFound";
 import { TelaDeAbertura } from "@/components/TelaDeAbertura";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { StudentBottomNav } from "@/components/StudentBottomNav";
 import { AdminBottomNav } from "@/components/AdminBottomNav";
 import { FAIXAS_ALTURA_CM, FAIXAS_PESO_KG, contarFaixas, type Faixa } from "@/lib/studentProfile";
@@ -991,6 +992,11 @@ const ALUNO_CASOS: {
   },
 ];
 
+/** Lança um erro ao renderizar: só para mostrar o `ErrorBoundary` na galeria (o React registra o erro no console; é esperado). */
+function BombaDeAmostra(): ReactNode {
+  throw new Error("Amostra: erro lançado de propósito (Supabase não configurado)");
+}
+
 function SeededAdmin({ data, children, seed }: { data: unknown; children: ReactNode; seed?: (qc: QueryClient) => void }) {
   const [client] = useState(() => {
     const qc = new QueryClient({
@@ -1630,6 +1636,11 @@ export default function Amostras() {
                 <NotFound amostra />
               </ComRota>
             </Seeded>
+          </Frame>
+          <Frame title="Erro inesperado" note="o que o app mostra se uma tela lançar um erro (em vez de ficar em branco)">
+            <ErrorBoundary>
+              <BombaDeAmostra />
+            </ErrorBoundary>
           </Frame>
           <Frame title="Abertura do app" note="enquanto a sessão carrega (no lugar do formulário de login que piscava)">
             <TelaDeAbertura />
