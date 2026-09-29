@@ -3490,6 +3490,41 @@ a tela 404 (`NotFound`).**
 `backdrop-blur-xl` da barra (custa GPU em aparelhos fracos e quase não aparece com 92% de opacidade); "Agendar" do aluno aparece e some enquanto o modo carrega (salto de 4 para 3 abas); ícones 21px x 20px antes (agora 21px nos dois);
 `staleTime: Infinity` no modo (a troca do modo só aparece ao recarregar).
 
+### Tela 404 e abertura do app: rodada de crítica (2026-09-29) — sem migration nova
+
+`src/pages/NotFound.tsx` (rota `*`), e, do mesmo caminho, `App.tsx` (`PostLoginRedirect`), `ProtectedRoute.tsx`, `Login.tsx` e o componente NOVO `TelaDeAbertura.tsx`: crítica **15/40** (a mais baixa do app depois de Pacotes do aluno),
+relatório em `.impeccable/critique/*notfound*`. Três passos na `dev`, testados pelo Lucas. Na página de amostras ("Página não encontrada": 404 logado, 404 deslogado, abertura do app).
+**Com esta rodada, todas as telas do app já passaram por uma crítica.**
+
+**FATOS (código e configuração) — não desfazer sem decisão:**
+- **Um endereço desconhecido NUNCA dá um 404 de verdade:** o `vite-plugin-pwa` (sem `navigateFallback`/`workbox`, o `NavigationRoute` padrão para `index.html`) e o `vercel.json` (rewrite `/(.*)` → `/index.html`) devolvem o app para
+  QUALQUER endereço; a 404 é só da SPA (status 200), online e offline. **No app instalado (`display: standalone`) não há barra de endereço nem botão de voltar do navegador**: os botões da 404 são a única saída.
+- A rota `*` fica FORA dos layouts e do `ProtectedRoute`: sem barra de navegação, mesmo logado. Nenhuma outra tela define `document.title`.
+- **Sem `.env` local o `AuthProvider` lança "Supabase não configurado" e NÃO há error boundary: qualquer rota, inclusive a 404, fica em branco** (só afeta quem roda sem credenciais, como o navegador desta sessão).
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Texto da 404 em português, marca e dois botões:** marca "BAHIA BOXE" + ícone `SearchX`, título **"NÃO ACHAMOS ESSA PÁGINA"**, "O link pode estar antigo ou incompleto. Volte ao início e siga por lá." (**os textos são meus, aprovados**).
+  Botão principal pela SESSÃO: logado **"Ir para o início"** (`/`, que já manda cada papel para a sua home), deslogado **"Entrar"** (`/login`); **"Voltar"** (secundário, `navigate(-1)`) só quando há para onde voltar
+  (`window.history.state.idx > 0`, posição que o React Router guarda). Enquanto a sessão carrega os botões esperam (esqueleto de 52px: senão "Entrar" apareceria por um instante para quem está logado). Título da aba "Página
+  não encontrada · Bahia Boxe" (restaurado ao sair) e foco no título (`tabIndex={-1}`) para o leitor de tela anunciar a mudança.
+- **Abertura do app: corrigir o "pisca" do login.** Antes `PostLoginRedirect` NÃO consultava `AuthContext.loading`: ao abrir `/` (`start_url` do PWA) já logado, `profile` ainda era null e ele mandava para `/login`; o Login só voltava
+  para a home DEPOIS (`if (profile)`), então o **formulário de login piscava a cada abertura**, e as rotas protegidas mostravam `return null` (tela vazia). Agora `PostLoginRedirect`, `ProtectedRoute` e `Login` mostram
+  `TelaDeAbertura` (a marca "BAHIA BOXE" com `animate-bb-pulse`, desligada com "reduzir movimento"; `role="status"` sr-only "Abrindo o Bahia Boxe…") enquanto `loading` é verdadeiro. `loading` só vale para a carga INICIAL
+  (`signIn` não o mexe), então entrar pelo formulário não passa pela tela de abertura. **Risco aceito: se a verificação da sessão nunca responder (rede que trava sem falhar), a pessoa fica na tela de abertura em vez de ver o
+  login; uma falha de rede comum termina em erro e cai no login normalmente.**
+- **Rota do OUTRO papel: aviso ao redirecionar** (aluno em `/admin/...`, professor em `/app/...`): `RedirecionaPapelErrado` em `ProtectedRoute.tsx` dispara `toast("Esse endereço não é para o seu tipo de conta.", { id: "papel-errado" })`
+  e leva à própria home, como antes. Neutro (`toast`, não âmbar/vermelho: não é erro de quem abriu), `id` fixo para não repetir no StrictMode. A alternativa de mostrar a 404 nesse caso foi oferecida e recusada.
+- Escopo: tudo, na ordem.
+
+**O que mudou / armadilhas:**
+- `NotFound` aceita `amostra` (SÓ para a galeria: não mexe no título nem no foco da página de amostras) e usa `useAuth` (`profile`, `loading`): **não renderizá-la fora do `AuthProvider`.**
+- **Toda tela que decide por `profile` antes de a sessão carregar tem que esperar `loading`** (a lição do pisca): `PostLoginRedirect`, `ProtectedRoute` e `Login` já esperam; uma tela pública nova que redirecione por `profile` deve fazer o mesmo.
+
+**Não conferido:** o "pisca" com sessão real (só a tela de abertura na galeria), o botão "Voltar" e o foco no título (a galeria não tem histórico), o aviso de papel errado (a galeria não tem o `Toaster` nem sessão), o app instalado em aparelho real.
+
+**Deixado para depois (registrado, não pedido):** um error boundary (sem ele qualquer erro de configuração deixa o app em branco); "Falar com o professor" (WhatsApp) na 404 do aluno logado (exigiria uma consulta na 404); a 404 dentro do layout do papel, com a barra de baixo;
+um título de aba próprio em TODAS as telas; redirecionar endereços desconhecidos para a home com aviso em vez de mostrar a 404.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
