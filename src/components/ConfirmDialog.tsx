@@ -49,7 +49,7 @@ export function ConfirmDialog({
             size="lg"
             className={cn(
               "flex-1 h-auto min-h-14 whitespace-normal py-3 text-center leading-tight",
-              tone === "destructive" && "!bg-destructive !text-destructive-foreground !border-none",
+              tone === "destructive" && "!bg-[hsl(var(--destructive-solid))] !text-destructive-foreground !border-none",
             )}
             disabled={confirmDisabled}
             onClick={() => {

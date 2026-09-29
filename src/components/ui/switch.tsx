@@ -11,7 +11,7 @@ const Switch = React.forwardRef<
     className={cn(
       // Visual track stays 31x52 (design spec); before: pads the tap target out to 44px tall
       // without resizing the switch itself.
-      "peer relative inline-flex h-[31px] w-[52px] shrink-0 items-center rounded-full border-none transition-colors before:absolute before:-inset-y-[6.5px] before:inset-x-0 before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted",
+      "peer relative inline-flex h-[31px] w-[52px] shrink-0 items-center rounded-full border-none transition-colors before:absolute before:-inset-y-[6.5px] before:inset-x-0 before:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted data-[state=unchecked]:shadow-[inset_0_0_0_2px_hsl(var(--control-border))]",
       className,
     )}
     {...props}

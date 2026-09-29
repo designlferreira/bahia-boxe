@@ -30,6 +30,13 @@
     /* Mesmo problema, em selos: vermelho puro sobre fundo vermelho/20 dá ~3:1 ("Agendada",
        "Faltou"). Este tom dá 5,3–5,7:1 sobre esses fundos. */
     --red-text: 0 85% 72%;
+    /* Contorno de CONTROLE (campo de texto, interruptor desligado): o --border (20%) dá ~1,2:1 contra o fundo e
+       o controle some; 40% dá ~3,2:1 sobre o fundo e ~3,0:1 sobre o cartão (mínimo do WCAG para limite de controle).
+       Cartão comum, que não é controle, segue com --border. */
+    --control-border: 0 0% 40%;
+    /* Preenchimento do botão de confirmar ação destrutiva: o --destructive (60% de luz) dá 3,8:1 com texto branco;
+       este dá ~5,9:1. */
+    --destructive-solid: 0 72% 45%;
 
     --gradient-hero: linear-gradient(135deg, hsl(0 72% 51%), hsl(0 72% 35%));
     --gradient-gold: linear-gradient(135deg, hsl(45 93% 58%), hsl(35 93% 45%));
@@ -93,7 +100,7 @@
 
   .input-dark {
     /* text-base (16px), not 15px: iOS Safari auto-zooms on focus for inputs under 16px */
-    @apply w-full rounded-xl border border-border bg-input px-3.5 text-base text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors;
+    @apply w-full rounded-xl border border-[hsl(var(--control-border))] bg-input px-3.5 text-base text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors;
   }
 
   /* O app é desenhado pro celular. Em tablet/computador o conteúdo parava de ter forma — cartões e

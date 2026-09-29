@@ -3274,6 +3274,35 @@ estado de erro. As datas com ano ao lado das barras (`w-[86px]`) podem ficar ape
 técnica); um gráfico de linha com mais de duas medições; comparar com a avaliação anterior (e não só a primeira); "Fazer avaliação completa" com a versão já
 selecionada; a borda global do `card-dark`/trilho da barra (1,16–1,48:1, estilo global do tema).
 
+### Polish do tema: contorno de controles e botão destrutivo (2026-09-29) — sem migration nova
+
+Fecha três itens registrados como "estilo global" nas rodadas de crítica ("Deixado para depois"). Um passo na `dev`, testado pelo Lucas. **É uma mudança de tema:
+aparece em todas as telas.** Arquivos: `src/index.css`, `src/components/ui/switch.tsx`, `src/components/ConfirmDialog.tsx`.
+
+**O que mudou:**
+- **`--control-border: 0 0% 40%`** (novo, em `index.css`): contorno de CONTROLE. `.input-dark` (campo de texto, caixa de texto, valor em R$ — todos passam por ela) e o
+  interruptor desligado usam esse valor: **3,26:1 contra o fundo** (medido no navegador). O `--border` (20%) dava ~1,2:1 e o campo sumia no escuro. Telas que já tinham
+  contorno próprio mais claro (`border-muted-foreground/60–70`) continuam como estavam (a classe de utilidade vence a da camada de componentes).
+- **Interruptor desligado:** contorno interno de 2px (`shadow-[inset_0_0_0_2px …]`) na mesma cor, sem mudar o tamanho (31×52) nem a posição da bolinha; NÃO usei
+  `border` porque deslocaria a bolinha. O preenchimento escuro continua.
+- **`--destructive-solid: 0 72% 45%`** (novo): preenchimento do botão de confirmar em `ConfirmDialog` (tom destrutivo). O `--destructive` (60% de luz) dava ~3,8:1 com
+  texto branco; este dá ~5,5:1 (calculado, não medido na tela).
+
+**Decisões do Lucas que continuam de pé (NÃO mexidas nesta rodada):**
+- **O brilho vermelho dos botões primários** (identidade do spec). Eu o listei como alvo ao perguntar o que polir e errei: já estava decidido.
+- **Botão desativado com 50% de opacidade** (controles desativados são isentos de contraste; a explicação é por texto).
+- **Borda dos cartões comuns (`card-dark`, 1,48:1):** cartão que não é controle não precisa de 3:1 (WCAG 1.4.11 fala de limite de CONTROLE). Cartões que são botões receberam
+  contorno mais forte tela a tela nas rodadas anteriores.
+
+**Regra para daqui em diante:** contorno de controle novo usa `--control-border`, não `--border`; botão que confirma ação destrutiva com texto branco usa
+`--destructive-solid`, não `--destructive`. O `--destructive` continua servindo para fundos translúcidos (`bg-destructive/10`) e bordas.
+
+**Não conferido:** o resultado visual nas telas (o painel do navegador devolve captura preta; só medi os valores computados), aparelhos reais e o `--destructive-solid`
+medido na tela (só calculado).
+
+**Deixado para depois (registrado, não pedido):** o trilho do interruptor ligado (vermelho 51%) tem ~4,8:1 e está ok; o contorno do `card-dark` só muda se houver decisão de
+identidade; auditar telas que ainda usam `bg-destructive` sólido com texto branco.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
