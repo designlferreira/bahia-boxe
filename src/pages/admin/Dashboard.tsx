@@ -450,9 +450,13 @@ function Grupo({
         onClick={() => setAberto((v) => !v)}
         className="w-full text-left min-h-11 py-3 flex items-center gap-3 active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
       >
+        {/* Aberto, o título vira rótulo (menor, apagado) e o resumo some — quem ganha destaque é
+            cada item; antes título e nome do aluno tinham o mesmo peso. */}
         <div className="flex-1 min-w-0">
-          <div className="text-[15px] font-semibold text-foreground">{titulo}</div>
-          <div className="text-sm text-muted-foreground">{resumo}</div>
+          <div className={cn("font-semibold", aberto ? "text-[13px] text-muted-foreground" : "text-[15px] text-foreground")}>
+            {titulo}
+          </div>
+          {!aberto && <div className="text-sm text-muted-foreground">{resumo}</div>}
         </div>
         <ChevronDown
           className={cn("h-[18px] w-[18px] text-muted-foreground shrink-0 transition-transform", aberto && "rotate-180")}
