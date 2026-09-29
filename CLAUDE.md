@@ -3453,6 +3453,43 @@ turmas pequenas.
 **Deixado para depois (registrado, não pedido):** agregar no servidor (ver acima); renomear a tela ("A turma"/"Como é a turma") e um atalho no cartão "Alunos"; uma ação para lembrar os alunos de
 preencher (WhatsApp); a divisão "N de M" por dado versus as % (base diferente) continua em cada cartão.
 
+### Barras de navegação de baixo (aluno e professor): rodada de crítica (2026-09-29) — sem migration nova
+
+`StudentBottomNav.tsx`, `AdminBottomNav.tsx` e, NOVOS, `BottomNavItem.tsx` e `BottomNavShell.tsx` (montadas em `layouts/StudentLayout.tsx` e `AdminLayout.tsx`): crítica **25/40**, relatório em
+`.impeccable/critique/*bottomnav*`. Quatro passos na `dev`, testados pelo Lucas. Na página de amostras ("Barras de navegação (aluno e professor)": dez quadros, um por situação). **Continua SEM crítica só
+a tela 404 (`NotFound`).**
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **A barra do professor tem 5 abas** (eram 6): **Painel, Agenda, Alunos, Aulas, Conta.** **"Pedidos" SAIU da barra**; a tela continua em `/admin/solicitacoes`, acessível pelo "Resolver agora" do
+  Painel e pelo sino, e **acende a aba Painel**. Com seis abas cada uma tinha 49-58px e o rótulo era de 9,5px. **O número de pendências vive na aba Painel** (ver contador abaixo).
+- **Mapa central de "onde estou"** (cada barra declara, ao lado de cada aba, os prefixos que lhe pertencem — `prefixos` de `BottomNavItem`): aluno — detalhe da aula (`/app/aula`) acende **Aulas**;
+  Pacotes e Perfil de Boxe (`/app/pacotes`, `/app/perfil-lutador`) acendem **Conta**. Professor — detalhe da aula (`/admin/aula`) acende **Agenda**; `/admin/pacotes`, `/admin/disponibilidade`,
+  `/admin/orientacoes`, `/admin/perfil-alunos`, `/admin/configuracoes` acendem **Conta**; `/admin/solicitacoes` acende **Painel**. **O detalhe da aula do professor SEMPRE acende Agenda**, mesmo vindo de Aulas
+  ou do detalhe de um aluno (guardar a origem exigiria estado de navegação): escolha minha, aceita. **Ao criar uma tela nova de segundo nível, acrescente o prefixo na aba certa** (senão nenhuma acende).
+  O caso especial que só existia para `/admin/alunos/` era redundante (a aba Alunos já casa por prefixo) e saiu.
+- **Contador do Painel = pedidos de pacote/aula avulsa + pedidos de horário/remarcação** (`purchase_requests` pendentes + `bookings` em `pending_confirmation`, o mesmo conjunto do "Resolver agora" e do
+  sino). Antes só contava os de pacote, e o painel, o sino e a aba discordavam.
+
+**O que mudou / armadilhas:**
+- **`BottomNavItem` é o item ÚNICO das duas barras** (as duas eram cópias que divergiram: rótulo 12px x 9,5px, cinza cheio x `/70` a 3,81:1, `gap` e ícones diferentes). Usa `Link` (não `NavLink`) e calcula
+  a aba ativa com `casaPrefixo(pathname, [to, ...prefixos])`, pelo limite do segmento ("/app/aula" casa "/app/aula/7", não "/app/aulas"); põe `aria-current="page"` ele mesmo. **Aba ativa = cor + um traço de 2px no topo +
+  rótulo em negrito** (a cor sozinha não é uma marca de forma). Rótulo `text-xs` (12px) em todas; inativa em `text-muted-foreground` cheio; `focus-visible:ring-2`; ícones `aria-hidden`.
+- **Contador (`countPendenciasDoProfessor`, api.ts):** dois `count: "exact", head: true`, só CONTAM (antes a barra usava `getPurchaseRequests`, que trazia alunos, modelos, pacotes e saldos a cada 15s em TODA tela do professor
+  para olhar `.length`). Atualiza a cada **60s**, só com o app visível, `staleTime` 30s. **A chave da consulta é `["admin-dashboard", "pendencias", id]` DE PROPÓSITO:** Pedidos, Painel, Agenda e o detalhe da aula já
+  invalidam o prefixo `["admin-dashboard"]` ao decidir algo, então o número acompanha sem essas telas conhecerem a chave. Selo de 12px, círculo de 20px, "9+", e texto `sr-only` ("3 pendências"; o `aria-label`
+  fixo que escondia o número saiu).
+- **`BottomNavShell`:** `<nav>` das duas, com a altura `calc(62px + max(22px, env(safe-area-inset-bottom)))` e o mesmo valor de `padding-bottom` (antes 84px/22px fixos: num iPhone com barra de gesto grande os alvos ficavam sob o
+  indicador; `viewport-fit=cover` já existia). **No celular (`pointer: coarse`), enquanto um campo de TEXTO (input de texto/e-mail/senha/busca, textarea, select, contenteditable; checkbox/botão/faixa não contam) está com o foco, a barra desce
+  (`translate-y-full`) e volta ao perder o foco.** No computador nada muda. `.page-container` mantém `pb-28` (112px), maior que a barra mesmo com a área segura.
+- **Galeria:** as barras são `fixed`; cada quadro tem um contêiner com `[transform:translateZ(0)]` que as prende ao quadro (a mesma armadilha do `.page-container`, agora usada a favor). O contador dos quadros do professor é semeado em
+  `["admin-dashboard", "pendencias", PROFESSOR.id]` (um número).
+
+**Não conferido:** o visual real (a captura do navegador da galeria vem preta), a margem da barra de gesto e o teclado escondendo a barra (dependem de aparelho de toque), o contador com dados reais, foco por Tab e leitor de tela.
+
+**Deixado para depois (registrado, não pedido):** guardar a aba de ORIGEM do detalhe da aula do professor (Aulas/Alunos em vez de sempre Agenda); renomear "Aulas" do professor (é o histórico de todos os alunos, o do aluno é "suas aulas"); tirar o
+`backdrop-blur-xl` da barra (custa GPU em aparelhos fracos e quase não aparece com 92% de opacidade); "Agendar" do aluno aparece e some enquanto o modo carrega (salto de 4 para 3 abas); ícones 21px x 20px antes (agora 21px nos dois);
+`staleTime: Infinity` no modo (a troca do modo só aparece ao recarregar).
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
