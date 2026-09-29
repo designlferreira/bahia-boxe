@@ -151,6 +151,18 @@ export default function AdminAgenda() {
     enabled: !!profile,
   });
   const diaPassado = isoDateOnly(selectedDate) < isoDateOnly(hoje);
+  const ehHojeSelecionado = isoDateOnly(selectedDate) === isoDateOnly(hoje);
+
+  // Horário livre que já passou não serve pra mais nada (ninguém agenda no passado) — só ocupava
+  // espaço. Hora de São Paulo, como a própria agenda.
+  const [hAgora, mAgora] = formatTime(hoje).split(":").map(Number);
+  const minutosAgora = hAgora * 60 + mAgora;
+  const visiveis = (data ?? []).filter((e) => {
+    if (!e.free) return true;
+    if (diaPassado) return false;
+    if (!ehHojeSelecionado) return true;
+    return parseInt(e.hour, 10) * 60 >= minutosAgora;
+  });
   const podePublicar = !diaPassado && (settings?.modoAgendamento ?? "autosservico") === "autosservico";
 
   function invalidate() {
@@ -269,7 +281,7 @@ export default function AdminAgenda() {
       )}
 
       {/* Dia sem aula nem horário publicado: antes a tela ficava em branco abaixo da semana. */}
-      {!isLoading && !isError && data && data.length === 0 && (
+      {!isLoading && !isError && data && visiveis.length === 0 && (
         <EmptyState
           icon={CalendarX}
           title={diaPassado ? "Nenhuma aula neste dia" : "Nenhum horário neste dia"}
@@ -277,7 +289,7 @@ export default function AdminAgenda() {
             podePublicar
               ? "Publique seus horários para os alunos poderem agendar."
               : diaPassado
-                ? "Não houve aula nem horário publicado."
+                ? "Não houve aula neste dia."
                 : "Nenhuma aula marcada para este dia."
           }
           ctaLabel={podePublicar ? "Publicar horários" : undefined}
@@ -285,12 +297,21 @@ export default function AdminAgenda() {
         />
       )}
 
-      {!isLoading && !isError && data && data.length > 0 && (
+      {!isLoading && !isError && data && visiveis.length > 0 && (
         <div className="flex flex-col">
-          {data.map((entry) => {
+          {visiveis.map((entry) => {
             const booking = entry.booking;
             const awaiting = !entry.free && booking!.status === "scheduled" && isAwaitingConfirmation(booking!.status, booking!.endTime);
             const temAcao = awaiting || booking?.status === "pending_confirmation";
+            const agoraMs = hoje.getTime();
+            const emAndamento =
+              !entry.free &&
+              booking!.status === "scheduled" &&
+              new Date(booking!.startTime).getTime() <= agoraMs &&
+              agoraMs < new Date(booking!.endTime).getTime();
+            // Pedido cujo horário já começou: aprovar ainda é possível, mas o professor precisa saber.
+            const pedidoPassou =
+              booking?.status === "pending_confirmation" && new Date(booking.startTime).getTime() <= agoraMs;
 
             return (
               <div key={entry.hour} className="flex gap-3 min-h-[74px]">
@@ -356,12 +377,15 @@ export default function AdminAgenda() {
                           )}
                         </div>
                         <span className="flex items-center gap-1 shrink-0">
-                          <StatusBadge status={booking!.status} semRegistro={awaiting} />
+                          <StatusBadge status={booking!.status} semRegistro={awaiting} agora={emAndamento} />
                           {!temAcao && <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden />}
                         </span>
                         <span className="sr-only">. Ver detalhes</span>
                       </button>
 
+                      {pedidoPassou && (
+                        <div className="text-[13px] text-amber mb-2">O horário deste pedido já passou.</div>
+                      )}
                       {booking?.status === "pending_confirmation" && (
                         <div className="flex gap-2">
                           <Button

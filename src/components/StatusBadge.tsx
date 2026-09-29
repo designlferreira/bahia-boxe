@@ -11,6 +11,8 @@ interface StatusBadgeProps {
    * ali engana — e é o estado que mais precisa dele, então vai em âmbar ("depende de você").
    */
   semRegistro?: boolean;
+  /** Aula `scheduled` em andamento (começou e não terminou): "Agora", não "Agendada". */
+  agora?: boolean;
   className?: string;
 }
 
@@ -23,8 +25,9 @@ interface StatusBadgeProps {
  * vermelho = falta/recusa. "Concluída" era dourado e quase não se distinguia do âmbar no selo
  * pequeno (decisão do Lucas, 2026-09-28).
  */
-export function StatusBadge({ status, audience = "admin", semRegistro = false, className }: StatusBadgeProps) {
+export function StatusBadge({ status, audience = "admin", semRegistro = false, agora = false, className }: StatusBadgeProps) {
   if (semRegistro) return <Badge className={cn("bg-amber/20 text-amber", className)}>Sem registro</Badge>;
+  if (agora) return <Badge className={cn("bg-primary/20 text-[hsl(var(--red-text))]", className)}>Agora</Badge>;
   const cfg = getStatusConfig(status, audience);
   return (
     <Badge className={cn(cfg.badgeClass, "gap-1", className)}>
