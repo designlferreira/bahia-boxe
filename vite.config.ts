@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.svg"],
+      includeAssets: ["favicon.svg", "apple-touch-icon.png"],
       // Padrão do plugin não inclui fontes: sem isto os títulos (Bebas Neue) caem numa fonte comum no app instalado sem internet.
       workbox: { globPatterns: ["**/*.{js,css,html,woff2,svg,webmanifest}"] },
       manifest: {
@@ -17,11 +17,16 @@ export default defineConfig({
         description: "Gestão de aulas de boxe",
         theme_color: "#121212",
         background_color: "#121212",
+        lang: "pt-BR",
         display: "standalone",
         start_url: "/",
+        // PNG de verdade: o SVG declarado como 192/512 não é aceito por todos os aparelhos, e o iPhone usa o apple-touch-icon (link no index.html).
+        // O "maskable" é o mesmo logo menor, com o vermelho até a borda: o sistema recorta no formato do ícone sem cortar o desenho.
         icons: [
-          { src: "/favicon.svg", sizes: "192x192", type: "image/svg+xml" },
-          { src: "/favicon.svg", sizes: "512x512", type: "image/svg+xml" },
+          { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+          { src: "/favicon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
         ],
       },
     }),

@@ -104,7 +104,7 @@ export function BoxingProfileComparisonView({ self, coach, viewer, showNextSteps
       )}
       {/* O resultado que a tela promete vem PRIMEIRO; as duas leituras que o formam ficam logo abaixo,
           e radar/tabela como detalhe (antes o combinado era o último bloco, a ~75% da página). */}
-      <div className="rounded-[20px] p-5 mb-3 bg-[linear-gradient(150deg,#1F1B0C,#171717_60%)] border border-amber/30">
+      <div className="rounded-[20px] p-5 mb-3 bg-[linear-gradient(150deg,hsl(var(--surface-amber-wash)),hsl(var(--surface-raised))_60%)] border border-amber/30">
         <div className="flex items-center gap-1.5 text-amber text-xs font-bold uppercase tracking-wide mb-2">
           <Trophy className="h-3.5 w-3.5" aria-hidden /> Resultado combinado
         </div>

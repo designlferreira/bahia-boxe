@@ -54,6 +54,11 @@
        o controle some; 40% dá ~3,2:1 sobre o fundo e ~3,0:1 sobre o cartão (mínimo do WCAG para limite de controle).
        Cartão comum, que não é controle, segue com --border. */
     --control-border: 0 0% 40%;
+    /* Superfícies em camadas acima do fundo (7%): "raised" = folha (sheet), linhas em cartão e o fim do degradê do Perfil de Boxe;
+       "overlay" = aviso (toast); "amber-wash" = começo do degradê do destaque do Perfil de Boxe. Eram hexadecimais soltos no código. */
+    --surface-raised: 0 0% 9%;
+    --surface-overlay: 0 0% 12%;
+    --surface-amber-wash: 45 44% 8%;
     /* Preenchimento do botão de confirmar ação destrutiva: o --destructive (60% de luz) dá 3,8:1 com texto branco;
        este dá ~5,9:1. */
     --destructive-solid: 0 72% 45%;

@@ -40,6 +40,8 @@ export default {
           DEFAULT: "hsl(var(--amber))",
           foreground: "hsl(var(--amber-foreground))",
         },
+        raised: "hsl(var(--surface-raised))",
+        overlay: "hsl(var(--surface-overlay))",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

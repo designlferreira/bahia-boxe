@@ -3618,10 +3618,10 @@ Um passo na `dev`, testado pelo Lucas (com poucos alunos: o teste dele foi de "n
 ### Auditoria técnica e `optimize` (2026-09-30) — sem migration nova
 
 **Auditoria por amostragem (`/impeccable audit`, só leitura): 15/20 (Bom)** — Acessibilidade 3, Desempenho 2, Responsivo 3, Temas 3, Integridade 4. O detector do skill varreu `src` e devolveu vazio. Sem medição em aparelho real nem leitor de tela.
-Achados que NÃO foram tratados e seguem abertos (registrados, não pedidos):
-- **[P2] Ícone do app só em SVG:** `public/` tem só `favicon.svg`, declarado no manifest como 192/512; sem `apple-touch-icon`. No iPhone o ícone da tela inicial sai como captura da página. Precisa gerar PNGs (192, 512, maskable, 180 Apple).
-- **[P3] 7 cores fixas no código:** `App.tsx` (toast: `#1E1E1E`/`#343434`/`#262626`), degradê `#1F1B0C`/`#171717` em `BoxingProfileComparisonView.tsx` e `BoxingProfileScoresSummary.tsx`, mais `ui/sheet.tsx` e `Disponibilidade.tsx`. Não quebra nada; trocar por variáveis de cor se o tema mudar.
-- **[P3] Dois textos de 11px** em `GuardInfoDialog.tsx` (únicos abaixo de 12px que sobraram).
+Achados da auditoria — **os três foram resolvidos no `polish` logo abaixo (2026-09-30)**:
+- ~~**[P2] Ícone do app só em SVG:**~~ RESOLVIDO: `public/` tem só `favicon.svg`, declarado no manifest como 192/512; sem `apple-touch-icon`. No iPhone o ícone da tela inicial sai como captura da página. Precisa gerar PNGs (192, 512, maskable, 180 Apple).
+- ~~**[P3] 7 cores fixas no código:**~~ RESOLVIDO: `App.tsx` (toast: `#1E1E1E`/`#343434`/`#262626`), degradê `#1F1B0C`/`#171717` em `BoxingProfileComparisonView.tsx` e `BoxingProfileScoresSummary.tsx`, mais `ui/sheet.tsx` e `Disponibilidade.tsx`. Não quebra nada; trocar por variáveis de cor se o tema mudar.
+- ~~**[P3] Dois textos de 11px**~~ RESOLVIDO em `GuardInfoDialog.tsx` (únicos abaixo de 12px que sobraram).
 
 **`optimize` — feito, testado pelo Lucas e verificado no navegador com o app real ligado a um Supabase falso (login abriu, a tela "criar conta" carregou o pedaço sob demanda, zero pedidos ao Google Fonts):**
 - **Telas sob demanda:** todas as rotas e os dois layouts usam `React.lazy` em `App.tsx`. Antes, um único `index-*.js` de **995 kB (276 kB comprimido)** carregava as ~40 telas de uma vez. Agora o primeiro arquivo tem **165 kB**; as telas viram arquivos de 0,1 a 27 kB.
@@ -3633,6 +3633,20 @@ Achados que NÃO foram tratados e seguem abertos (registrados, não pedidos):
 - **Ainda pesado:** `@supabase/supabase-js` sozinho tem **220 kB** (traz realtime, storage e functions que o app não usa). Reduzir exigiria trocar o cliente por partes menores dele: mudança maior, não feita.
 
 **Não conferido:** tempo de carregamento real em rede lenta/aparelho de entrada (só o tamanho dos arquivos foi medido); as fontes offline no app instalado em aparelho real; o cache do service worker depois de um deploy novo (`autoUpdate`: ver o gotcha do topo deste arquivo).
+
+### `polish` pós-auditoria: ícones, cores e textos (2026-09-30) — sem migration nova
+
+Um passo na `dev`, testado pelo Lucas (o teste principal era o ícone na tela inicial do iPhone). Fecha os três achados abertos da auditoria da seção acima.
+
+- **Ícones PNG em `public/`:** `icon-192.png` e `icon-512.png` (cantos arredondados), `icon-maskable-512.png` (vermelho até a borda, logo em 62% do tamanho, para o sistema recortar sem cortar o desenho) e `apple-touch-icon.png` (180, vermelho até a borda, logo em 80%).
+  Foram gerados por um script em Python que redesenha o logo do `favicon.svg` (as duas linhas brancas de traço 2 sobre `#DE2323`), porque não havia biblioteca de imagem instalada; **o script NÃO está no repositório**. Se o logo mudar, os PNGs precisam ser refeitos à mão a partir do novo `favicon.svg`.
+  `vite.config.ts`: o manifest declara os PNGs (`any` e `maskable`) e mantém o SVG como reserva; `lang: "pt-BR"` (era `"en"`); `includeAssets` inclui o `apple-touch-icon.png`. `index.html` ganhou `<link rel="apple-touch-icon">`.
+- **Cores como variáveis (`index.css` + `tailwind.config.ts`):** `--surface-raised` (0 0% 9%, classe `bg-raised`: folha `ui/sheet.tsx`, linhas da Disponibilidade, fim do degradê do Perfil de Boxe), `--surface-overlay` (0 0% 12%, `bg-overlay`: o aviso `toast` em `App.tsx`) e
+  `--surface-amber-wash` (45 44% 8%, começo do degradê dourado em `BoxingProfileComparisonView.tsx` e `BoxingProfileScoresSummary.tsx`, via `hsl(var(--surface-amber-wash))`). Os cinzas `#262626`/`#343434` viraram `secondary`/`border`, que já existiam. As cores mudam no máximo 1% de brilho.
+  **Não voltar a escrever hexadecimal em `.tsx`:** use estas variáveis ou as que já existem.
+- **Textos de 11px:** `GuardInfoDialog.tsx` foi para `text-xs`; "Desvantagens" passou de `text-destructive` para `--red-text` (contraste). Não há mais texto abaixo de 12px fora da galeria.
+
+**Não conferido:** o ícone em aparelho real além do teste do Lucas; o recorte do ícone `maskable` em cada fabricante de Android.
 
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 

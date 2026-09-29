@@ -138,8 +138,8 @@ export default function App() {
           offset={84}
           toastOptions={{
             classNames: {
-              toast: "!bg-[#1E1E1E] !border !border-[#343434] !text-foreground !rounded-2xl",
-              actionButton: "!bg-[#262626] !text-accent",
+              toast: "!bg-overlay !border !border-border !text-foreground !rounded-2xl",
+              actionButton: "!bg-secondary !text-accent",
             },
           }}
         />
