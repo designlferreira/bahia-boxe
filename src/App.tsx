@@ -15,6 +15,7 @@ import Convite from "@/pages/auth/Convite";
 import NotFound from "@/pages/NotFound";
 import { TelaDeAbertura } from "@/components/TelaDeAbertura";
 import { FaixaSemInternet } from "@/components/FaixaSemInternet";
+import { FaixaConexaoLenta } from "@/components/FaixaConexaoLenta";
 import { TelaSessaoNaoCarregou } from "@/components/TelaSessaoNaoCarregou";
 
 import StudentHome from "@/pages/student/Home";
@@ -124,6 +125,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <FaixaSemInternet />
+        <FaixaConexaoLenta />
         <BrowserRouter>
           <AppRoutes />
         </BrowserRouter>

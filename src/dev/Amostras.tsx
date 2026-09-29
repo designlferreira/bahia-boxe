@@ -10,6 +10,7 @@
  */
 import { useState, type ReactNode } from "react";
 import { FaixaSemInternet } from "@/components/FaixaSemInternet";
+import { FaixaConexaoLenta } from "@/components/FaixaConexaoLenta";
 import { TelaSessaoNaoCarregou } from "@/components/TelaSessaoNaoCarregou";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
@@ -1646,6 +1647,13 @@ export default function Amostras() {
           </Frame>
           <Frame title="Sem internet" note="faixa que aparece no topo quando o aparelho fica offline">
             <div className="relative h-24"><FaixaSemInternet amostra /></div>
+          </Frame>
+          <Frame title="Conexão lenta" note="aviso que aparece quando uma consulta passa de 8s">
+            <SemLogin>
+              <div className="relative h-40">
+                <FaixaConexaoLenta amostra />
+              </div>
+            </SemLogin>
           </Frame>
           <Frame title="Abertura do app" note="enquanto a sessão carrega (no lugar do formulário de login que piscava)">
             <TelaDeAbertura />
