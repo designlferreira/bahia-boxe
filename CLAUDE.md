@@ -3574,6 +3574,25 @@ Agora `loadProfile` LANÇA `AuthError` (`code = "profile_load_failed"`) em erro 
 **Não feito (registrado, não pedido):** o que o aluno VÊ no app sem vínculo com um professor (segue dependendo da consulta no SQL Editor que o Lucas ficou de rodar); `accept_invite` que falha continua calado (ver "Polish do fluxo do aluno novo");
 tempo limite nas chamadas (conexão lenta); `markNotificationRead` em `PerfilLutador.tsx` sem `.catch` (rejeição não tratada no console se a chamada falhar).
 
+### Endurecimento (`harden`) da conexão lenta (2026-09-30) — sem migration nova
+
+Um passo na `dev`, testado pelo Lucas (com "Slow 3G"/offline no Chrome). Fecha o item "conexão lenta" que ficou aberto nas duas seções anteriores de `harden`.
+
+**Problema:** as chamadas ao Supabase não tinham tempo limite. Numa rede que trava SEM falhar, o esqueleto ficava na tela para sempre, sem erro nem explicação.
+
+- **Tempo limite de 25s em toda chamada** (`TEMPO_LIMITE_MS`, `fetchComTempoLimite` em `src/integrations/supabase/client.ts`, passado como `global.fetch` do `createClient`; vale também para o login). Respeita o cancelamento de quem chamou. Ao estourar,
+  aborta com `DOMException("conexao_lenta", "TimeoutError")`. **Não passar `fetch` próprio em chamadas novas sem manter o tempo limite.**
+- `mensagemDeErro` (`src/lib/erros.ts`) separa "lenta" de "sem internet": `TimeoutError`/`conexao_lenta` → "A conexão está lenta e a resposta não chegou. Tente de novo." (a checagem de `navigator.onLine` falso continua vindo primeiro). Teste novo em `erros.test.ts`.
+- **`FaixaConexaoLenta`** (`src/components/FaixaConexaoLenta.tsx`, montada em `App.tsx` ao lado da `FaixaSemInternet`): cartão no rodapé, acima da barra de baixo, "Está demorando mais que o normal. Confira sua conexão; se não carregar, tente de novo."
+  quando `useIsFetching() > 0` por mais de 8s; some sozinho. Textos meus, aprovados. Na galeria: "Conexão lenta".
+- Sequência que a pessoa vê numa rede ruim: 8s → aviso "demorando"; 25s → a chamada falha (com uma nova tentativa da consulta: `retry: 1`) → `ErrorState` com "Tentar novamente". Nunca mais esqueleto infinito.
+
+**Efeito colateral aceito:** a atualização automática do contador de pendências do professor (a cada 60s) também conta como consulta em andamento; se o servidor demorar mais de 8s nela, o aviso pode aparecer sem a pessoa ter feito nada.
+
+**Não conferido:** o estouro dos 25s em aparelho real com rede travada de verdade (só simulado com o throttling do Chrome); a posição do aviso em telas sem barra de baixo (Login e afins: fica um pouco alto, aceito).
+
+**Não feito (registrado, não pedido):** listas com centenas de itens (Alunos, Aulas, Agenda) não foram testadas para lentidão; tempo limite diferente por tipo de chamada (hoje 25s para tudo); botão "Cancelar" no aviso de demora.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
