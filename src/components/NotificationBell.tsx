@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/SkeletonCard";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { cn } from "@/lib/utils";
 import { relativeTime } from "@/lib/dateUtils";
 import { notificationHref } from "@/lib/notifications";
@@ -32,7 +31,6 @@ interface NotificationBellProps {
  * nunca uma rota fixa passada de fora. */
 export function NotificationBell({ userId }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
-  const [confirmClear, setConfirmClear] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
@@ -69,7 +67,10 @@ export function NotificationBell({ userId }: NotificationBellProps) {
     mutationFn: () => clearNotifications(userId),
     onSuccess: (removed) => {
       queryClient.invalidateQueries({ queryKey: key });
-      toast.warning("Central limpa", {
+      // Sem janela de confirmação: a ação é reversível (o "Desfazer" fica 8s), então perguntar antes seria atrito em dobro. E o aviso
+      // diz a verdade: "limpar" só esconde os avisos NESTE aparelho (ler/limpar vive no `localStorage`, ver `notificationState`);
+      // em outro aparelho eles continuam aparecendo. Neutro, não `toast.warning`: âmbar é "depende do professor".
+      toast("Avisos limpos neste aparelho", {
         duration: 8000,
         action: {
           label: "Desfazer",
@@ -188,21 +189,12 @@ export function NotificationBell({ userId }: NotificationBellProps) {
           </div>
 
           {notifs.length > 0 && (
-            <Button variant="secondary" className="mt-3 h-11 shrink-0" disabled={clearAll.isPending} onClick={() => setConfirmClear(true)}>
-              Limpar central
+            <Button variant="secondary" className="mt-3 h-11 shrink-0" disabled={clearAll.isPending} onClick={() => clearAll.mutate()}>
+              Limpar avisos
             </Button>
           )}
         </SheetContent>
       </Sheet>
-
-      <ConfirmDialog
-        open={confirmClear}
-        onOpenChange={setConfirmClear}
-        title="LIMPAR NOTIFICAÇÕES"
-        description="Todas as notificações serão removidas da central."
-        confirmLabel="Limpar"
-        onConfirm={() => clearAll.mutate()}
-      />
     </>
   );
 }
