@@ -9,7 +9,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/SkeletonCard";
 import { Button } from "@/components/ui/button";
 import { formatDateShort } from "@/lib/dateUtils";
-import { DIMENSIONS, DIMENSION_LABELS, FIGHTER_PROFILE_LABELS } from "@/lib/boxingProfile";
+import { DIMENSIONS, DIMENSION_LABELS, FIGHTER_PROFILE_LABELS, SCORING_VERSION } from "@/lib/boxingProfile";
 import { getBoxingProfileHistory, studentIdForProfile } from "@/integrations/backend/api";
 
 export default function StudentPerfilLutadorHistorico() {
@@ -40,7 +40,10 @@ export default function StudentPerfilLutadorHistorico() {
   // vez de 3-4, uma medição bem mais ruidosa — misturar as duas no mesmo gráfico de tendência
   // sugeriria uma precisão que a curta não tem (CLAUDE.md, "Compatibilidade entre curta e
   // completa"). A lista "Avaliações realizadas" abaixo continua mostrando as duas, com um selo.
-  const fullHistory = history?.filter((a) => a.assessmentLength === "full");
+  // Também só a fórmula ATUAL: uma nota calculada pela fórmula anterior contra uma da atual mostraria uma "queda" (ou
+  // subida) que vem do cálculo, não do aluno. Elas continuam na lista, com o selo.
+  const fullHistory = history?.filter((a) => a.assessmentLength === "full" && a.scoringVersion === SCORING_VERSION);
+  const temFormulaAnterior = !!history?.some((a) => a.assessmentLength === "full" && a.scoringVersion !== SCORING_VERSION);
 
   // Do mais antigo pro mais recente — é a ordem que a visão de evolução por dimensão precisa.
   const chronological = fullHistory ? [...fullHistory].reverse() : [];
@@ -81,6 +84,8 @@ export default function StudentPerfilLutadorHistorico() {
                   : "Para ver sua evolução por competência, faça pelo menos 2 avaliações completas."}
                 {history.some((a) => a.assessmentLength === "short") &&
                   " As rápidas medem menos e não entram nessa comparação."}
+                {temFormulaAnterior &&
+                  " As avaliações da fórmula anterior também ficam de fora, porque as notas eram calculadas de outro jeito."}
               </p>
               <Button size="lg" className="w-full" onClick={novaAvaliacao}>
                 Fazer nova avaliação
@@ -144,8 +149,13 @@ export default function StudentPerfilLutadorHistorico() {
                   </span>
                   <span className="text-[12px] text-muted-foreground">{formatDateShort(a.completedAt)}</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[12.5px] text-accent font-semibold">{a.profileScores[a.primaryProfile]}% de afinidade</span>
+                  {a.scoringVersion !== SCORING_VERSION && (
+                    <span className="text-xs font-bold uppercase tracking-wide text-amber bg-amber/10 rounded-full px-2 py-0.5">
+                      Calculado pela fórmula anterior
+                    </span>
+                  )}
                   {a.assessmentLength === "short" && (
                     <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground bg-secondary rounded-full px-2 py-0.5">
                       Rápida
