@@ -86,6 +86,9 @@ function HoraChips({ label, horas, selecionada, desabilitada, onPick }: HoraChip
   );
 }
 
+/** 1 -> "1 aula", 2 -> "2 aulas" (antes: "aula(s)"). */
+const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
+
 /** ["seg", "ter", "sex"] -> "Seg, ter e sex" */
 function listaDias(dias: string[]): string {
   const txt = dias.length <= 1 ? dias.join("") : `${dias.slice(0, -1).join(", ")} e ${dias[dias.length - 1]}`;
@@ -141,7 +144,7 @@ export default function AdminDisponibilidade() {
     mutationFn: ({ weekday, active }: { weekday: number; active: boolean }) => toggleAvailabilityDay(profile!.id, weekday, active),
     onSuccess: (_r, vars) => {
       invalidate();
-      toast(vars.active ? `Dia disponível para agendamento` : `Dia indisponível para novos agendamentos`, {
+      toast(vars.active ? "Dia aberto para agendamento" : "Dia pausado: não recebe novos agendamentos", {
         className: vars.active ? undefined : "!text-amber",
       });
     },
@@ -199,7 +202,7 @@ export default function AdminDisponibilidade() {
 
   return (
     <div className="page-container">
-      <PageHeader title="MINHA DISPONIBILIDADE" subtitle={`Grade semanal · próximas ${HORIZON_WEEKS} semanas`} back />
+      <PageHeader title="MINHA DISPONIBILIDADE" subtitle={`Repete toda semana · próximas ${HORIZON_WEEKS} semanas`} back />
 
       {/* A semana num relance: quais dias estão abertos (antes um cartão dourado com "N intervalos" que repetia a lista). */}
       {!isLoading && !isError && data && (
@@ -261,13 +264,9 @@ export default function AdminDisponibilidade() {
                     {day.name}
                   </h2>
                   <div className="text-xs text-muted-foreground mt-0.5">
-                    {day.slots.length === 0
-                      ? day.active
-                        ? "Sem horários"
-                        : "Indisponível"
-                      : day.active
-                        ? `${day.slots.length} intervalo(s)`
-                        : `Indisponível · ${day.slots.length} intervalo(s) pausado(s)`}
+                    {day.active
+                      ? plural(day.slots.length, "horário", "horários")
+                      : `Pausado · ${plural(day.slots.length, "horário guardado", "horários guardados")}`}
                   </div>
                 </div>
                 <Switch
@@ -298,7 +297,7 @@ export default function AdminDisponibilidade() {
                             {!day.active
                               ? "Pausado enquanto o dia está desativado"
                               : booked > 0
-                                ? `${booked} aula(s) marcada(s) neste intervalo`
+                                ? `${plural(booked, "aula marcada", "aulas marcadas")} neste horário`
                                 : "Aberto para agendamento"}
                           </div>
                         </div>
@@ -361,7 +360,7 @@ export default function AdminDisponibilidade() {
               selecionada={editor.start}
               desabilitada={() => false}
               onPick={(v) => {
-                // Se o novo início passa do fim, o fim acompanha (início + 1h): nunca deixa um intervalo inválido.
+                // Se o novo início passa do fim, o fim acompanha (início + 1h): nunca deixa um horário inválido.
                 const end = horaDe(editor.end) > horaDe(v) ? editor.end : hhmm(Math.min(horaDe(v) + 1, 24));
                 setEditor({ ...editor, start: v, end });
                 setEditorError(null);
@@ -404,7 +403,11 @@ export default function AdminDisponibilidade() {
         open={!!confirmDeactivate}
         onOpenChange={(o) => !o && setConfirmDeactivate(null)}
         title={`DESATIVAR ${confirmDeactivate?.name.toUpperCase() ?? ""}`}
-        description={`Há ${confirmDeactivate?.booked} aula(s) já marcada(s) nesse dia. Elas continuam válidas, mas o dia deixa de aceitar novos agendamentos.`}
+        description={
+          confirmDeactivate
+            ? `${confirmDeactivate.booked === 1 ? "Há 1 aula já marcada nesse dia. Ela continua valendo" : `Há ${confirmDeactivate.booked} aulas já marcadas nesse dia. Elas continuam valendo`}, mas o dia deixa de aceitar novos agendamentos. Os horários ficam guardados, e você pode reativar o dia quando quiser.`
+            : ""
+        }
         confirmLabel="Desativar"
         onConfirm={() => confirmDeactivate && toggleDay.mutate({ weekday: confirmDeactivate.weekday, active: false })}
       />
@@ -413,7 +416,11 @@ export default function AdminDisponibilidade() {
         open={!!confirmDelete}
         onOpenChange={(o) => !o && setConfirmDelete(null)}
         title="REMOVER HORÁRIO"
-        description={`Há ${confirmDelete?.booked} aula(s) marcada(s) nesse intervalo em ${confirmDelete?.dayName}. Remover o intervalo não cancela essas aulas, mas bloqueia novos agendamentos.`}
+        description={
+          confirmDelete
+            ? `${confirmDelete.booked === 1 ? "Há 1 aula marcada nesse horário" : `Há ${confirmDelete.booked} aulas marcadas nesse horário`} em ${confirmDelete.dayName.toLowerCase()}. Remover o horário não cancela ${confirmDelete.booked === 1 ? "essa aula" : "essas aulas"}, mas bloqueia novos agendamentos.`
+            : ""
+        }
         confirmLabel="Remover"
         onConfirm={() => confirmDelete && deleteSlot.mutate(confirmDelete.slot)}
       />
