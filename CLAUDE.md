@@ -3089,6 +3089,50 @@ galeria só tinha a do aluno). É o que a rodada da Minha conta do aluno deixou 
 link de ajuda/suporte e versão do app (útil com o aviso do service worker); "Perfil dos alunos" talvez pertença à aba Alunos; trocar a aba "Conta" por
 "Ajustes"; WhatsApp do professor visível na própria conta.
 
+### Recuperar senha e Nova senha: rodada de crítica (2026-09-29) — sem migration nova
+
+`src/pages/auth/RecuperarSenha.tsx` (`/recuperar-senha`, "Esqueceu a senha?" do Login) e `src/pages/auth/ResetPassword.tsx`
+(`/auth/reset-password`, aberta pelo link do e-mail): crítica **16/40**, relatório em `.impeccable/critique/*recuperarsenha*`. Sete passos na
+`dev`, testados pelo Lucas com uma conta de teste. Na página de amostras, seção "Entrada" (Recuperar senha, enviado, Nova senha, link expirado,
+verificando).
+
+**ERRO GRAVE corrigido — o fluxo era uma MAQUETE (achado por leitura de código, confirmado por duas avaliações independentes):**
+`RecuperarSenha` esperava 0,6s e mostrava "LINK ENVIADO" **sem enviar e-mail nenhum**; `ResetPassword` esperava 0,7s e mostrava "SENHA REDEFINIDA"
+**sem alterar nada**. Nunca existiu `resetPasswordForEmail`/`PASSWORD_RECOVERY` no código (`updateUser` só em `changePassword`, que exige a senha
+atual). Quem esquecia a senha ficava trancado fora achando que o e-mail caíra no spam. **Regra: nenhuma tela de autenticação pode dizer "enviado"
+ou "alterada" sem a chamada real ter dado certo.** Ao implementar, a falha de verdade (limite, conexão, servidor) NÃO é engolida.
+
+**O que foi implementado (`src/integrations/backend/auth.ts`):**
+- `sendPasswordResetEmail(email)`: `resetPasswordForEmail` com `redirectTo: <origem>/auth/reset-password`. Sucesso é sempre neutro (não revela se o
+  e-mail existe); erros: limite ("Aguarde um momento…"), conexão, e-mail inválido, e um genérico. Cartão "LINK ENVIADO": e-mail em negrito, "olhe a
+  caixa de spam", "Reenviar e-mail" com espera de 60s, "Usar outro e-mail", um só "Voltar para o login", foco no título (`role="status"`).
+- `redefinirSenhaPeloLink(senha)`: `updateUser({ password })` **sem pedir a senha atual** (a pessoa não a tem) e depois `signOut()`.
+  **Decisão do Lucas: depois de redefinir, volta ao LOGIN com o aviso "Senha alterada. Entre com a nova senha."** (não entra direto no app).
+- **`estadoDoLinkDeRecuperacao()` lê o `#…type=recovery` (ou `#error=…`) UMA vez, quando o módulo é avaliado**, porque o Supabase (fluxo implícito)
+  troca o hash por sessão e o LIMPA logo depois. **Decisão de segurança:** uma sessão comum NÃO basta para redefinir sem a senha atual — quem está
+  logado usa "Alterar senha". Sem link de recuperação válido (ou link expirado/já usado, ou página aberta digitando o endereço) a tela mostra
+  **"LINK EXPIRADO"** com "Pedir novo link". **Limite conhecido:** recarregar a página depois de abrir o link perde o hash e mostra "LINK EXPIRADO".
+- Nova senha: "Mostrar senha", regras com ✓ via **`PasswordRule`** (componente único, agora também usado por `ContaForm`/Criar conta/Convite), botão
+  desativado que explica o motivo, "Voltar para o login", esqueleto anunciado ("Verificando o link…"), foco no aviso do link expirado.
+  Campo de e-mail: `autoComplete`/`inputMode="email"`/`autoCapitalize="none"`/`spellCheck={false}`, foco no campo com erro, erro em `--red-text`.
+  As duas telas aceitam props só para a galeria (`amostra`, `amostraEnviado`), sem efeito no app.
+
+**CONFIGURAÇÃO NO PAINEL DO SUPABASE — depende do Lucas, não do código (registrar aqui para não se perder):**
+1. **Authentication → URL Configuration → Redirect URLs:** `<endereço do app>/auth/reset-password` para produção, para o alias de preview
+   (`https://bahia-boxe-git-dev-designlferreiras-projects.vercel.app/auth/reset-password`) e para `http://localhost:5173/auth/reset-password`. Sem isso o
+   Supabase ignora o `redirectTo` e manda a pessoa para a **Site URL**. Conferir também a **Site URL**. (O Lucas testou o caminho completo no preview, então as URLs do preview
+   funcionam; o endereço de **produção** ainda precisa ser confirmado quando o app for a produção.)
+2. **Authentication → Emails → modelo "Reset Password": ainda em inglês (texto padrão do Supabase) — traduzir** e manter a variável `{{ .ConfirmationURL }}`,
+   com assunto em português. **PENDENTE.** O texto do cartão diz só "pouco tempo" para a validade do link; **o tempo real (padrão 1h) é uma configuração do painel
+   que não foi conferida.**
+3. **Cota de e-mails:** o SMTP padrão do Supabase tem limite baixo por hora; o "Reenviar" e testes seguidos podem bater nele ("Aguarde um momento…").
+   Um SMTP próprio evita e-mails perdidos.
+4. Quem nunca confirmou o e-mail e pede recuperação recebe o mesmo e-mail e, ao redefinir, passa a ter a conta usável ("Confirm email" está ativo, ver "Entrada").
+
+**Deixado para depois (registrado, não pedido):** WhatsApp do professor nestas telas (a RPC `whatsapp_do_professor` exige login, então não serve aqui: precisaria de um
+contato público); "Esqueci a senha" como bloco do próprio Login; entrar direto depois de redefinir (foi oferecido e recusado); a mensagem do link expirado
+distinguir "expirado" de "já usado"; amostras de "erro de rede" e "reenviar aguardando" com o servidor.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
