@@ -9,6 +9,7 @@
  * `import.meta.env.DEV`, que o Vite troca por `false` no build e elimina o import junto.
  */
 import { useState, type ReactNode } from "react";
+import { FaixaSemInternet } from "@/components/FaixaSemInternet";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { addDays, subDays } from "date-fns";
@@ -1641,6 +1642,9 @@ export default function Amostras() {
             <ErrorBoundary>
               <BombaDeAmostra />
             </ErrorBoundary>
+          </Frame>
+          <Frame title="Sem internet" note="faixa que aparece no topo quando o aparelho fica offline">
+            <div className="relative h-24"><FaixaSemInternet amostra /></div>
           </Frame>
           <Frame title="Abertura do app" note="enquanto a sessão carrega (no lugar do formulário de login que piscava)">
             <TelaDeAbertura />

@@ -14,6 +14,7 @@ import ResetPassword from "@/pages/auth/ResetPassword";
 import Convite from "@/pages/auth/Convite";
 import NotFound from "@/pages/NotFound";
 import { TelaDeAbertura } from "@/components/TelaDeAbertura";
+import { FaixaSemInternet } from "@/components/FaixaSemInternet";
 
 import StudentHome from "@/pages/student/Home";
 import StudentAgendar from "@/pages/student/Agendar";
@@ -47,7 +48,9 @@ import AdminMinhaConta from "@/pages/admin/MinhaConta";
 import AlterarSenha from "@/pages/shared/AlterarSenha";
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, staleTime: 10_000 } },
+  // Consultas ficam no padrão ("online"): sem rede pausam e retomam ao reconectar. Gravações NÃO podem pausar em silêncio
+  // (o botão ficaria em "Salvando…" para sempre): com "always" elas falham na hora e caem no aviso de erro da tela.
+  defaultOptions: { queries: { retry: 1, staleTime: 10_000 }, mutations: { networkMode: "always" } },
 });
 
 function PostLoginRedirect() {
@@ -118,6 +121,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <FaixaSemInternet />
         <BrowserRouter>
           <AppRoutes />
         </BrowserRouter>
