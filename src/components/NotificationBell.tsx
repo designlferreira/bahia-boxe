@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { Sheet, SheetClose, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
+import { ErrorState } from "@/components/ErrorState";
+import { SkeletonList } from "@/components/SkeletonCard";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { cn } from "@/lib/utils";
 import { relativeTime } from "@/lib/dateUtils";
@@ -36,12 +38,17 @@ export function NotificationBell({ userId }: NotificationBellProps) {
   const { profile } = useAuth();
   const key = ["notifications", userId];
 
-  const { data: notifs = [] } = useQuery({ queryKey: key, queryFn: () => getNotifications(userId) });
+  // `isLoading`/`isError` separados do vazio: antes uma consulta que falhava (ou ainda carregava) mostrava "Nenhuma notificação", e
+  // quem tinha um pedido parado concluía que não havia nada.
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: key, queryFn: () => getNotifications(userId) });
+  const notifs = data ?? [];
   const unread = notifs.filter((n) => !n.read).length;
 
+  // Abrir uma notificação SEMPRE navega: marcar como lida é secundário (antes só navegava se a marcação desse certo, e o toque
+  // não fazia nada quando ela falhava).
   const openNotif = useMutation({
     mutationFn: (n: AppNotification) => markNotificationRead(n.id),
-    onSuccess: (_r, n) => {
+    onSettled: (_r, _e, n) => {
       queryClient.invalidateQueries({ queryKey: key });
       setOpen(false);
       const href = profile ? notificationHref(n, profile.role) : null;
@@ -55,6 +62,7 @@ export function NotificationBell({ userId }: NotificationBellProps) {
       queryClient.invalidateQueries({ queryKey: key });
       toast.success("Todas as notificações marcadas como lidas");
     },
+    onError: () => toast.error("Não foi possível marcar como lidas. Tente de novo."),
   });
 
   const clearAll = useMutation({
@@ -66,12 +74,17 @@ export function NotificationBell({ userId }: NotificationBellProps) {
         action: {
           label: "Desfazer",
           onClick: async () => {
-            await restoreNotifications(removed);
-            queryClient.invalidateQueries({ queryKey: key });
+            try {
+              await restoreNotifications(removed);
+              queryClient.invalidateQueries({ queryKey: key });
+            } catch {
+              toast.error("Não foi possível desfazer. Tente de novo.");
+            }
           },
         },
       });
     },
+    onError: () => toast.error("Não foi possível limpar. Tente de novo."),
   });
 
   return (
@@ -98,7 +111,7 @@ export function NotificationBell({ userId }: NotificationBellProps) {
               <div className="text-xs text-muted-foreground mt-0.5">{unread} não lida(s)</div>
             </div>
             {notifs.length > 0 && (
-              <Button variant="secondary" size="sm" onClick={() => markAll.mutate()}>
+              <Button variant="secondary" size="sm" disabled={markAll.isPending} onClick={() => markAll.mutate()}>
                 Marcar todas
               </Button>
             )}
@@ -114,7 +127,15 @@ export function NotificationBell({ userId }: NotificationBellProps) {
           </div>
 
           <div className="flex-1 overflow-y-auto flex flex-col gap-2.5">
-            {notifs.length === 0 && (
+            {isLoading && <SkeletonList count={3} height={72} />}
+            {isError && (
+              <ErrorState
+                title="Não conseguimos carregar suas notificações"
+                description="Verifique sua conexão e tente novamente."
+                onRetry={() => refetch()}
+              />
+            )}
+            {!isLoading && !isError && notifs.length === 0 && (
               <EmptyState
                 icon={Bell}
                 title="Nenhuma notificação"
@@ -163,7 +184,7 @@ export function NotificationBell({ userId }: NotificationBellProps) {
           </div>
 
           {notifs.length > 0 && (
-            <Button variant="secondary" className="mt-3 h-11 shrink-0" onClick={() => setConfirmClear(true)}>
+            <Button variant="secondary" className="mt-3 h-11 shrink-0" disabled={clearAll.isPending} onClick={() => setConfirmClear(true)}>
               Limpar central
             </Button>
           )}
