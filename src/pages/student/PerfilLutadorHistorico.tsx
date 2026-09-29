@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/SkeletonCard";
+import { Button } from "@/components/ui/button";
 import { formatDateShort } from "@/lib/dateUtils";
 import { DIMENSIONS, DIMENSION_LABELS, FIGHTER_PROFILE_LABELS } from "@/lib/boxingProfile";
 import { getBoxingProfileHistory, studentIdForProfile } from "@/integrations/backend/api";
@@ -45,6 +46,11 @@ export default function StudentPerfilLutadorHistorico() {
   const chronological = fullHistory ? [...fullHistory].reverse() : [];
   const oldest = chronological[0];
   const newest = chronological[chronological.length - 1];
+  const temEvolucao = chronological.length >= 2;
+
+  function novaAvaliacao() {
+    navigate("/app/perfil-lutador/questionario");
+  }
 
   return (
     <div className="page-container">
@@ -58,12 +64,31 @@ export default function StudentPerfilLutadorHistorico() {
           icon={History}
           title="Nenhuma avaliação ainda"
           description="Faça sua primeira autoavaliação de Perfil de Boxe para começar a acompanhar sua evolução."
+          ctaLabel="Fazer minha primeira avaliação"
+          onCta={novaAvaliacao}
         />
       )}
 
       {!isLoading && !isError && history && history.length > 0 && (
         <>
-          {chronological.length >= 2 && oldest && newest && (
+          {/* Sem 2 avaliações completas o gráfico não existe: antes ele sumia em silêncio e o aluno achava que a tela quebrou. */}
+          {!temEvolucao && (
+            <div className="card-dark p-4 mb-5">
+              <h2 className="text-[15px] font-semibold text-foreground mb-1.5">Sua evolução ainda não aparece aqui</h2>
+              <p className="text-[13.5px] text-muted-foreground leading-relaxed mb-4">
+                {chronological.length === 1 && newest
+                  ? `Você tem 1 avaliação completa (${formatDateShort(newest.completedAt)}). Faça mais uma avaliação completa para comparar suas competências.`
+                  : "Para ver sua evolução por competência, faça pelo menos 2 avaliações completas."}
+                {history.some((a) => a.assessmentLength === "short") &&
+                  " As rápidas medem menos e não entram nessa comparação."}
+              </p>
+              <Button size="lg" className="w-full" onClick={novaAvaliacao}>
+                Fazer nova avaliação
+              </Button>
+            </div>
+          )}
+
+          {temEvolucao && oldest && newest && (
             <>
               <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2.5">
                 Evolução por dimensão
@@ -130,6 +155,18 @@ export default function StudentPerfilLutadorHistorico() {
               </button>
             ))}
           </div>
+
+          {/* Uma só ação principal por tela: com o cartão de "evolução ainda não aparece", o botão mora nele. */}
+          {temEvolucao && (
+            <div className="mt-6">
+              <Button size="lg" className="w-full" onClick={novaAvaliacao}>
+                Nova autoavaliação
+              </Button>
+              <p className="text-center text-[13px] text-muted-foreground mt-2.5">
+                Refaça de tempos em tempos para acompanhar sua evolução.
+              </p>
+            </div>
+          )}
         </>
       )}
     </div>
