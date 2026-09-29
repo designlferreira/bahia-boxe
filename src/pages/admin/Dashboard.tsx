@@ -7,7 +7,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { formatDate, formatDateShort, formatDateTime, formatRelativeDay, formatTime } from "@/lib/dateUtils";
+import { formatDate, formatDateShort, formatRelativeDay, formatTime } from "@/lib/dateUtils";
 import { getAdminDashboard, type PrimeirosPassos } from "@/integrations/backend/api";
 import { getStatusConfig } from "@/lib/bookingStatus";
 import { cn } from "@/lib/utils";
@@ -130,7 +130,7 @@ export default function AdminDashboard() {
                     key={student.id}
                     type="button"
                     onClick={() => navigate(`/admin/alunos/${student.id}`)}
-                    className="w-full text-left card-dark p-3.5 flex items-center gap-3 active:scale-[0.985] transition-transform"
+                    className="w-full text-left card-dark p-3.5 flex items-center gap-3 active:scale-[0.985] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <div
                       aria-hidden
@@ -149,7 +149,7 @@ export default function AdminDashboard() {
                   <button
                     type="button"
                     onClick={() => navigate("/admin/alunos?filtro=risco")}
-                    className="min-h-11 text-sm font-semibold text-foreground underline underline-offset-4 self-start"
+                    className="min-h-11 text-sm font-semibold text-foreground underline underline-offset-4 self-start rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     Ver todos ({data.atRisk.length})
                   </button>
@@ -204,7 +204,7 @@ function ResolverAgora({
 
   return (
     <section aria-labelledby="resolver" className="rounded-[20px] bg-card border border-amber/40 px-4 pt-3.5 pb-1 animate-bb-up">
-      <h2 id="resolver" className="text-[13px] font-semibold text-amber mb-1">
+      <h2 id="resolver" className="section-title !text-amber mb-1">
         Resolver agora
       </h2>
 
@@ -220,16 +220,17 @@ function ResolverAgora({
                   // Pedido de remarcação: de onde pra onde — sem isso o professor precisava lembrar qual
                   // aula estava sendo movida.
                   <>
-                    <span className="line-through">{formatDateTime(b.antecessorInicio)}</span>
+                    <span className="sr-only">de </span>
+                    <span className="line-through">{quando(b.antecessorInicio)}</span>
                     <span aria-hidden> → </span>
-                    <span className="sr-only">para</span>
-                    <span className="text-foreground">{formatDateTime(b.startTime)}</span>
+                    <span className="sr-only">para </span>
+                    <span className="text-foreground">{quando(b.startTime)}</span>
                   </>
                 ) : (
-                  `${formatDateTime(b.startTime)} – ${formatTime(b.endTime)}`
+                  `${quando(b.startTime)} – ${formatTime(b.endTime)}`
                 )
               }
-              quando={formatDateTime(b.startTime)}
+              quando={quando(b.startTime)}
               busy={pendentes.isBusy(b.id)}
               primario={{ label: "Aprovar", onClick: () => pendentes.requestApprove(b) }}
               secundario={{ label: "Recusar", onClick: () => pendentes.requestReject(b) }}
@@ -284,7 +285,8 @@ function ResolverAgora({
 
 /**
  * Uma linha que se abre no próprio painel. Recolhida por padrão: aberta, cada item ocupa ~130px e a
- * agenda do dia (o destaque) ia pra baixo da dobra justo no dia mais cheio.
+ * agenda do dia (o destaque) ia pra baixo da dobra justo no dia mais cheio. Lembra, na sessão, se o
+ * professor deixou aberto — ir pra agenda e voltar não fecha o que ele estava resolvendo.
  */
 function Grupo({
   id,
@@ -299,7 +301,24 @@ function Grupo({
   borda?: boolean;
   children: ReactNode;
 }) {
-  const [aberto, setAberto] = useState(false);
+  const chave = `painel.grupo.${id}`;
+  const [aberto, setAbertoState] = useState(() => {
+    try {
+      return sessionStorage.getItem(chave) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const setAberto = (f: (v: boolean) => boolean) =>
+    setAbertoState((v) => {
+      const novo = f(v);
+      try {
+        sessionStorage.setItem(chave, novo ? "1" : "0");
+      } catch {
+        /* sem armazenamento: só não lembra */
+      }
+      return novo;
+    });
   return (
     <div className={cn(borda && "border-t border-border")}>
       <button
@@ -481,7 +500,7 @@ function Hoje({ today, nextAfterToday, agora }: { today: AulaComNome[]; nextAfte
         <button
           type="button"
           onClick={() => navigate("/admin/agenda")}
-          className="min-h-11 px-2 -mr-2 flex items-center gap-1 text-sm text-muted-foreground"
+          className="min-h-11 px-2 -mr-2 flex items-center gap-1 text-sm text-muted-foreground rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           Agenda completa
           <ChevronRight className="h-4 w-4" aria-hidden />
