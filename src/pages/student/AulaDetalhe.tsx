@@ -190,6 +190,10 @@ export default function StudentAulaDetalhe() {
     new Date(booking.startTime).getTime() > Date.now() &&
     !tarde6h;
   const aindaNaoComecou = new Date(booking.startTime).getTime() > Date.now();
+  const passou =
+    booking.status === "completed" ||
+    booking.status === "no_show" ||
+    new Date(booking.endTime).getTime() < Date.now();
   const arrival = guidelines ? arrivalMessage(guidelines.arrivalMinutes) : null;
   const equipment = guidelines ? equipmentItems(guidelines.equipment) : [];
   const address = guidelines && hasAddress(guidelines) ? formatAddress(guidelines) : null;
@@ -201,6 +205,7 @@ export default function StudentAulaDetalhe() {
       <div className="card-dark p-5 mb-3.5">
         <div className="flex items-center gap-2 mb-3">
           <StatusBadge status={booking.status} audience="student" />
+          {(isPedido || pedidoPendente) && <Badge className="bg-amber/20 text-amber">Pedido em análise</Badge>}
           {booking.isReplacement && (
             <Badge className="bg-secondary text-muted-foreground flex items-center gap-1">
               <Repeat className="h-3 w-3" /> Reposição
@@ -223,6 +228,64 @@ export default function StudentAulaDetalhe() {
         </div>
       </div>
 
+      {/* A página segue o momento da aula (decisão do Lucas, 2026-09-29):
+          - pedido de outro horário pendente: a novidade sobe pra logo abaixo da data;
+          - depois da aula: o recado do professor vem primeiro e a logística (chegada, equipamento,
+            endereço), que só serve ANTES da aula, sai. */}
+      {!passou && (
+        <>
+      {isPedido && (
+        <div className="rounded-2xl p-4 bg-amber/10 border border-amber/30 mb-3.5">
+          <div className="text-[15px] font-semibold text-amber">Pedido de remarcação</div>
+          <div className="text-sm text-muted-foreground mt-1">
+            Seu professor ainda vai aprovar este horário. Até lá, a aula continua no horário original.
+          </div>
+          <Button
+            variant="secondary"
+            className="w-full mt-3"
+            onClick={() => cancelarPedido.mutate(booking.id)}
+            disabled={cancelarPedido.isPending}
+          >
+            Cancelar pedido
+          </Button>
+        </div>
+      )}
+
+      {pedidoPendente && (
+        <div className="rounded-2xl p-4 bg-amber/10 border border-amber/30 mb-3.5">
+          <div className="text-[15px] font-semibold text-amber">Você pediu outro horário</div>
+          <div className="text-base font-semibold text-foreground mt-1 first-letter:uppercase">
+            {formatDate(pedidoPendente.startTime)} · {formatTime(pedidoPendente.startTime)}
+          </div>
+          <div className="text-sm text-muted-foreground mt-0.5">Aguardando o professor</div>
+          <Button
+            variant="secondary"
+            className="w-full mt-3"
+            onClick={() => cancelarPedido.mutate(pedidoPendente.id)}
+            disabled={cancelarPedido.isPending}
+          >
+            Cancelar pedido
+          </Button>
+        </div>
+      )}
+
+        </>
+      )}
+      {passou && (
+        <>
+      {booking.teacherNote && booking.status !== "rejected" && (
+        <div className="rounded-2xl p-4 bg-amber/[0.08] border border-amber/25 mb-3.5">
+          <div className="text-[11.5px] uppercase tracking-wide text-amber/80 font-semibold mb-1.5">
+            Observação do professor
+          </div>
+          <div className="text-[13.5px] text-foreground/85 leading-relaxed">{booking.teacherNote}</div>
+        </div>
+      )}
+
+        </>
+      )}
+      {!passou && (
+        <>
       {address && (
         <div className="card-dark p-4 mb-3.5">
           <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">
@@ -280,41 +343,8 @@ export default function StudentAulaDetalhe() {
         </div>
       )}
 
-      {isPedido && (
-        <div className="rounded-2xl p-4 bg-amber/10 border border-amber/30 mb-3.5">
-          <div className="text-[15px] font-semibold text-amber">Pedido de remarcação</div>
-          <div className="text-sm text-muted-foreground mt-1">
-            Seu professor ainda vai aprovar este horário. Até lá, a aula continua no horário original.
-          </div>
-          <Button
-            variant="secondary"
-            className="w-full mt-3"
-            onClick={() => cancelarPedido.mutate(booking.id)}
-            disabled={cancelarPedido.isPending}
-          >
-            Cancelar pedido
-          </Button>
-        </div>
+        </>
       )}
-
-      {pedidoPendente && (
-        <div className="rounded-2xl p-4 bg-amber/10 border border-amber/30 mb-3.5">
-          <div className="text-[15px] font-semibold text-amber">Você pediu outro horário</div>
-          <div className="text-base font-semibold text-foreground mt-1 first-letter:uppercase">
-            {formatDate(pedidoPendente.startTime)} · {formatTime(pedidoPendente.startTime)}
-          </div>
-          <div className="text-sm text-muted-foreground mt-0.5">Aguardando o professor</div>
-          <Button
-            variant="secondary"
-            className="w-full mt-3"
-            onClick={() => cancelarPedido.mutate(pedidoPendente.id)}
-            disabled={cancelarPedido.isPending}
-          >
-            Cancelar pedido
-          </Button>
-        </div>
-      )}
-
       {booking.status === "scheduled" && isRecorrencia && !pedidoPendente && !tarde6h && (
         faltaMaisDe24h ? (
           <Button variant="secondary" size="lg" className="w-full mb-3" onClick={() => setPickerOpen(true)}>
