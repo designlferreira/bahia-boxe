@@ -2418,6 +2418,48 @@ tem observador) para simular "item resolvido" pelo console.
 RPC nova); "há N dias" ao lado de aula sem registro; "Convidar o primeiro aluno" abrir o convite
 direto em vez da lista.
 
+### Agenda do professor: duas rodadas de crítica (2026-09-28) — sem migration nova
+
+`src/pages/admin/Agenda.tsx`: críticas **22 → 27 de 40**, depois mais 5 correções (relatórios em
+`.impeccable/critique/*admin-agenda*`). Mesma disciplina do painel: um passo por commit, testado
+pelo Lucas. As regras de cor, `StatusBadge`, "Aconteceu"/"Faltou" e `getRegraDeConsumo` da seção
+anterior valem aqui igualmente.
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Semana de segunda a domingo** (`startOfWeek`, `weekStartsOn: 1`), não "os próximos 7 dias". Botão
+  **"Hoje"** quando fora de hoje; trocar de semana mantém o dia da semana. Setas e período numa linha
+  própria, pros 7 dias caberem na largura (44px cada) sem rolagem.
+- **Botões no cartão só quando a aula pede ação:** pedido pendente (Aprovar/Recusar) e aula passada
+  sem registro (Aconteceu/Faltou). Aula futura ou já registrada só mostra (nome, horário, selo, ›);
+  Remarcar, Cancelar e "Marcar como reposição" ficam no **detalhe da aula** (`AulaDetalhe.tsx`).
+- **Pendência fora da semana na tela vira uma linha com atalho** acima dos dias ("1 aula sem registro
+  na semana passada ›" / "… depois desta semana ›") — resolve o ponto cego da segunda-feira.
+
+**Estrutura e armadilhas:**
+- O cartão **não é um botão** — só o cabeçalho (nome/horário/selo) abre o detalhe. Antes o cartão
+  inteiro era `<button>` com as ações dentro (HTML inválido). Não voltar a envolver ações num botão.
+- Coluna do cartão e bloco de texto precisam de `min-w-0`: sem isso uma etiqueta de vínculo ou a linha
+  "de → para" empurrava o cartão pra fora da tela (regressão real, corrigida no mesmo dia).
+- `getAdminAgendaForDay` mostra **uma aula por hora** e agora **exclui recusadas**
+  (`rejected`/`rejected_with_suggestion`, além de `cancelled`/`rescheduled`): uma recusada podia
+  esconder a aula real do mesmo horário. Havendo mais de uma na hora, a ativa ganha.
+- Bolinhas marcam aula sem registro **e** pedido pendente (`getPedidosPendentes`, chave
+  `agenda-pedidos-pendentes` — invalidada também pelo painel).
+- Estados de tempo: `StatusBadge` ganhou **"Agora"** (aula em andamento); pedido cujo horário já
+  começou mostra "O horário deste pedido já passou."; horários livres que já começaram (hoje) ou de
+  dias passados não aparecem.
+- Dia vazio: aviso próprio; "Publicar horários" só no autosserviço e em dia que não passou.
+- `formatQuando` (`dateUtils.ts`) é a data de começo de linha ("Amanhã, 07:00" / "Terça-feira,
+  06 out · 07:00"), usada pelo painel e pela agenda. Variant `destructive` do botão usa `--red-text`
+  (o vermelho puro dava 4,0:1).
+
+**Página de amostras:** a agenda está lá com ±3 semanas de dados (hoje com todos os estados, amanhã
+com pedidos, depois de amanhã sem horários). Os horários de hoje são relativos à hora atual — tarde da
+noite, as aulas "futuras" aparecem como passadas.
+
+**Deixado para depois (sugerido pela crítica, não pedido):** "Todas aconteceram" também na agenda;
+"ir para data"; tocar num horário livre pra marcar aula ali.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
