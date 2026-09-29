@@ -32,7 +32,7 @@ export function RemarcacaoSheet({ open, onOpenChange, bookingId, onDone, onError
   const [hora, setHora] = useState<string | null>(null);
   const diaKey = formatInTimeZone(dia, TIMEZONE, "yyyy-MM-dd");
 
-  const { data: horas, isLoading, isError } = useQuery({
+  const { data: horas, isLoading, isError, refetch } = useQuery({
     queryKey: ["horarios-livres-remarcacao", bookingId, diaKey],
     queryFn: () => getHorariosLivresRemarcacao(bookingId, diaKey),
     enabled: open,
@@ -86,7 +86,14 @@ export function RemarcacaoSheet({ open, onOpenChange, bookingId, onDone, onError
 
         <div className="text-sm font-semibold text-foreground mt-4 mb-2">Horário livre</div>
         {isLoading && <SkeletonCard height={96} />}
-        {isError && <div className="text-sm text-muted-foreground">Não foi possível carregar os horários. Tente outro dia.</div>}
+        {isError && (
+          <div className="text-sm text-muted-foreground">
+            Não foi possível carregar os horários.{" "}
+            <button type="button" onClick={() => refetch()} className="min-h-11 font-semibold text-foreground underline underline-offset-4">
+              Tentar de novo
+            </button>
+          </div>
+        )}
         {!isLoading && !isError && horas && horas.length === 0 && (
           <div className="text-sm text-muted-foreground rounded-xl border border-dashed border-border p-4 text-center">
             Nenhum horário livre neste dia. Tente outro.

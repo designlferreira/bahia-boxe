@@ -78,12 +78,12 @@ export default function AdminAulaDetalhe() {
           <StatusBadge status={booking.status} semRegistro={awaiting} />
           {vinculo && (
             <Badge className="bg-secondary text-muted-foreground flex items-center gap-1">
-              <Repeat className="h-3 w-3" /> {VINCULO_LABEL[vinculo]}
+              <Repeat className="h-3 w-3" aria-hidden /> {VINCULO_LABEL[vinculo]}
             </Badge>
           )}
           {remarcacoes > 0 && (
             <Badge className="bg-secondary text-muted-foreground flex items-center gap-1">
-              <History className="h-3 w-3" /> Remarcada {remarcacoes}x
+              <History className="h-3 w-3" aria-hidden /> Remarcada {remarcacoes}x
             </Badge>
           )}
         </div>
@@ -103,11 +103,11 @@ export default function AdminAulaDetalhe() {
         <button
           type="button"
           onClick={() => navigate(`/admin/alunos/${booking.studentId}`)}
-          className="flex items-center gap-2.5 -m-1 p-1 rounded-xl active:scale-[0.98] transition-transform"
+          className="flex items-center gap-2.5 -m-1 p-1 rounded-xl active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Avatar initials={initials} size="sm" />
           <div className="text-left">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Aluno</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Aluno</div>
             <div className="text-[14.5px] font-semibold text-foreground">{studentName}</div>
           </div>
         </button>
@@ -115,7 +115,7 @@ export default function AdminAulaDetalhe() {
 
       {booking.teacherNote && (
         <div className="rounded-2xl p-4 bg-amber/[0.08] border border-amber/25 mb-3.5">
-          <div className="text-[11.5px] uppercase tracking-wide text-amber/80 font-semibold mb-1.5">Sua observação</div>
+          <h2 className="text-xs uppercase tracking-wide text-amber/80 font-semibold mb-1.5">Sua observação</h2>
           <div className="text-[13.5px] text-foreground/85 leading-relaxed">{booking.teacherNote}</div>
         </div>
       )}
@@ -245,8 +245,8 @@ export default function AdminAulaDetalhe() {
         title="DESFAZER?"
         description={
           booking.status === "completed"
-            ? "A aula volta a ficar aguardando confirmação, desfazendo a conclusão registrada. O saldo do aluno se ajusta de acordo."
-            : "A aula volta a ficar aguardando confirmação, desfazendo a falta registrada. O saldo do aluno se ajusta de acordo."
+            ? "A aula volta a ficar sem registro, desfazendo a conclusão registrada. O saldo do aluno se ajusta de acordo."
+            : "A aula volta a ficar sem registro, desfazendo a falta registrada. O saldo do aluno se ajusta de acordo."
         }
         confirmLabel="Desfazer"
         cancelLabel="Cancelar"
