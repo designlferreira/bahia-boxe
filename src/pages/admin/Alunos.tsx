@@ -80,16 +80,16 @@ export default function AdminAlunos() {
               onClick={() => navigate(`/admin/alunos/${student.id}`)}
               className="w-full text-left card-dark p-3.5 flex items-center gap-3 active:scale-[0.985] transition-transform hover:border-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <div aria-hidden className="h-[42px] w-[42px] rounded-full bg-secondary flex items-center justify-center text-sm font-semibold text-foreground/80 shrink-0">
-                {student.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
-              </div>
               <div className="flex-1 min-w-0">
-                <div className="text-[15px] font-semibold text-foreground truncate">{student.name}</div>
+                {/* Sem avatar de iniciais (repetia o nome e tomava ~54px): com a coluna mais larga o nome cabe inteiro
+                    ou quebra em 2 linhas, em vez de "Ana Beatriz Sou…" — dois alunos com o mesmo primeiro nome ficavam iguais. */}
+                <div className="text-[15px] font-semibold text-foreground leading-snug line-clamp-2 break-words">{student.name}</div>
                 {soRisco && emRisco ? (
                   <div className={`text-[12.5px] ${emRisco.grave ? "text-[hsl(var(--red-text))]" : "text-amber"}`}>{emRisco.motivo}</div>
                 ) : (
-                  <div className="text-[12.5px] text-muted-foreground truncate">
-                    {pkg ? `${pkg.templateName} · ${pkg.usedClasses}/${pkg.totalClasses} usadas` : "Sem pacote ativo"}
+                  // O número de aulas restantes já está à direita; repetir "5/8 usadas" só cortava o texto. O detalhe do aluno tem o resto.
+                  <div className="text-[12.5px] text-muted-foreground line-clamp-2 break-words">
+                    {pkg ? pkg.templateName : "Sem pacote ativo"}
                   </div>
                 )}
               </div>
