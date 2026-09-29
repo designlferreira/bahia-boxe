@@ -1,4 +1,5 @@
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Calendar, Check, ChevronRight, Hourglass, MessageCircle } from "lucide-react";
@@ -27,7 +28,15 @@ import { mensagemDeErro } from "@/lib/erros";
 export default function StudentHome() {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
+  // Veio de AGENDAR (`state.agendadaEm` = instante da aula): se ela for a próxima, o cartão acende uma vez. Guardado no primeiro render e o
+  // estado da navegação é limpo, para não repetir ao recarregar nem cortar a animação no meio.
+  const [agendadaEm] = useState<number | null>(() => (location.state as { agendadaEm?: number | null } | null)?.agendadaEm ?? null);
+  useEffect(() => {
+    if (agendadaEm !== null) navigate(location.pathname, { replace: true, state: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["student-home", profile?.id],
@@ -284,7 +293,10 @@ export default function StudentHome() {
               type="button"
               onClick={() => navigate(`/app/aula/${data.nextBooking!.id}`)}
               aria-label={`${["Hoje", "Amanhã"].includes(formatRelativeDay(data.nextBooking.startTime)) ? formatRelativeDay(data.nextBooking.startTime) + ", " : ""}${formatDate(data.nextBooking.startTime)}, ${formatTime(data.nextBooking.startTime)}, ${getStatusConfig(data.nextBooking.status, "student").label}. Ver detalhes`}
-              className="w-full text-left card-dark p-4 flex gap-4 items-center mb-6 active:scale-[0.98] active:bg-secondary transition-[transform,background-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className={cn(
+                "w-full text-left card-dark p-4 flex gap-4 items-center mb-6 active:scale-[0.98] active:bg-secondary transition-[transform,background-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                agendadaEm !== null && new Date(data.nextBooking.startTime).getTime() === agendadaEm && "animate-bb-acende",
+              )}
             >
               <div aria-hidden className="w-[54px] text-center border-r border-border pr-3">
                 <div className="font-display text-3xl leading-none text-foreground">

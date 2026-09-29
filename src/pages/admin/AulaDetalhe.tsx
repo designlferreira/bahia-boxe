@@ -16,6 +16,7 @@ import { usePendingActions } from "@/hooks/usePendingActions";
 import { useAuth } from "@/context/AuthContext";
 import { getAdminBookingDetail, VINCULO_LABEL } from "@/integrations/backend/api";
 import { StatusBadge } from "@/components/StatusBadge";
+import { EstaloAoMudar } from "@/components/EstaloAoMudar";
 
 export default function AdminAulaDetalhe() {
   const { id } = useParams<{ id: string }>();
@@ -75,7 +76,9 @@ export default function AdminAulaDetalhe() {
 
       <div className="card-dark p-5 mb-3.5">
         <div className="flex items-center gap-2 mb-3">
-          <StatusBadge status={booking.status} semRegistro={awaiting} />
+          <EstaloAoMudar valor={`${booking.status}-${awaiting}`}>
+            <StatusBadge status={booking.status} semRegistro={awaiting} />
+          </EstaloAoMudar>
           {vinculo && (
             <Badge className="bg-secondary text-muted-foreground flex items-center gap-1">
               <Repeat className="h-3 w-3" aria-hidden /> {VINCULO_LABEL[vinculo]}

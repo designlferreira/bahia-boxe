@@ -172,12 +172,29 @@
   .animate-bb-bar {
     animation: none !important;
   }
+  /* O selo que "estala" (escala) vira o mesmo esmaecimento curto; a saída de item perde o fechar do espaço e fica só no esmaecer.
+     O "acende" da aula agendada é só sombra (nada se desloca): continua, é o que liga a ação ao resultado. */
+  .animate-bb-pop {
+    animation: bb-fade 0.2s ease-out both !important;
+  }
+  .animate-bb-sai {
+    animation: bb-sai-suave 0.15s ease-out forwards !important;
+  }
   .active\:scale-95:active,
   .active\:scale-\[0\.98\]:active {
     transform: none !important;
   }
   html {
     scroll-behavior: auto !important;
+  }
+}
+
+@keyframes bb-sai-suave {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }
 
