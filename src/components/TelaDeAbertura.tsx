@@ -6,9 +6,14 @@
 export function TelaDeAbertura() {
   return (
     <main className="min-h-dvh flex flex-col items-center justify-center bg-background px-6" aria-busy="true">
-      <div aria-hidden className="font-display text-4xl tracking-wide text-foreground animate-bb-pulse">
-        BAHIA BOXE
-      </div>
+      <img
+        src="/logo-bahia-boxe.png"
+        alt=""
+        aria-hidden
+        width={600}
+        height={400}
+        className="w-full max-w-[240px] h-auto animate-bb-pulse"
+      />
       <p role="status" className="sr-only">
         Abrindo o Bahia Boxe…
       </p>
