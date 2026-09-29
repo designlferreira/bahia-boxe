@@ -45,6 +45,7 @@ import AdminAlunoPerfilBoxeQuestionario from "@/pages/admin/AlunoPerfilBoxeQuest
 import StudentPerfilLutadorResultado from "@/pages/student/PerfilLutadorResultado";
 import StudentPerfilLutadorHistorico from "@/pages/student/PerfilLutadorHistorico";
 import AlterarSenha from "@/pages/shared/AlterarSenha";
+import { NotificationBell } from "@/components/NotificationBell";
 import { BoxingProfileHeading, BoxingProfileQuestionnaire } from "@/components/BoxingProfileQuestionnaire";
 import { getQuestions, QUESTIONNAIRE_VERSION } from "@/lib/boxingProfile";
 import AdminHistorico from "@/pages/admin/Historico";
@@ -1003,7 +1004,8 @@ function SeededAdmin({ data, children, seed }: { data: unknown; children: ReactN
       qc.setQueryData(["admin-settings", ADMIN_ID], { adminId: ADMIN_ID, noShowConsumesClass: false, modoAgendamento: "autosservico", whatsapp: null });
     }
     qc.setQueryData(["regra-consumo", "a-s3--1-19", false], { falta: true, cancelamentoPeloAluno: true, origem: "pacote" });
-    qc.setQueryData(["notifications", ADMIN_ID], []);
+    // Só o padrão (vazio): uma amostra pode ter semeado avisos ou até um ERRO da consulta (ver "Sino de notificações").
+    if (!qc.getQueryState(["notifications", ADMIN_ID])) qc.setQueryData(["notifications", ADMIN_ID], []);
     return qc;
   });
   return (
@@ -1611,6 +1613,69 @@ export default function Amostras() {
                 </Seeded>
               </Frame>
             ));
+          })()}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Sino de notificações</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {(() => {
+            const aviso = (id: string, userId: string, kind: AppNotification["kind"], title: string, description: string, dias: number, read: boolean, entity: AppNotification["entity"]): AppNotification => ({
+              id,
+              userId,
+              kind,
+              title,
+              description,
+              createdAt: at(dias, 10),
+              read,
+              entity,
+            });
+            const doAluno = [
+              aviso("n1", PROFILE.id, "cancel", "Agendamento recusado", "Toque para ver os detalhes.", 0, false, { type: "booking", id: "b1" }),
+              aviso("n2", PROFILE.id, "confirm", "Aula remarcada", "De Ter, 06 out · 19:00 para Qui, 08 out · 19:00.", -1, false, { type: "booking", id: "b2" }),
+              aviso("n3", PROFILE.id, "system", "Pedido aprovado", "Suas aulas já estão disponíveis para agendar.", -3, true, { type: "home" }),
+              aviso("n4", PROFILE.id, "confirm", "Aula confirmada", "Sua aula é Sexta, 03 de outubro · 19:00.", -6, true, { type: "booking", id: "b3" }),
+            ];
+            const doProfessor = [
+              aviso("p1", ADMIN_ID, "system", "Pedido de pacote", "Um aluno está aguardando sua aprovação.", 0, false, { type: "purchase_requests" }),
+              aviso("p2", ADMIN_ID, "booking", "Agendamento aguardando confirmação", "Um aluno pediu um horário.", -1, false, { type: "booking", id: "b9" }),
+            ];
+            const sino = (userId: string) => (
+              <ComRota path="/app/home" url="/app/home">
+                <div className="flex items-center justify-between p-5">
+                  <span className="font-display text-xl tracking-wide">TOQUE NO SINO</span>
+                  <NotificationBell userId={userId} />
+                </div>
+              </ComRota>
+            );
+            return (
+              <>
+                <Frame title="Sino · aluno com avisos" note="2 novos e 2 lidos; toque no sino para abrir a folha">
+                  <Seeded data={base} modo="autosservico" extra={[[["notifications", PROFILE.id], doAluno]]}>
+                    {sino(PROFILE.id)}
+                  </Seeded>
+                </Frame>
+                <Frame title="Sino · aluno sem avisos" note="folha vazia">
+                  <Seeded data={base} modo="autosservico">
+                    {sino(PROFILE.id)}
+                  </Seeded>
+                </Frame>
+                <Frame title="Sino · professor com avisos" note="pedidos esperando">
+                  <SeededAdmin data={null} seed={(qc) => qc.setQueryData(["notifications", ADMIN_ID], doProfessor)}>
+                    {sino(ADMIN_ID)}
+                  </SeededAdmin>
+                </Frame>
+                <Frame title="Sino · a consulta falhou" note="a folha mostra o erro com 'Tentar novamente', não 'Nenhuma notificação'">
+                  <SeededAdmin
+                    data={null}
+                    seed={(qc) =>
+                      qc.getQueryCache().build(qc, { queryKey: ["notifications", ADMIN_ID] }).setState({ status: "error", error: new Error("amostra"), errorUpdateCount: 1, fetchStatus: "idle" })
+                    }
+                  >
+                    {sino(ADMIN_ID)}
+                  </SeededAdmin>
+                </Frame>
+              </>
+            );
           })()}
         </div>
 
