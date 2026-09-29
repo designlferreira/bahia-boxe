@@ -33,6 +33,7 @@ const FILTROS: Record<Periodo, { value: string; label: string }[]> = {
     { value: "completed", label: "Concluídas" },
     { value: "no_show", label: "Faltas" },
     { value: "cancelled", label: "Canceladas" },
+    { value: "rescheduled", label: "Remarcadas" },
   ],
 };
 
