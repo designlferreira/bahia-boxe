@@ -63,7 +63,12 @@ export default function AdminAlunoDetalhe() {
     enabled: !!studentId,
   });
 
-  const { data: templates } = useQuery({
+  const {
+    data: templates,
+    isLoading: carregandoModelos,
+    isError: erroModelos,
+    refetch: recarregarModelos,
+  } = useQuery({
     queryKey: ["package-templates-admin", profile?.id],
     queryFn: () => getPackageTemplates(profile!.id),
     enabled: assignOpen && !!profile,
@@ -248,29 +253,31 @@ export default function AdminAlunoDetalhe() {
       <button
         type="button"
         onClick={() => navigate(`/admin/alunos/${studentId}/perfil-lutador`)}
-        className="w-full card-dark p-3.5 mb-2.5 flex items-center gap-3 text-left active:scale-[0.99] transition-transform"
+        className="w-full card-dark p-3.5 mb-2.5 flex items-center gap-3 text-left active:scale-[0.99] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <div className="h-9 w-9 shrink-0 rounded-full bg-amber/15 flex items-center justify-center">
-          <Sparkles className="h-4 w-4 text-amber" />
+          <Sparkles className="h-4 w-4 text-amber" aria-hidden />
         </div>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="text-[14px] font-semibold text-foreground">Perfil de Boxe</div>
           <div className="text-[12px] text-muted-foreground">Sua avaliação técnica e a comparação com a autoavaliação do aluno</div>
         </div>
+        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
       </button>
 
       <button
         type="button"
         onClick={() => navigate(`/admin/alunos/${studentId}/recorrencia`)}
-        className="w-full card-dark p-3.5 mb-5 flex items-center gap-3 text-left active:scale-[0.99] transition-transform"
+        className="w-full card-dark p-3.5 mb-5 flex items-center gap-3 text-left active:scale-[0.99] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <div className="h-9 w-9 shrink-0 rounded-full bg-primary/15 flex items-center justify-center">
-          <CalendarClock className="h-4 w-4 text-primary" />
+          <CalendarClock className="h-4 w-4 text-primary" aria-hidden />
         </div>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="text-[14px] font-semibold text-foreground">Horários fixos</div>
           <div className="text-[12px] text-muted-foreground">Rotina semanal e geração de aulas</div>
         </div>
+        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
       </button>
 
       {proximas.length === 0 && anteriores.length === 0 ? (
@@ -319,19 +326,21 @@ export default function AdminAlunoDetalhe() {
           if (!o) setModeloEscolhido(null);
         }}
       >
-        <SheetContent>
+        <SheetContent aria-describedby="atribuir-desc">
           <div className="flex items-start gap-2.5 mb-4">
-            <div className="flex-1">
-              <SheetTitle>ATRIBUIR PACOTE</SheetTitle>
-              <div className="text-[13px] text-muted-foreground mt-0.5">Escolha um modelo para {student.name}</div>
+            <div className="flex-1 min-w-0">
+              <SheetTitle className="break-words">ATRIBUIR PACOTE</SheetTitle>
+              <div id="atribuir-desc" className="text-[13px] text-muted-foreground mt-0.5 break-words">
+                Escolha um modelo para {student.name}
+              </div>
             </div>
             <SheetClose asChild>
               <button
                 type="button"
                 aria-label="Fechar"
-                className="h-11 w-11 shrink-0 rounded-[11px] border border-[#333] bg-secondary flex items-center justify-center active:scale-95 transition-transform"
+                className="h-11 w-11 shrink-0 rounded-[11px] border border-muted-foreground/60 bg-secondary flex items-center justify-center active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <X className="h-[15px] w-[15px] text-foreground/80" />
+                <X className="h-[15px] w-[15px] text-foreground/80" aria-hidden />
               </button>
             </SheetClose>
           </div>
@@ -339,6 +348,17 @@ export default function AdminAlunoDetalhe() {
           {avisoSubstitui && (
             <div className="rounded-xl border border-amber/40 bg-amber/10 p-3.5 mb-4 text-[13px] leading-snug text-amber">
               {avisoSubstitui}
+            </div>
+          )}
+          {carregandoModelos && <SkeletonList count={3} height={64} />}
+          {erroModelos && <ErrorState onRetry={() => recarregarModelos()} />}
+          {!carregandoModelos && !erroModelos && templates && templates.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-border p-5 text-center">
+              <div className="text-[14px] font-semibold text-foreground mb-1">Nenhum modelo cadastrado</div>
+              <div className="text-[12.5px] text-muted-foreground mb-3">Crie um modelo de pacote para poder atribuí-lo.</div>
+              <Button variant="secondary" onClick={() => navigate("/admin/pacotes")}>
+                Criar modelo de pacote
+              </Button>
             </div>
           )}
           <div role="radiogroup" aria-label="Modelo de pacote" className="flex flex-col gap-2.5">
@@ -369,6 +389,7 @@ export default function AdminAlunoDetalhe() {
           <Button
             size="lg"
             className="w-full mt-4"
+            hidden={!!templates && templates.length === 0}
             disabled={!escolhido || assign.isPending}
             onClick={() => escolhido && assign.mutate(escolhido.id)}
           >
