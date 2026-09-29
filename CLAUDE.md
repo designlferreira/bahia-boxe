@@ -3303,6 +3303,31 @@ medido na tela (só calculado).
 **Deixado para depois (registrado, não pedido):** o trilho do interruptor ligado (vermelho 51%) tem ~4,8:1 e está ok; o contorno do `card-dark` só muda se houver decisão de
 identidade; auditar telas que ainda usam `bg-destructive` sólido com texto branco.
 
+### Polish do fluxo do aluno novo: o convite viaja com a conta (2026-09-29) — sem migration nova
+
+Fluxo caminhado por leitura de código: convite → criar conta → confirmar e-mail → login → Home. Um passo na `dev`, **testado pelo Lucas** (conta de teste, link do e-mail aberto em
+outro navegador). Arquivos: `integrations/backend/auth.ts`, `context/AuthContext.tsx`, `pages/auth/Convite.tsx`, `pages/auth/ConfirmarEmail.tsx`.
+
+**Emenda achada (complementa "Entrada: convite e criar conta"):** o convite guardado em `localStorage` só existe no aparelho/navegador onde o aluno abriu o link do professor.
+Com "Confirm email" ligado, o link do e-mail pode abrir em OUTRO navegador ou aparelho (o app instalado e o navegador do celular não dividem `localStorage`): o
+convite se perdia em silêncio — conta criada, sem vínculo com o professor — e a tela "Confirme seu e-mail" prometia "seu convite é concluído sozinho".
+
+**Decisão do Lucas: levar o convite junto com a conta.** `signUpWithPassword(name, email, password, convite?)` grava o token nos METADADOS da conta
+(`user_metadata.convite_pendente`) além do `localStorage`. O `AuthProvider` procura o convite nos dois lugares (`lerConvitePendente() ?? lerConviteDaConta()`) assim que há
+usuário logado, tenta `acceptInvite` e, de qualquer jeito, apaga o convite dos dois (`limparConviteDaConta`: `updateUser({ data: { convite_pendente: null } })`).
+- `lerConviteDaConta` usa `getSession()` (leitura local, **sem chamada de rede**); só `limparConviteDaConta` fala com o servidor, e só quando havia convite.
+- Um `useRef` (`conviteEmAndamento`) impede duas conclusões ao mesmo tempo (o `setProfile` do próprio efeito o dispara de novo).
+- **Nada muda no painel do Supabase.** Contas criadas ANTES desta mudança não têm o convite gravado: para elas nada muda.
+- Não voltar a guardar o convite só no aparelho. Qualquer fluxo que dependa de estado local depois de um `signUp` com confirmação de e-mail falha quando o link abre em outro lugar.
+
+**Também:** o aviso de erro da tela "Confirme seu e-mail" usava `text-destructive` sobre `bg-destructive/10`; passou a `--red-text`.
+
+**AINDA EM ABERTO (aceito, não decidido):** se `accept_invite` falhar (convite já usado/expirado ou falha de conexão) o app continua **calado** e o aluno segue sem vínculo; o convite é
+apagado mesmo assim (não dá para distinguir falha definitiva de transitória). E **não foi verificado o que o aluno VÊ no app quando está sem vínculo com um professor.**
+Se aparecer aluno assim, é o primeiro lugar a olhar (junto com a consulta para achá-lo e ligá-lo, já registrada em "Entrada").
+
+**Não conferido:** o fluxo em aparelho real além do teste do Lucas; convite que expira entre o cadastro e o primeiro login.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
