@@ -17,7 +17,7 @@ import {
   scheduleBooking,
 } from "@/integrations/backend/api";
 import type { DaySlot } from "@/integrations/backend/api";
-import { CalendarSearch } from "lucide-react";
+import { CalendarCheck, CalendarSearch } from "lucide-react";
 
 const DAY_COUNT = 7;
 
@@ -110,6 +110,42 @@ export default function StudentAgendar() {
       queryClient.invalidateQueries({ queryKey: ["available-slots-semana"] });
     },
   });
+
+  // Sem aula para agendar: antes a grade continuava ativa e o erro só aparecia depois de "Confirmar".
+  // Agora a tela diz logo o motivo e o que fazer — com o mesmo verbo da Home ("Pedir").
+  const semAulas = !!home && home.credits === 0;
+  const aviso = !home
+    ? null
+    : home.pendingRequest
+      ? {
+          titulo: "Seu pedido está com o professor",
+          texto: "Assim que ele aprovar, você agenda por aqui.",
+          cta: null,
+        }
+      : home.nextBooking
+        ? {
+            titulo: "Todas as suas aulas já estão agendadas",
+            texto: "Para marcar mais, peça mais aulas ao seu professor.",
+            cta: "Pedir mais aulas",
+          }
+        : home.package || home.lastPackage
+          ? { titulo: "Suas aulas acabaram", texto: "Peça mais aulas para continuar agendando.", cta: "Pedir mais aulas" }
+          : { titulo: "Você ainda não tem aulas", texto: "Escolha um pacote e seu professor libera as aulas.", cta: "Pedir pacote" };
+
+  if (semAulas && aviso) {
+    return (
+      <div className="page-container">
+        <PageHeader title="AGENDAR AULA" back />
+        <EmptyState
+          icon={CalendarCheck}
+          title={aviso.titulo}
+          description={aviso.texto}
+          ctaLabel={aviso.cta ?? undefined}
+          onCta={aviso.cta ? () => navigate("/app/pacotes") : undefined}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="page-container pb-40">
