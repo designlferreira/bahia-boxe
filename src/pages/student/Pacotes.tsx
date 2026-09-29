@@ -74,6 +74,10 @@ export default function StudentPacotes() {
     onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível enviar o pedido."),
   });
 
+  const pedido = home?.pendingRequest ?? null;
+  const pedidoNome = pedido?.kind === "package" ? "pacote" : "aula avulsa";
+  const pedidoModelo = pedido?.templateId ? templates?.find((t) => t.id === pedido.templateId) : undefined;
+
   return (
     <div className="page-container">
       <PageHeader title="MEUS PACOTES" back />
@@ -97,7 +101,27 @@ export default function StudentPacotes() {
         </div>
       )}
 
+      {/* Pedido em espera: a tela já recebe o pedido (`home.pendingRequest`, o mesmo que a Home mostra) e antes o ignorava —
+          os "Pedir" seguiam ativos e o aluno podia mandar outro, e cada pedido aprovado encerra o pacote atual. Âmbar =
+          depende do professor. */}
+      {pedido && (
+        <div role="status" className="rounded-2xl border border-amber/40 bg-amber/10 p-4 mb-6">
+          <div className="text-[15px] font-semibold text-amber">
+            Pedido de {pedidoNome} enviado
+            {pedidoModelo ? ` · ${pedidoModelo.name}` : ""}
+          </div>
+          <div className="text-[13px] text-foreground/85 mt-1">
+            Enviado em {formatDateShort(pedido.createdAt)}. Aguardando o professor responder.
+          </div>
+        </div>
+      )}
+
       <h2 className="section-title mb-3">Pedir mais aulas</h2>
+      {pedido && (
+        <p id="pedido-motivo" className="text-[13px] text-muted-foreground -mt-1.5 mb-3">
+          Você já tem um pedido com o professor. Espere a resposta para pedir outro.
+        </p>
+      )}
 
       {isLoading && <SkeletonList count={3} height={90} />}
 
@@ -118,7 +142,9 @@ export default function StudentPacotes() {
               size="sm"
               className="shrink-0 hover:border-primary hover:text-primary"
               onClick={() => request.mutate(t)}
-              disabled={request.isPending}
+              // Desativado enquanto há pedido em espera (e enquanto a Home ainda não chegou: sem ela não dá para saber).
+              disabled={request.isPending || !home || !!pedido}
+              aria-describedby={pedido ? "pedido-motivo" : undefined}
             >
               Pedir
             </Button>

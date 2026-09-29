@@ -34,6 +34,7 @@ import AdminDisponibilidade from "@/pages/admin/Disponibilidade";
 import AdminPacotes from "@/pages/admin/Pacotes";
 import StudentMinhaConta from "@/pages/student/MinhaConta";
 import StudentHistorico from "@/pages/student/Historico";
+import StudentPacotes from "@/pages/student/Pacotes";
 import AdminHistorico from "@/pages/admin/Historico";
 import AdminAlunoDetalhe from "@/pages/admin/AlunoDetalhe";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
@@ -1287,6 +1288,37 @@ export default function Amostras() {
               <StudentHistorico />
             </Seeded>
           </Frame>
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Pacotes (aluno)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {(
+            [
+              { title: "Pacotes · com pacote ativo", note: "pacote em andamento e três modelos para pedir", data: { ...base, package: pkg(8, 5, { id: "pk-a" }), credits: 1 }, modelos: 3 },
+              { title: "Pacotes · sem pacote", note: "aluno sem pacote ativo", data: base, modelos: 3 },
+              { title: "Pacotes · pedido em análise", note: "já pediu um pacote e o professor não respondeu", data: { ...base, package: pkg(8, 8, { id: "pk-b", status: "finished" }), pendingRequest: { ...PEDIDO, templateId: "m1" } }, modelos: 3 },
+              { title: "Pacotes · sem modelos", note: "o professor ainda não cadastrou nenhum modelo", data: base, modelos: 0 },
+            ] as { title: string; note: string; data: HomeData; modelos: number }[]
+          ).map((c) => (
+            <Frame key={c.title} title={c.title} note={c.note}>
+              <Seeded
+                data={c.data}
+                modo="autosservico"
+                extra={[
+                  [
+                    ["package-templates", ADMIN_ID],
+                    [
+                      { ...modelo("m1", "Pacote 8 aulas", 8, 32000), description: "Duas aulas por semana", validityDays: 60 },
+                      modelo("m2", "Pacote 12 aulas", 12, 45000),
+                      modelo("m3", "Aula avulsa", 1, null),
+                    ].slice(0, c.modelos),
+                  ],
+                ]}
+              >
+                <StudentPacotes />
+              </Seeded>
+            </Frame>
+          ))}
         </div>
 
         <h2 className="text-lg font-semibold mb-4">Histórico (professor)</h2>
