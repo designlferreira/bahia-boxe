@@ -263,7 +263,9 @@ export default function AdminAgenda() {
                     )}
                   />
                 </div>
-                <div className="flex-1 pb-3">
+                {/* min-w-0: sem isto a coluna crescia com o conteúdo do cartão (etiqueta, "de → para")
+                    e o cartão saía pela lateral da tela, cortando Recusar/Cancelar. */}
+                <div className="flex-1 min-w-0 pb-3">
                   {entry.free ? (
                     <div className="border border-dashed border-muted-foreground/40 rounded-2xl p-3.5 text-[13px] text-muted-foreground">
                       Horário livre
@@ -283,15 +285,14 @@ export default function AdminAgenda() {
                         onClick={() => navigate(`/admin/aula/${booking!.id}`)}
                         className="w-full min-h-11 text-left flex justify-between items-start gap-2 mb-2 rounded-md active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        <div>
-                          <div className="text-[14.5px] font-semibold text-foreground flex items-center gap-1.5">
-                            {entry.studentName}
-                            {entry.vinculo && (
-                              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-secondary text-muted-foreground whitespace-nowrap">
-                                {VINCULO_LABEL[entry.vinculo]}
-                              </span>
-                            )}
-                          </div>
+                        <div className="min-w-0">
+                          <div className="text-[14.5px] font-semibold text-foreground break-words">{entry.studentName}</div>
+                          {/* Etiqueta numa linha própria, abaixo do nome — ao lado dele empurrava o cartão. */}
+                          {entry.vinculo && (
+                            <span className="inline-block mt-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                              {VINCULO_LABEL[entry.vinculo]}
+                            </span>
+                          )}
                           {entry.vinculo === "pedido_remarcacao" && entry.antecessorInicio ? (
                             // Pedido de remarcação: de onde pra onde, como no painel.
                             <div className="text-[13px] text-muted-foreground mt-0.5">
@@ -309,7 +310,7 @@ export default function AdminAgenda() {
                             </div>
                           )}
                         </div>
-                        <StatusBadge status={booking!.status} semRegistro={awaiting} />
+                        <StatusBadge status={booking!.status} semRegistro={awaiting} className="shrink-0" />
                         <span className="sr-only">. Ver detalhes</span>
                       </button>
 
