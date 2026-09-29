@@ -22,6 +22,7 @@ export default function AdminAulaDetalhe() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [confirmUndo, setConfirmUndo] = useState(false);
+  const [outrasAbertas, setOutrasAbertas] = useState(false);
 
   const { data: detail, isLoading, isError, refetch } = useQuery({
     queryKey: ["admin-booking", id],
@@ -182,30 +183,41 @@ export default function AdminAulaDetalhe() {
               </Button>
             </div>
           )}
-          <div className="flex gap-2.5">
-            <Button
-              variant="secondary"
-              size="lg"
-              className="flex-1"
-              disabled={actions.isBusy(booking.id)}
-              onClick={() => actions.openReagendar(booking, studentName)}
-            >
-              Remarcar
+          {/* Aula que já passou sem registro: a pergunta é uma só (aconteceu ou faltou?). Remarcar,
+              Cancelar e reposição continuam aqui, atrás de "Outras ações" (decisão do Lucas,
+              2026-09-29) — nada some, só sai do caminho, como no cartão da agenda. */}
+          {awaiting && !outrasAbertas ? (
+            <Button variant="ghost" size="lg" className="w-full" onClick={() => setOutrasAbertas(true)} aria-expanded={false}>
+              Outras ações
             </Button>
-            <Button
-              variant="destructive"
-              size="lg"
-              className="flex-1"
-              disabled={actions.isBusy(booking.id)}
-              onClick={() => actions.openCancelar(booking, studentName)}
-            >
-              Cancelar aula
-            </Button>
-          </div>
-          {!booking.isReplacement && (
-            <Button variant="secondary" size="lg" onClick={() => actions.openReplacement(booking, studentName)}>
-              Marcar como reposição
-            </Button>
+          ) : (
+            <>
+              <div className="flex gap-2.5">
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  className="flex-1"
+                  disabled={actions.isBusy(booking.id)}
+                  onClick={() => actions.openReagendar(booking, studentName)}
+                >
+                  Remarcar
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="lg"
+                  className="flex-1"
+                  disabled={actions.isBusy(booking.id)}
+                  onClick={() => actions.openCancelar(booking, studentName)}
+                >
+                  Cancelar aula
+                </Button>
+              </div>
+              {!booking.isReplacement && (
+                <Button variant="secondary" size="lg" onClick={() => actions.openReplacement(booking, studentName)}>
+                  Marcar como reposição
+                </Button>
+              )}
+            </>
           )}
         </div>
       )}
