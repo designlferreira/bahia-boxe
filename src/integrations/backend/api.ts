@@ -1338,18 +1338,30 @@ export async function getAdminStudentDetail(studentId: string) {
     .single();
   if (error) throw new Error(error.message);
 
-  const [names, pkg, credits, historyRes, completedRes, noShowRes] = await Promise.all([
+  const agoraIso = new Date().toISOString();
+  const [names, pkg, credits, proximasRes, anterioresRes, completedRes, noShowRes] = await Promise.all([
     profileNames([row.profile_id]),
     activePackageForStudentRow(studentId),
     creditsAvailableFor(studentId),
-    // Janela de exibição ("ÚLTIMAS AULAS"), não base de cálculo — ver os dois counts abaixo.
+    // Duas janelas de exibição (não base de cálculo — ver os dois counts abaixo): as PRÓXIMAS (que ainda vão
+    // acontecer, da mais próxima) e as ANTERIORES (da mais recente). Antes era uma janela só, das 6 mais "novas"
+    // por data, que com recorrência era composta só de aulas futuras sob o título "Últimas aulas".
+    client()
+      .from("bookings")
+      .select("*")
+      .eq("student_id", studentId)
+      .in("status", ["scheduled", "pending_confirmation"])
+      .gte("end_time", agoraIso)
+      .order("start_time", { ascending: true })
+      .limit(3),
     client()
       .from("bookings")
       .select("*")
       .eq("student_id", studentId)
       .or(SEM_DESCARTE_DE_REGENERACAO)
+      .lt("end_time", agoraIso)
       .order("start_time", { ascending: false })
-      .limit(6),
+      .limit(3),
     // Frequência/faltas contam sobre TODAS as aulas que aconteceram, não sobre a janela de 6:
     // com recorrência, essa janela é composta só de aulas FUTURAS `scheduled` (ordem descendente
     // por start_time), o que zerava a frequência de qualquer aluno em recorrência. `count` com
@@ -1366,7 +1378,8 @@ export async function getAdminStudentDetail(studentId: string) {
       .eq("student_id", studentId)
       .eq("status", "no_show"),
   ]);
-  if (historyRes.error) throw new Error(historyRes.error.message);
+  if (proximasRes.error) throw new Error(proximasRes.error.message);
+  if (anterioresRes.error) throw new Error(anterioresRes.error.message);
   if (completedRes.error) throw new Error(completedRes.error.message);
   if (noShowRes.error) throw new Error(noShowRes.error.message);
 
@@ -1381,7 +1394,8 @@ export async function getAdminStudentDetail(studentId: string) {
     student,
     package: pkg,
     credits,
-    history: (historyRes.data ?? []).map(mapBooking),
+    proximas: (proximasRes.data ?? []).map(mapBooking),
+    anteriores: (anterioresRes.data ?? []).map(mapBooking),
     completedCount: completedRes.count ?? 0,
     noShowCount: noShowRes.count ?? 0,
   };

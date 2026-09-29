@@ -873,7 +873,8 @@ const ALUNO_CASOS: {
   aluno: StudentRecord;
   pacote: PackageRecord | null;
   credits: number;
-  history: Booking[];
+  proximas: Booking[];
+  anteriores: Booking[];
   completed: number;
   noShow: number;
   saldo?: SaldoPacote;
@@ -884,24 +885,19 @@ const ALUNO_CASOS: {
     aluno: aluno("s1", "Ana Beatriz Souza"),
     pacote: pkg(10, 6, { id: "pkg-ana", studentId: "s1", templateName: "Pacote 10 aulas" }),
     credits: 3,
-    history: [
-      booking(1, "scheduled", { id: "ah1" }),
-      booking(-2, "completed", { id: "ah2" }),
-      booking(-4, "no_show", { id: "ah3" }),
-      booking(-7, "completed", { id: "ah4" }),
-      booking(-9, "cancelled", { id: "ah5" }),
-      booking(-11, "completed", { id: "ah6" }),
-    ],
+    proximas: [booking(1, "scheduled", { id: "ah1" })],
+    anteriores: [booking(-2, "completed", { id: "ah2" }), booking(-4, "no_show", { id: "ah3" }), booking(-9, "cancelled", { id: "ah5" })],
     completed: 6,
     noShow: 2,
   },
   {
     title: "Em recorrência",
-    note: "pacote de recorrência: as 6 linhas do histórico são futuras (aulas marcadas)",
+    note: "pacote de recorrência: 3 aulas marcadas e 3 anteriores",
     aluno: aluno("s2", "Carlos Henrique Lima"),
     pacote: pkg(8, 3, { id: "pkg-carlos", studentId: "s2", origin: "recurrence", templateName: undefined }),
     credits: 0,
-    history: [1, 3, 5, 8, 10, 12].map((d, i) => booking(d, "scheduled", { id: `ch${i}`, pacoteId: "pkg-carlos" })),
+    proximas: [1, 3, 5].map((d, i) => booking(d, "scheduled", { id: `ch${i}`, pacoteId: "pkg-carlos" })),
+    anteriores: [booking(-2, "completed", { id: "chp1" }), booking(-4, "completed", { id: "chp2" }), booking(-6, "no_show", { id: "chp3" })],
     completed: 3,
     noShow: 1,
     saldo: { pacoteId: "pkg-carlos", studentId: "s2", recorrenciaId: "r1", total: 8, consumidas: 3, restantes: 5, aRepor: 1 },
@@ -912,7 +908,8 @@ const ALUNO_CASOS: {
     aluno: aluno("s3", "Julia Pereira"),
     pacote: null,
     credits: 0,
-    history: [],
+    proximas: [],
+    anteriores: [],
     completed: 0,
     noShow: 0,
   },
@@ -1303,7 +1300,8 @@ export default function Amostras() {
                     student: c.aluno,
                     package: c.pacote,
                     credits: c.credits,
-                    history: c.history,
+                    proximas: c.proximas,
+                    anteriores: c.anteriores,
                     completedCount: c.completed,
                     noShowCount: c.noShow,
                   });

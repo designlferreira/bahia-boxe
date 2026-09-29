@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CalendarClock, Mail, Sparkles, X } from "lucide-react";
+import { CalendarClock, ChevronRight, Mail, Sparkles, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard, SkeletonList } from "@/components/SkeletonCard";
@@ -11,7 +11,9 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { Sheet, SheetClose, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { formatDateTime } from "@/lib/dateUtils";
+import { formatQuando } from "@/lib/dateUtils";
+import { isAwaitingConfirmation } from "@/lib/bookingStatus";
+import type { Booking } from "@/integrations/backend/types";
 import { formatPriceLabel } from "@/lib/packageUtils";
 import { cn } from "@/lib/utils";
 import {
@@ -23,6 +25,26 @@ import {
   removeActivePackage,
 } from "@/integrations/backend/api";
 import { StatusBadge } from "@/components/StatusBadge";
+
+/** Uma aula do aluno: toca e abre o detalhe da aula (antes a lista era só texto). */
+function LinhaAula({ booking, onOpen }: { booking: Booking; onOpen: () => void }) {
+  const agora = Date.now();
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full min-h-[52px] card-dark px-3.5 py-2.5 flex items-center gap-2.5 text-left active:scale-[0.99] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <div className="flex-1 min-w-0 text-[13.5px] text-foreground/90">{formatQuando(booking.startTime)}</div>
+      <StatusBadge
+        status={booking.status}
+        semRegistro={isAwaitingConfirmation(booking.status, booking.endTime)}
+        agora={booking.status === "scheduled" && new Date(booking.startTime).getTime() <= agora && new Date(booking.endTime).getTime() > agora}
+      />
+      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
+    </button>
+  );
+}
 
 export default function AdminAlunoDetalhe() {
   const { studentId } = useParams<{ studentId: string }>();
@@ -111,7 +133,7 @@ export default function AdminAlunoDetalhe() {
     );
   }
 
-  const { student, credits, history, completedCount, noShowCount } = data;
+  const { student, credits, proximas, anteriores, completedCount, noShowCount } = data;
   const escolhido = templates?.find((t) => t.id === modeloEscolhido) ?? null;
   const primeiroNome = student.name.split(" ")[0];
   // O pacote experimental (trial) convive com os outros e NAO e encerrado ao atribuir; os demais sao.
@@ -140,6 +162,21 @@ export default function AdminAlunoDetalhe() {
           <span className="break-all">{emailAluno}</span>
         </a>
       )}
+
+      {/* A pergunta de quem abre um aluno antes do treino: quando é a próxima aula? */}
+      <div className="mb-3.5 text-[13.5px]">
+        {proximas[0] ? (
+          <button
+            type="button"
+            onClick={() => navigate(`/admin/aula/${proximas[0].id}`)}
+            className="text-left text-foreground/90 underline underline-offset-4 min-h-11 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Próxima aula: <strong className="text-foreground">{formatQuando(proximas[0].startTime)}</strong>
+          </button>
+        ) : (
+          <span className="text-muted-foreground">Sem aula marcada</span>
+        )}
+      </div>
 
       <div className="mb-3.5">
         <ActivePackageCard pkg={pkg} credits={credits} saldo={saldo} />
@@ -193,18 +230,44 @@ export default function AdminAlunoDetalhe() {
         </div>
       </button>
 
-      <h2 className="section-title mb-3">Últimas aulas</h2>
-      <div className="flex flex-col gap-2.5">
-        {history.length === 0 && <div className="text-[13px] text-muted-foreground">Nenhuma aula registrada.</div>}
-        {history.map((h) => {
-          return (
-            <div key={h.id} className="card-dark p-3 flex items-center gap-2.5">
-              <div className="flex-1 text-[13.5px] text-foreground/85">{formatDateTime(h.startTime)}</div>
-              <StatusBadge status={h.status} />
-            </div>
-          );
-        })}
-      </div>
+      {proximas.length === 0 && anteriores.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border p-5 text-center">
+          <div className="text-[14px] font-semibold text-foreground mb-1">Ainda sem aulas</div>
+          <div className="text-[12.5px] text-muted-foreground">
+            {pkg ? `As aulas de ${primeiroNome} aparecem aqui.` : `Atribua um pacote para ${primeiroNome} começar.`}
+          </div>
+        </div>
+      ) : (
+        <>
+          {proximas.length > 0 && (
+            <section aria-labelledby="aulas-proximas" className="mb-5">
+              <h2 id="aulas-proximas" className="section-title mb-3">Próximas aulas</h2>
+              <div className="flex flex-col gap-2.5">
+                {proximas.map((b) => (
+                  <LinhaAula key={b.id} booking={b} onOpen={() => navigate(`/admin/aula/${b.id}`)} />
+                ))}
+              </div>
+            </section>
+          )}
+          {anteriores.length > 0 && (
+            <section aria-labelledby="aulas-anteriores" className="mb-4">
+              <h2 id="aulas-anteriores" className="section-title mb-3">Aulas anteriores</h2>
+              <div className="flex flex-col gap-2.5">
+                {anteriores.map((b) => (
+                  <LinhaAula key={b.id} booking={b} onOpen={() => navigate(`/admin/aula/${b.id}`)} />
+                ))}
+              </div>
+            </section>
+          )}
+          <Button
+            variant="secondary"
+            className="w-full"
+            onClick={() => navigate(`/admin/historico?busca=${encodeURIComponent(student.name)}`)}
+          >
+            Ver todas as aulas de {primeiroNome}
+          </Button>
+        </>
+      )}
 
       <Sheet
         open={assignOpen}
