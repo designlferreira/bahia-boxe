@@ -3235,6 +3235,45 @@ do resultado e `role="status"` ("Carregando o resultado…"). `PerfilLutador` ga
 **Deixado para depois (registrado, não pedido):** **a tela ainda tem ~2.500px (quase três telas)** — encurtar exige decidir o que recolher (pontos fortes/prioridades/foco); "Prioridades de evolução" soa técnico ("No que trabalhar"?);
 `FIGHTER_PROFILE_DESCRIPTIONS` abre sempre com "Seu perfil atual demonstra…" (soa diagnóstico); explicar o selo "Versão rápida" ("menos preciso que a completa"); compartilhar o resultado (a arte compartilhável foi cancelada, ver acima); caminho para quem discorda do estilo além de refazer.
 
+### A evolução do Perfil de Boxe (aluno): rodada de crítica (2026-09-29) — sem migration nova
+
+`src/pages/student/PerfilLutadorHistorico.tsx` (rota `/app/perfil-lutador/historico`, "Ver minha evolução"): crítica **20/40**, relatório em
+`.impeccable/critique/*perfillutadorhistorico*` (gravado à mão no mesmo formato: o comando do skill falhou por erro transitório do verificador de comandos).
+Quatro passos na `dev`, testados pelo Lucas. **Era a última tela sem crítica.** Na página de amostras ("Minha evolução (aluno)": nenhuma avaliação, só
+rápidas, 1 completa + rápida, 2 completas com uma da fórmula anterior, 3 completas com uma da fórmula anterior, com queda e igual, 3 completas) — a tela
+NÃO tinha amostra e nunca tinha sido vista com dados. **O estado de erro não está na galeria** (o histórico já vem semeado; o componente de erro não mudou).
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Sem 2 avaliações completas, o gráfico dá lugar a um CARTÃO que explica** ("Sua evolução ainda não aparece aqui"): diz quantas completas há, que as
+  rápidas não entram ("medem menos") e, se houver, que as da fórmula anterior também ficam de fora; o botão "Fazer nova avaliação" mora DENTRO do cartão.
+  Antes o gráfico sumia em silêncio e o aluno achava que a tela quebrou.
+- **Uma só ação principal por tela:** cartão presente → botão nele; gráfico presente → "Nova autoavaliação" no fim ("Refaça de tempos em tempos…",
+  SEM prometer prazo). Estado vazio ganhou "Fazer minha primeira avaliação". O botão vai direto a `/app/perfil-lutador/questionario` (escolha da versão),
+  sem o "você fez uma há pouco, refazer?" que a tela do Perfil de Boxe tem.
+- **O gráfico só usa autoavaliações COMPLETAS da fórmula ATUAL** (`scoringVersion === SCORING_VERSION`): notas de fórmulas diferentes mostrariam uma "queda"
+  que vem do cálculo, não do aluno. As antigas ficam na lista com o selo âmbar "Calculado pela fórmula anterior" (o mesmo do resultado).
+- **Duas barras por competência, com data:** primeira avaliação completa × mais recente ("01 jun 2026 · 46", "24 set 2026 · 66"), sem as barras do meio
+  (o texto as ignorava). Diferença em palavras — "Subiu N pontos" / "Ficou igual" / "Ficou em X, N a menos" —, **sem vermelho para queda**.
+  A tela abre com "Você subiu mais em A e B." (até 2, só quem subiu de fato) e mostra só essas; "Ver as outras N competências" abre o resto (`aria-expanded`).
+  Se nenhuma subiu, as 8 aparecem direto. Com alguma queda: "Uma nota mais baixa não quer dizer que você piorou: pode ser uma leitura mais atenta de si
+  mesmo. Converse com o seu professor sobre isso." (**texto novo meu, não aprovado palavra por palavra**).
+
+**O que mudou / armadilhas:**
+- "Dimensão" virou "competência" (vocabulário do resto do app); "primeira autoavaliação" virou "primeira avaliação completa"; datas com ANO nesta tela.
+- Acessibilidade: os dois títulos são `<h2>`; a lista é `<ul>/<li>` com `aria-label`; cada cartão tem nome falado ("Pressure Fighter / Swarmer, 82% de
+  afinidade, 24 set 2026, versão completa, a mais recente", + "calculada pela fórmula anterior" se for o caso); anel de foco nos cartões;
+  `motion-reduce` desliga o encolher ao tocar; barras `aria-hidden` com o texto ("Potência: de 46 para 66. Subiu 20 pontos.") só para leitor de tela.
+  **A lista é ORDENADA de fato** (mais recente primeiro; não depende da ordem do banco) e a mais recente ganha o selo "Mais recente" (só com 2+).
+- **A crítica errou uma cor:** disse que "% de afinidade" era vermelho e devia usar `--red-text`. `text-accent` é o DOURADO do tema (contraste 10,9:1): não mudou.
+- **`useState` (`verTodas`) fica acima dos `return`** (ver a regra dos hooks em "Orientações da aula").
+
+**Não conferido:** foco com Tab real, leitor de tela, largura no celular (o painel do navegador tinha largura 0: as medições de overflow não valem) e o
+estado de erro. As datas com ano ao lado das barras (`w-[86px]`) podem ficar apertadas em telas estreitas.
+
+**Deixado para depois (registrado, não pedido):** mostrar a leitura do professor ao longo do tempo (a autopercepção pode subir por confiança, não por
+técnica); um gráfico de linha com mais de duas medições; comparar com a avaliação anterior (e não só a primeira); "Fazer avaliação completa" com a versão já
+selecionada; a borda global do `card-dark`/trilho da barra (1,16–1,48:1, estilo global do tema).
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa

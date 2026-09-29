@@ -43,6 +43,7 @@ import AdminOrientacoesAula from "@/pages/admin/OrientacoesAula";
 import StudentPerfilLutadorQuestionario from "@/pages/student/PerfilLutadorQuestionario";
 import AdminAlunoPerfilBoxeQuestionario from "@/pages/admin/AlunoPerfilBoxeQuestionario";
 import StudentPerfilLutadorResultado from "@/pages/student/PerfilLutadorResultado";
+import StudentPerfilLutadorHistorico from "@/pages/student/PerfilLutadorHistorico";
 import { BoxingProfileHeading, BoxingProfileQuestionnaire } from "@/components/BoxingProfileQuestionnaire";
 import { getQuestions, QUESTIONNAIRE_VERSION } from "@/lib/boxingProfile";
 import AdminHistorico from "@/pages/admin/Historico";
@@ -1564,6 +1565,52 @@ export default function Amostras() {
               </Seeded>
             </Frame>
           ))}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Minha evolução (aluno)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {(() => {
+            // Uma autoavaliação por linha; `notas` muda a série de cada competência para o gráfico ter o que mostrar.
+            const av = (id: string, dias: number, extra: Partial<BoxingProfileAssessment> = {}, deslocamento = 0): BoxingProfileAssessment => ({
+              ...SELF,
+              id,
+              completedAt: at(dias, 10),
+              createdAt: at(dias, 10),
+              dimensionScores: Object.fromEntries(
+                DIMENSIONS.map((d) => [d, Math.max(0, Math.min(100, SELF.dimensionScores[d] + deslocamento))]),
+              ) as BoxingProfileAssessment["dimensionScores"],
+              ...extra,
+            });
+            const casos: { title: string; note: string; lista: BoxingProfileAssessment[] }[] = [
+              { title: "Evolução · nenhuma avaliação", note: "estado vazio, com botão para a primeira", lista: [] },
+              { title: "Evolução · só rápidas", note: "2 rápidas: o gráfico não existe e a tela explica", lista: [av("ev-r2", -5, { assessmentLength: "short" }), av("ev-r1", -60, { assessmentLength: "short" })] },
+              { title: "Evolução · 1 completa + rápida", note: "falta mais uma completa", lista: [av("ev-r", -5, { assessmentLength: "short" }), av("ev-c", -70)] },
+              { title: "Evolução · 2 completas + fórmula anterior", note: "a antiga fica fora do gráfico (só 1 atual: cartão) e leva o selo", lista: [av("ev-n", -5), av("ev-o", -90, { scoringVersion: "boxing-profile-scoring-v1" }, -12)] },
+              { title: "Evolução · 3 completas (1 da fórmula anterior)", note: "gráfico só com as 2 da fórmula atual", lista: [av("ev-3", -5, {}, 8), av("ev-2", -60, {}, 0), av("ev-1", -150, { scoringVersion: "boxing-profile-scoring-v1" }, -20)] },
+              {
+                title: "Evolução · com queda e igual",
+                note: "uma competência caiu, uma ficou igual; sem vermelho",
+                lista: [
+                  av("ev-b", -5),
+                  av("ev-a", -120, {
+                    dimensionScores: Object.fromEntries(
+                      DIMENSIONS.map((d, i) => [d, Math.max(0, Math.min(100, SELF.dimensionScores[d] + ([15, 0, -20, -6][i] ?? -2)))]),
+                    ) as BoxingProfileAssessment["dimensionScores"],
+                  }),
+                ],
+              },
+              { title: "Evolução · 3 completas", note: "gráfico e botão de nova avaliação", lista: [av("ev-3", -5, {}, 8), av("ev-2", -60, {}, 0), av("ev-1", -150, {}, -10)] },
+            ];
+            return casos.map((c) => (
+              <Frame key={c.title} title={c.title} note={c.note}>
+                <Seeded data={base} modo="autosservico" extra={[[["boxing-profile-history", "amostra-student"], c.lista]]}>
+                  <ComRota path="/app/perfil-lutador/historico" url="/app/perfil-lutador/historico">
+                    <StudentPerfilLutadorHistorico />
+                  </ComRota>
+                </Seeded>
+              </Frame>
+            ));
+          })()}
         </div>
 
         <h2 className="text-lg font-semibold mb-4">Histórico (professor)</h2>
