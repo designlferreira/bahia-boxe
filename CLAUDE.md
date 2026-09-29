@@ -3328,6 +3328,48 @@ Se aparecer aluno assim, é o primeiro lugar a olhar (junto com a consulta para 
 
 **Não conferido:** o fluxo em aparelho real além do teste do Lucas; convite que expira entre o cadastro e o primeiro login.
 
+### Alterar senha (aluno e professor): rodada de crítica (2026-09-29) — sem migration nova
+
+`src/pages/shared/AlterarSenha.tsx` (`/app/minha-conta/alterar-senha` e `/admin/minha-conta/alterar-senha`, mesma tela com a prop `backTo`): crítica **19/40**, relatório em
+`.impeccable/critique/*alterarsenha*`. Cinco passos na `dev`, testados pelo Lucas. Na página de amostras ("Alterar senha (aluno e professor)": em branco, senha atual errada,
+falha geral, sucesso, professor). **Esta tela NUNCA tinha sido criticada nem estava na galeria** (eu tinha dito que todas as telas já haviam passado pela crítica: era falso).
+**Continuam SEM crítica:** Perfil dos alunos (`admin/PerfilAlunos.tsx`), sino de notificações (`NotificationBell`), as duas barras de navegação de baixo e a tela 404 (`NotFound`).
+
+**O que estava errado (achados, complementa "Recuperar senha e Nova senha"):**
+- **Texto de maquete visível a usuário real:** "Demo: a senha atual é 123456". Apagado. A troca em si sempre foi real (`changePassword` reautentica e depois `updateUser`).
+- **O `<form>` envolvia SÓ o botão:** o Enter num campo (e o "Ir" do teclado do celular) não enviava, e o gerenciador de senhas não reconhecia o formulário. Agora envolve os campos.
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Sucesso: só corrigir o TEXTO, sem mexer na sessão.** "Pronto. Você continua conectado neste aparelho e vai usar a nova senha nos próximos acessos." (antes "Use-a no próximo
+  login": impreciso, `changePassword` NÃO faz `signOut`). **Não há opção "Sair dos outros aparelhos":** oferecida e recusada. **O que acontece nas outras sessões/aparelhos depende do
+  Supabase e NÃO foi conferido.**
+- **"Não lembro minha senha atual" = link que EXPLICA o caminho** (sair da conta e tocar em "Esqueceu a senha? Recuperar" no login), **sem deslogar sozinho.** A alternativa de um
+  botão que sai e leva ao Recuperar senha foi oferecida e recusada.
+- Escopo: tudo, na ordem (P1 → acabamento).
+
+**O que mudou / armadilhas:**
+- **Dois erros, cada um no seu lugar:** o da senha atual fica embaixo do campo dela (`aria-invalid` só nele) e leva o foco; o resto (conexão, limite, senha fraca) fica embaixo do botão.
+  Somem ao editar QUALQUER dos três campos. Vermelho em `--red-text` (o `text-destructive` dava 4,2:1 sobre `bg-destructive/10`). O aviso (`toast`) que repetia a mensagem foi removido, nos
+  dois sentidos (erro e sucesso).
+- **`changePassword` (auth.ts) distingue a falha da conferência:** só credencial inválida (status 400 / "invalid login credentials") vira `AuthError` com `code = "senha_atual_incorreta"` (a tela
+  põe no campo); 429 vira "Muitas tentativas…"; o resto, "Não foi possível verificar sua senha atual. Verifique sua conexão…". Antes TODA falha ali virava "Senha atual incorreta".
+- **Sucesso:** `role="status"`, o foco vai ao título "SENHA ALTERADA" (`tabIndex={-1}`), "Voltar para a conta" usa `navigate(backTo, { replace: true })`.
+- **Botão "Mostrar senhas"/"Ocultar senhas"** (vale para os TRÊS campos; antes "Mostrar" ao lado de "Senha atual"): 44px (margem negativa mantém a linha do rótulo compacta), foco visível,
+  `aria-pressed`. **Regras da senha usam `PasswordRule` (componente compartilhado, com ✓ e "— atendido")**; a cópia local `Rule` (só mudava de cor) foi apagada.
+- **Botão desativado diz o motivo por texto** (primeiro pendente): "Digite sua senha atual." / "A nova senha ainda não segue todas as regras." / "Escolha uma senha diferente da atual." /
+  "As duas senhas precisam ser iguais." **Nova senha igual à atual é bloqueada no cliente** (`igualAtual`).
+- **Aviso ao sair com campos preenchidos:** a seta de voltar abre "SAIR SEM ALTERAR?" (`ConfirmDialog`) e `beforeunload` cobre fechar/recarregar a aba. **Limite conhecido, igual às outras telas:
+  as abas de baixo não são interceptadas** (`BrowserRouter`, sem `useBlocker`). Nada disso vale na galeria (`amostra`).
+- **Campos travados durante o envio** (`<fieldset disabled>`). Como um campo desativado não aceita foco, **o foco volta num `useEffect` que só roda com `loading` falso** (senha atual errada → campo da
+  senha atual; falha geral → botão). **Não focar dentro do `catch`:** ainda é `loading`.
+- `amostra` é uma prop SÓ para a galeria (`"erro-atual" | "erro-geral" | "sucesso"`, campos já preenchidos com senhas de exemplo diferentes entre si); sem efeito no app.
+
+**Não conferido:** o foco depois de um erro real, o aviso ao sair e o leitor de tela (só a estrutura na galeria, cuja captura do navegador vem preta); o que os outros aparelhos veem depois da troca; a
+mensagem do Supabase para senha fraca/igual (`same_password`/`weak_password` não são mapeadas aqui; só em `redefinirSenhaPeloLink`).
+
+**Deixado para depois (registrado, não pedido):** um formulário de senha ÚNICO para esta tela e a Nova senha (hoje só compartilham `PasswordRule`); "Sair dos outros aparelhos" (recusado);
+mapear `same_password`/`weak_password` em `changePassword`; placeholder "Sua senha de hoje" (informal).
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa

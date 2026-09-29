@@ -44,6 +44,7 @@ import StudentPerfilLutadorQuestionario from "@/pages/student/PerfilLutadorQuest
 import AdminAlunoPerfilBoxeQuestionario from "@/pages/admin/AlunoPerfilBoxeQuestionario";
 import StudentPerfilLutadorResultado from "@/pages/student/PerfilLutadorResultado";
 import StudentPerfilLutadorHistorico from "@/pages/student/PerfilLutadorHistorico";
+import AlterarSenha from "@/pages/shared/AlterarSenha";
 import { BoxingProfileHeading, BoxingProfileQuestionnaire } from "@/components/BoxingProfileQuestionnaire";
 import { getQuestions, QUESTIONNAIRE_VERSION } from "@/lib/boxingProfile";
 import AdminHistorico from "@/pages/admin/Historico";
@@ -1611,6 +1612,45 @@ export default function Amostras() {
               </Frame>
             ));
           })()}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Alterar senha (aluno e professor)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          <Frame title="Alterar senha · aluno" note="formulário em branco (Enter envia; sem texto de demonstração)">
+            <Seeded data={base} modo="autosservico">
+              <ComRota path="/app/minha-conta/alterar-senha" url="/app/minha-conta/alterar-senha">
+                <AlterarSenha backTo="/app/minha-conta" />
+              </ComRota>
+            </Seeded>
+          </Frame>
+          <Frame title="Alterar senha · senha atual errada" note="erro embaixo do campo, com o foco nele">
+            <Seeded data={base} modo="autosservico">
+              <ComRota path="/app/minha-conta/alterar-senha" url="/app/minha-conta/alterar-senha">
+                <AlterarSenha backTo="/app/minha-conta" amostra="erro-atual" />
+              </ComRota>
+            </Seeded>
+          </Frame>
+          <Frame title="Alterar senha · falha geral" note="conexão ou servidor: aviso embaixo do botão">
+            <Seeded data={base} modo="autosservico">
+              <ComRota path="/app/minha-conta/alterar-senha" url="/app/minha-conta/alterar-senha">
+                <AlterarSenha backTo="/app/minha-conta" amostra="erro-geral" />
+              </ComRota>
+            </Seeded>
+          </Frame>
+          <Frame title="Alterar senha · sucesso" note="texto sobre a sessão; o foco vai para o título (só no app real)">
+            <Seeded data={base} modo="autosservico">
+              <ComRota path="/app/minha-conta/alterar-senha" url="/app/minha-conta/alterar-senha">
+                <AlterarSenha backTo="/app/minha-conta" amostra="sucesso" />
+              </ComRota>
+            </Seeded>
+          </Frame>
+          <Frame title="Alterar senha · professor" note="a mesma tela, voltando para a conta do professor">
+            <SeededAdmin data={null}>
+              <ComRota path="/admin/minha-conta/alterar-senha" url="/admin/minha-conta/alterar-senha">
+                <AlterarSenha backTo="/admin/minha-conta" />
+              </ComRota>
+            </SeededAdmin>
+          </Frame>
         </div>
 
         <h2 className="text-lg font-semibold mb-4">Histórico (professor)</h2>
