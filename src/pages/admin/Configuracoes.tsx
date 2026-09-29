@@ -97,45 +97,15 @@ export default function AdminConfiguracoes() {
     <div className="page-container">
       <PageHeader title="CONFIGURAÇÕES" back />
 
-      <button
-        type="button"
-        onClick={() => navigate("/admin/orientacoes")}
-        className="w-full text-left card-dark p-4 flex items-center gap-3 mb-3.5 active:scale-[0.99] transition-transform"
-      >
-        <div className="h-10 w-10 shrink-0 rounded-xl bg-secondary flex items-center justify-center">
-          <MapPin className="h-[18px] w-[18px] text-foreground/80" />
-        </div>
-        <div className="flex-1">
-          <div className="text-[14.5px] font-semibold text-foreground">Orientações da aula</div>
-          <div className="text-[12.5px] text-muted-foreground mt-0.5">Local, antecedência e equipamento — mostrados ao aluno</div>
-        </div>
-        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-      </button>
-
       {isError && !isLoading && <ErrorState onRetry={() => refetch()} />}
 
       {isLoading && <SkeletonCard height={80} />}
       {isLoading && <SkeletonCard height={120} className="mt-3.5" />}
 
       {!isLoading && !isError && (
-        <div className="card-dark p-4 flex items-center gap-3">
-          <div className="flex-1">
-            <div className="text-[14.5px] font-semibold text-foreground">Falta consome crédito</div>
-            <div className="text-[12.5px] text-muted-foreground mt-0.5">
-              Aluno que não aparece perde a aula do pacote.
-            </div>
-          </div>
-          <Switch
-            aria-label="Alternar consumo de crédito na falta"
-            checked={data?.noShowConsumesClass ?? true}
-            disabled={toggle.isPending}
-            onCheckedChange={(v) => toggle.mutate(v)}
-          />
-        </div>
-      )}
-
-      {!isLoading && !isError && (
-        <div className="card-dark p-4 mt-3.5">
+        <>
+          <h2 className="section-title mb-2.5">Como os alunos agendam</h2>
+        <div className="card-dark p-4">
           <div className="text-[14.5px] font-semibold text-foreground">Modo de agendamento</div>
           <div className="text-[12.5px] text-muted-foreground mt-0.5">
             Autosserviço: o aluno escolhe o horário na sua disponibilidade publicada. Recorrência:
@@ -167,10 +137,33 @@ export default function AdminConfiguracoes() {
             estão, nos dois modos. Isto só decide qual fluxo fica disponível daqui pra frente.
           </div>
         </div>
+        </>
       )}
 
       {!isLoading && !isError && (
-        <div className="card-dark p-4 mt-3.5">
+        <>
+          <h2 className="section-title mt-6 mb-2.5">Regras do pacote</h2>
+        <div className="card-dark p-4 flex items-center gap-3">
+          <div className="flex-1">
+            <div className="text-[14.5px] font-semibold text-foreground">Falta consome crédito</div>
+            <div className="text-[12.5px] text-muted-foreground mt-0.5">
+              Aluno que não aparece perde a aula do pacote.
+            </div>
+          </div>
+          <Switch
+            aria-label="Alternar consumo de crédito na falta"
+            checked={data?.noShowConsumesClass ?? true}
+            disabled={toggle.isPending}
+            onCheckedChange={(v) => toggle.mutate(v)}
+          />
+        </div>
+        </>
+      )}
+
+      {!isLoading && !isError && (
+        <>
+          <h2 className="section-title mt-6 mb-2.5">Contato</h2>
+        <div className="card-dark p-4">
           <label htmlFor="whatsapp" className="text-[15px] font-semibold text-foreground">
             WhatsApp para os alunos
           </label>
@@ -203,7 +196,25 @@ export default function AdminConfiguracoes() {
             {saveWhatsapp.isPending ? "Salvando…" : "Salvar WhatsApp"}
           </Button>
         </div>
+        </>
       )}
+
+      <h2 className="section-title mt-6 mb-2.5">O que o aluno vê</h2>
+      <button
+        type="button"
+        onClick={() => navigate("/admin/orientacoes")}
+        className="w-full text-left card-dark p-4 flex items-center gap-3 active:scale-[0.99] transition-transform"
+      >
+        <div className="h-10 w-10 shrink-0 rounded-xl bg-secondary flex items-center justify-center">
+          <MapPin className="h-[18px] w-[18px] text-foreground/80" />
+        </div>
+        <div className="flex-1">
+          <div className="text-[14.5px] font-semibold text-foreground">Orientações da aula</div>
+          <div className="text-[12.5px] text-muted-foreground mt-0.5">Local, antecedência e equipamento — mostrados ao aluno</div>
+        </div>
+        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+      </button>
+
 
       <ConfirmDialog
         open={!!modoPendente}
