@@ -1,5 +1,12 @@
+import { Trophy } from "lucide-react";
 import { BoxingRadarChart } from "@/components/BoxingRadarChart";
-import { DIMENSIONS, DIMENSION_LABELS, FIGHTER_PROFILE_LABELS, combineAssessments } from "@/lib/boxingProfile";
+import {
+  DIMENSIONS,
+  DIMENSION_LABELS,
+  FIGHTER_PROFILE_DESCRIPTIONS,
+  FIGHTER_PROFILE_LABELS,
+  combineAssessments,
+} from "@/lib/boxingProfile";
 import type { BoxingProfileAssessment } from "@/integrations/backend/types";
 
 interface BoxingProfileComparisonViewProps {
@@ -86,7 +93,32 @@ export function BoxingProfileComparisonView({ self, coach, viewer }: BoxingProfi
             : "Essas duas avaliações foram calculadas por versões diferentes da fórmula — os números abaixo não são diretamente comparáveis."}
         </p>
       )}
-      <p className="text-[13px] text-muted-foreground leading-relaxed mb-4">{copy.intro}</p>
+      {/* O resultado que a tela promete vem PRIMEIRO; as duas leituras que o formam ficam logo abaixo,
+          e radar/tabela como detalhe (antes o combinado era o último bloco, a ~75% da página). */}
+      <div className="rounded-[20px] p-5 mb-3 bg-[linear-gradient(150deg,#1F1B0C,#171717_60%)] border border-amber/30">
+        <div className="flex items-center gap-1.5 text-amber text-[11px] font-bold uppercase tracking-wide mb-2">
+          <Trophy className="h-3.5 w-3.5" aria-hidden /> Resultado combinado
+        </div>
+        <div className="font-display text-[28px] tracking-wide text-foreground leading-none mb-1">
+          {FIGHTER_PROFILE_LABELS[combined.primaryProfile]}
+        </div>
+        <div className="text-accent text-[15px] font-semibold mb-3">{combined.profileScores[combined.primaryProfile]}% de compatibilidade</div>
+        {viewer === "student" && (
+          <p className="text-[13.5px] text-foreground/85 leading-relaxed mb-2.5">{FIGHTER_PROFILE_DESCRIPTIONS[combined.primaryProfile]}</p>
+        )}
+        <p className="text-[12.5px] text-muted-foreground leading-relaxed">
+          Vem da média das duas leituras, competência por competência.
+        </p>
+      </div>
+
+      {combined.isDivergent && (
+        <p className="text-[11.5px] text-amber leading-relaxed mb-4">
+          {divergenceText(combined.divergentDimension ? DIMENSION_LABELS[combined.divergentDimension] : null)}
+        </p>
+      )}
+
+      <h2 className="section-title mb-2.5 mt-5">As duas leituras</h2>
+      <p className="text-[13px] text-muted-foreground leading-relaxed mb-3">{copy.intro}</p>
 
       <div className="grid grid-cols-2 gap-2.5 mb-2.5">
         <div className="card-dark p-3.5">
@@ -102,12 +134,7 @@ export function BoxingProfileComparisonView({ self, coach, viewer }: BoxingProfi
       </div>
       <p className="text-[11.5px] text-muted-foreground leading-relaxed mb-5">{samePrimaryProfile ? copy.agree : copy.differ}</p>
 
-      {combined.isDivergent && (
-        <p className="text-[11.5px] text-amber leading-relaxed mb-5 -mt-2.5">
-          {divergenceText(combined.divergentDimension ? DIMENSION_LABELS[combined.divergentDimension] : null)}
-        </p>
-      )}
-
+      <h2 className="section-title mb-2.5">Competências</h2>
       <div className="card-dark p-4 mb-2 flex flex-col items-center">
         <BoxingRadarChart scores={self.dimensionScores} compareScores={coach.dimensionScores} />
         <div className="flex items-center gap-4 mt-1">
@@ -137,12 +164,6 @@ export function BoxingProfileComparisonView({ self, coach, viewer }: BoxingProfi
             </div>
           ))}
         </div>
-      </div>
-
-      <div className="card-dark p-3.5 mb-5">
-        <div className="text-[10.5px] uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">Resultado combinado</div>
-        <div className="text-[14px] font-semibold text-foreground leading-snug">{FIGHTER_PROFILE_LABELS[combined.primaryProfile]}</div>
-        <div className="text-[12px] text-accent font-semibold mt-0.5">{combined.profileScores[combined.primaryProfile]}%</div>
       </div>
 
       <p className="text-[11.5px] text-muted-foreground leading-relaxed">{copy.disclaimer}</p>

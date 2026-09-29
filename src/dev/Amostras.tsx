@@ -27,6 +27,8 @@ import Convite from "@/pages/auth/Convite";
 import CriarConta from "@/pages/auth/CriarConta";
 import ConfirmarEmail from "@/pages/auth/ConfirmarEmail";
 import AdminAlunoRecorrencia from "@/pages/admin/AlunoRecorrencia";
+import StudentPerfilLutador from "@/pages/student/PerfilLutador";
+import AdminAlunoPerfilBoxe from "@/pages/admin/AlunoPerfilBoxe";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
 import { RemarcacaoSheet } from "@/components/RemarcacaoSheet";
@@ -276,7 +278,10 @@ function assessment(
   const profileScores = Object.fromEntries(
     FIGHTER_PROFILES.map((p) => [p, p === primary ? 82 : p === secondary ? 70 : 45]),
   ) as Record<FighterProfileKey, number>;
-  const dimensionScores = Object.fromEntries(DIMENSIONS.map((d) => [d, 60])) as BoxingProfileAssessment["dimensionScores"];
+  // Notas diferentes por dimensão (e diferentes entre aluno e professor) — com tudo igual a 60 a
+  // tela de comparação e o radar ficavam sem nada para mostrar.
+  const serie = type === "self" ? [78, 58, 66, 52, 72, 80, 44, 70] : [64, 70, 60, 68, 55, 62, 58, 66];
+  const dimensionScores = Object.fromEntries(DIMENSIONS.map((d, i) => [d, serie[i % serie.length]])) as BoxingProfileAssessment["dimensionScores"];
   return {
     id,
     assessmentType: type,
@@ -762,6 +767,13 @@ const RECORRENCIA_CASOS: { title: string; note: string; modo: "recorrencia" | "a
   },
 ];
 
+const PERFIL_PROF_CASOS: { title: string; note: string; lista: BoxingProfileAssessment[] }[] = [
+  { title: "Nenhuma avaliação", note: "professor ainda não avaliou e o aluno também não", lista: [] },
+  { title: "Só o aluno", note: "autoavaliação feita, professor ainda não", lista: [SELF] },
+  { title: "Só o professor", note: "professor avaliou, aluno ainda não", lista: [COACH] },
+  { title: "Os dois", note: "comparação e resultado combinado", lista: [SELF, COACH] },
+];
+
 function SeededAdmin({ data, children, seed }: { data: unknown; children: ReactNode; seed?: (qc: QueryClient) => void }) {
   const [client] = useState(() => {
     const qc = new QueryClient({
@@ -973,6 +985,37 @@ export default function Amostras() {
               >
                 <ComRota path="/admin/alunos/:studentId/recorrencia" url="/admin/alunos/s1/recorrencia">
                   <AdminAlunoRecorrencia />
+                </ComRota>
+              </SeededAdmin>
+            </Frame>
+          ))}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Perfil de Boxe (aluno)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {PROFILE_CASES.map((c) => (
+            <Frame key={c.title} title={c.title} note={c.note}>
+              <Seeded data={base} modo="autosservico" extra={c.extra}>
+                <StudentPerfilLutador />
+              </Seeded>
+            </Frame>
+          ))}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Perfil de Boxe (professor)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {PERFIL_PROF_CASOS.map((c) => (
+            <Frame key={c.title} title={c.title} note={c.note}>
+              <SeededAdmin
+                data={null}
+                seed={(qc) => {
+                  qc.setQueryData(["admin-student-detail", "s1"], { student: aluno("s1", "Ana Beatriz Souza"), package: null, credits: 0, history: [], completedCount: 0, noShowCount: 0 });
+                  qc.setQueryData(["boxing-profile-history", "s1"], c.lista);
+                  for (const a of c.lista) qc.setQueryData(["boxing-profile-assessment", a.id], a);
+                }}
+              >
+                <ComRota path="/admin/alunos/:studentId/perfil-lutador" url="/admin/alunos/s1/perfil-lutador">
+                  <AdminAlunoPerfilBoxe />
                 </ComRota>
               </SeededAdmin>
             </Frame>
