@@ -421,7 +421,7 @@ function aulaEm(studentId: string, studentName: string, minutos: number, status:
 }
 
 const RISCO = [
-  { student: aluno("s6", "Helena Costa"), motivo: "Sem aulas no pacote", grave: true },
+  { student: aluno("s6", "Helena Costa"), motivo: "Sem pacote ativo", grave: true },
   { student: aluno("s7", "Igor Nascimento"), motivo: "Restam 2 aulas no pacote · 2 faltas seguidas", grave: false },
   { student: aluno("s9", "Karina Duarte"), motivo: "Resta 1 aula no pacote", grave: false },
   { student: aluno("s10", "Leonardo Prado"), motivo: "2 faltas seguidas", grave: false },
@@ -729,7 +729,7 @@ function semearAlunos(qc: QueryClient) {
   const nomes = ["Ana Beatriz Souza", "Helena Costa", "Igor Nascimento", "Julia Pereira", "Karina Duarte", "Leonardo Prado"];
   const ids = ["s1", "s6", "s7", "s8", "s9", "s10"];
   qc.setQueryData(
-    ["admin-students", ADMIN_ID, ""],
+    ["admin-students", ADMIN_ID],
     ids.map((id, i) => ({
       student: aluno(id, nomes[i]),
       restantes: id === "s6" ? null : id === "s9" ? 1 : id === "s7" ? 2 : 3,

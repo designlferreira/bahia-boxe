@@ -14,6 +14,8 @@ interface BookingFiltersProps {
   filters?: StatusFilter[];
   activeFilter?: string;
   onFilterChange?: (v: string) => void;
+  /** Nome do grupo de filtros para leitor de tela ("Filtrar por status" só serve para aulas). */
+  filtersLabel?: string;
 }
 
 const FOCO = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -26,6 +28,7 @@ export function BookingFilters({
   filters,
   activeFilter,
   onFilterChange,
+  filtersLabel = "Filtrar por status",
 }: BookingFiltersProps) {
   const ativoRef = useRef<HTMLButtonElement>(null);
   // A fileira rola: o filtro escolhido (ou o primeiro ao trocar de lista) nunca fica escondido fora da tela.
@@ -60,7 +63,7 @@ export function BookingFilters({
         )}
       </div>
       {filters && (
-        <div role="group" aria-label="Filtrar por status" className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-1 mb-3.5 scroll-fade-x">
+        <div role="group" aria-label={filtersLabel} className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-1 mb-3.5 scroll-fade-x">
           {filters.map((f) => {
             const on = activeFilter === f.value;
             return (

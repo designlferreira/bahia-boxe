@@ -2929,6 +2929,35 @@ existe em `auth.users`, que o cliente não lê. `revoke ... from public, anon; g
 modelo" em um toque; estado dentro do cartão do Perfil de Boxe ("Ainda não avaliado"); contraste do botão "Encerrar" do `ConfirmDialog`
 (global).
 
+### Alunos (lista do professor): rodada de crítica (2026-09-29) — sem migration nova
+
+`src/pages/admin/Alunos.tsx` (rota `/admin/alunos`, item "Alunos" da barra inferior): crítica **23/40**, relatório em
+`.impeccable/critique/*admin-alunos*`. Seis passos na `dev`, testados pelo Lucas. Na página de amostras ("Lista de alunos").
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Triagem por chips com contagem:** "Todos N", "Em risco N", "Sem pacote N", sobre TODOS os alunos (a contagem não muda ao
+  digitar na busca). Filtro na URL (`?filtro=risco` | `?filtro=sem-pacote`; "Ver todos" do painel continua caindo em "risco").
+  Não há seletor de ordem: a lista é sempre por nome (`localeCompare("pt-BR")`); "Em risco" segue a ordem de urgência do painel.
+- **Aluno sem pacote = selo âmbar "Sem pacote"** no lugar do número (âmbar = depende do professor), igual em Todos/Em risco/Sem pacote.
+- **Cartão sem avatar de iniciais**, nome até 2 linhas (`line-clamp-2`), subtítulo só com o nome do pacote (o "5/8 usadas" saiu:
+  o número de restantes já está à direita e o detalhe do aluno mostra o resto). Altura mínima 70px.
+
+**O que mudou / armadilhas:**
+- **A busca filtra EM MEMÓRIA:** a consulta é uma só (`["admin-students", id]`, sem o texto na chave) e `semAcento` (agora exportada de
+  `api.ts`) filtra na tela. Com o texto na chave, cada letra trocava a chave, virava esqueleto e refazia 3 consultas. **Não voltar a
+  pôr a busca na `queryKey`.** A consulta de "Em risco" agora roda sempre (o chip mostra a contagem).
+- Título com `PageHeader`. Lista é `<ul aria-label="Alunos">`; cada botão tem `aria-label` falado ("Nome. Pacote 8 aulas. 3 aulas
+  restantes"; em "Em risco" só o motivo, sem repetir); `<p role="status" class="sr-only">` anuncia "N alunos [em risco|sem pacote]".
+  `BookingFilters` (compartilhado com Aulas) ganhou `filtersLabel` (padrão "Filtrar por status"; aqui "Filtrar alunos").
+
+**FATO (não é bug desta tela): o app NÃO tem como o professor criar um convite.** O código só faz `validate_invite`/`accept_invite`
+(`api.ts`); a criação do link é feita fora do app (provavelmente direto no Supabase). Por isso o "Convidar aluno" sugerido pela crítica
+ficou de fora: não há para onde o botão levar. Criar convite dentro do app é uma rodada própria (função nova no banco, guardar o
+link, mostrar/copiar/compartilhar). A frase do vazio ("Convide um novo aluno para começar.") continua só texto.
+
+**Deixado para depois (registrado, não pedido):** criar convite no app (ver acima); próxima aula / "há N dias sem vir" no cartão;
+estilo do lutador (Perfil de Boxe) no cartão; ordenar por aulas restantes; abrir o cartão em nova aba (é botão, não link).
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
