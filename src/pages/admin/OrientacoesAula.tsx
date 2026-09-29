@@ -235,19 +235,21 @@ export default function AdminOrientacoesAula() {
         />
       </Section>
 
-      <Section title="Antecedência recomendada">
-        <div className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-1 scroll-fade-x">
+      <Section title="Antecedência recomendada" titleId="antecedencia-titulo">
+        {/* Quebra de linha em vez de rolagem lateral: em 375px "20 min" e "30 min" ficavam escondidos fora da vista. */}
+        <div role="group" aria-labelledby="antecedencia-titulo" className="flex flex-wrap gap-2">
           {ARRIVAL_OPTIONS.map((min) => {
             const on = form.arrivalMinutes === min;
             return (
               <button
                 key={min}
                 type="button"
+                aria-pressed={on}
                 // Tocar de novo na marcada desmarca: sem isso não havia como voltar a "não avisar antecedência".
                 onClick={() => setForm((f) => ({ ...f, arrivalMinutes: f.arrivalMinutes === min ? null : min }))}
                 className={cn(
-                  "shrink-0 h-11 px-4 rounded-xl border text-sm font-semibold transition-all active:scale-95",
-                  on ? "bg-primary/15 border-primary text-primary" : "bg-secondary border-[#333] text-foreground/85",
+                  "shrink-0 h-11 px-4 rounded-xl border text-sm font-semibold transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  on ? PILL_ON : PILL_OFF,
                 )}
               >
                 {min} min
@@ -270,6 +272,7 @@ export default function AdminOrientacoesAula() {
         >
           {eq.gloves && (
             <SizePills
+              label="Tamanhos de luva"
               options={GLOVE_SIZES}
               selected={eq.gloves.sizes}
               onToggle={(s) => setEquipment({ gloves: { ...eq.gloves!, sizes: toggleSize(eq.gloves!.sizes, s) } })}
@@ -284,6 +287,7 @@ export default function AdminOrientacoesAula() {
         >
           {eq.wraps && (
             <SizePills
+              label="Comprimentos de bandagem"
               options={WRAP_LENGTHS}
               selected={eq.wraps.lengths}
               onToggle={(s) => setEquipment({ wraps: { ...eq.wraps!, lengths: toggleSize(eq.wraps!.lengths, s) } })}
@@ -291,12 +295,12 @@ export default function AdminOrientacoesAula() {
           )}
         </EquipmentGroup>
 
-        <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mt-4 mb-2">Proteções</div>
-        <div className="flex flex-wrap gap-2">
-          <TogglePill label="Protetor bucal" on={!!eq.mouthguard} onClick={() => setEquipment({ mouthguard: !eq.mouthguard })} />
-          <TogglePill label="Coquilha" on={!!eq.groinGuard} onClick={() => setEquipment({ groinGuard: !eq.groinGuard })} />
-          <TogglePill label="Capacete" on={!!eq.headgear} onClick={() => setEquipment({ headgear: !eq.headgear })} />
-          <TogglePill label="Caneleiras" on={!!eq.shinGuards} onClick={() => setEquipment({ shinGuards: !eq.shinGuards })} />
+        <div id="protecoes-titulo" className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mt-4 mb-2">Proteções</div>
+        <div role="group" aria-labelledby="protecoes-titulo" className="flex flex-wrap gap-2">
+          <TogglePill mode="toggle" label="Protetor bucal" on={!!eq.mouthguard} onClick={() => setEquipment({ mouthguard: !eq.mouthguard })} />
+          <TogglePill mode="toggle" label="Coquilha" on={!!eq.groinGuard} onClick={() => setEquipment({ groinGuard: !eq.groinGuard })} />
+          <TogglePill mode="toggle" label="Capacete" on={!!eq.headgear} onClick={() => setEquipment({ headgear: !eq.headgear })} />
+          <TogglePill mode="toggle" label="Caneleiras" on={!!eq.shinGuards} onClick={() => setEquipment({ shinGuards: !eq.shinGuards })} />
         </div>
       </Section>
 
@@ -336,10 +340,14 @@ export default function AdminOrientacoesAula() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+// Marcada: vermelho de TEXTO (o vermelho de destaque dava 3,25:1 sobre o fundo) e contorno; desmarcada: contorno legível (era #333, 1,4:1).
+const PILL_ON = "bg-primary/15 border-primary text-[hsl(var(--red-text))]";
+const PILL_OFF = "bg-secondary border-muted-foreground/60 text-foreground/85";
+
+function Section({ title, titleId, children }: { title: string; titleId?: string; children: React.ReactNode }) {
   return (
     <div className="card-dark p-4 mb-3.5">
-      <h2 className="section-title mb-3">{title}</h2>
+      <h2 id={titleId} className="section-title mb-3">{title}</h2>
       {children}
     </div>
   );
@@ -392,35 +400,37 @@ function EquipmentGroup({
 }) {
   return (
     <div className="mb-4 last:mb-0">
-      <div className="text-[14.5px] font-semibold text-foreground mb-2">{title}</div>
-      <div className="flex gap-2 mb-2.5">
-        <TogglePill label="Não recomendado" on={!level} onClick={() => onLevel(null)} />
-        <TogglePill label="Recomendado" on={level === "recommended"} onClick={() => onLevel("recommended")} />
-        <TogglePill label="Obrigatório" on={level === "required"} onClick={() => onLevel("required")} />
+      <div id={`nivel-${title}`} className="text-[14.5px] font-semibold text-foreground mb-2">{title}</div>
+      <div role="radiogroup" aria-labelledby={`nivel-${title}`} className="flex flex-wrap gap-2 mb-2.5">
+        <TogglePill mode="radio" label="Não recomendado" on={!level} onClick={() => onLevel(null)} />
+        <TogglePill mode="radio" label="Recomendado" on={level === "recommended"} onClick={() => onLevel("recommended")} />
+        <TogglePill mode="radio" label="Obrigatório" on={level === "required"} onClick={() => onLevel("required")} />
       </div>
       {children}
     </div>
   );
 }
 
-function SizePills({ options, selected, onToggle }: { options: string[]; selected: string[]; onToggle: (s: string) => void }) {
+function SizePills({ label, options, selected, onToggle }: { label: string; options: string[]; selected: string[]; onToggle: (s: string) => void }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div role="group" aria-label={label} className="flex flex-wrap gap-2">
       {options.map((opt) => (
-        <TogglePill key={opt} label={opt} on={selected.includes(opt)} onClick={() => onToggle(opt)} />
+        <TogglePill key={opt} mode="toggle" label={opt} on={selected.includes(opt)} onClick={() => onToggle(opt)} />
       ))}
     </div>
   );
 }
 
-function TogglePill({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
+/** `radio` = escolha única (o estado vai em `aria-checked`); `toggle` = liga/desliga (`aria-pressed`). Antes o estado era só a cor. */
+function TogglePill({ label, on, onClick, mode }: { label: string; on: boolean; onClick: () => void; mode: "radio" | "toggle" }) {
   return (
     <button
       type="button"
+      {...(mode === "radio" ? { role: "radio", "aria-checked": on } : { "aria-pressed": on })}
       onClick={onClick}
       className={cn(
-        "h-10 px-3.5 rounded-xl border text-[13px] font-semibold transition-all active:scale-95",
-        on ? "bg-primary/15 border-primary text-primary" : "bg-secondary border-[#333] text-foreground/80",
+        "h-11 px-3.5 rounded-xl border text-[13px] font-semibold transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        on ? PILL_ON : PILL_OFF,
       )}
     >
       {label}
