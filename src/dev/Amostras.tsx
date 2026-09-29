@@ -35,6 +35,7 @@ import AdminPacotes from "@/pages/admin/Pacotes";
 import StudentMinhaConta from "@/pages/student/MinhaConta";
 import StudentHistorico from "@/pages/student/Historico";
 import StudentPacotes from "@/pages/student/Pacotes";
+import StudentPerfil from "@/pages/student/Perfil";
 import AdminHistorico from "@/pages/admin/Historico";
 import AdminAlunoDetalhe from "@/pages/admin/AlunoDetalhe";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
@@ -1317,6 +1318,32 @@ export default function Amostras() {
                 ]}
               >
                 <StudentPacotes />
+              </Seeded>
+            </Frame>
+          ))}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Meus dados físicos (aluno)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {(
+            [
+              { title: "Meus dados físicos · em branco", note: "aluno novo, nada preenchido", dados: null },
+              { title: "Meus dados físicos · preenchido", note: "todos os campos preenchidos", dados: { sex: "female", heightCm: 165, weightKg: 59.5, wingspanCm: 168, guard: "orthodox", laterality: "right" } },
+              { title: "Meus dados físicos · erro", note: "a consulta falhou (não é semeada de propósito): sem formulário", dados: undefined },
+            ] as { title: string; note: string; dados: Record<string, unknown> | null | undefined }[]
+          ).map((c) => (
+            <Frame key={c.title} title={c.title} note={c.note}>
+              <Seeded
+                data={base}
+                modo="autosservico"
+                extra={c.dados === undefined ? [] : [
+                  [
+                    ["student-profile", "amostra-student"],
+                    { studentId: "amostra-student", sex: null, heightCm: null, weightKg: null, wingspanCm: null, guard: null, laterality: null, fighterProfileResult: null, updatedAt: at(-1, 10), ...(c.dados ?? {}) },
+                  ],
+                ]}
+              >
+                <StudentPerfil />
               </Seeded>
             </Frame>
           ))}

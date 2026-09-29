@@ -3022,6 +3022,44 @@ testados pelo Lucas. Na página de amostras ("Pacotes (aluno)": com pacote ativo
 (a RPC já tem `notes`; hoje vai "Pedido a partir de …" na aula avulsa); mostrar a descrição completa na janela de confirmação; "R$/aula" para
 comparar modelos; "Pedir de novo o mesmo pacote"; "Sugestão: use em até N dias" pode ser confundido com validade (segue só informativo).
 
+### Meus dados físicos (aluno): rodada de crítica (2026-09-29) — sem migration nova
+
+`src/pages/student/Perfil.tsx` (rota `/app/minha-conta/perfil`, linha "Meus dados físicos" em Minha conta): crítica **20/40**, relatório em
+`.impeccable/critique/*student-perfil*`. Seis passos na `dev`, testados pelo Lucas. Na página de amostras ("Meus dados físicos (aluno)": em
+branco, preenchido e erro — a galeria não tinha amostra desta tela).
+
+**ERRO REAL corrigido (P0, perda de dados): falha ao carregar abria o formulário VAZIO e o "Salvar" gravava tudo em branco por cima dos dados
+verdadeiros.** A tela só tratava `isLoading`. Agora, se a consulta falha (`erroId`/`erroDados`), aparece `ErrorState` "Seus dados não foram
+alterados… Tentar novamente" **sem formulário**; enquanto não há `data` mostra o esqueleto; e o Salvar exige `data`. **Não voltar a mostrar
+formulário sem os dados carregados.**
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Validação por campo** (no blur, `role="alert"`, `aria-invalid`): altura 100–250 cm, peso 30–300 kg, envergadura 100–260 cm; vazio vale (a tela é
+  opcional). Peso: até 3 dígitos, **um** separador e **uma** casa (o banco é `numeric(5,1)`; antes "60,5,5" virava `NaN`); exemplo "59,5".
+  Um "168" digitado em Altura mudaria o estilo do Perfil de Boxe (envergadura ÷ altura, `physicalAnchor.ts`).
+- **Salvar só quando mudou e válido**, com o motivo escrito embaixo ("Nenhuma alteração para salvar." / "Corrija os campos em vermelho…").
+  A comparação com o salvo é **por valor** ("59,5" digitado = 59.5 salvo). **Aviso ao sair com alterações:** a seta de voltar
+  (`PageHeader` ganhou `onBack`) e o link do Perfil de Boxe abrem "SAIR SEM SALVAR?"; `beforeunload` cobre fechar/recarregar a aba.
+  **Limite conhecido: as abas de baixo do app não são interceptadas** (o app usa `BrowserRouter`, sem `useBlocker`).
+- **O banner "Novo desafio" saiu do topo** (154px, cordas/poste/anel girando, textos de 9px, empurrava o Sexo para 439px): virou uma linha discreta
+  **no fim**, depois do Salvar ("Descobrir meu estilo de lutador"), com o aviso acima se houver alterações.
+- **Por que pedimos, só com fatos verdadeiros:** subtítulo "Opcional — deixe em branco o que preferir" e uma caixa: "Seu professor vê só médias e
+  contagens do conjunto dos alunos, não os seus números. Altura e envergadura também entram no cálculo do seu Perfil de Boxe." **Conferido no
+  código:** a única tela do professor que usa esses dados é `PerfilAlunos` (`getStudentProfileStats`: média/mín/máx e contagens); nenhuma mostra o
+  número de um aluno; só altura e envergadura entram no Perfil de Boxe. **NÃO conferido no banco:** se a RLS de `student_profiles` deixaria o
+  professor ler o dado individual por outro caminho — o texto descreve o que o APP mostra (uma primeira versão dizia "No app, seu professor vê…", encurtada para caber). Se essa promessa precisar valer também no banco, pedir a consulta das policies.
+- **Guardas** (`GUARD_INFO` tem **7**, não 6): cartão inteiro selecionável (`role="radio"`, grupo `aria-labelledby`), resumo em 12px, "O que é essa
+  guarda?" com **44px** e nome próprio por guarda (`aria-label`), dica "Não sabe? Pode deixar em branco… pé esquerdo à frente costuma ser ortodoxa;
+  direito, southpaw… Toque de novo para desmarcar". **Sem cartão "Ainda não sei"** (gravaria o mesmo `null` de "não preencheu"; foi oferecido).
+
+**O que mudou / armadilhas:** Sexo, Guarda e Lateralidade são `radiogroup` com `aria-checked`; pills com foco visível; "Informações pessoais"/"Boxe" são
+`<h2>`; contornos de campos/pills/cartões com `border-muted-foreground/60–70` (o do tema dava 1,48:1); marcada usa `--red-text`; esqueleto com 5 blocos
+do tamanho do formulário. `PageHeader` agora aceita `onBack` (substitui o `navigate(-1)` quando a tela precisa confirmar).
+
+**Deixado para depois (registrado, não pedido):** aviso ao sair pelas abas de baixo (exige trocar para roteador de dados); "salvar campo a campo";
+aviso "preencha altura e envergadura juntas" (sem uma das duas o índice é `null`); motivo por campo (sexo/peso são só estatística do conjunto);
+"Prefiro não dizer" em Sexo; barra "Salvar" fixa numa tela de ~1800px; a borda global do `card-dark`/inputs (1,48:1) segue no tema.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
