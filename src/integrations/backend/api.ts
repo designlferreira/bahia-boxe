@@ -2328,13 +2328,19 @@ async function deriveNotifications(userId: string): Promise<AppNotification[]> {
           read: false,
           entity: { type: "booking", id: b.id },
         });
-      } else if (b.status === "scheduled" && b.start_time > nowIso) {
+      } else if (b.status === "scheduled" && b.start_time > nowIso && !b.pacote_id) {
+        // "Aula confirmada" é o aviso de quem se AUTOAGENDOU. Uma aula gerada pelo professor na recorrência (`pacote_id`) não é
+        // novidade aqui: o pacote inteiro nasce de uma vez, e o aluno de recorrência abria o sino e via uma "Nova" por aula (12
+        // de uma vez, sem nada a fazer). Ele fica sabendo pelo "Pedido aprovado"/pelas aulas na tela; remarcação e reposição
+        // (os ramos acima) continuam avisando, em qualquer modo.
         items.push({
           id: `booking:${b.id}:scheduled`,
           userId,
           kind: "confirm",
           title: "Aula confirmada",
-          description: "Seu horário está garantido.",
+          // A data da aula, não "seu horário está garantido": a hora do cartão é a de quando o aviso nasceu ("há 3 dias"), e o
+          // aluno queria saber QUANDO é a aula.
+          description: `Sua aula é ${when(b.start_time)}.`,
           createdAt: b.created_at,
           read: false,
           entity: { type: "booking", id: b.id },

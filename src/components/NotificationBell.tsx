@@ -139,7 +139,11 @@ export function NotificationBell({ userId }: NotificationBellProps) {
               <EmptyState
                 icon={Bell}
                 title="Nenhuma notificação"
-                description="Novos agendamentos e avisos aparecem aqui."
+                description={
+                  profile?.role === "admin"
+                    ? "Pedidos e horários esperando a sua resposta aparecem aqui."
+                    : "Avisos sobre suas aulas e pedidos aparecem aqui."
+                }
               />
             )}
             {notifs.map((n) => {

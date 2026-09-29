@@ -1633,7 +1633,7 @@ export default function Amostras() {
               aviso("n1", PROFILE.id, "cancel", "Agendamento recusado", "Toque para ver os detalhes.", 0, false, { type: "booking", id: "b1" }),
               aviso("n2", PROFILE.id, "confirm", "Aula remarcada", "De Ter, 06 out · 19:00 para Qui, 08 out · 19:00.", -1, false, { type: "booking", id: "b2" }),
               aviso("n3", PROFILE.id, "system", "Pedido aprovado", "Suas aulas já estão disponíveis para agendar.", -3, true, { type: "home" }),
-              aviso("n4", PROFILE.id, "confirm", "Aula confirmada", "Seu horário está garantido.", -6, true, { type: "booking", id: "b3" }),
+              aviso("n4", PROFILE.id, "confirm", "Aula confirmada", "Sua aula é Sexta, 03 de outubro · 19:00.", -6, true, { type: "booking", id: "b3" }),
             ];
             const doProfessor = [
               aviso("p1", ADMIN_ID, "system", "Pedido de pacote", "Um aluno está aguardando sua aprovação.", 0, false, { type: "purchase_requests" }),
