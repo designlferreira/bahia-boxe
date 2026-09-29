@@ -3593,6 +3593,28 @@ Um passo na `dev`, testado pelo Lucas (com "Slow 3G"/offline no Chrome). Fecha o
 
 **Não feito (registrado, não pedido):** listas com centenas de itens (Alunos, Aulas, Agenda) não foram testadas para lentidão; tempo limite diferente por tipo de chamada (hoje 25s para tudo); botão "Cancelar" no aviso de demora.
 
+### Endurecimento (`harden`) das listas grandes (2026-09-30) — sem migration nova
+
+Um passo na `dev`, testado pelo Lucas (com poucos alunos: o teste dele foi de "nada quebrou"; os limites abaixo NÃO foram exercitados contra o servidor real). Fecha o último item aberto das seções de `harden` anteriores.
+
+**Medido:** a lista de Alunos com **1.500 alunos** na galeria desenhou os 1.500 cartões em ~85 ms (22 mil elementos no DOM). Sem paginação por enquanto; a busca dessa tela filtra em memória.
+
+**Dois problemas reais achados por leitura do código:**
+1. **`.in("coluna", ids)` vai NA URL.** Cada uuid tem ~37 caracteres; com algumas centenas de alunos o endereço passa do limite do servidor (~8 KB, valor típico, **não medido** contra o Supabase de vocês) e a consulta falha inteira.
+   Afetava nomes (`profileNames`), pacotes e saldos (Alunos, Alunos em risco, Pedidos) e dados físicos (Perfil dos alunos).
+2. **O servidor corta em 1000 linhas por consulta, sem avisar.** "Alunos em risco" busca 120 dias de aulas de TODOS os alunos; passava de 1000 linhas com uma turma média e as mais antigas sumiam em silêncio (escondendo faltas seguidas).
+
+**Correção (`src/integrations/backend/api.ts`, com `lotes.test.ts`):**
+- `emLotes(ids, buscar)`: fatia em lotes de `LOTE_IN = 100`, roda os lotes em paralelo e devolve o mesmo formato `{ data, error }` (o primeiro erro) — os chamadores não mudaram de forma. **Toda lista de ids que cresce com o número de alunos/pacotes usa `emLotes`; não escrever `.in("student_id", ids)` direto.**
+  Ficaram como estavam, de propósito, as listas curtas por natureza (ids de uma página de 30 aulas, modelos de pacote, ids de antecessores da página).
+- `todasAsPaginas(pedir)`: pede `.range()` de 1000 em 1000 até a página vir incompleta. Usada só nas aulas de "Alunos em risco" (dentro de cada lote de alunos; a ordem por aluno se mantém porque cada aluno está em um lote só).
+- **Busca por nome na tela Aulas** (`getAdminBookingHistoryPage`): a consulta é UMA, ordenada e paginada, então não dá para fatiar. Se o nome casar com **mais de 100 alunos**, lança `BUSCA_AMPLA_DEMAIS` ("Muitos alunos com esse nome. Digite mais letras para refinar a busca."),
+  mostrada no `ErrorState` de `Historico.tsx` (só esse texto; as outras falhas seguem no texto padrão). Solução completa (filtrar por nome no servidor, via embed `students!inner(profiles!inner(name))` ou RPC) não foi feita: exigiria conferir as FKs no banco.
+
+**Não conferido:** o comportamento real acima de ~200 alunos (o professor hoje tem poucos alunos); o limite exato de URL do servidor; o corte de 1000 linhas com dados reais.
+
+**Não feito (registrado, não pedido):** paginar/virtualizar a lista de Alunos (só vale acima de alguns milhares); Agenda com centenas de aulas no mesmo dia (mostra uma por hora, já limitada); `getAdminStudents` e afins ainda baixam TODOS os alunos de uma vez.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa

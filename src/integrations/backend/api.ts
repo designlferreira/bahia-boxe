@@ -197,11 +197,41 @@ export async function studentIdForProfile(profileId: string): Promise<string> {
   return data.id;
 }
 
+/**
+ * `.in("coluna", ids)` vai NA URL da requisição: cada uuid tem ~37 caracteres, então com algumas centenas de alunos o endereço passa do limite
+ * do servidor (~8 KB) e a consulta falha inteira ("Request-URI Too Large"). Aqui a lista é fatiada em lotes de 100 e os resultados juntados.
+ * Devolve o mesmo formato `{ data, error }` do Supabase (o primeiro erro, se houver) para os chamadores não mudarem.
+ * Use SEMPRE para listas de ids que crescem com o número de alunos/pacotes.
+ */
+const LOTE_IN = 100;
+export const BUSCA_AMPLA_DEMAIS = "Muitos alunos com esse nome. Digite mais letras para refinar a busca.";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Linhas = { data: any[] | null; error: { message: string } | null };
+export async function emLotes(ids: string[], buscar: (lote: string[]) => PromiseLike<Linhas>): Promise<Linhas> {
+  const lotes: string[][] = [];
+  for (let i = 0; i < ids.length; i += LOTE_IN) lotes.push(ids.slice(i, i + LOTE_IN));
+  const res = await Promise.all(lotes.map((l) => buscar(l)));
+  return { data: res.flatMap((r) => r.data ?? []), error: res.find((r) => r.error)?.error ?? null };
+}
+
+/** O servidor devolve no máximo 1000 linhas por consulta e CORTA o resto sem avisar; isto pede página por página até acabar. */
+const PAGINA_SERVIDOR = 1000;
+export async function todasAsPaginas(pedir: (de: number, ate: number) => PromiseLike<Linhas>): Promise<Linhas> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const todas: any[] = [];
+  for (let de = 0; ; de += PAGINA_SERVIDOR) {
+    const { data, error } = await pedir(de, de + PAGINA_SERVIDOR - 1);
+    if (error) return { data: null, error };
+    todas.push(...(data ?? []));
+    if ((data ?? []).length < PAGINA_SERVIDOR) return { data: todas, error: null };
+  }
+}
+
 /** {profileId: name}. Students can only read their own profile; admins can read every profile. */
 async function profileNames(profileIds: string[]): Promise<Record<string, string>> {
   const unique = Array.from(new Set(profileIds)).filter(Boolean);
   if (unique.length === 0) return {};
-  const { data, error } = await client().from("profiles").select("id, name").in("id", unique);
+  const { data, error } = await emLotes(unique, (l) => client().from("profiles").select("id, name").in("id", l));
   if (error) throw new Error(error.message);
   const map: Record<string, string> = {};
   for (const row of data ?? []) map[row.id] = row.name;
@@ -906,26 +936,34 @@ async function alunosEmRisco(students: StudentRecord[]): Promise<AlunoEmRisco[]>
   const ids = students.map((s) => s.id);
   const desde = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString();
   const [pkgRes, aulasRes] = await Promise.all([
-    client()
-      .from("packages")
-      .select("id, student_id, total_classes, used_classes, origin")
-      .in("student_id", ids)
-      .eq("status", "active")
-      .neq("origin", "trial"),
-    client()
-      .from("bookings")
-      .select("student_id, status, start_time")
-      .in("student_id", ids)
-      .in("status", ["completed", "no_show"])
-      .gte("start_time", desde)
-      .order("start_time", { ascending: false }),
+    emLotes(ids, (l) =>
+      client()
+        .from("packages")
+        .select("id, student_id, total_classes, used_classes, origin")
+        .in("student_id", l)
+        .eq("status", "active")
+        .neq("origin", "trial"),
+    ),
+    // Cada lote de alunos pode passar de 1000 aulas em 120 dias: pagina, senão o servidor corta as mais antigas sem avisar.
+    emLotes(ids, (l) =>
+      todasAsPaginas((de, ate) =>
+        client()
+          .from("bookings")
+          .select("student_id, status, start_time")
+          .in("student_id", l)
+          .in("status", ["completed", "no_show"])
+          .gte("start_time", desde)
+          .order("start_time", { ascending: false })
+          .range(de, ate),
+      ),
+    ),
   ]);
   if (pkgRes.error) throw new Error(pkgRes.error.message);
   if (aulasRes.error) throw new Error(aulasRes.error.message);
 
   const recIds = (pkgRes.data ?? []).filter((p) => p.origin === "recurrence").map((p) => p.id);
   const saldoRes = recIds.length
-    ? await client().from("saldo_pacotes").select("pacote_id, restantes").in("pacote_id", recIds)
+    ? await emLotes(recIds, (l) => client().from("saldo_pacotes").select("pacote_id, restantes").in("pacote_id", l))
     : { data: [], error: null };
   if (saldoRes.error) throw new Error(saldoRes.error.message);
   const restantesRec = new Map((saldoRes.data ?? []).map((r) => [r.pacote_id as string, r.restantes as number]));
@@ -1312,14 +1350,14 @@ export async function getAdminStudents(adminId: string, search: string) {
   const students = await adminStudents(adminId);
   const ids = students.map((s) => s.id);
   const pkgRes = ids.length
-    ? await client().from("packages").select("*").in("student_id", ids).eq("status", "active")
+    ? await emLotes(ids, (l) => client().from("packages").select("*").in("student_id", l).eq("status", "active"))
     : ({ data: [], error: null } as const);
   if (pkgRes.error) throw new Error(pkgRes.error.message);
   const pkgs = pkgRes.data ?? [];
 
   const recIds = pkgs.filter((p) => p.origin === "recurrence").map((p) => p.id as string);
   const saldoRes = recIds.length
-    ? await client().from("saldo_pacotes").select("pacote_id, consumidas, restantes").in("pacote_id", recIds)
+    ? await emLotes(recIds, (l) => client().from("saldo_pacotes").select("pacote_id, consumidas, restantes").in("pacote_id", l))
     : { data: [], error: null };
   if (saldoRes.error) throw new Error(saldoRes.error.message);
   const saldo = new Map((saldoRes.data ?? []).map((r) => [r.pacote_id as string, r as { consumidas: number; restantes: number }]));
@@ -1666,6 +1704,8 @@ export async function getAdminBookingHistoryPage(
   if (q) {
     const ids = students.filter((s) => semAcento(s.name).includes(q)).map((s) => s.id);
     if (ids.length === 0) return { items: [], hasMore: false };
+    // Os ids vão na URL (ver `emLotes`) e aqui não dá para fatiar: a consulta é UMA, ordenada e paginada. Busca ampla demais pede mais letras.
+    if (ids.length > LOTE_IN) throw new Error(BUSCA_AMPLA_DEMAIS);
     query = query.in("student_id", ids);
   }
   // Próximas = ainda não terminaram (em ordem crescente); anteriores = já terminaram (da mais recente para a mais
@@ -1739,7 +1779,7 @@ export async function getPurchaseRequests(adminId: string) {
       : Promise.resolve({ data: [], error: null } as const),
     // Pacotes ativos de quem pediu — pra avisar o professor do que a aprovação encerra.
     studentIds.length
-      ? client().from("packages").select("*").in("student_id", studentIds).eq("status", "active")
+      ? emLotes(studentIds, (l) => client().from("packages").select("*").in("student_id", l).eq("status", "active"))
       : Promise.resolve({ data: [], error: null } as const),
   ]);
   if (templatesRes.error) throw new Error(templatesRes.error.message);
@@ -1764,7 +1804,7 @@ export async function getPurchaseRequests(adminId: string) {
   // "essas aulas deixam de valer" para quem tinha só aulas já marcadas.
   const recIds = (activePkgsRes.data ?? []).filter((r) => r.origin === "recurrence").map((r) => r.id as string);
   const saldoRes = recIds.length
-    ? await client().from("saldo_pacotes").select("pacote_id, restantes").in("pacote_id", recIds)
+    ? await emLotes(recIds, (l) => client().from("saldo_pacotes").select("pacote_id, restantes").in("pacote_id", l))
     : { data: [], error: null };
   if (saldoRes.error) throw new Error(saldoRes.error.message);
   const restantesRec = new Map((saldoRes.data ?? []).map((r) => [r.pacote_id as string, r.restantes as number]));
@@ -2580,7 +2620,7 @@ export async function getStudentProfileStats(adminId: string): Promise<StudentPr
 
   const profiles = ids.length
     ? await (async () => {
-        const { data, error } = await client().from("student_profiles").select("*").in("student_id", ids);
+        const { data, error } = await emLotes(ids, (l) => client().from("student_profiles").select("*").in("student_id", l));
         if (error) throw new Error(error.message);
         return (data ?? []).map((r) => mapStudentProfile(r.student_id, r));
       })()
