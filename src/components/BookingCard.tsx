@@ -42,12 +42,12 @@ export function BookingCard({
         <div className="w-[46px] text-center shrink-0">
           <div className="font-display text-2xl leading-none text-foreground">{dayNumber}</div>
           {monthLabel && (
-            <div className="text-[10.5px] uppercase tracking-wide text-muted-foreground mt-0.5">{monthLabel}</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground mt-0.5">{monthLabel}</div>
           )}
         </div>
       )}
       <div className="flex-1 min-w-0">
-        <div className="text-[14.5px] font-semibold text-foreground truncate">{title}</div>
+        <div className="text-[14.5px] font-semibold text-foreground leading-snug line-clamp-2 break-words">{title}</div>
         {subtitle && <div className="text-xs text-muted-foreground mt-0.5">{subtitle}</div>}
         <StatusBadge status={status} audience="student" className="mt-1.5" />
         {actions && <div className="flex gap-2 mt-3">{actions}</div>}

@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/SkeletonCard";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatDayNumber, formatMonthShort, formatTime } from "@/lib/dateUtils";
+import { formatQuando } from "@/lib/dateUtils";
 import { getStudentBookingHistory } from "@/integrations/backend/api";
 
 type Tab = "proximas" | "anteriores" | "todas";
@@ -45,9 +45,9 @@ export default function StudentHistorico() {
           {data.map((b) => (
             <BookingCard
               key={b.id}
-              dayNumber={formatDayNumber(b.startTime)}
-              monthLabel={formatMonthShort(b.startTime)}
-              title={`${formatTime(b.startTime)} – ${formatTime(b.endTime)}`}
+              // "Amanhã, 19:00" / "Quarta-feira, 30 set · 19:00": responde "quando é?" sem o aluno calcular o dia da semana
+              // (antes: "30" + "set" com o mês em 10,5px e só "19:00 – 20:00"). A hora final fica no detalhe.
+              title={formatQuando(b.startTime)}
               status={b.status}
               onClick={() => navigate(`/app/aula/${b.id}`)}
             />

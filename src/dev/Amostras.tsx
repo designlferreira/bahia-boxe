@@ -33,6 +33,7 @@ import AdminConfiguracoes from "@/pages/admin/Configuracoes";
 import AdminDisponibilidade from "@/pages/admin/Disponibilidade";
 import AdminPacotes from "@/pages/admin/Pacotes";
 import StudentMinhaConta from "@/pages/student/MinhaConta";
+import StudentHistorico from "@/pages/student/Historico";
 import AdminHistorico from "@/pages/admin/Historico";
 import AdminAlunoDetalhe from "@/pages/admin/AlunoDetalhe";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
@@ -261,6 +262,15 @@ function Seeded({
       </AuthContext.Provider>
     </QueryClientProvider>
   );
+}
+
+/** Minhas aulas (aluno): as três abas, no mesmo formato que `getStudentBookingHistory` devolve (próximas em ordem crescente, o resto decrescente). */
+function historicoAluno(proximas: Booking[], anteriores: Booking[]): [unknown[], unknown][] {
+  return [
+    [["student-history", PROFILE.id, "proximas"], proximas],
+    [["student-history", PROFILE.id, "anteriores"], anteriores],
+    [["student-history", PROFILE.id, "todas"], [...proximas].reverse().concat(anteriores)],
+  ];
 }
 
 function Frame({ title, note, children }: { title: string; note: string; children: ReactNode }) {
@@ -1233,6 +1243,39 @@ export default function Amostras() {
           <Frame title="Minha conta · Recorrência" note="professor em Recorrência: a linha Meu pacote some">
             <Seeded data={base} modo="recorrencia">
               <StudentMinhaConta />
+            </Seeded>
+          </Frame>
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Minhas aulas (aluno)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          <Frame title="Minhas aulas" note="autosserviço: 3 próximas; anteriores com concluída, falta e cancelada">
+            <Seeded
+              data={base}
+              modo="autosservico"
+              extra={historicoAluno(
+                [booking(1, "scheduled", { id: "h1" }), booking(3, "pending_confirmation", { id: "h2" }), booking(8, "scheduled", { id: "h3" })],
+                [booking(-2, "completed", { id: "h4" }), booking(-5, "no_show", { id: "h5" }), booking(-9, "cancelled", { id: "h6", cancelledBy: "professor" } as Partial<Booking>), booking(-12, "completed", { id: "h7" })],
+              )}
+            >
+              <StudentHistorico />
+            </Seeded>
+          </Frame>
+          <Frame title="Minhas aulas · Recorrência" note="professor em Recorrência: muitas próximas, uma remarcada">
+            <Seeded
+              data={base}
+              modo="recorrencia"
+              extra={historicoAluno(
+                [1, 3, 5, 8, 10, 12].map((d, i) => booking(d, "scheduled", { id: `r${i}`, pacoteId: "pkg-rec" })),
+                [booking(-2, "completed", { id: "r10" }), booking(-4, "rescheduled", { id: "r11" }), booking(-6, "completed", { id: "r12" })],
+              )}
+            >
+              <StudentHistorico />
+            </Seeded>
+          </Frame>
+          <Frame title="Minhas aulas · sem aulas" note="aluno novo, nada nas três abas">
+            <Seeded data={base} modo="autosservico" extra={historicoAluno([], [])}>
+              <StudentHistorico />
             </Seeded>
           </Frame>
         </div>
