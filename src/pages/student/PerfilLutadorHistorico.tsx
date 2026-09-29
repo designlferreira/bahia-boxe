@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/SkeletonCard";
 import { Button } from "@/components/ui/button";
-import { formatDateShort, formatDateWithYear } from "@/lib/dateUtils";
+import { formatDateWithYear } from "@/lib/dateUtils";
 import { DIMENSIONS, DIMENSION_LABELS, FIGHTER_PROFILE_LABELS, SCORING_VERSION, type Dimension } from "@/lib/boxingProfile";
 import { getBoxingProfileHistory, studentIdForProfile } from "@/integrations/backend/api";
 
@@ -88,6 +88,11 @@ export default function StudentPerfilLutadorHistorico() {
   const oldest = chronological[0];
   const newest = chronological[chronological.length - 1];
   const temEvolucao = chronological.length >= 2;
+  // Não depende da ordem em que o banco devolve a lista.
+  const maisRecenteId = history?.reduce<(typeof history)[number] | undefined>(
+    (m, a) => (!m || a.completedAt > m.completedAt ? a : m),
+    undefined,
+  )?.id;
 
   // Primeira × mais recente, por competência; quem mais subiu (até 2, só se subiu de fato) abre a lista, o resto fica recolhido.
   const linhas: Linha[] =
@@ -134,7 +139,7 @@ export default function StudentPerfilLutadorHistorico() {
               <h2 className="text-[15px] font-semibold text-foreground mb-1.5">Sua evolução ainda não aparece aqui</h2>
               <p className="text-[13.5px] text-muted-foreground leading-relaxed mb-4">
                 {chronological.length === 1 && newest
-                  ? `Você tem 1 avaliação completa (${formatDateShort(newest.completedAt)}). Faça mais uma avaliação completa para comparar suas competências.`
+                  ? `Você tem 1 avaliação completa (${formatDateWithYear(newest.completedAt)}). Faça mais uma avaliação completa para comparar suas competências.`
                   : "Para ver sua evolução por competência, faça pelo menos 2 avaliações completas."}
                 {history.some((a) => a.assessmentLength === "short") &&
                   " As rápidas medem menos e não entram nessa comparação."}
@@ -149,9 +154,9 @@ export default function StudentPerfilLutadorHistorico() {
 
           {temEvolucao && oldest && newest && (
             <>
-              <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2.5">
+              <h2 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2.5">
                 Evolução por competência
-              </div>
+              </h2>
               <div className="text-xs text-muted-foreground leading-relaxed mb-3">
                 Comparando sua primeira avaliação completa ({formatDateWithYear(oldest.completedAt)}) com a mais recente (
                 {formatDateWithYear(newest.completedAt)}).
@@ -188,24 +193,34 @@ export default function StudentPerfilLutadorHistorico() {
             </>
           )}
 
-          <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2.5">Avaliações realizadas</div>
-          <div className="flex flex-col gap-2.5">
-            {history.map((a) => (
+          <h2 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-1">Avaliações realizadas</h2>
+          <p className="text-xs text-muted-foreground mb-2.5">Da mais recente para a mais antiga. Toque em uma para abrir o resultado.</p>
+          <ul className="flex flex-col gap-2.5" aria-label="Avaliações realizadas">
+            {[...history].sort((x, y) => y.completedAt.localeCompare(x.completedAt)).map((a) => {
+              const maisRecente = history.length > 1 && a.id === maisRecenteId;
+              const antiga = a.scoringVersion !== SCORING_VERSION;
+              return (
+              <li key={a.id}>
               <button
-                key={a.id}
                 type="button"
                 onClick={() => navigate(`/app/perfil-lutador/resultado/${a.id}`)}
-                className="card-dark p-4 text-left w-full active:scale-[0.99] transition-transform"
+                aria-label={`${FIGHTER_PROFILE_LABELS[a.primaryProfile]}, ${a.profileScores[a.primaryProfile]}% de afinidade, ${formatDateWithYear(a.completedAt)}, versão ${a.assessmentLength === "short" ? "rápida" : "completa"}${antiga ? ", calculada pela fórmula anterior" : ""}${maisRecente ? ", a mais recente" : ""}`}
+                className="card-dark p-4 text-left w-full active:scale-[0.99] motion-reduce:active:scale-100 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <div className="flex items-baseline justify-between mb-1">
-                  <span className="text-[14.5px] font-semibold text-foreground">
+                <div className="flex items-baseline justify-between gap-3 mb-1">
+                  <span className="min-w-0 text-[14.5px] font-semibold text-foreground">
                     {FIGHTER_PROFILE_LABELS[a.primaryProfile]}
                     <FighterProfileGloss profile={a.primaryProfile} />
                   </span>
-                  <span className="text-[12px] text-muted-foreground">{formatDateShort(a.completedAt)}</span>
+                  <span className="shrink-0 text-[12px] text-muted-foreground">{formatDateWithYear(a.completedAt)}</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[12.5px] text-accent font-semibold">{a.profileScores[a.primaryProfile]}% de afinidade</span>
+                  {maisRecente && (
+                    <span className="text-xs font-bold uppercase tracking-wide text-foreground bg-secondary rounded-full px-2 py-0.5">
+                      Mais recente
+                    </span>
+                  )}
                   {a.scoringVersion !== SCORING_VERSION && (
                     <span className="text-xs font-bold uppercase tracking-wide text-amber bg-amber/10 rounded-full px-2 py-0.5">
                       Calculado pela fórmula anterior
@@ -218,8 +233,10 @@ export default function StudentPerfilLutadorHistorico() {
                   )}
                 </div>
               </button>
-            ))}
-          </div>
+              </li>
+              );
+            })}
+          </ul>
 
           {/* Uma só ação principal por tela: com o cartão de "evolução ainda não aparece", o botão mora nele. */}
           {temEvolucao && (
