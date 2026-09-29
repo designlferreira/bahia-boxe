@@ -26,7 +26,9 @@ interface StatusBadgeProps {
  * pequeno (decisão do Lucas, 2026-09-28).
  */
 export function StatusBadge({ status, audience = "admin", semRegistro = false, agora = false, className }: StatusBadgeProps) {
-  if (semRegistro) return <Badge className={cn("bg-amber/20 text-amber", className)}>Sem registro</Badge>;
+  // Mesmo estado, duas vozes: o professor "tem que registrar" (Sem registro); o aluno "espera o registro".
+  if (semRegistro)
+    return <Badge className={cn("bg-amber/20 text-amber", className)}>{audience === "student" ? "Aguardando registro" : "Sem registro"}</Badge>;
   if (agora) return <Badge className={cn("bg-primary/20 text-[hsl(var(--red-text))]", className)}>Agora</Badge>;
   const cfg = getStatusConfig(status, audience);
   return (

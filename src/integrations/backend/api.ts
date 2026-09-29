@@ -590,13 +590,15 @@ export async function getStudentBookingHistory(
   const now = Date.now();
   return (data ?? [])
     .filter((r) => {
-      const isFuture = new Date(r.start_time).getTime() > now;
-      // "Próximas" é o que ainda vai acontecer: uma aula cancelada não vai. Nas abas de histórico,
-      // cancelamento pelo professor CONTINUA aparecendo — é um fato que o aluno viveu; só o
-      // descarte por regeneração some (filtrado na query acima), porque nunca foi compromisso.
-      if (tab === "proximas") return isFuture && r.status !== "cancelled";
-      // A aba "Todas" saiu (era a soma das duas e mudava a ordem das mesmas aulas entre as abas).
-      return !isFuture;
+      // "Próximas" é o que ainda vai acontecer OU está acontecendo agora (pelo FIM, não pelo começo: a aula em
+      // andamento não é "anterior") e ainda está de pé — cancelada, remarcada e recusada não vão acontecer.
+      // "Anteriores" é todo o resto, então nenhuma aula some das duas abas (antes uma cancelada FUTURA não
+      // aparecia em lugar nenhum). Cancelamento pelo professor continua aparecendo — é um fato que o aluno
+      // viveu; só o descarte por regeneração some (filtrado na query acima), porque nunca foi compromisso.
+      const naoAcabou = new Date(r.end_time).getTime() > now;
+      const dePe = ["scheduled", "pending_confirmation", "rejected_with_suggestion"].includes(r.status);
+      const proxima = naoAcabou && dePe;
+      return tab === "proximas" ? proxima : !proxima;
     })
     .map(mapBooking);
 }

@@ -1248,13 +1248,18 @@ export default function Amostras() {
 
         <h2 className="text-lg font-semibold mb-4">Minhas aulas (aluno)</h2>
         <div className="flex flex-wrap gap-6 mb-12">
-          <Frame title="Minhas aulas" note="autosserviço: 3 próximas; anteriores com concluída, falta e cancelada">
+          <Frame title="Minhas aulas" note="autosserviço: uma em andamento, próximas, e anteriores com sem-registro, concluída, falta e cancelada">
             <Seeded
               data={base}
               modo="autosservico"
               extra={historicoAluno(
-                [booking(1, "scheduled", { id: "h1" }), booking(3, "pending_confirmation", { id: "h2" }), booking(8, "scheduled", { id: "h3" })],
-                [booking(-2, "completed", { id: "h4" }), booking(-5, "no_show", { id: "h5" }), booking(-9, "cancelled", { id: "h6", cancelledBy: "professor" } as Partial<Booking>), booking(-12, "completed", { id: "h7" })],
+                [
+                  booking(0, "scheduled", { id: "h0", startTime: new Date(Date.now() - 20 * 60000).toISOString(), endTime: new Date(Date.now() + 40 * 60000).toISOString() }),
+                  booking(1, "scheduled", { id: "h1" }),
+                  booking(3, "pending_confirmation", { id: "h2" }),
+                  booking(8, "scheduled", { id: "h3" }),
+                ],
+                [booking(-1, "scheduled", { id: "h8" }), booking(-2, "completed", { id: "h4" }), booking(-5, "no_show", { id: "h5" }), booking(-9, "cancelled", { id: "h6", cancelledBy: "professor" } as Partial<Booking>), booking(-12, "completed", { id: "h7" })],
               )}
             >
               <StudentHistorico />

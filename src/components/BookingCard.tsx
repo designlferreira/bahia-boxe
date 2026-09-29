@@ -12,6 +12,9 @@ interface BookingCardProps {
   onClick?: () => void;
   actions?: ReactNode;
   highlight?: boolean;
+  /** Aula agendada cujo horário já passou (o professor ainda não registrou) / em andamento — ver StatusBadge. */
+  semRegistro?: boolean;
+  agora?: boolean;
 }
 
 /** Card de aula: data/hora, badge de status, ações contextuais (aluno x admin). */
@@ -24,6 +27,8 @@ export function BookingCard({
   onClick,
   actions,
   highlight,
+  semRegistro,
+  agora,
 }: BookingCardProps) {
   // Hoje só usado pelo histórico do aluno — rótulos na voz do aluno.
   const Wrapper = onClick ? "button" : "div";
@@ -49,7 +54,7 @@ export function BookingCard({
       <div className="flex-1 min-w-0">
         <div className="text-[14.5px] font-semibold text-foreground leading-snug line-clamp-2 break-words">{title}</div>
         {subtitle && <div className="text-xs text-muted-foreground mt-0.5">{subtitle}</div>}
-        <StatusBadge status={status} audience="student" className="mt-1.5" />
+        <StatusBadge status={status} audience="student" semRegistro={semRegistro} agora={agora} className="mt-1.5" />
         {actions && <div className="flex gap-2 mt-3">{actions}</div>}
       </div>
       {onClick && !actions && <ChevronRight className="h-[18px] w-[18px] text-muted-foreground shrink-0" />}

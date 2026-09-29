@@ -9,6 +9,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/SkeletonCard";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatQuando } from "@/lib/dateUtils";
+import { isAwaitingConfirmation } from "@/lib/bookingStatus";
 import { getStudentBookingHistory } from "@/integrations/backend/api";
 
 type Tab = "proximas" | "anteriores";
@@ -48,6 +49,8 @@ export default function StudentHistorico() {
               // (antes: "30" + "set" com o mês em 10,5px e só "19:00 – 20:00"). A hora final fica no detalhe.
               title={formatQuando(b.startTime)}
               status={b.status}
+              semRegistro={isAwaitingConfirmation(b.status, b.endTime)}
+              agora={b.status === "scheduled" && new Date(b.startTime).getTime() <= Date.now() && new Date(b.endTime).getTime() > Date.now()}
               onClick={() => navigate(`/app/aula/${b.id}`)}
             />
           ))}
