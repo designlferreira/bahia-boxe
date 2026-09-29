@@ -46,6 +46,7 @@ import StudentPerfilLutadorResultado from "@/pages/student/PerfilLutadorResultad
 import StudentPerfilLutadorHistorico from "@/pages/student/PerfilLutadorHistorico";
 import AlterarSenha from "@/pages/shared/AlterarSenha";
 import { NotificationBell } from "@/components/NotificationBell";
+import AdminPerfilAlunos from "@/pages/admin/PerfilAlunos";
 import { BoxingProfileHeading, BoxingProfileQuestionnaire } from "@/components/BoxingProfileQuestionnaire";
 import { getQuestions, QUESTIONNAIRE_VERSION } from "@/lib/boxingProfile";
 import AdminHistorico from "@/pages/admin/Historico";
@@ -1611,6 +1612,60 @@ export default function Amostras() {
                     <StudentPerfilLutadorHistorico />
                   </ComRota>
                 </Seeded>
+              </Frame>
+            ));
+          })()}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Perfil dos alunos (professor)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {(() => {
+            const g = (o: Record<string, number>) => ({ orthodox: 0, southpaw: 0, switch: 0, peekaboo: 0, cross_arm: 0, philly_shell: 0, long_guard: 0, ...o });
+            const casos: { title: string; note: string; stats: unknown }[] = [
+              {
+                title: "Perfil dos alunos · 12 alunos, 8+ preencheram",
+                note: "acima do mínimo: mostra médias e porcentagens (sem mínimo nem máximo)",
+                stats: {
+                  totalStudents: 12,
+                  sex: { filled: 9, breakdown: { female: 4, male: 5, other: 0 } },
+                  guard: { filled: 10, breakdown: g({ orthodox: 6, southpaw: 2, switch: 1, peekaboo: 1 }) },
+                  laterality: { filled: 10, breakdown: { right: 8, left: 2, ambidextrous: 0 } },
+                  heightCm: { filled: 9, avg: 171.4, min: 158, max: 188 },
+                  weightKg: { filled: 8, avg: 72.3, min: 54, max: 98 },
+                },
+              },
+              {
+                title: "Perfil dos alunos · poucos preencheram",
+                note: "2 a 3 de 8: os cartões explicam o mínimo em vez de mostrar números",
+                stats: {
+                  totalStudents: 8,
+                  sex: { filled: 2, breakdown: { female: 1, male: 1, other: 0 } },
+                  guard: { filled: 2, breakdown: g({ orthodox: 2 }) },
+                  laterality: { filled: 3, breakdown: { right: 3, left: 0, ambidextrous: 0 } },
+                  heightCm: { filled: 2, avg: 170, min: 165, max: 175 },
+                  weightKg: { filled: 0, avg: null, min: null, max: null },
+                },
+              },
+              {
+                title: "Perfil dos alunos · sem alunos",
+                note: "estado vazio",
+                stats: {
+                  totalStudents: 0,
+                  sex: { filled: 0, breakdown: { female: 0, male: 0, other: 0 } },
+                  guard: { filled: 0, breakdown: g({}) },
+                  laterality: { filled: 0, breakdown: { right: 0, left: 0, ambidextrous: 0 } },
+                  heightCm: { filled: 0, avg: null, min: null, max: null },
+                  weightKg: { filled: 0, avg: null, min: null, max: null },
+                },
+              },
+            ];
+            return casos.map((c) => (
+              <Frame key={c.title} title={c.title} note={c.note}>
+                <SeededAdmin data={null} seed={(qc) => qc.setQueryData(["student-profile-stats", PROFESSOR.id], c.stats)}>
+                  <ComRota path="/admin/perfil-alunos" url="/admin/perfil-alunos">
+                    <AdminPerfilAlunos />
+                  </ComRota>
+                </SeededAdmin>
               </Frame>
             ));
           })()}

@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { EmptyState } from "@/components/EmptyState";
 import { getStudentProfileStats, type CategoryStats, type NumericStats } from "@/integrations/backend/api";
-import { GUARD_LABELS, LATERALITY_LABELS, SEX_LABELS } from "@/lib/studentProfile";
+import { GUARD_LABELS, LATERALITY_LABELS, MIN_ALUNOS_NA_ESTATISTICA, SEX_LABELS } from "@/lib/studentProfile";
 import type { Guard, Laterality, Sex } from "@/integrations/backend/types";
 
 export default function AdminPerfilAlunos() {
@@ -68,8 +68,8 @@ function CategoryCard<T extends string>({
           {stats.filled} de {total} preencheram
         </div>
       </div>
-      {stats.filled === 0 ? (
-        <div className="text-[12.5px] text-muted-foreground">Ninguém preencheu ainda.</div>
+      {stats.filled < MIN_ALUNOS_NA_ESTATISTICA ? (
+        <PoucosAlunos filled={stats.filled} total={total} />
       ) : (
         <div className="flex flex-col gap-2">
           {order.map((key) => {
@@ -103,15 +103,28 @@ function NumericCard({ title, unit, stats, total }: { title: string; unit: strin
           {stats.filled} de {total} preencheram
         </div>
       </div>
-      {stats.filled === 0 ? (
-        <div className="text-[12.5px] text-muted-foreground">Ninguém preencheu ainda.</div>
+      {stats.filled < MIN_ALUNOS_NA_ESTATISTICA ? (
+        <PoucosAlunos filled={stats.filled} total={total} />
       ) : (
+        // Só a MÉDIA: o mínimo e o máximo são, por definição, o dado de um aluno (o mais baixo, o mais pesado), mesmo com muita gente.
         <div className="flex gap-4">
-          <Stat label="Média" value={`${stats.avg!.toFixed(1)} ${unit}`} />
-          <Stat label="Mínimo" value={`${stats.min} ${unit}`} />
-          <Stat label="Máximo" value={`${stats.max} ${unit}`} />
+          <Stat label="Média" value={`${stats.avg!.toFixed(1).replace(".", ",")} ${unit}`} />
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Com poucos alunos a média (e as porcentagens) são o dado de UM aluno, e o aluno foi avisado de que o professor não vê os números
+ * dele. Em vez de esconder sem dizer nada, a tela explica o motivo.
+ */
+function PoucosAlunos({ filled, total }: { filled: number; total: number }) {
+  return (
+    <div className="text-[12.5px] text-muted-foreground leading-snug">
+      {filled === 0
+        ? "Ninguém preencheu ainda."
+        : `Poucos alunos preencheram ainda (${filled} de ${total}). Os números aparecem a partir de ${MIN_ALUNOS_NA_ESTATISTICA}, para não expor o dado de cada um.`}
     </div>
   );
 }

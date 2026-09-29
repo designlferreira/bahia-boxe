@@ -12,6 +12,14 @@ export const LATERALITY_LABELS: Record<Laterality, string> = {
   ambidextrous: "Ambidestro",
 };
 
+/**
+ * Quantos alunos precisam ter preenchido um dado para o professor ver o número dele em "Perfil dos alunos". Abaixo disso a média
+ * (e, com 1-3, até o mínimo e o máximo) é o dado de UM aluno. O aluno lê essa promessa em "Meus dados físicos": o número da tela dele e
+ * o da tela do professor vêm DESTA constante, para nunca divergirem. Vale só para a interface: a RLS de `student_profiles` deixa o
+ * professor ler a linha individual (0004), e a agregação é feita no navegador dele (`getStudentProfileStats`).
+ */
+export const MIN_ALUNOS_NA_ESTATISTICA = 5;
+
 const NOT_INFORMED = "Não informado";
 
 export function sexLabel(v: Sex | null) {
