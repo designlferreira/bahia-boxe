@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ChevronRight, HelpCircle } from "lucide-react";
+import { ChevronRight, HelpCircle, Sparkles } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -72,7 +72,9 @@ export default function StudentPerfil() {
   const [guardInfoOpen, setGuardInfoOpen] = useState<Guard | null>(null);
   const loadedRef = useRef(false);
   const [tocados, setTocados] = useState<Partial<Record<CampoNumerico, boolean>>>({});
-  const [sairOpen, setSairOpen] = useState(false);
+  // Para onde ir depois de "Sair sem salvar": -1 = voltar; ou um caminho (o link do Perfil de Boxe).
+  const [sairPara, setSairPara] = useState<string | number | null>(null);
+  const irPara = (destino: string | number) => (mudou ? setSairPara(destino) : typeof destino === "number" ? navigate(destino) : navigate(destino));
 
   const { data: studentId, isError: erroId, refetch: recarregarId } = useQuery({
     queryKey: ["my-student-id", profile?.id],
@@ -172,55 +174,8 @@ export default function StudentPerfil() {
         title="MEUS DADOS FÍSICOS"
         subtitle="Opcional — ajuda seu professor a te conhecer melhor"
         back
-        onBack={() => (mudou ? setSairOpen(true) : navigate(-1))}
+        onBack={() => irPara(-1)}
       />
-
-      <button
-        type="button"
-        onClick={() => navigate("/app/perfil-lutador")}
-        className="w-full text-left relative rounded-xl bg-background p-2 mb-5 shadow-card active:scale-[0.98] transition-transform animate-bb-up"
-      >
-        <div className="relative rounded-2xl border border-dashed border-amber/40 bg-card px-4 pt-[18px] pb-4">
-          {/* Camada clipada — só as cordas/postes precisam ser cortados nos cantos arredondados;
-              a badge abaixo fica FORA dela de propósito, senão o overflow-hidden corta a badge
-              (que propositalmente ultrapassa a borda de cima do card). */}
-          <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
-            {/* Cordas do ringue */}
-            <div className="absolute left-0 right-0 top-[6px] h-0.5 bg-amber/50" />
-            <div className="absolute left-0 right-0 top-[13px] h-0.5 bg-amber/35" />
-            <div className="absolute left-0 right-0 top-[20px] h-0.5 bg-amber/[.22]" />
-            {/* Postes de canto */}
-            <div className="absolute top-[3px] left-3 w-[9px] h-[22px] rounded-sm bg-secondary" />
-            <div className="absolute top-[3px] right-3 w-[9px] h-[22px] rounded-sm bg-secondary" />
-          </div>
-
-          <div className="absolute -top-[9px] left-[34px] bg-amber text-amber-foreground text-[9px] font-extrabold uppercase tracking-[.08em] px-[9px] py-[3px] rounded-full">
-            Novo desafio
-          </div>
-
-          <div className="relative mt-3.5 flex items-center gap-2.5">
-            <div className="relative flex-none w-10 h-10">
-              <div className="absolute inset-0 rounded-full bg-[conic-gradient(hsl(var(--amber))_0deg,hsl(var(--secondary))_360deg)] motion-safe:animate-bb-spin" />
-              <div className="absolute inset-1 rounded-full bg-card flex items-center justify-center">
-                <div className="w-[9px] h-[9px] bg-foreground/90 rotate-45" />
-              </div>
-            </div>
-
-            <div className="flex-1 min-w-0">
-              <div className="text-[9.5px] font-bold uppercase tracking-[.1em] text-amber/90 mb-1">PERFIL DE LUTADOR</div>
-              <div className="font-display text-[15.5px] leading-[1.2] text-foreground">
-                Qual é seu estilo
-                <br />
-                no ringue?
-              </div>
-            </div>
-
-            <div className="flex-none flex items-center gap-1 bg-amber/10 text-accent border border-amber/50 rounded-[10px] px-2.5 py-2 text-xs font-bold whitespace-nowrap">
-              Descobrir <ChevronRight className="h-3.5 w-3.5" />
-            </div>
-          </div>
-        </div>
-      </button>
 
       <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Informações pessoais</div>
       <div className="mb-2.5">
@@ -352,14 +307,34 @@ export default function StudentPerfil() {
         {invalido ? "Corrija os campos em vermelho para salvar." : !mudou ? "Nenhuma alteração para salvar." : " "}
       </p>
 
+      {/* O atalho para o Perfil de Boxe era um banner de 154px no TOPO (cordas, poste, anel girando, textos de 9px) que empurrava o
+          formulário para a metade da tela e disputava com a ação da tela, que é preencher e salvar. Agora é uma linha discreta no fim. */}
+      <button
+        type="button"
+        onClick={() => irPara("/app/perfil-lutador")}
+        className="mt-8 w-full min-h-[52px] flex items-center gap-3 border-t border-border pt-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
+      >
+        <Sparkles className="h-4 w-4 text-amber shrink-0" aria-hidden />
+        <span className="flex-1 min-w-0">
+          <span className="block text-[14px] font-semibold text-foreground">Descobrir meu estilo de lutador</span>
+          <span className="block text-[12.5px] text-muted-foreground">Responda o questionário do Perfil de Boxe</span>
+        </span>
+        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
+      </button>
+
       <ConfirmDialog
-        open={sairOpen}
-        onOpenChange={setSairOpen}
+        open={sairPara !== null}
+        onOpenChange={(o) => !o && setSairPara(null)}
         title="SAIR SEM SALVAR?"
         description="Você mudou alguns dados e ainda não salvou. Se sair agora, as mudanças serão perdidas."
         confirmLabel="Sair sem salvar"
         cancelLabel="Continuar editando"
-        onConfirm={() => navigate(-1)}
+        onConfirm={() => {
+          const destino = sairPara;
+          setSairPara(null);
+          if (typeof destino === "number") navigate(destino);
+          else if (destino) navigate(destino);
+        }}
       />
 
       <GuardInfoDialog guard={guardInfoOpen} onOpenChange={(o) => !o && setGuardInfoOpen(null)} />
