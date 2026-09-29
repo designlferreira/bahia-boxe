@@ -34,6 +34,7 @@ import AdminDisponibilidade from "@/pages/admin/Disponibilidade";
 import AdminPacotes from "@/pages/admin/Pacotes";
 import StudentMinhaConta from "@/pages/student/MinhaConta";
 import AdminHistorico from "@/pages/admin/Historico";
+import AdminAlunoDetalhe from "@/pages/admin/AlunoDetalhe";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
 import { RemarcacaoSheet } from "@/components/RemarcacaoSheet";
@@ -865,6 +866,58 @@ function historicoAmostra() {
   ];
 }
 
+/** Detalhe do aluno (professor): três situações típicas. */
+const ALUNO_CASOS: {
+  title: string;
+  note: string;
+  aluno: StudentRecord;
+  pacote: PackageRecord | null;
+  credits: number;
+  history: Booking[];
+  completed: number;
+  noShow: number;
+  saldo?: SaldoPacote;
+}[] = [
+  {
+    title: "Pacote comprado",
+    note: "autosserviço: 10 aulas, 6 usadas; histórico misto; 2 faltas",
+    aluno: aluno("s1", "Ana Beatriz Souza"),
+    pacote: pkg(10, 6, { id: "pkg-ana", studentId: "s1", templateName: "Pacote 10 aulas" }),
+    credits: 3,
+    history: [
+      booking(1, "scheduled", { id: "ah1" }),
+      booking(-2, "completed", { id: "ah2" }),
+      booking(-4, "no_show", { id: "ah3" }),
+      booking(-7, "completed", { id: "ah4" }),
+      booking(-9, "cancelled", { id: "ah5" }),
+      booking(-11, "completed", { id: "ah6" }),
+    ],
+    completed: 6,
+    noShow: 2,
+  },
+  {
+    title: "Em recorrência",
+    note: "pacote de recorrência: as 6 linhas do histórico são futuras (aulas marcadas)",
+    aluno: aluno("s2", "Carlos Henrique Lima"),
+    pacote: pkg(8, 3, { id: "pkg-carlos", studentId: "s2", origin: "recurrence", templateName: undefined }),
+    credits: 0,
+    history: [1, 3, 5, 8, 10, 12].map((d, i) => booking(d, "scheduled", { id: `ch${i}`, pacoteId: "pkg-carlos" })),
+    completed: 3,
+    noShow: 1,
+    saldo: { pacoteId: "pkg-carlos", studentId: "s2", recorrenciaId: "r1", total: 8, consumidas: 3, restantes: 5, aRepor: 1 },
+  },
+  {
+    title: "Aluno novo",
+    note: "cadastrou agora: sem pacote, sem aulas (frequência 0%)",
+    aluno: aluno("s3", "Julia Pereira"),
+    pacote: null,
+    credits: 0,
+    history: [],
+    completed: 0,
+    noShow: 0,
+  },
+];
+
 function SeededAdmin({ data, children, seed }: { data: unknown; children: ReactNode; seed?: (qc: QueryClient) => void }) {
   const [client] = useState(() => {
     const qc = new QueryClient({
@@ -1237,6 +1290,37 @@ export default function Amostras() {
               <AdminHistorico />
             </SeededAdmin>
           </Frame>
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Detalhe do aluno (professor)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {ALUNO_CASOS.map((c) => (
+            <Frame key={c.title} title={c.title} note={c.note}>
+              <SeededAdmin
+                data={null}
+                seed={(qc) => {
+                  qc.setQueryData(["admin-student-detail", c.aluno.id], {
+                    student: c.aluno,
+                    package: c.pacote,
+                    credits: c.credits,
+                    history: c.history,
+                    completedCount: c.completed,
+                    noShowCount: c.noShow,
+                  });
+                  if (c.pacote && c.saldo) qc.setQueryData(["saldo-pacote", c.pacote.id], c.saldo);
+                  qc.setQueryData(["package-templates-admin", ADMIN_ID], [
+                    modelo("m1", "Pacote 8 aulas", 8, 32000),
+                    modelo("m2", "Pacote 12 aulas", 12, 45000),
+                    modelo("m3", "Aula avulsa", 1, 5000),
+                  ]);
+                }}
+              >
+                <ComRota path="/admin/alunos/:studentId" url={`/admin/alunos/${c.aluno.id}`}>
+                  <AdminAlunoDetalhe />
+                </ComRota>
+              </SeededAdmin>
+            </Frame>
+          ))}
         </div>
 
         <h2 className="text-lg font-semibold mb-4">Lista de alunos</h2>

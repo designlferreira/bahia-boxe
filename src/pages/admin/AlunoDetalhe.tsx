@@ -13,6 +13,7 @@ import { Sheet, SheetClose, SheetContent, SheetTitle } from "@/components/ui/she
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/dateUtils";
 import { formatPriceLabel } from "@/lib/packageUtils";
+import { cn } from "@/lib/utils";
 import {
   assignPackageFromTemplate,
   getAdminStudentDetail,
@@ -28,6 +29,9 @@ export default function AdminAlunoDetalhe() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [assignOpen, setAssignOpen] = useState(false);
+  // Tocar num modelo só ESCOLHE; quem atribui é o botão de baixo (antes um toque já criava o pacote novo e
+  // encerrava o atual, sem aviso).
+  const [modeloEscolhido, setModeloEscolhido] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
@@ -61,6 +65,7 @@ export default function AdminAlunoDetalhe() {
     onSuccess: (_r, templateId) => {
       invalidate();
       setAssignOpen(false);
+      setModeloEscolhido(null);
       const t = templates?.find((x) => x.id === templateId);
       toast.success(`Pacote atribuído a ${data?.student.name.split(" ")[0]}${t ? ` · ${t.name}` : ""}`);
     },
@@ -96,6 +101,14 @@ export default function AdminAlunoDetalhe() {
   }
 
   const { student, credits, history, completedCount, noShowCount } = data;
+  const escolhido = templates?.find((t) => t.id === modeloEscolhido) ?? null;
+  const primeiroNome = student.name.split(" ")[0];
+  // O pacote experimental (trial) convive com os outros e NAO e encerrado ao atribuir; os demais sao.
+  const restantes = saldo ? saldo.restantes : pkg ? Math.max(0, pkg.totalClasses - pkg.usedClasses) : 0;
+  const avisoSubstitui =
+    pkg && pkg.origin !== "trial"
+      ? `${primeiroNome} já tem um pacote ativo (${restantes === 1 ? "1 aula restante" : `${restantes} aulas restantes`}). Atribuir um novo encerra o atual. As aulas já marcadas continuam valendo.`
+      : null;
   // Frequência sobre as aulas que CONTAM (realizadas + faltas), não sobre `history` — aquilo é a
   // janela de exibição das 6 últimas linhas, que com recorrência é composta só de aulas futuras
   // ainda `scheduled` e zerava a frequência de todo aluno em recorrência.
@@ -172,7 +185,13 @@ export default function AdminAlunoDetalhe() {
         })}
       </div>
 
-      <Sheet open={assignOpen} onOpenChange={setAssignOpen}>
+      <Sheet
+        open={assignOpen}
+        onOpenChange={(o) => {
+          setAssignOpen(o);
+          if (!o) setModeloEscolhido(null);
+        }}
+      >
         <SheetContent>
           <div className="flex items-start gap-2.5 mb-4">
             <div className="flex-1">
@@ -189,23 +208,45 @@ export default function AdminAlunoDetalhe() {
               </button>
             </SheetClose>
           </div>
-          <div className="flex flex-col gap-2.5">
-            {templates?.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => assign.mutate(t.id)}
-                disabled={assign.isPending}
-                className="w-full text-left card-dark p-4 flex items-center justify-between gap-3 active:scale-[0.98] transition-transform"
-              >
-                <div>
-                  <div className="text-[15px] font-semibold text-foreground">{t.name}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">{t.description}</div>
-                </div>
-                <div className="text-accent font-semibold text-sm shrink-0">{formatPriceLabel(t.priceCents)}</div>
-              </button>
-            ))}
+          {/* Atribuir ENCERRA o pacote ativo não-experimental (regra do banco); as aulas já marcadas continuam valendo. */}
+          {avisoSubstitui && (
+            <div className="rounded-xl border border-amber/40 bg-amber/10 p-3.5 mb-4 text-[13px] leading-snug text-amber">
+              {avisoSubstitui}
+            </div>
+          )}
+          <div role="radiogroup" aria-label="Modelo de pacote" className="flex flex-col gap-2.5">
+            {templates?.map((t) => {
+              const on = modeloEscolhido === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => setModeloEscolhido(t.id)}
+                  disabled={assign.isPending}
+                  className={cn(
+                    "w-full text-left card-dark p-4 flex items-center justify-between gap-3 active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    on && "border-primary bg-primary/10",
+                  )}
+                >
+                  <div>
+                    <div className="text-[15px] font-semibold text-foreground">{t.name}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{t.description}</div>
+                  </div>
+                  <div className="text-accent font-semibold text-sm shrink-0">{formatPriceLabel(t.priceCents)}</div>
+                </button>
+              );
+            })}
           </div>
+          <Button
+            size="lg"
+            className="w-full mt-4"
+            disabled={!escolhido || assign.isPending}
+            onClick={() => escolhido && assign.mutate(escolhido.id)}
+          >
+            {assign.isPending ? "Atribuindo…" : escolhido ? `Atribuir ${escolhido.name}` : "Escolha um modelo"}
+          </Button>
         </SheetContent>
       </Sheet>
 
