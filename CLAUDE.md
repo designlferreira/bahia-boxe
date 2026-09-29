@@ -2586,6 +2586,46 @@ tentativa). Corrigido:
 **Deixado para depois:** WhatsApp do professor na tela de convite inválido (não dá: exige login);
 "Já confirmei" verificar a confirmação de fato antes de mandar ao login.
 
+### Pedidos (professor): rodada de crítica (2026-09-29) — sem migration nova
+
+`src/pages/admin/Pedidos.tsx` (rota `/admin/solicitacoes`, aba "Pedidos"): crítica **20/40**, relatório em
+`.impeccable/critique/*pedidos*`. Seis passos na `dev`, testados pelo Lucas. Na página de amostras
+("Solicitações (professor)", 2 casos). **Nome único da tela: "Pedidos"** (menu, título e subtítulo; o
+endereço fica `/admin/solicitacoes`) — não voltar a "Solicitações" nem "pedidos de aulas" na interface.
+
+**REGRA DE NEGÓCIO (não desfazer): num pacote de RECORRÊNCIA, as aulas restantes já nascem todas
+MARCADAS e continuam valendo depois que o pacote é encerrado** (a conclusão debita pelo `pacote_id`).
+Aprovar um pedido encerra os pacotes ativos não-trial do aluno, mas isso só "tira" aulas dos pacotes que
+NÃO são de recorrência (as que sobravam para agendar). Antes o aviso somava tudo com `used_classes`
+(cópia defasada depois de um desfazer) e dizia "essas aulas deixam de valer" também na recorrência.
+Agora `getPurchaseRequests` separa: `classesLostOnApprove` (só pacotes normais) e
+`recorrenciaRestantes` (de `saldo_pacotes`, a autoridade — decisão 4), mostrada como linha informativa
+cinza ("N aulas marcadas na recorrência. Elas continuam valendo."), nunca como alarme âmbar.
+
+**Decisões do Lucas:**
+- **Aprovar SEMPRE confirma**, sem desfazer: cria pacote/mexe em dinheiro e reverter exigiria migration e
+  mexer em saldo (descartado). Janela curta ("Pacote de 8 aulas para Ana… Não dá para desfazer depois");
+  com perda de aulas, a janela destrutiva de antes ("Aprovar mesmo assim").
+- **Recusar NÃO confirma** — tem só o "Desfazer" de 8s (o lado reversível). Não recolocar a janela.
+- Avisos citam o primeiro nome do aluno; o painel invalida a contagem de pedidos ao decidir.
+
+**O que mudou / armadilhas:**
+- Cartão: "Pedido há 4 dias · 3 aulas restantes" (todos os pacotes ativos, experimental incluída;
+  recorrência via `saldo_pacotes`; "sem pacote ativo") e o recado do aluno (`notes`, que já vinha do
+  banco e nunca aparecia).
+- Trava por cartão (`approve.variables?.id`): só o cartão decidido trava ("Aprovando…"/"Recusando…");
+  botões com `aria-label` com o nome do aluno.
+- Selo de tipo ("Pacote"/"Aula avulsa") **neutro**: é rótulo, não estado (o vermelho falhava no
+  contraste). "Aprovar" em `variant="soft"`.
+- "Decididos recentemente" (últimos 5, `getPedidosDecididos`); estado vazio com "Ver agenda".
+- **Aviso do aluno (`deriveNotifications`):** aprovado diz "Suas aulas já estão disponíveis para
+  agendar" só no autosserviço; na recorrência, "Seu professor liberou o pacote. As aulas são marcadas
+  por ele." (lê o modo via `getModoAgendamentoEfetivo`). Recusado leva à tela inicial (novo
+  `NotificationEntity` `{ type: "home" }`, onde mora o "Falar com o professor").
+
+**Deixado para depois:** desfazer uma aprovação (exigiria função no banco e cuidado com saldo);
+WhatsApp direto no cartão do pedido; motivo da recusa.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
