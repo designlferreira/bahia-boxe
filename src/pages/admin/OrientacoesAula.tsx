@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -72,6 +72,15 @@ function chaveDe(f: Form): string {
   });
 }
 
+/** "41810010" → "41810-010" (só dígitos, no máximo 8). */
+function mascaraCep(v: string) {
+  const d = v.replace(/\D/g, "").slice(0, 8);
+  return d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d;
+}
+
+/** Campos que a busca de CEP preenche. */
+type CampoDoCep = "street" | "neighborhood" | "city" | "state";
+
 function toggleSize(list: string[], size: string) {
   return list.includes(size) ? list.filter((s) => s !== size) : [...list, size];
 }
@@ -84,6 +93,12 @@ export default function AdminOrientacoesAula() {
   const [sairOpen, setSairOpen] = useState(false);
   const [salvoEm, setSalvoEm] = useState<string | null>(null);
   const [cepLoading, setCepLoading] = useState(false);
+  const [cepMsg, setCepMsg] = useState<string | null>(null);
+  // ids únicos por instância (a galeria mostra a tela várias vezes na mesma página).
+  const idNumero = useId();
+  const idCepMsg = useId();
+  // Campos que a busca de CEP preencheu e o professor ainda não mexeu: só esses (e os vazios) são trocados numa nova busca.
+  const veioDoCep = useRef<Set<CampoDoCep>>(new Set());
   // Sem isso, o React Query padrão refaz a busca sempre que a aba/teclado reganha foco — o que é
   // comum ao alternar entre campos no celular — e o useEffect abaixo sobrescrevia o que o
   // professor tinha acabado de digitar com o dado antigo do servidor. Uma vez carregado, o
@@ -106,24 +121,51 @@ export default function AdminOrientacoesAula() {
 
   async function lookupCep() {
     const digits = (form.cep ?? "").replace(/\D/g, "");
-    if (digits.length !== 8) return;
+    setCepMsg(null);
+    if (digits.length === 0) return;
+    if (digits.length !== 8) {
+      setCepMsg("O CEP tem 8 números.");
+      return;
+    }
     setCepLoading(true);
     try {
       const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
       const found = await res.json();
-      if (found.erro) return;
-      setForm((f) => ({
-        ...f,
-        street: found.logradouro || f.street,
-        neighborhood: found.bairro || f.neighborhood,
-        city: found.localidade || f.city,
-        state: found.uf || f.state,
-      }));
+      if (found.erro) {
+        setCepMsg("CEP não encontrado. Preencha o endereço à mão.");
+        return;
+      }
+      const chegou: Record<CampoDoCep, string> = {
+        street: found.logradouro ?? "",
+        neighborhood: found.bairro ?? "",
+        city: found.localidade ?? "",
+        state: found.uf ?? "",
+      };
+      // Antes o CEP SOBRESCREVIA rua/bairro/cidade/estado já digitados (uma correção à mão sumia). Agora só entram os campos vazios ou
+      // que a própria busca preencheu antes e o professor não editou.
+      setForm((f) => {
+        const next = { ...f };
+        (Object.keys(chegou) as CampoDoCep[]).forEach((c) => {
+          if (chegou[c] && (!(f[c] ?? "").trim() || veioDoCep.current.has(c))) {
+            next[c] = chegou[c];
+            veioDoCep.current.add(c);
+          }
+        });
+        return next;
+      });
+      // Com o endereço preenchido, o que falta é o número: leva o foco até ele.
+      document.getElementById(idNumero)?.focus();
     } catch {
-      /* sem internet ou CEP inválido — o professor preenche à mão, sem bloquear o resto do formulário */
+      setCepMsg("Não consegui buscar o CEP agora. Preencha o endereço à mão.");
     } finally {
       setCepLoading(false);
     }
+  }
+
+  /** Editar à mão um campo que veio do CEP o "solta": uma nova busca não o troca. */
+  function editaCampo(c: CampoDoCep, v: string) {
+    veioDoCep.current.delete(c);
+    setForm((f) => ({ ...f, [c]: v }));
   }
 
   const save = useMutation({
@@ -140,6 +182,22 @@ export default function AdminOrientacoesAula() {
   function setEquipment(patch: Partial<EquipmentConfig>) {
     setForm((f) => ({ ...f, equipment: { ...f.equipment, ...patch } }));
   }
+
+  // ATENÇÃO (regra dos hooks): estes dois ficam ACIMA dos `return` antecipados de erro/carregando. Um hook depois deles muda a
+  // quantidade de hooks entre o esqueleto e a tela pronta e o React lança "Rendered more hooks than during the previous render".
+  // O que está salvo (`data === null` = nunca salvou: comparar com o vazio). Salvar só vale quando algo mudou.
+  const mudou = chaveDe(form) !== chaveDe(data ? formDe(data) : empty);
+
+  // Fechar/recarregar a aba com alterações não salvas: o navegador pergunta. Sair pelo "voltar" do cabeçalho: janela própria. (As abas de
+  // baixo do app não dá para interceptar — o app usa BrowserRouter, sem `useBlocker`.)
+  useEffect(() => {
+    if (!mudou) return;
+    const aviso = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", aviso);
+    return () => window.removeEventListener("beforeunload", aviso);
+  }, [mudou]);
 
   // Antes só existia `isLoading`: se a consulta FALHAVA o formulário abria VAZIO (indistinguível de "nunca preencheu") e o "Salvar
   // orientações" gravava tudo em branco por cima do endereço, equipamento e recado que os alunos veem no detalhe da aula. Agora, sem a
@@ -167,20 +225,6 @@ export default function AdminOrientacoesAula() {
   }
 
   const eq = form.equipment;
-  // O que está salvo (`data === null` = nunca salvou: comparar com o vazio). Salvar só vale quando algo mudou.
-  const mudou = chaveDe(form) !== chaveDe(data ? formDe(data) : empty);
-
-  // Fechar/recarregar a aba com alterações não salvas: o navegador pergunta. Sair pelo "voltar" do cabeçalho: janela própria. (As abas de
-  // baixo do app não dá para interceptar — o app usa BrowserRouter, sem `useBlocker`.)
-  useEffect(() => {
-    if (!mudou) return;
-    const aviso = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-    };
-    window.addEventListener("beforeunload", aviso);
-    return () => window.removeEventListener("beforeunload", aviso);
-  }, [mudou]);
-
   return (
     <div className="page-container">
       <PageHeader
@@ -196,42 +240,72 @@ export default function AdminOrientacoesAula() {
             <Field
               label="CEP"
               value={form.cep}
-              onChange={(v) => setForm((f) => ({ ...f, cep: v }))}
+              onChange={(v) => {
+                setCepMsg(null);
+                setForm((f) => ({ ...f, cep: mascaraCep(v) }));
+              }}
               onBlur={lookupCep}
               placeholder="41000-000"
               autoComplete="postal-code"
               inputMode="numeric"
+              maxLength={9}
+              erroId={cepMsg ? idCepMsg : undefined}
             />
             {cepLoading && (
-              <div className="absolute right-3 bottom-3.5 text-[11px] text-muted-foreground">buscando…</div>
+              <div role="status" className="absolute right-3 bottom-3.5 text-xs text-muted-foreground">
+                buscando…
+              </div>
             )}
           </div>
-          <Field label="Número" value={form.number} onChange={(v) => setForm((f) => ({ ...f, number: v }))} placeholder="123" inputMode="numeric" />
+          <Field
+            id={idNumero}
+            label="Número"
+            value={form.number}
+            onChange={(v) => setForm((f) => ({ ...f, number: v }))}
+            placeholder="123 ou S/N"
+            inputMode="text"
+            autoComplete="off"
+            maxLength={10}
+          />
         </div>
+        {cepMsg && (
+          <div id={idCepMsg} role="alert" className="text-[12.5px] text-[hsl(var(--red-text))] -mt-1.5 mb-3">
+            {cepMsg}
+          </div>
+        )}
         <Field
           label="Rua"
           value={form.street}
-          onChange={(v) => setForm((f) => ({ ...f, street: v }))}
+          onChange={(v) => editaCampo("street", v)}
           placeholder="Rua das Palmeiras"
           autoComplete="address-line1"
           className="mb-3"
         />
         <div className="grid grid-cols-2 gap-3 mb-3">
           <Field label="Complemento" value={form.complement} onChange={(v) => setForm((f) => ({ ...f, complement: v }))} placeholder="Sala 2" autoComplete="address-line2" />
-          <Field label="Bairro" value={form.neighborhood} onChange={(v) => setForm((f) => ({ ...f, neighborhood: v }))} placeholder="Centro" />
+          <Field label="Bairro" value={form.neighborhood} onChange={(v) => editaCampo("neighborhood", v)} placeholder="Centro" />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Cidade" value={form.city} onChange={(v) => setForm((f) => ({ ...f, city: v }))} placeholder="Salvador" autoComplete="address-level2" />
-          <Field label="Estado" value={form.state} onChange={(v) => setForm((f) => ({ ...f, state: v }))} placeholder="BA" autoComplete="address-level1" />
+          <Field label="Cidade" value={form.city} onChange={(v) => editaCampo("city", v)} placeholder="Salvador" autoComplete="address-level2" />
+          <Field
+            label="Estado"
+            value={form.state}
+            onChange={(v) => editaCampo("state", v.replace(/[^a-zA-Z]/g, "").slice(0, 2).toUpperCase())}
+            placeholder="BA"
+            autoComplete="address-level1"
+            maxLength={2}
+          />
         </div>
       </Section>
 
       <Section title="Ponto de referência">
         <Textarea
+          aria-label="Ponto de referência"
+          maxLength={200}
           value={form.referencePoint ?? ""}
           onChange={(e) => setForm((f) => ({ ...f, referencePoint: e.target.value }))}
           placeholder="Entrada ao lado do estacionamento do mercado."
-          className="h-16"
+          className="h-16 border-muted-foreground/70"
         />
       </Section>
 
@@ -306,10 +380,12 @@ export default function AdminOrientacoesAula() {
 
       <Section title="Outros">
         <Textarea
+          aria-label="Outras orientações para o aluno"
+          maxLength={500}
           value={form.notes ?? ""}
           onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
           placeholder="Traga garrafa de água e uma toalha."
-          className="h-16"
+          className="h-16 border-muted-foreground/70"
         />
       </Section>
 
@@ -354,6 +430,7 @@ function Section({ title, titleId, children }: { title: string; titleId?: string
 }
 
 function Field({
+  id,
   label,
   value,
   onChange,
@@ -362,7 +439,10 @@ function Field({
   autoComplete,
   inputMode,
   onBlur,
+  maxLength,
+  erroId,
 }: {
+  id?: string;
   label: string;
   value: string | null;
   onChange: (v: string) => void;
@@ -371,17 +451,28 @@ function Field({
   autoComplete?: string;
   inputMode?: "text" | "numeric";
   onBlur?: () => void;
+  maxLength?: number;
+  /** id da mensagem de erro deste campo (liga ao input por aria-describedby). */
+  erroId?: string;
 }) {
+  // Antes o <Label> não tinha htmlFor e o input não tinha id: nenhum dos campos tinha nome para o leitor de tela.
+  const auto = useId();
+  const fid = id ?? auto;
   return (
     <div className={className}>
-      <Label>{label}</Label>
+      <Label htmlFor={fid}>{label}</Label>
       <Input
+        id={fid}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur}
         placeholder={placeholder}
         autoComplete={autoComplete}
         inputMode={inputMode}
+        maxLength={maxLength}
+        aria-invalid={erroId ? true : undefined}
+        aria-describedby={erroId}
+        className="border-muted-foreground/70"
       />
     </div>
   );
