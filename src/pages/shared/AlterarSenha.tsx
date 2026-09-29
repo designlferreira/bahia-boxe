@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
@@ -8,15 +8,31 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { changePassword, AuthError } from "@/integrations/backend/auth";
 
-export default function AlterarSenha({ backTo }: { backTo: string }) {
+const SENHA_DE_AMOSTRA = "Amostra123";
+
+/** `amostra`: só para a página de amostras de desenvolvimento (abre a tela já num estado); não tem efeito no app. */
+export default function AlterarSenha({ backTo, amostra }: { backTo: string; amostra?: "erro-atual" | "erro-geral" }) {
   const navigate = useNavigate();
+  const currentRef = useRef<HTMLInputElement>(null);
   const [show, setShow] = useState(false);
-  const [current, setCurrent] = useState("");
-  const [next, setNext] = useState("");
-  const [confirm, setConfirm] = useState("");
+  const [current, setCurrent] = useState(amostra ? SENHA_DE_AMOSTRA : "");
+  const [next, setNext] = useState(amostra ? SENHA_DE_AMOSTRA : "");
+  const [confirm, setConfirm] = useState(amostra ? SENHA_DE_AMOSTRA : "");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Dois erros, cada um no seu lugar: o da senha atual fica EMBAIXO do campo dela (e leva o foco); o resto (conexão, servidor,
+  // senha fraca) fica embaixo do botão. Antes havia um só, longe do campo, e o campo da senha atual era marcado inválido por qualquer falha.
+  const [errorCurrent, setErrorCurrent] = useState<string | null>(
+    amostra === "erro-atual" ? "Senha atual incorreta. Confira e tente de novo." : null,
+  );
+  const [errorGeral, setErrorGeral] = useState<string | null>(
+    amostra === "erro-geral" ? "Não foi possível alterar a senha. Verifique sua conexão e tente de novo." : null,
+  );
   const [done, setDone] = useState(false);
+
+  function limparErros() {
+    setErrorCurrent(null);
+    setErrorGeral(null);
+  }
 
   const ruleLen = next.length >= 8;
   const ruleNum = /\d/.test(next);
@@ -28,14 +44,18 @@ export default function AlterarSenha({ backTo }: { backTo: string }) {
     e.preventDefault();
     if (!canSubmit) return;
     setLoading(true);
-    setError(null);
+    limparErros();
     try {
       await changePassword(current, next);
       setDone(true);
       toast.success("Senha alterada com sucesso");
     } catch (err) {
-      setError(err instanceof AuthError ? err.message : "Não foi possível alterar a senha.");
-      toast.error("Não foi possível alterar a senha");
+      if (err instanceof AuthError && err.code === "senha_atual_incorreta") {
+        setErrorCurrent(err.message);
+        currentRef.current?.focus();
+      } else {
+        setErrorGeral(err instanceof AuthError ? err.message : "Não foi possível alterar a senha. Tente novamente.");
+      }
     } finally {
       setLoading(false);
     }
@@ -64,18 +84,24 @@ export default function AlterarSenha({ backTo }: { backTo: string }) {
           </div>
           <Input
             id="current"
+            ref={currentRef}
             type={show ? "text" : "password"}
             autoComplete="current-password"
             value={current}
             onChange={(e) => {
               setCurrent(e.target.value);
-              setError(null);
+              limparErros();
             }}
             placeholder="Sua senha de hoje"
-            className="mb-3.5"
-            aria-invalid={!!error}
-            aria-describedby={error ? "current-error" : undefined}
+            className={errorCurrent ? "" : "mb-3.5"}
+            aria-invalid={!!errorCurrent}
+            aria-describedby={errorCurrent ? "current-error" : undefined}
           />
+          {errorCurrent && (
+            <div id="current-error" role="alert" className="text-[12.5px] text-[hsl(var(--red-text))] mt-2 mb-3.5">
+              {errorCurrent}
+            </div>
+          )}
 
           <Label htmlFor="next">Nova senha</Label>
           <Input
@@ -83,7 +109,10 @@ export default function AlterarSenha({ backTo }: { backTo: string }) {
             type={show ? "text" : "password"}
             autoComplete="new-password"
             value={next}
-            onChange={(e) => setNext(e.target.value)}
+            onChange={(e) => {
+              setNext(e.target.value);
+              limparErros();
+            }}
             placeholder="Mínimo 8 caracteres"
             className="mb-3"
           />
@@ -99,20 +128,27 @@ export default function AlterarSenha({ backTo }: { backTo: string }) {
             type={show ? "text" : "password"}
             autoComplete="new-password"
             value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
+            onChange={(e) => {
+              setConfirm(e.target.value);
+              limparErros();
+            }}
             placeholder="Repita a nova senha"
             aria-invalid={mismatch}
             aria-describedby={mismatch ? "confirm-mismatch" : undefined}
           />
           {mismatch && (
-            <div id="confirm-mismatch" role="alert" className="text-[12.5px] text-destructive mt-2">
+            <div id="confirm-mismatch" role="alert" className="text-[12.5px] text-[hsl(var(--red-text))] mt-2">
               As senhas não coincidem.
             </div>
           )}
 
-          {error && (
-            <div id="current-error" role="alert" className="mt-3.5 rounded-2xl border border-destructive/35 bg-destructive/10 p-3.5 text-[13px] text-destructive">
-              {error}
+          {errorGeral && (
+            <div
+              id="erro-geral"
+              role="alert"
+              className="mt-3.5 rounded-2xl border border-destructive/35 bg-destructive/10 p-3.5 text-[13px] text-[hsl(var(--red-text))]"
+            >
+              {errorGeral}
             </div>
           )}
 

@@ -253,7 +253,15 @@ export async function changePassword(currentPassword: string, newPassword: strin
   // wrong "current password" is caught explicitly, matching the UI's error state for that case.
   const { error: reauthError } = await client().auth.signInWithPassword({ email, password: currentPassword });
   if (reauthError) {
-    throw new AuthError("Senha atual incorreta. Tente novamente.");
+    // Só "credencial inválida" é senha atual errada (a tela põe o erro no campo dela). Limite de tentativas e falha de conexão
+    // são outra coisa: antes TODA falha aqui virava "Senha atual incorreta".
+    if (reauthError.status === 429) {
+      throw new AuthError("Muitas tentativas seguidas. Aguarde alguns minutos e tente novamente.");
+    }
+    if (reauthError.status === 400 || /invalid login credentials/i.test(reauthError.message)) {
+      throw new AuthError("Senha atual incorreta. Confira e tente de novo.", "senha_atual_incorreta");
+    }
+    throw new AuthError("Não foi possível verificar sua senha atual. Verifique sua conexão e tente de novo.");
   }
 
   const { error } = await client().auth.updateUser({ password: newPassword });

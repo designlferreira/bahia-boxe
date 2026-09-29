@@ -1623,6 +1623,20 @@ export default function Amostras() {
               </ComRota>
             </Seeded>
           </Frame>
+          <Frame title="Alterar senha · senha atual errada" note="erro embaixo do campo, com o foco nele">
+            <Seeded data={base} modo="autosservico">
+              <ComRota path="/app/minha-conta/alterar-senha" url="/app/minha-conta/alterar-senha">
+                <AlterarSenha backTo="/app/minha-conta" amostra="erro-atual" />
+              </ComRota>
+            </Seeded>
+          </Frame>
+          <Frame title="Alterar senha · falha geral" note="conexão ou servidor: aviso embaixo do botão">
+            <Seeded data={base} modo="autosservico">
+              <ComRota path="/app/minha-conta/alterar-senha" url="/app/minha-conta/alterar-senha">
+                <AlterarSenha backTo="/app/minha-conta" amostra="erro-geral" />
+              </ComRota>
+            </Seeded>
+          </Frame>
           <Frame title="Alterar senha · professor" note="a mesma tela, voltando para a conta do professor">
             <SeededAdmin data={null}>
               <ComRota path="/admin/minha-conta/alterar-senha" url="/admin/minha-conta/alterar-senha">
