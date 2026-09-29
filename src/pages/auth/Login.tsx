@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { AuthError, resendConfirmationEmail } from "@/integrations/backend/auth";
+import { lerConvitePendente } from "@/lib/convitePendente";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -21,6 +22,9 @@ export default function Login() {
   const [reenvio, setReenvio] = useState<{ ok: boolean; texto: string } | null>(null);
   const [reenviando, setReenviando] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+  // Convite guardado neste aparelho (conta criada sem sessão, ou e-mail que já tinha conta): ao entrar,
+  // o AuthProvider o conclui — a tela avisa, em vez de parecer um login qualquer.
+  const [convite] = useState(() => lerConvitePendente());
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
 
@@ -93,7 +97,21 @@ export default function Login() {
         </h1>
       </div>
 
-      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-3.5 mt-auto">
+      {convite && (
+        <div className="rounded-2xl bg-secondary p-3.5 text-sm text-foreground mt-auto mb-3.5">
+          <div className="font-semibold">Entre para concluir seu convite</div>
+          <div className="text-muted-foreground mt-0.5">
+            Use a conta que você criou. Assim que entrar, você já vê suas aulas.{" "}
+            <Link
+              to={`/convite/${convite}`}
+              className="inline-flex min-h-11 items-center font-semibold text-foreground underline underline-offset-4 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Voltar ao convite
+            </Link>
+          </div>
+        </div>
+      )}
+      <form onSubmit={handleSubmit} noValidate className={`flex flex-col gap-3.5 ${convite ? "" : "mt-auto"}`}>
         <div>
           <Label htmlFor="email">E-mail</Label>
           <Input
