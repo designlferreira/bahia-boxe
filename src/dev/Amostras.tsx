@@ -1541,7 +1541,22 @@ export default function Amostras() {
               <Seeded
                 data={base}
                 modo="autosservico"
-                extra={c.dados === undefined ? [] : [[["boxing-profile-assessment", c.id], c.dados]]}
+                extra={
+                  c.dados === undefined
+                    ? []
+                    : [
+                        [["boxing-profile-assessment", c.id], c.dados],
+                        // Histórico do aluno: a avaliação antiga tem uma MAIS RECENTE por cima (para o aviso "esta é uma avaliação antiga").
+                        [
+                          ["boxing-profile-history", "amostra-student"],
+                          c.id === "res-old"
+                            ? [{ ...SELF, id: "res-new", completedAt: new Date().toISOString(), createdAt: new Date().toISOString() }, c.dados]
+                            : c.dados
+                              ? [c.dados]
+                              : [],
+                        ],
+                      ]
+                }
               >
                 <ComRota path="/app/perfil-lutador/resultado/:id" url={`/app/perfil-lutador/resultado/${c.id}`}>
                   <StudentPerfilLutadorResultado />
