@@ -8,9 +8,7 @@ import { SkeletonCard } from "@/components/SkeletonCard";
 import { ErrorState } from "@/components/ErrorState";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Avatar } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getStatusConfig } from "@/lib/bookingStatus";
 import { formatDateTime, formatTime, formatDate } from "@/lib/dateUtils";
 import { arrivalMessage, equipmentItems, formatAddress, hasAddress, mapsUrl } from "@/lib/classGuidelines";
 import {
@@ -24,6 +22,8 @@ import {
   getWhatsappDoProfessor,
 } from "@/integrations/backend/api";
 import { RemarcacaoSheet } from "@/components/RemarcacaoSheet";
+import { StatusBadge } from "@/components/StatusBadge";
+import { Badge } from "@/components/ui/badge";
 
 export default function StudentAulaDetalhe() {
   const { id } = useParams<{ id: string }>();
@@ -172,7 +172,6 @@ export default function StudentAulaDetalhe() {
     );
   }
 
-  const cfg = getStatusConfig(booking.status, "student");
   const cancelable = (booking.status === "scheduled" || booking.status === "pending_confirmation") &&
     new Date(booking.startTime).getTime() > Date.now();
   const arrival = guidelines ? arrivalMessage(guidelines.arrivalMinutes) : null;
@@ -185,7 +184,7 @@ export default function StudentAulaDetalhe() {
 
       <div className="card-dark p-5 mb-3.5">
         <div className="flex items-center gap-2 mb-3">
-          <Badge className={cfg.badgeClass}>{cfg.label}</Badge>
+          <StatusBadge status={booking.status} audience="student" />
           {booking.isReplacement && (
             <Badge className="bg-secondary text-muted-foreground flex items-center gap-1">
               <Repeat className="h-3 w-3" /> Reposição

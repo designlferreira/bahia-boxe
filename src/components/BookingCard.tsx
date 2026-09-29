@@ -1,8 +1,7 @@
 import type { ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { getStatusConfig } from "@/lib/bookingStatus";
 import { cn } from "@/lib/utils";
+import { StatusBadge } from "@/components/StatusBadge";
 
 interface BookingCardProps {
   dayNumber?: string;
@@ -27,7 +26,6 @@ export function BookingCard({
   highlight,
 }: BookingCardProps) {
   // Hoje só usado pelo histórico do aluno — rótulos na voz do aluno.
-  const cfg = getStatusConfig(status, "student");
   const Wrapper = onClick ? "button" : "div";
 
   return (
@@ -51,7 +49,7 @@ export function BookingCard({
       <div className="flex-1 min-w-0">
         <div className="text-[14.5px] font-semibold text-foreground truncate">{title}</div>
         {subtitle && <div className="text-xs text-muted-foreground mt-0.5">{subtitle}</div>}
-        <Badge className={cn(cfg.badgeClass, "mt-1.5")}>{cfg.label}</Badge>
+        <StatusBadge status={status} audience="student" className="mt-1.5" />
         {actions && <div className="flex gap-2 mt-3">{actions}</div>}
       </div>
       {onClick && !actions && <ChevronRight className="h-[18px] w-[18px] text-muted-foreground shrink-0" />}

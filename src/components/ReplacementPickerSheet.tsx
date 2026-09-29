@@ -2,10 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { EmptyState } from "@/components/EmptyState";
 import { formatDateTime } from "@/lib/dateUtils";
-import { getStatusConfig } from "@/lib/bookingStatus";
-import { Badge } from "@/components/ui/badge";
 import { getReplaceableBookingsForStudent } from "@/integrations/backend/api";
 import { CalendarSearch } from "lucide-react";
+import { StatusBadge } from "@/components/StatusBadge";
 
 interface ReplacementPickerSheetProps {
   open: boolean;
@@ -48,7 +47,6 @@ export function ReplacementPickerSheet({ open, onOpenChange, studentId, studentN
         {!isLoading && data && data.length > 0 && (
           <div className="flex flex-col gap-2">
             {data.map((b) => {
-              const cfg = getStatusConfig(b.status);
               return (
                 <button
                   key={b.id}
@@ -57,7 +55,7 @@ export function ReplacementPickerSheet({ open, onOpenChange, studentId, studentN
                   className="w-full text-left card-dark p-3.5 flex items-center justify-between gap-3 active:scale-[0.98] transition-transform"
                 >
                   <span className="text-[13.5px] text-foreground/90">{formatDateTime(b.startTime)}</span>
-                  <Badge className={cfg.badgeClass}>{cfg.label}</Badge>
+                  <StatusBadge status={b.status} />
                 </button>
               );
             })}

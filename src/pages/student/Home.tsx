@@ -10,7 +10,6 @@ import { ErrorState } from "@/components/ErrorState";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   SlotTakenError,
@@ -22,6 +21,7 @@ import {
 import type { Booking } from "@/integrations/backend/types";
 import { getStatusConfig } from "@/lib/bookingStatus";
 import { formatDayNumber, formatMonthShort, formatDate, formatDateShort, formatTime, formatRelativeDay } from "@/lib/dateUtils";
+import { StatusBadge } from "@/components/StatusBadge";
 
 export default function StudentHome() {
   const { profile } = useAuth();
@@ -298,9 +298,7 @@ export default function StudentHome() {
                   {formatRelativeDay(data.nextBooking.startTime)} ·{" "}
                   <span className="whitespace-nowrap">{formatTime(data.nextBooking.startTime)}</span>
                 </div>
-                <Badge className={getStatusConfig(data.nextBooking.status, "student").badgeClass}>
-                  {getStatusConfig(data.nextBooking.status, "student").label}
-                </Badge>
+                <StatusBadge status={data.nextBooking.status} audience="student" />
               </div>
               <ChevronRight className="h-[18px] w-[18px] text-muted-foreground" aria-hidden />
             </button>

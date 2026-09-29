@@ -6,15 +6,14 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { formatDate, formatDateShort, formatRelativeDay, formatTime } from "@/lib/dateUtils";
 import { getAdminDashboard, type PrimeirosPassos } from "@/integrations/backend/api";
-import { getStatusConfig } from "@/lib/bookingStatus";
 import { cn } from "@/lib/utils";
 import { CheckCircle2, ChevronDown, ChevronRight, Circle } from "lucide-react";
 import { usePendingActions } from "@/hooks/usePendingActions";
 import { useLessonActions } from "@/hooks/useLessonActions";
 import type { Booking } from "@/integrations/backend/types";
+import { StatusBadge } from "@/components/StatusBadge";
 
 type AulaComNome = Booking & { studentName: string };
 
@@ -515,7 +514,6 @@ function Hoje({ today, nextAfterToday, agora }: { today: AulaComNome[]; nextAfte
             const passou = t(b.endTime) <= agora;
             // "Agendada" num horário que já passou engana: falta o professor registrar.
             const semRegistro = b.status === "scheduled" && passou;
-            const cfg = getStatusConfig(b.status);
             return (
               <li key={b.id}>
                 <button
@@ -529,11 +527,7 @@ function Hoje({ today, nextAfterToday, agora }: { today: AulaComNome[]; nextAfte
                   <span className={cn("flex-1 min-w-0 text-[15px] truncate", passou ? "text-muted-foreground" : "text-foreground font-semibold")}>
                     {b.studentName}
                   </span>
-                  {semRegistro ? (
-                    <Badge className="bg-amber/20 text-amber">Sem registro</Badge>
-                  ) : (
-                    <Badge className={cfg.badgeClass}>{cfg.label}</Badge>
-                  )}
+                  <StatusBadge status={b.status} semRegistro={semRegistro} />
                 </button>
               </li>
             );

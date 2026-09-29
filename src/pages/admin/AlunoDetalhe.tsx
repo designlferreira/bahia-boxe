@@ -10,9 +10,7 @@ import { ErrorState } from "@/components/ErrorState";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { Sheet, SheetClose, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getStatusConfig } from "@/lib/bookingStatus";
 import { formatDateTime } from "@/lib/dateUtils";
 import { formatPriceLabel } from "@/lib/packageUtils";
 import {
@@ -22,6 +20,7 @@ import {
   getSaldoPacote,
   removeActivePackage,
 } from "@/integrations/backend/api";
+import { StatusBadge } from "@/components/StatusBadge";
 
 export default function AdminAlunoDetalhe() {
   const { studentId } = useParams<{ studentId: string }>();
@@ -164,11 +163,10 @@ export default function AdminAlunoDetalhe() {
       <div className="flex flex-col gap-2.5">
         {history.length === 0 && <div className="text-[13px] text-muted-foreground">Nenhuma aula registrada.</div>}
         {history.map((h) => {
-          const cfg = getStatusConfig(h.status);
           return (
             <div key={h.id} className="card-dark p-3 flex items-center gap-2.5">
               <div className="flex-1 text-[13.5px] text-foreground/85">{formatDateTime(h.startTime)}</div>
-              <Badge className={cfg.badgeClass}>{cfg.label}</Badge>
+              <StatusBadge status={h.status} />
             </div>
           );
         })}

@@ -6,11 +6,11 @@ import { BookingFilters } from "@/components/BookingFilters";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/SkeletonCard";
-import { Badge } from "@/components/ui/badge";
-import { getStatusConfig } from "@/lib/bookingStatus";
 import { formatDateTime } from "@/lib/dateUtils";
 import { getAdminBookingHistory } from "@/integrations/backend/api";
 import { CalendarX } from "lucide-react";
+import { StatusBadge } from "@/components/StatusBadge";
+import { Badge } from "@/components/ui/badge";
 
 const FILTERS = [
   { value: "todas", label: "Todas" },
@@ -51,7 +51,6 @@ export default function AdminHistorico() {
       {!isLoading && !isError && data && data.length > 0 && (
         <div className="flex flex-col gap-2.5">
           {data.map(({ booking, studentName }) => {
-            const cfg = getStatusConfig(booking.status);
             return (
               <button
                 key={booking.id}
@@ -65,7 +64,7 @@ export default function AdminHistorico() {
                     <div className="text-[12.5px] text-muted-foreground mt-0.5">{formatDateTime(booking.startTime)}</div>
                   </div>
                   {booking.isReplacement && <Badge className="bg-secondary text-muted-foreground">Reposição</Badge>}
-                  <Badge className={cfg.badgeClass}>{cfg.label}</Badge>
+                  <StatusBadge status={booking.status} />
                 </div>
               </button>
             );

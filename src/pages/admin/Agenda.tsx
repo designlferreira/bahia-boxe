@@ -5,11 +5,10 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { ErrorState } from "@/components/ErrorState";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatDate, formatDayNumber, formatWeekdayLong, formatWeekdayShort, isoDateOnly } from "@/lib/dateUtils";
-import { getStatusConfig, isAwaitingConfirmation } from "@/lib/bookingStatus";
+import { isAwaitingConfirmation } from "@/lib/bookingStatus";
 import { useLessonActions } from "@/hooks/useLessonActions";
 import { usePendingActions, type PendenteAlvo } from "@/hooks/usePendingActions";
 import {
@@ -18,6 +17,7 @@ import {
   type TimelineEntry,
   VINCULO_LABEL,
 } from "@/integrations/backend/api";
+import { StatusBadge } from "@/components/StatusBadge";
 
 const DAY_COUNT = 7;
 
@@ -193,7 +193,6 @@ export default function AdminAgenda() {
           {data.map((entry) => {
             const booking = entry.booking;
             const awaiting = !entry.free && booking!.status === "scheduled" && isAwaitingConfirmation(booking!.status, booking!.endTime);
-            const cfg = booking ? getStatusConfig(booking.status) : null;
 
             return (
               <div key={entry.hour} className="flex gap-3 min-h-[74px]">
@@ -236,9 +235,7 @@ export default function AdminAgenda() {
                             {entry.hour} – {String((parseInt(entry.hour, 10) + 1) % 24).padStart(2, "0")}:00
                           </div>
                         </div>
-                        <Badge className={cn(awaiting ? "bg-amber/20 text-amber" : cfg!.badgeClass, "whitespace-nowrap")}>
-                          {awaiting ? "Aguardando confirmação" : cfg!.label}
-                        </Badge>
+                        <StatusBadge status={booking!.status} semRegistro={awaiting} />
                       </div>
 
                       {booking?.status === "pending_confirmation" && (

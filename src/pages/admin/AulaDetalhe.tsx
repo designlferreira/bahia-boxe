@@ -9,10 +9,11 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getStatusConfig, isAwaitingConfirmation } from "@/lib/bookingStatus";
+import { isAwaitingConfirmation } from "@/lib/bookingStatus";
 import { formatDate, formatTime } from "@/lib/dateUtils";
 import { useLessonActions } from "@/hooks/useLessonActions";
 import { getAdminBookingDetail, VINCULO_LABEL } from "@/integrations/backend/api";
+import { StatusBadge } from "@/components/StatusBadge";
 
 export default function AdminAulaDetalhe() {
   const { id } = useParams<{ id: string }>();
@@ -54,7 +55,6 @@ export default function AdminAulaDetalhe() {
     );
   }
 
-  const cfg = getStatusConfig(booking.status);
   const awaiting = booking.status === "scheduled" && isAwaitingConfirmation(booking.status, booking.endTime);
   const initials = studentName.split(" ").map((n) => n[0]).slice(0, 2).join("");
 
@@ -64,9 +64,7 @@ export default function AdminAulaDetalhe() {
 
       <div className="card-dark p-5 mb-3.5">
         <div className="flex items-center gap-2 mb-3">
-          <Badge className={awaiting ? "bg-amber/20 text-amber" : cfg.badgeClass}>
-            {awaiting ? "Aguardando confirmação" : cfg.label}
-          </Badge>
+          <StatusBadge status={booking.status} semRegistro={awaiting} />
           {vinculo && (
             <Badge className="bg-secondary text-muted-foreground flex items-center gap-1">
               <Repeat className="h-3 w-3" /> {VINCULO_LABEL[vinculo]}

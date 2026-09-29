@@ -29,7 +29,9 @@ const STATUS_MAP: Record<BookingStatus, StatusConfig> = {
   // Neutro: "agendada" é o estado calmo, está tudo certo. Vermelho (spec §12.1) fica pra ação e
   // urgência — aqui ele dividia a cor com "Faltou"/"Rejeitada" e com o botão principal.
   scheduled: { label: "Agendada", badgeClass: "bg-foreground/10 text-foreground", icon: Calendar },
-  completed: { label: "Concluída", badgeClass: "bg-accent/20 text-accent", icon: CheckCircle },
+  // Neutro com ✓ (StatusBadge): feito não disputa atenção. Era dourado e se confundia com o âmbar
+  // de "Pendente"/"Sem registro" no selo pequeno.
+  completed: { label: "Concluída", badgeClass: "border border-border text-muted-foreground", icon: CheckCircle },
   cancelled: { label: "Cancelada", badgeClass: "bg-muted text-muted-foreground", icon: XCircle },
   no_show: { label: "Faltou", badgeClass: "bg-destructive/20 text-[hsl(var(--red-text))]", icon: AlertTriangle },
   pending_confirmation: { label: "Pendente", badgeClass: "bg-amber/20 text-amber", icon: Clock },
