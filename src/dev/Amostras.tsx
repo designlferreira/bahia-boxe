@@ -764,6 +764,13 @@ export default function Amostras() {
               </ComRota>
             </SemLogin>
           </Frame>
+          <Frame title="Confirme seu e-mail (convite)" note="veio de um convite: conclui sozinho depois de confirmar">
+            <SemLogin>
+              <ComRota path="/confirmar-email" url="/confirmar-email?email=aluno@exemplo.com&convite=1">
+                <ConfirmarEmail />
+              </ComRota>
+            </SemLogin>
+          </Frame>
           <Frame title="Confirme seu e-mail" note="depois de criar a conta">
             <SemLogin>
               <ComRota path="/confirmar-email" url="/confirmar-email?email=aluno@exemplo.com">
