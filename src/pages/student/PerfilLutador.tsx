@@ -13,7 +13,14 @@ import { BoxingProfileResultView } from "@/components/BoxingProfileResultView";
 import { BoxingProfileScoresSummary } from "@/components/BoxingProfileScoresSummary";
 import { BoxingProfileComparisonView } from "@/components/BoxingProfileComparisonView";
 import { BoxingProfilePartialNotice } from "@/components/BoxingProfilePartialNotice";
-import { getBoxingProfileAssessment, getBoxingProfileHistory, markNotificationRead, studentIdForProfile } from "@/integrations/backend/api";
+import {
+  getBoxingProfileAssessment,
+  getBoxingProfileHistory,
+  getStudentAdminId,
+  getWhatsappDoProfessor,
+  markNotificationRead,
+  studentIdForProfile,
+} from "@/integrations/backend/api";
 import { coachAssessmentNotificationId } from "@/components/BoxingProfileHomeCard";
 
 /** Abaixo disso, refazer o teste mostra um aviso (não bloqueante) antes de seguir. */
@@ -44,6 +51,20 @@ export default function StudentPerfilLutador() {
 
   // `history` traz 'self' e 'coach' juntos (RLS por posse, não por tipo) — filtra por tipo em vez
   // de assumir a linha mais recente.
+  // Canal do aluno com o professor (mesmo da Home): só usado quando as leituras divergem.
+  const { data: adminId } = useQuery({
+    queryKey: ["student-admin-id", profile?.id],
+    queryFn: () => getStudentAdminId(profile!.id),
+    enabled: !!profile,
+    staleTime: Infinity,
+  });
+  const { data: whatsapp } = useQuery({
+    queryKey: ["whatsapp-professor", adminId],
+    queryFn: () => getWhatsappDoProfessor(adminId!),
+    enabled: !!adminId,
+    staleTime: 60 * 60 * 1000,
+  });
+
   const latest = history?.find((a) => a.assessmentType === "self");
   const latestCoach = history?.find((a) => a.assessmentType === "coach");
   // Abrir esta tela = ver a avaliação do professor. Marca o aviso como lido pra Home parar de
@@ -140,7 +161,17 @@ export default function StudentPerfilLutador() {
         />
       )}
       {!isLoading && !isError && bothExist && selfFullQuery.data && coachFullQuery.data && (
-        <BoxingProfileComparisonView self={selfFullQuery.data} coach={coachFullQuery.data} viewer="student" />
+        <BoxingProfileComparisonView
+          self={selfFullQuery.data}
+          coach={coachFullQuery.data}
+          viewer="student"
+          showNextSteps
+          talkToCoachHref={
+            whatsapp
+              ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(`Olá! Aqui é ${profile?.name.split(" ")[0] ?? ""}. Vi o resultado do meu Perfil de Boxe e queria conversar sobre ele.`)}`
+              : null
+          }
+        />
       )}
 
       {!isLoading && !isError && latest && !latestCoach && (

@@ -1,4 +1,5 @@
-import { Trophy } from "lucide-react";
+import { MessageCircle, Trophy } from "lucide-react";
+import { BoxingProfileNextSteps } from "@/components/BoxingProfileNextSteps";
 import { BoxingRadarChart } from "@/components/BoxingRadarChart";
 import {
   DIMENSIONS,
@@ -20,6 +21,13 @@ interface BoxingProfileComparisonViewProps {
   coach: BoxingProfileAssessment;
   /** Quem está lendo — só muda os rótulos/o texto de apoio, nunca os números. */
   viewer: "student" | "admin";
+  /**
+   * Só o aluno: mostra "pontos fortes / prioridades / foco" calculados sobre o resultado COMBINADO
+   * (o professor lê sobre o aluno; a voz desses textos é do aluno).
+   */
+  showNextSteps?: boolean;
+  /** Link do WhatsApp do professor; aparece quando as leituras divergem. Sem número, sem link. */
+  talkToCoachHref?: string | null;
 }
 
 const VIEWER_COPY: Record<
@@ -72,7 +80,7 @@ function divergenceText(dim: string | null): string {
  * Comparação Aluno×Professor lado a lado — sempre neutra, nunca "quem está certo". Só monta
  * quando as duas avaliações existem; quem chama decide o que mostrar se faltar uma das duas.
  */
-export function BoxingProfileComparisonView({ self, coach, viewer }: BoxingProfileComparisonViewProps) {
+export function BoxingProfileComparisonView({ self, coach, viewer, showNextSteps = false, talkToCoachHref }: BoxingProfileComparisonViewProps) {
   const copy = VIEWER_COPY[viewer];
   const samePrimaryProfile = self.primaryProfile === coach.primaryProfile;
   // Nunca null aqui: as duas avaliações sempre existem quando este componente é montado.
@@ -133,6 +141,25 @@ export function BoxingProfileComparisonView({ self, coach, viewer }: BoxingProfi
         </div>
       </div>
       <p className="text-[11.5px] text-muted-foreground leading-relaxed mb-5">{samePrimaryProfile ? copy.agree : copy.differ}</p>
+
+      {viewer === "student" && talkToCoachHref && (!samePrimaryProfile || combined.isDivergent) && (
+        <a
+          href={talkToCoachHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mb-6 flex items-center gap-3 rounded-2xl border border-border p-4 active:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <MessageCircle className="h-5 w-5 text-foreground/85 shrink-0" aria-hidden />
+          <div className="flex-1 min-w-0">
+            <div className="text-[15px] font-semibold text-foreground">Conversar com o professor</div>
+            <div className="text-sm text-muted-foreground">Abre uma conversa no WhatsApp</div>
+          </div>
+        </a>
+      )}
+
+      {showNextSteps && viewer === "student" && (
+        <BoxingProfileNextSteps primaryProfile={combined.primaryProfile} dimensionScores={combined.dimensionScores} />
+      )}
 
       <h2 className="section-title mb-2.5">Competências</h2>
       <div className="card-dark p-4 mb-2 flex flex-col items-center">
