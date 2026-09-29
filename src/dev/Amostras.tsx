@@ -16,6 +16,7 @@ import { AuthContext } from "@/context/AuthContext";
 import StudentHome from "@/pages/student/Home";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminAlunos from "@/pages/admin/Alunos";
+import AdminAgenda from "@/pages/admin/Agenda";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
 import { RemarcacaoSheet } from "@/components/RemarcacaoSheet";
@@ -474,6 +475,50 @@ const DASH_CASES: { title: string; note: string; data: unknown }[] = [
   },
 ];
 
+/**
+ * Agenda do professor: 3 semanas (a passada, esta e a próxima) semeadas, cada dia com a mesma chave
+ * que a tela usa (`selectedDate.toDateString()`). Hoje tem de tudo; ontem tem aula sem registro;
+ * amanhã tem pedido novo e pedido de remarcação; depois de amanhã é dia sem horário publicado.
+ */
+function semearAgenda(qc: QueryClient) {
+  const h0 = Math.min(Math.max(new Date().getHours(), 9), 19); // hora "agora", presa num dia útil
+  const aulaNa = (dias: number, hora: number, status: Booking["status"], extra: Partial<Booking> = {}) =>
+    booking(dias, status, { id: `ag-${dias}-${hora}`, startTime: at(dias, hora), endTime: at(dias, hora + 1), ...extra });
+  const livre = (hora: number) => ({ hour: `${String(hora).padStart(2, "0")}:00`, free: true });
+  const aula = (dias: number, hora: number, nome: string, status: Booking["status"], extra: Partial<Booking> = {}, mais = {}) => ({
+    hour: `${String(hora).padStart(2, "0")}:00`,
+    free: false,
+    booking: aulaNa(dias, hora, status, extra),
+    studentName: nome,
+    vinculo: null,
+    antecessorInicio: null,
+    ...mais,
+  });
+
+  const porDia = new Map<number, unknown[]>();
+  porDia.set(0, [
+    aula(0, h0 - 3, "Ana Beatriz Souza", "completed"),
+    aula(0, h0 - 2, "Diego Martins", "no_show"),
+    aula(0, h0 - 1, "Julia Pereira", "scheduled"),
+    aula(0, h0 + 1, "Fernanda Rocha", "scheduled"),
+    aula(0, h0 + 2, "Carlos Henrique Lima", "pending_confirmation", { replacementForBookingId: "orig" }, {
+      vinculo: "pedido_remarcacao",
+      antecessorInicio: at(1, 19),
+    }),
+    livre(h0 + 3),
+    aula(0, h0 + 4, "Igor Nascimento", "scheduled", { isReplacement: true, replacementForBookingId: "falta" }, { vinculo: "reposicao" }),
+  ]);
+  porDia.set(-1, [aula(-1, 18, "Gustavo Alves", "scheduled"), aula(-1, 19, "Helena Costa", "completed"), livre(20)]);
+  porDia.set(1, [aula(1, 7, "Marina Costa", "pending_confirmation"), aula(1, 18, "Karina Duarte", "scheduled"), livre(19), livre(20)]);
+  porDia.set(2, []);
+  for (let d = -7; d <= 14; d++) {
+    const dia = addDays(new Date(), d);
+    const entradas = porDia.get(d) ?? (d % 2 ? [livre(18), aula(d, 19, "Leonardo Prado", d < 0 ? "completed" : "scheduled"), livre(20)] : [livre(7), livre(8)]);
+    qc.setQueryData(["admin-agenda", ADMIN_ID, dia.toDateString()], entradas);
+  }
+  qc.setQueryData(["awaiting-confirmation-bookings", ADMIN_ID], [aulaNa(-1, 18, "scheduled"), aulaNa(0, h0 - 1, "scheduled")]);
+}
+
 /** Lista de alunos: 6 alunos, 4 deles em risco (os mesmos do painel). */
 function semearAlunos(qc: QueryClient) {
   const nomes = ["Ana Beatriz Souza", "Helena Costa", "Igor Nascimento", "Julia Pereira", "Karina Duarte", "Leonardo Prado"];
@@ -550,6 +595,15 @@ export default function Amostras() {
               </SeededAdmin>
             </Frame>
           ))}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Agenda do professor</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          <Frame title="Agenda" note="abre em hoje; ontem tem aula sem registro, amanhã tem pedidos, depois de amanhã sem horários">
+            <SeededAdmin data={null} seed={semearAgenda}>
+              <AdminAgenda />
+            </SeededAdmin>
+          </Frame>
         </div>
 
         <h2 className="text-lg font-semibold mb-4">Lista de alunos</h2>

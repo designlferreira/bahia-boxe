@@ -213,15 +213,20 @@ export default function AdminAgenda() {
                       Horário livre
                     </div>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/admin/aula/${booking!.id}`)}
+                    // O cartão NÃO é um botão: antes era, e os botões de ação ficavam dentro dele
+                    // (HTML inválido — leitor de tela anunciava errado, teclado se perdia, e um toque
+                    // podia abrir o detalhe em vez de acionar a ação). Só o cabeçalho abre o detalhe.
+                    <div
                       className={cn(
-                        "w-full text-left bg-card border rounded-2xl p-3.5 transition-colors active:scale-[0.99]",
+                        "bg-card border rounded-2xl p-3.5",
                         booking?.status === "pending_confirmation" || awaiting ? "border-amber/35" : "border-border",
                       )}
                     >
-                      <div className="flex justify-between items-start gap-2 mb-2">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/admin/aula/${booking!.id}`)}
+                        className="w-full text-left flex justify-between items-start gap-2 mb-2 rounded-md active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
                         <div>
                           <div className="text-[14.5px] font-semibold text-foreground flex items-center gap-1.5">
                             {entry.studentName}
@@ -236,10 +241,11 @@ export default function AdminAgenda() {
                           </div>
                         </div>
                         <StatusBadge status={booking!.status} semRegistro={awaiting} />
-                      </div>
+                        <span className="sr-only">. Ver detalhes</span>
+                      </button>
 
                       {booking?.status === "pending_confirmation" && (
-                        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex gap-2">
                           <Button
                             size="sm"
                             className="flex-1"
@@ -263,7 +269,7 @@ export default function AdminAgenda() {
                       )}
 
                       {booking?.status === "scheduled" && (
-                        <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex flex-col gap-2">
                           {awaiting && (
                             <div className="flex gap-2">
                               <Button
@@ -317,7 +323,7 @@ export default function AdminAgenda() {
                           )}
                         </div>
                       )}
-                    </button>
+                    </div>
                   )}
                 </div>
               </div>
