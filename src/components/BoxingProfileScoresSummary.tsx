@@ -1,5 +1,6 @@
 import { Trophy } from "lucide-react";
 import { BoxingRadarChart } from "@/components/BoxingRadarChart";
+import { FighterProfileGloss } from "@/components/FighterProfileGloss";
 import { DIMENSIONS, DIMENSION_LABELS, FIGHTER_PROFILES, FIGHTER_PROFILE_LABELS, SCORING_VERSION } from "@/lib/boxingProfile";
 import type { BoxingProfileAssessmentSummary } from "@/integrations/backend/types";
 
@@ -53,15 +54,19 @@ export function BoxingProfileScoresSummary({
         <div className="font-display text-[28px] tracking-wide text-foreground leading-none mb-1">
           {FIGHTER_PROFILE_LABELS[primaryProfile]}
         </div>
-        <div className="text-accent text-[15px] font-semibold mb-3">{profileScores[primaryProfile]}% de compatibilidade</div>
+        <FighterProfileGloss profile={primaryProfile} className="text-[13.5px] text-foreground/70 mb-2" />
+        <div className="text-accent text-[15px] font-semibold mb-3">{profileScores[primaryProfile]}% de afinidade com esse estilo</div>
         {description && <p className="text-[13.5px] text-foreground/85 leading-relaxed">{description}</p>}
       </div>
 
       <div className="card-dark p-4 mb-5">
         <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">Perfil secundário</div>
-        <div className="flex items-baseline justify-between">
-          <div className="text-[15px] font-semibold text-foreground">{FIGHTER_PROFILE_LABELS[secondaryProfile]}</div>
-          <div className="text-[13px] text-accent font-semibold">{profileScores[secondaryProfile]}% de compatibilidade</div>
+        <div className="flex items-baseline justify-between gap-3">
+          <div>
+            <div className="text-[15px] font-semibold text-foreground">{FIGHTER_PROFILE_LABELS[secondaryProfile]}</div>
+            <FighterProfileGloss profile={secondaryProfile} />
+          </div>
+          <div className="text-[13px] text-accent font-semibold shrink-0">{profileScores[secondaryProfile]}% de afinidade</div>
         </div>
       </div>
 
@@ -72,7 +77,10 @@ export function BoxingProfileScoresSummary({
             .sort((a, b) => profileScores[b] - profileScores[a])
             .map((p) => (
               <div key={p} className="flex items-center gap-2.5">
-                <span className="flex-1 text-[12.5px] text-foreground/80">{FIGHTER_PROFILE_LABELS[p]}</span>
+                <span className="flex-1 min-w-0 text-[12.5px] text-foreground/80">
+                  {FIGHTER_PROFILE_LABELS[p]}
+                  <FighterProfileGloss profile={p} />
+                </span>
                 <div className="w-20 h-1.5 rounded-full bg-secondary overflow-hidden">
                   <div className="h-full rounded-full bg-accent" style={{ width: `${profileScores[p]}%` }} />
                 </div>

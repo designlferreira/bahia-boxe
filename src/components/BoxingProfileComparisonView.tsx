@@ -1,5 +1,6 @@
 import { MessageCircle, Trophy } from "lucide-react";
 import { BoxingProfileNextSteps } from "@/components/BoxingProfileNextSteps";
+import { FighterProfileGloss } from "@/components/FighterProfileGloss";
 import { BoxingRadarChart } from "@/components/BoxingRadarChart";
 import {
   DIMENSIONS,
@@ -110,7 +111,8 @@ export function BoxingProfileComparisonView({ self, coach, viewer, showNextSteps
         <div className="font-display text-[28px] tracking-wide text-foreground leading-none mb-1">
           {FIGHTER_PROFILE_LABELS[combined.primaryProfile]}
         </div>
-        <div className="text-accent text-[15px] font-semibold mb-3">{combined.profileScores[combined.primaryProfile]}% de compatibilidade</div>
+        <FighterProfileGloss profile={combined.primaryProfile} className="text-[13.5px] text-foreground/70 mb-2" />
+        <div className="text-accent text-[15px] font-semibold mb-3">{combined.profileScores[combined.primaryProfile]}% de afinidade com esse estilo</div>
         {viewer === "student" && (
           <p className="text-[13.5px] text-foreground/85 leading-relaxed mb-2.5">{FIGHTER_PROFILE_DESCRIPTIONS[combined.primaryProfile]}</p>
         )}
@@ -132,11 +134,13 @@ export function BoxingProfileComparisonView({ self, coach, viewer, showNextSteps
         <div className="card-dark p-3.5">
           <div className="text-[10.5px] uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">{copy.selfLabel}</div>
           <div className="text-[14px] font-semibold text-foreground leading-snug">{FIGHTER_PROFILE_LABELS[self.primaryProfile]}</div>
+          <FighterProfileGloss profile={self.primaryProfile} />
           <div className="text-[12px] text-accent font-semibold mt-0.5">{self.profileScores[self.primaryProfile]}%</div>
         </div>
         <div className="card-dark p-3.5">
           <div className="text-[10.5px] uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">{copy.coachLabel}</div>
           <div className="text-[14px] font-semibold text-foreground leading-snug">{FIGHTER_PROFILE_LABELS[coach.primaryProfile]}</div>
+          <FighterProfileGloss profile={coach.primaryProfile} />
           <div className="text-[12px] text-accent font-semibold mt-0.5">{coach.profileScores[coach.primaryProfile]}%</div>
         </div>
       </div>
