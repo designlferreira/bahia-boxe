@@ -3411,6 +3411,48 @@ foco por Tab e leitor de tela (só a estrutura na galeria); o erro de consulta e
 **Deixado para depois (registrado, não pedido):** nome do aluno nos avisos do professor ("Um aluno pediu um horário" continua sem nome: exigiria uma consulta a mais); "Toque para ver os detalhes."
 genérico na recusa sem recado; "lido/limpo" no servidor (ver acima); agrupar/separar "novas" e antigas; o fundo da folha usa uma cor fixa (`#161616`), não o token do cartão.
 
+### Perfil dos alunos (professor): rodada de crítica (2026-09-29) — sem migration nova
+
+`src/pages/admin/PerfilAlunos.tsx` (`/admin/perfil-alunos`, linha "Perfil dos alunos" em Minha conta do professor; estatísticas do CONJUNTO a partir de "Meus dados físicos" dos alunos):
+crítica **19/40**, relatório em `.impeccable/critique/*perfilalunos*`. Quatro passos na `dev`, testados pelo Lucas. Na página de amostras ("Perfil dos alunos (professor)": 12 alunos, poucos
+preencheram, ninguém preencheu, sem alunos, a consulta falhou). **Continuam SEM crítica:** as duas barras de navegação de baixo e a tela 404 (`NotFound`).
+
+**FATOS DE DADOS (lidos nas migrations e no código, NÃO no banco real) — resolvem a dúvida antiga de "Meus dados físicos":**
+- `getStudentProfileStats` (api.ts) baixa `select("*")` de `student_profiles` de TODOS os alunos do professor e AGREGA NO NAVEGADOR DELE; não há RPC/view de agregados.
+- `0004_student_profiles.sql` cria `student_profiles_admin_select`: **o professor pode LER a linha individual de cada aluno seu.** Nenhuma tela mostra o número de um aluno, mas o dado individual chega ao
+  aparelho dele. **A promessa ao aluno vale só para a INTERFACE, não para o banco.** Para valer de verdade seria preciso agregar no servidor (RPC `security definer` devolvendo só agregados +
+  revogar a leitura da linha): **oferecido, NÃO escolhido (mexe em segurança, exige migration + verificação), dívida registrada.**
+- Antes não havia mínimo algum: com 1 aluno, média = mín = máx = o dado dele (e "100% · 1"); com 2, os dois valores ficavam expostos; com 3, o terceiro se deduzia por média×3 − mín − máx.
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Privacidade = mínimo NA TELA + texto do aluno honesto** (a alternativa "agregar no servidor" foi oferecida e recusada). **Mínimo de 5 alunos por cartão** (`MIN_ALUNOS_NA_ESTATISTICA` em
+  `lib/studentProfile.ts`): abaixo disso o cartão diz "Poucos alunos preencheram ainda (2 de 8). Os números aparecem a partir de 5, para não expor o dado de cada um." (0 = "Ninguém preencheu ainda.").
+  **O texto do aluno em `student/Perfil.tsx` usa a MESMA constante:** "Seu professor vê só a média e as contagens do conjunto dos alunos, e só quando pelo menos 5 alunos preencheram o mesmo dado: nunca os
+  seus números." Mudar o 5 muda as duas telas juntas.
+- **Uso da tela: equipamento e duplas, com FAIXAS** (não só média): peso (Menos de 60 / 60 a 75 / 75 a 90 / 90 kg ou mais), altura e ENVERGADURA (Menos de 1,60 / 1,60 a 1,70 / 1,70 a 1,80 /
+  1,80 m ou mais), lateralidade, guarda, sexo. **Os cortes são uma CONVENÇÃO minha** (`FAIXAS_PESO_KG`/`FAIXAS_ALTURA_CM`, faixa [de, ate): o valor exato da divisa cai na faixa de cima), fáceis
+  de trocar num lugar só sem afetar nenhum dado gravado.
+- Escopo: tudo, na ordem.
+
+**O que mudou / armadilhas:**
+- **Mínimo e máximo SAÍRAM** (são, por definição, o dado de um aluno, mesmo com muita gente): fica a MÉDIA (altura/envergadura sem casa decimal, peso com uma, vírgula em vez de ponto).
+  `NumericStats.min/max` ainda existem em `api.ts`, mas a tela NÃO os mostra: **não mostrar de novo.**
+- **Grupos com menos de 2 alunos não aparecem** (`MIN_ALUNOS_POR_GRUPO`): "10% · 1" identificava um aluno mesmo numa turma grande. A tela avisa quantos ficaram de fora ("2 alunos estão em
+  grupos com menos de 2 pessoas e não aparecem aqui…" / "1 aluno está num grupo sozinho…"), senão as porcentagens pareceriam errar a conta. Limite conhecido: o mínimo protege o caso mais grave,
+  não impede alguém de deduzir por eliminação em turmas muito pequenas.
+- `numericStats(values, faixas)` devolve também `faixas: {label, count}[]`; `StudentProfileStats` ganhou `wingspanCm` (a envergadura já era coletada em `student_profiles` e não aparecia).
+- **Falhou ≠ vazio:** `ErrorState` com "Tentar novamente" (antes uma linha de texto vermelho solto, sem `role=alert`); esqueleto com a forma da página (cinco blocos) e `role=status`, que também cobre a
+  consulta ainda desligada (sem perfil) — antes só o título na tela. Com alunos mas NINGUÉM preencheu: um aviso só ("Ninguém preencheu ainda…"), não cinco cartões iguais.
+- Lista de verdade (`ul/li`), barras `aria-hidden` (o número está em texto ao lado), textos >= 12px (o "N de M preencheram" era 11,5px e o rótulo da média 10,5px), barras em `bg-foreground/70`
+  (o dourado é "ação positiva", não dado), grupos do maior para o menor, ordem pelo uso (Peso, Altura, Envergadura, Lateralidade, Guarda, Sexo) e uma linha de resumo no topo ("12 alunos. Cada cartão
+  diz quantos preencheram aquele dado."). Os nomes das guardas já vinham em português; não mudaram.
+
+**Não conferido:** o visual real (a captura do navegador da galeria vem preta; só textos e atributos), os dados reais de alunos, foco/leitor de tela, e o comportamento com dados de verdade em
+turmas pequenas.
+
+**Deixado para depois (registrado, não pedido):** agregar no servidor (ver acima); renomear a tela ("A turma"/"Como é a turma") e um atalho no cartão "Alunos"; uma ação para lembrar os alunos de
+preencher (WhatsApp); a divisão "N de M" por dado versus as % (base diferente) continua em cada cartão.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa

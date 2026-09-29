@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getStudentProfile, saveStudentProfile, studentIdForProfile } from "@/integrations/backend/api";
 import type { Guard, Laterality, Sex } from "@/integrations/backend/types";
-import { GUARD_INFO, LATERALITY_LABELS, SEX_LABELS } from "@/lib/studentProfile";
+import { GUARD_INFO, LATERALITY_LABELS, MIN_ALUNOS_NA_ESTATISTICA, SEX_LABELS } from "@/lib/studentProfile";
 
 interface Form {
   sex: Sex | null;
@@ -186,8 +186,8 @@ export default function StudentPerfil() {
           tela "Perfil dos alunos"), nunca o número de um aluno; altura e envergadura são usadas pelo Perfil de Boxe (versão completa). O
           subtítulo antigo, "ajuda seu professor a te conhecer melhor", prometia mais do que a tela do professor mostra. */}
       <div className="rounded-xl border border-border bg-card px-4 py-3 mb-5 text-[13px] leading-snug text-muted-foreground">
-        Seu professor vê só médias e contagens do conjunto dos alunos, não os seus números. Altura e envergadura também entram no cálculo do seu
-        Perfil de Boxe.
+        Seu professor vê só a média e as contagens do conjunto dos alunos, e só quando pelo menos {MIN_ALUNOS_NA_ESTATISTICA} alunos
+        preencheram o mesmo dado: nunca os seus números. Altura e envergadura também entram no cálculo do seu Perfil de Boxe.
       </div>
 
       <h2 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Informações pessoais</h2>
