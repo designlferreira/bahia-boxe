@@ -5,6 +5,7 @@ import { ChevronRight, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { BookingFilters } from "@/components/BookingFilters";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/SkeletonCard";
@@ -72,7 +73,7 @@ export default function AdminAlunos() {
 
   return (
     <div className="page-container">
-      <h1 className="font-display text-3xl tracking-wide text-foreground leading-none mb-3.5">ALUNOS</h1>
+      <PageHeader title="ALUNOS" />
       <BookingFilters
         search={search}
         onSearchChange={setSearch}
