@@ -10,7 +10,6 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { AccountRow } from "@/components/AccountRow";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 import { EditProfileDialog } from "@/components/EditProfileDialog";
-import { formatDateShort } from "@/lib/dateUtils";
 
 export default function AdminMinhaConta() {
   const { profile, signOut } = useAuth();
@@ -28,7 +27,8 @@ export default function AdminMinhaConta() {
       </div>
     );
   }
-  const initials = profile.name.split(" ").map((n) => n[0]).slice(0, 2).join("");
+  // `filter(Boolean)`: nome com espaço duplo ou no fim não pula uma inicial; maiúsculas mesmo se o nome foi digitado em minúsculas.
+  const initials = profile.name.split(" ").filter(Boolean).map((n) => n[0]).slice(0, 2).join("").toUpperCase();
 
   return (
     <div className="page-container">
@@ -36,9 +36,12 @@ export default function AdminMinhaConta() {
 
       <div className="card-dark p-4 flex items-center gap-3.5 mb-4">
         <Avatar initials={initials} size="md" />
-        <div>
-          <div className="text-base font-semibold text-foreground">{profile.name}</div>
-          <div className="text-[12.5px] text-muted-foreground">Professor · desde {formatDateShort(profile.createdAt)}</div>
+        {/* `min-w-0` + quebra: um nome ou e-mail longo passava de 700px e estourava a tela. O e-mail da conta responde "com qual conta eu
+            entrei?" (o aluno já tinha); "Professor · desde 13 mar" saiu: sem ano, e era a data de criação da conta, não de quando
+            começou a dar aula. */}
+        <div className="min-w-0">
+          <div className="text-base font-semibold text-foreground break-words">{profile.name}</div>
+          <div className="text-[12.5px] text-muted-foreground break-all">{profile.email}</div>
         </div>
       </div>
 
