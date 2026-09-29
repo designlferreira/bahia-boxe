@@ -2826,6 +2826,40 @@ vencimento que não existe (e a edição gravava 60 em modelo sem prazo).
 **Deixado para depois (registrado, não pedido):** ocultar/reativar modelos sem apagar; duplicar modelo; ordenar; a tela
 do aluno (`student/Pacotes.tsx`); em modo Recorrência esta tela continua igual (o aluno nem chega a pedir pacote).
 
+### Minha conta (aluno): rodada de crítica (2026-09-29) — sem migration nova
+
+`src/pages/student/MinhaConta.tsx` (rota `/app/minha-conta`): crítica **21/40**, relatório em
+`.impeccable/critique/*minhaconta*`. Cinco passos na `dev`, testados pelo Lucas. Na página de amostras ("Minha conta
+(aluno)": autosserviço e Recorrência). A Minha conta do PROFESSOR (`admin/MinhaConta.tsx`) tem a mesma estrutura por
+cópia e NÃO foi mexida (só herdou o diálogo de nome e o `Avatar`).
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Nomes das linhas** (cada uma diz o que abre): "Meu nome" (edita o nome), "Meu Perfil de Boxe" (o RESULTADO do estilo,
+  `/app/perfil-lutador`), "Meus dados físicos" (formulário de altura/peso/envergadura/guarda; a tela passou a se chamar
+  "MEUS DADOS FÍSICOS"), "Meu pacote" (`/app/pacotes`, **some em Recorrência**, onde o aluno não pede pacote) e
+  "Alterar senha". Todas com ícone (o desalinhamento vinha do ícone opcional).
+- **O que o aluno encontra:** e-mail da conta (só leitura), **"Falar com o professor"** (WhatsApp de
+  `getWhatsappDoProfessor`, mesma mensagem da Home; a linha só existe com número cadastrado) e a frase
+  **"Na academia desde set/2026"** — SEM gênero (era "Aluna" fixo para todos) e com o ano. Não usar o campo `sex` do
+  perfil físico para adivinhar gênero: é medida esportiva, não identidade.
+- **"Sair da conta" é discreto** (ghost, sem preenchimento, texto `--red-text`, ícone, 44px), no fim da tela; a
+  confirmação continua. O vermelho cheio fica para a ação principal de cada tela.
+
+**O que mudou / armadilhas:**
+- **`EditProfileDialog` é COMPARTILHADO com o professor:** virou `<form>` (Enter salva), `maxLength` 80, `onError` com
+  aviso (antes a falha era muda), botão que explica por que está apagado ("Escreva seu nome…" / "Você ainda não mudou o
+  nome."), título "EDITAR NOME". O professor herdou tudo isso; a linha dele ainda se chama "Editar perfil".
+- **iPhone/Safari não dispara `beforeinstallprompt`:** o banner nunca aparecia. `PWAInstallBanner` (placement `settings`)
+  agora mostra a orientação "Compartilhar > Adicionar à Tela de Início" quando é iPhone/iPad e o app não está instalado
+  (`navigator.standalone`). Só simulado na galeria (UA trocado + eventos); não testado em aparelho.
+- `Avatar` (`ui/avatar.tsx`) ganhou `aria-hidden` no app inteiro (as iniciais repetem o nome ao lado); iniciais com
+  `filter(Boolean)`. Sem `profile`, a tela mostra título + esqueleto em vez de `null`. Título com `PageHeader`.
+- Linhas com foco visível; divisórias com `border-border` (era `#232323`).
+
+**Deixado para depois (registrado, não pedido):** aplicar o "Sair da conta" discreto e as linhas com ícone na Minha conta
+do professor; extrair `AccountRow` (copiado nos dois arquivos); notificações / excluir conta / trocar e-mail;
+esqueci a senha a partir daqui (só existe no Login).
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa

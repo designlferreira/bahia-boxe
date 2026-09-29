@@ -82,7 +82,7 @@ export default function StudentPerfil() {
   if (isLoading) {
     return (
       <div className="page-container">
-        <PageHeader title="PERFIL FÍSICO E DE BOXE" back />
+        <PageHeader title="MEUS DADOS FÍSICOS" back />
         <SkeletonCard height={280} />
       </div>
     );
@@ -90,7 +90,7 @@ export default function StudentPerfil() {
 
   return (
     <div className="page-container">
-      <PageHeader title="PERFIL FÍSICO E DE BOXE" subtitle="Opcional — ajuda seu professor a te conhecer melhor" back />
+      <PageHeader title="MEUS DADOS FÍSICOS" subtitle="Opcional — ajuda seu professor a te conhecer melhor" back />
 
       <button
         type="button"

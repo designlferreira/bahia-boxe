@@ -1,13 +1,19 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, KeyRound, User } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ChevronRight, KeyRound, LogOut, MessageCircle, Package, Ruler, Trophy, UserRound } from "lucide-react";
+import { formatInTimeZone } from "date-fns-tz";
+import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/context/AuthContext";
 import { Avatar } from "@/components/ui/avatar";
+import { PageHeader } from "@/components/PageHeader";
+import { SkeletonCard } from "@/components/SkeletonCard";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 import { EditProfileDialog } from "@/components/EditProfileDialog";
-import { formatDateShort } from "@/lib/dateUtils";
+import { TIMEZONE } from "@/lib/dateUtils";
+import { getModoAgendamentoEfetivo, getStudentAdminId, getWhatsappDoProfessor } from "@/integrations/backend/api";
 
 export default function StudentMinhaConta() {
   const { profile, signOut } = useAuth();
@@ -15,24 +21,74 @@ export default function StudentMinhaConta() {
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
 
-  if (!profile) return null;
-  const initials = profile.name.split(" ").map((n) => n[0]).slice(0, 2).join("");
+  // Em Recorrência o aluno não pede pacote (a tela de pacotes redireciona): a linha "Meu pacote" não aparece.
+  const { data: adminId } = useQuery({
+    queryKey: ["student-admin-id", profile?.id],
+    queryFn: () => getStudentAdminId(profile!.id),
+    enabled: !!profile,
+    staleTime: Infinity,
+  });
+  const { data: modo } = useQuery({
+    queryKey: ["modo-agendamento-efetivo", adminId],
+    queryFn: () => getModoAgendamentoEfetivo(adminId!),
+    enabled: !!adminId,
+    staleTime: Infinity,
+  });
+  const mostraPacote = modo !== "recorrencia";
+
+  // Canal do aluno com o professor (mesmo da Home): sem número cadastrado, a linha não aparece.
+  const { data: whatsapp } = useQuery({
+    queryKey: ["whatsapp-professor", adminId],
+    queryFn: () => getWhatsappDoProfessor(adminId!),
+    enabled: !!adminId,
+    staleTime: 60 * 60 * 1000,
+  });
+
+  // Antes `return null` deixava a tela em branco, sem título, enquanto o perfil não chegava.
+  if (!profile) {
+    return (
+      <div className="page-container">
+        <PageHeader title="MINHA CONTA" />
+        <SkeletonCard height={90} className="mb-4" />
+        <SkeletonCard height={200} />
+      </div>
+    );
+  }
+  // `filter(Boolean)`: nome com espaço duplo ou no fim não pula uma inicial.
+  const initials = profile.name.split(" ").filter(Boolean).map((n) => n[0]).slice(0, 2).join("").toUpperCase();
 
   return (
     <div className="page-container">
-      <h1 className="font-display text-3xl tracking-wide text-foreground mb-4">MINHA CONTA</h1>
+      <PageHeader title="MINHA CONTA" />
 
       <div className="card-dark p-4 flex items-center gap-3.5 mb-4">
         <Avatar initials={initials} size="md" />
-        <div>
-          <div className="text-base font-semibold text-foreground">{profile.name}</div>
-          <div className="text-[12.5px] text-muted-foreground">Aluna · desde {formatDateShort(profile.createdAt)}</div>
+        <div className="min-w-0">
+          <div className="text-base font-semibold text-foreground break-words">{profile.name}</div>
+          {/* O e-mail da conta: "com qual conta eu entrei?" (só leitura). */}
+          <div className="text-[12.5px] text-muted-foreground break-all">{profile.email}</div>
+          {/* Sem gênero ("Aluna" era fixo para todos) e com o ano. */}
+          <div className="text-[12.5px] text-muted-foreground">
+            Na academia desde {formatInTimeZone(profile.createdAt, TIMEZONE, "MMM/yyyy", { locale: ptBR })}
+          </div>
         </div>
       </div>
 
       <div className="flex flex-col rounded-2xl bg-card border border-border overflow-hidden mb-3.5">
-        <AccountRow label="Editar perfil" onClick={() => setEditOpen(true)} />
-        <AccountRow label="Perfil físico e de boxe" icon={User} onClick={() => navigate("/app/minha-conta/perfil")} />
+        {/* Nomes que dizem o que abre (antes: "Editar perfil" só editava o nome e "Perfil físico e de boxe"
+            parecia o "Perfil de Boxe" da Home, que é o resultado do estilo de luta). */}
+        {whatsapp && (
+          <AccountRow
+            label="Falar com o professor"
+            hint="Abre uma conversa no WhatsApp"
+            icon={MessageCircle}
+            href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(`Olá! Aqui é ${profile.name.split(" ")[0]}.`)}`}
+          />
+        )}
+        <AccountRow label="Meu nome" icon={UserRound} onClick={() => setEditOpen(true)} />
+        <AccountRow label="Meu Perfil de Boxe" icon={Trophy} onClick={() => navigate("/app/perfil-lutador")} />
+        <AccountRow label="Meus dados físicos" icon={Ruler} onClick={() => navigate("/app/minha-conta/perfil")} />
+        {mostraPacote && <AccountRow label="Meu pacote" icon={Package} onClick={() => navigate("/app/pacotes")} />}
         <AccountRow
           label="Alterar senha"
           icon={KeyRound}
@@ -43,7 +99,15 @@ export default function StudentMinhaConta() {
 
       <PWAInstallBanner placement="settings" />
 
-      <Button variant="destructive" size="lg" className="w-full" onClick={() => setConfirmLogout(true)}>
+      {/* Sair é uma ação rara: discreta (sem preenchimento), no fim da tela. Antes era o botão vermelho de
+          largura total, o elemento mais forte da tela — o vermelho fica para a ação principal de cada tela. */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="w-full mt-2 text-[hsl(var(--red-text))] hover:text-[hsl(var(--red-text))]"
+        onClick={() => setConfirmLogout(true)}
+      >
+        <LogOut className="h-4 w-4" aria-hidden />
         Sair da conta
       </Button>
 
@@ -62,26 +126,43 @@ export default function StudentMinhaConta() {
 
 function AccountRow({
   label,
+  hint,
   icon: Icon,
   onClick,
+  href,
   last,
 }: {
   label: string;
-  icon?: typeof KeyRound;
-  onClick: () => void;
+  hint?: string;
+  icon: typeof KeyRound;
+  onClick?: () => void;
+  /** Link externo (abre em outra aba); sem href, é um botão. */
+  href?: string;
   last?: boolean;
 }) {
+  const cls = `min-h-[52px] px-4 py-2 flex items-center gap-2.5 text-left text-[14.5px] text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${
+    last ? "" : "border-b border-border"
+  }`;
+  const conteudo = (
+    <>
+      <Icon className="h-[17px] w-[17px] text-muted-foreground shrink-0" aria-hidden />
+      <span className="flex-1">
+        {label}
+        {hint && <span className="block text-[12.5px] text-muted-foreground">{hint}</span>}
+      </span>
+      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
+    </>
+  );
+  if (href) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className={cls}>
+        {conteudo}
+      </a>
+    );
+  }
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`h-[52px] px-4 flex items-center gap-2.5 text-left text-[14.5px] text-foreground hover:bg-secondary transition-colors ${
-        last ? "" : "border-b border-[#232323]"
-      }`}
-    >
-      {Icon && <Icon className="h-[17px] w-[17px] text-muted-foreground" />}
-      <span className="flex-1">{label}</span>
-      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+    <button type="button" onClick={onClick} className={cls}>
+      {conteudo}
     </button>
   );
 }

@@ -15,7 +15,9 @@ function Avatar({
     lg: "w-[42px] h-[42px] text-sm font-semibold",
   } as const;
   return (
+    // Decorativo: as iniciais repetem o nome que vem ao lado (leitor de tela lia "MO" antes do nome).
     <div
+      aria-hidden
       className={cn(
         "flex items-center justify-center rounded-full bg-gradient-hero text-primary-foreground shrink-0",
         sizes[size],
