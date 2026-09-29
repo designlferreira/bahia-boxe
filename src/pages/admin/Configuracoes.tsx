@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ChevronRight, MapPin } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -23,11 +24,30 @@ const MODO_OPTIONS: { value: ModoAgendamento; label: string }[] = [
   { value: "recorrencia", label: "Recorrência" },
 ];
 
+/** O que o professor está decidindo, em termos do que o ALUNO passa a ver (não "fluxo" nem "dados"). */
+const MODO_CONFIRMACAO: Record<ModoAgendamento, { title: string; description: string; confirmLabel: string }> = {
+  recorrencia: {
+    title: "TROCAR PARA RECORRÊNCIA?",
+    description:
+      "Seus alunos deixam de ver \"Agendar\" e passam a ver \"Ver minhas aulas\": quem marca as aulas é você, nos horários fixos de cada aluno. Pacotes e aulas que já existem não mudam.",
+    confirmLabel: "Trocar para Recorrência",
+  },
+  autosservico: {
+    title: "TROCAR PARA AUTOSSERVIÇO?",
+    description:
+      "Seus alunos voltam a escolher o horário na sua disponibilidade publicada e a ver \"Agendar\". Horários fixos e aulas que já existem não mudam.",
+    confirmLabel: "Trocar para Autosserviço",
+  },
+};
+
 export default function AdminConfiguracoes() {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const key = ["admin-settings", profile?.id];
+
+  // Modo escolhido, esperando confirmação: só grava depois do "Trocar" (decisão do Lucas).
+  const [modoPendente, setModoPendente] = useState<ModoAgendamento | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: key,
@@ -123,7 +143,8 @@ export default function AdminConfiguracoes() {
                   type="button"
                   aria-pressed={active}
                   disabled={toggleModo.isPending}
-                  onClick={() => toggleModo.mutate(opt.value)}
+                  // Tocar no modo que já está ativo não faz nada (antes gravava de novo à toa).
+                  onClick={() => !active && setModoPendente(opt.value)}
                   className={cn(
                     "flex-1 h-10 rounded-xl text-[13px] font-semibold transition-colors",
                     active ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground",
@@ -176,6 +197,20 @@ export default function AdminConfiguracoes() {
           </Button>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!modoPendente}
+        onOpenChange={(open) => !open && setModoPendente(null)}
+        title={modoPendente ? MODO_CONFIRMACAO[modoPendente].title : ""}
+        description={modoPendente ? MODO_CONFIRMACAO[modoPendente].description : ""}
+        confirmLabel={modoPendente ? MODO_CONFIRMACAO[modoPendente].confirmLabel : "Trocar"}
+        cancelLabel="Cancelar"
+        tone="default"
+        onConfirm={() => {
+          if (modoPendente) toggleModo.mutate(modoPendente);
+          setModoPendente(null);
+        }}
+      />
     </div>
   );
 }
