@@ -504,6 +504,16 @@ export async function scheduleBooking(slotId: string) {
  * deixava passar em aula `scheduled`: cancelar uma aula ainda PENDENTE (agendada no autosserviço,
  * sem aprovação) afetava 0 linhas e o app culpava o prazo de 6 horas.
  */
+/**
+ * Cancelar essa aula desconta uma aula do aluno? (0035) A regra vem do banco — o aluno não lê
+ * `profiles` nem a cópia da regra no pacote —, a mesma que `calcular_saldo_pacote` aplica.
+ */
+export async function getCancelamentoDescontaAula(bookingId: string): Promise<boolean> {
+  const { data, error } = await client().rpc("cancelamento_desconta_aula", { p_booking_id: bookingId });
+  if (error) throw new Error(error.message);
+  return data === true;
+}
+
 export async function cancelBooking(bookingId: string) {
   const { error } = await client().rpc("cancelar_minha_aula", { p_booking_id: bookingId });
   if (!error) return;

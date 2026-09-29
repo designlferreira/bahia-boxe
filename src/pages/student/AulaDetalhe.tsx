@@ -15,6 +15,7 @@ import {
   SlotTakenError,
   acceptSuggestion,
   cancelBooking,
+  getCancelamentoDescontaAula,
   cancelarPedidoRemarcacao,
   getBookingDetail,
   getClassGuidelinesForBooking,
@@ -67,6 +68,14 @@ export default function StudentAulaDetalhe() {
     // Recorrência (< 24h) e qualquer aula agendada a menos de 6h (autosserviço inclusive).
     enabled: !!booking && ((isRecorrencia && !faltaMaisDe24h) || tarde6h),
     staleTime: 60 * 60 * 1000,
+  });
+  // Só quando o aluno abre a janela de cancelar. Sem resposta (falha), a janela diz o que sabe sem
+  // prometer nada sobre a contagem.
+  const { data: descontaAula } = useQuery({
+    queryKey: ["cancelamento-desconta", id],
+    queryFn: () => getCancelamentoDescontaAula(id!),
+    enabled: confirmCancel && isRecorrencia,
+    staleTime: 5 * 60 * 1000,
   });
   const invalidateAulas = () => {
     queryClient.invalidateQueries({ queryKey: ["student-home"] });
@@ -384,7 +393,13 @@ export default function StudentAulaDetalhe() {
         title="CANCELAR AULA"
         description={
           isRecorrencia
-            ? `A aula de ${formatDate(booking.startTime)} será cancelada. Se quiser só mudar o horário, use "Pedir outro horário".`
+            ? `A aula de ${formatDate(booking.startTime)} será cancelada. ${
+                descontaAula === undefined
+                  ? ""
+                  : descontaAula
+                    ? "Pela regra do seu pacote, cancelar desconta 1 aula. "
+                    : "Pela regra do seu pacote, cancelar não desconta aula. "
+              }Se quiser só mudar o horário, use "Pedir outro horário".`
             : `A aula de ${formatDate(booking.startTime)} será cancelada e a aula volta para o seu pacote.`
         }
         confirmLabel="Cancelar aula"
