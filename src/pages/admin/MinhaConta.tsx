@@ -45,11 +45,29 @@ export default function AdminMinhaConta() {
         </div>
       </div>
 
-      <div className="flex flex-col rounded-2xl bg-card border border-border overflow-hidden mb-3.5">
+      {/* Dois blocos: o que o professor OFERECE (ferramentas do negócio) e a CONTA dele. Antes eram 6 linhas numa lista só e "onde mudo
+          meus horários?" dependia de adivinhar que era em "Conta" (a barra de baixo não tem Horários nem Pacotes). A barra não mudou. */}
+      <h2 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">O que você oferece</h2>
+      <div className="flex flex-col rounded-2xl bg-card border border-border overflow-hidden mb-5">
         <AccountRow label="Minha disponibilidade" icon={CalendarClock} onClick={() => navigate("/admin/disponibilidade")} />
         <AccountRow label="Modelos de pacote" icon={Package} onClick={() => navigate("/admin/pacotes")} />
-        <AccountRow label="Perfil dos alunos" icon={Users} onClick={() => navigate("/admin/perfil-alunos")} />
-        <AccountRow label="Configurações" icon={Settings} onClick={() => navigate("/admin/configuracoes")} />
+        <AccountRow
+          label="Perfil dos alunos"
+          hint="Médias de altura, peso e guarda dos alunos"
+          icon={Users}
+          onClick={() => navigate("/admin/perfil-alunos")}
+          last
+        />
+      </div>
+
+      <h2 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Minha conta</h2>
+      <div className="flex flex-col rounded-2xl bg-card border border-border overflow-hidden mb-3.5">
+        <AccountRow
+          label="Configurações"
+          hint="Modo de agendamento, WhatsApp e regra de faltas"
+          icon={Settings}
+          onClick={() => navigate("/admin/configuracoes")}
+        />
         <AccountRow label="Meu nome" icon={UserRound} onClick={() => setEditOpen(true)} />
         <AccountRow label="Alterar senha" icon={KeyRound} onClick={() => navigate("/admin/minha-conta/alterar-senha")} last />
       </div>
