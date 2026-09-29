@@ -3648,6 +3648,25 @@ Um passo na `dev`, testado pelo Lucas (o teste principal era o ícone na tela in
 
 **Não conferido:** o ícone em aparelho real além do teste do Lucas; o recorte do ícone `maskable` em cada fabricante de Android.
 
+### Segunda auditoria (17/20) e `polish` de acessibilidade (2026-09-30) — sem migration nova
+
+**Segunda auditoria por amostragem (só leitura): 17/20 (Bom), subiu de 15** — Acessibilidade 3, Desempenho 3 (era 2), Responsivo 3, Temas 4 (era 3), Integridade 4. Sem medição em aparelho real nem leitor de tela.
+- **Detector:** 1 ocorrência, `overused-font` para "Inter" em `src/index.css`. **É gosto de design, não defeito, e NÃO foi mexida:** Inter é a fonte do corpo do app desde o início e nenhuma decisão do Lucas pediu para trocá-la. Se ele quiser outra, é um pedido de `typeset`, não um conserto.
+- **Aberto, na ordem combinada com o Lucas ("um por vez"):**
+  1. ~~[P2] título por tela~~ e ~~[P3] link "pular para o conteúdo"~~ — FEITOS (abaixo).
+  2. **[P2] `@supabase/supabase-js` = 220 kB** dos ~620 kB de JS da primeira abertura (traz realtime, storage e functions que o app não usa). Reduzir = usar só as partes de auth e consultas (`@supabase/auth-js` + `@supabase/postgrest-js`): mudança maior, exige teste. **Próximo passo combinado.**
+  3. [P3] sem `<meta name="description">` no `index.html` (só afeta compartilhamento do endereço).
+  4. Fora das cinco dimensões: `vercel.json` só tem o redirecionamento (sem cabeçalhos de segurança: política de conteúdo, proteção contra ser embutido em outro site). A chave pública do Supabase fica exposta por desenho; é higiene, não brecha.
+
+**`polish` de acessibilidade — feito e testado pelo Lucas:**
+- **Título por tela** (`src/lib/titulosDeRota.ts`, `tituloDaRota(pathname)`, com `titulosDeRota.test.ts`): lista `[regex, título]` onde a primeira regra que casa vale, então as específicas vêm antes das gerais (ex.: `/admin/alunos/:id/recorrencia` antes de `/admin/alunos/:id`).
+  A aba passa a dizer "Agenda · Bahia Boxe" etc. (WCAG 2.4.2). Endereço sem regra (a 404) devolve `null` e **a própria `NotFound` continua definindo o título dela**. **Tela nova = uma linha nessa lista** (senão fica "Bahia Boxe" ou com o título da tela anterior).
+- **`AnunciadorDeRota`** (montado em `App.tsx` DENTRO do `BrowserRouter`): em cada troca de tela põe o `document.title` e escreve o título numa região `aria-live="polite"` `sr-only`, para o leitor de tela avisar. **O primeiro carregamento não é anunciado** (o leitor já lê o título ao abrir).
+- **Link "Pular para o conteúdo"** nos dois layouts (`StudentLayout`, `AdminLayout`): primeiro item do teclado, `sr-only` até receber o foco (`focus:not-sr-only`), leva a `<main id="conteudo" tabIndex={-1}>` (WCAG 2.4.1). Só existe dentro do app logado; as telas de entrada não têm.
+- Verificado no navegador com o app real ligado a um Supabase falso (porta 5175): títulos de `/login` e `/criar-conta`, aviso de leitor de tela e a 404 preservada.
+
+**Não conferido:** o aviso com leitor de tela de verdade (só a região `aria-live` e o texto foram vistos); o link "pular" fora do teste manual do Lucas.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
