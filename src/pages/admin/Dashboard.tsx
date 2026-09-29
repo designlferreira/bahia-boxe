@@ -289,6 +289,22 @@ function ResolverAgora({
           resumo={resumoSemRegistro}
           borda={pending.length > 0}
         >
+          {awaiting.length >= 2 && (
+            <div className="pt-1 pb-3">
+              <Button
+                variant="soft"
+                size="sm"
+                className="w-full"
+                disabled={aulas.variasPending}
+                onClick={() => {
+                  marcar("aulas-sem-registro", awaiting, awaiting[0].id);
+                  aulas.openCompleteVarias(awaiting.map((b) => ({ booking: b, studentName: b.studentName })));
+                }}
+              >
+                {aulas.variasPending ? "Registrando…" : `Todas aconteceram (${awaiting.length})`}
+              </Button>
+            </div>
+          )}
           {/* Já vem da mais antiga pra mais nova — a mais antiga é a que mais corre risco de ser esquecida. */}
           {awaiting.map((b) => (
             <ItemResolver

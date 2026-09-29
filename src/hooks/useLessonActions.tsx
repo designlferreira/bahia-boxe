@@ -111,6 +111,55 @@ export function useLessonActions(onChanged: () => void) {
     onError: (err) => toast.error(errorMessage(err, "Não foi possível desfazer.")),
   });
 
+  const [confirmVarias, setConfirmVarias] = useState<Target[] | null>(null);
+
+  /**
+   * "Todas aconteceram" (pedido do Lucas, 2026-09-28): registra várias aulas de uma vez, com um só
+   * "Desfazer". Uma por vez, não em paralelo — várias podem ser do mesmo pacote, e cada RPC trava a
+   * linha do pacote. Se alguma falhar, as outras continuam e o aviso diz qual falhou.
+   */
+  const completeVarias = useMutation({
+    mutationFn: async (alvos: Target[]) => {
+      const feitas: Target[] = [];
+      const falhas: { alvo: Target; erro: string }[] = [];
+      for (const alvo of alvos) {
+        try {
+          await completeBooking(alvo.booking.id);
+          feitas.push(alvo);
+        } catch (err) {
+          falhas.push({ alvo, erro: errorMessage(err, "erro desconhecido") });
+        }
+      }
+      return { feitas, falhas };
+    },
+    onSuccess: ({ feitas, falhas }) => {
+      after();
+      if (feitas.length) {
+        toast.success(feitas.length === 1 ? "1 aula registrada" : `${feitas.length} aulas registradas`, {
+          duration: UNDO_TOAST_MS,
+          action: {
+            label: "Desfazer",
+            onClick: async () => {
+              for (const alvo of feitas) {
+                try {
+                  await undoLessonAction(alvo.booking.id);
+                } catch {
+                  /* segue desfazendo as outras; o aviso abaixo cobre */
+                }
+              }
+              after();
+              toast("Desfeito");
+            },
+          },
+        });
+      }
+      for (const { alvo, erro } of falhas) {
+        toast.error(`Aula de ${primeiroNome(alvo.studentName)} não foi registrada: ${erro}`);
+      }
+    },
+    onError: (err) => toast.error(errorMessage(err, "Não foi possível registrar as aulas.")),
+  });
+
   // "Aconteceu" registra direto, sem janela (decisão do Lucas, 2026-09-28): é reversível pelo
   // "Desfazer" do aviso e pelo botão permanente no detalhe da aula — a janela só atrasava.
   const complete = useMutation({
@@ -191,12 +240,26 @@ export function useLessonActions(onChanged: () => void) {
       lendoRegra === bookingId ||
       (complete.isPending && complete.variables?.id === bookingId) ||
       (noShow.isPending && noShow.variables?.id === bookingId) ||
-      (undo.isPending && undo.variables === bookingId)
+      (undo.isPending && undo.variables === bookingId) ||
+      (completeVarias.isPending && !!completeVarias.variables?.some((t) => t.booking.id === bookingId))
     );
   }
 
   const dialogs = (
     <>
+      <ConfirmDialog
+        open={!!confirmVarias}
+        onOpenChange={(o) => !o && setConfirmVarias(null)}
+        title={`REGISTRAR ${confirmVarias?.length ?? 0} AULAS?`}
+        description={confirmVarias ? `Todas aconteceram:\n${confirmVarias.map((t) => `• ${t.studentName}, ${formatDateTime(t.booking.startTime)}`).join("\n")}\n\nDá pra desfazer logo depois, no aviso.` : ""}
+        confirmLabel="Registrar todas"
+        cancelLabel="Cancelar"
+        tone="default"
+        onConfirm={() => {
+          if (confirmVarias) completeVarias.mutate(confirmVarias);
+          setConfirmVarias(null);
+        }}
+      />
 
       <ConfirmDialog
         open={!!confirmNoShow}
@@ -261,6 +324,9 @@ export function useLessonActions(onChanged: () => void) {
     isBusy,
     /** Registra direto (sem janela), com "Desfazer" no aviso. */
     openComplete: (booking: Booking, studentName: string) => complete.mutate({ id: booking.id, studentName }),
+    /** Várias de uma vez: confirma (mostra quais), registra todas, um só "Desfazer". */
+    openCompleteVarias: (alvos: Target[]) => setConfirmVarias(alvos),
+    variasPending: completeVarias.isPending,
     openNoShow: (booking: Booking, studentName: string) => {
       void pedirFalta(booking, studentName);
     },
