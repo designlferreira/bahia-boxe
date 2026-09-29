@@ -22,7 +22,7 @@ export function BoxingProfileResultView({ assessment, notice }: BoxingProfileRes
       <BoxingProfileScoresSummary assessment={assessment} description={FIGHTER_PROFILE_DESCRIPTIONS[primaryProfile]} notice={notice} />
 
       <BoxingProfileNextSteps primaryProfile={primaryProfile} dimensionScores={dimensionScores} />
-      <p className="text-[11.5px] text-muted-foreground leading-relaxed">
+      <p className="text-xs text-muted-foreground leading-relaxed">
         Este resultado representa sua autopercepção no momento da avaliação — não substitui a avaliação técnica do seu treinador.
       </p>
     </div>

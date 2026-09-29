@@ -3,7 +3,7 @@ import { DIMENSIONS, DIMENSION_SHORT_LABELS, type Dimension } from "@/lib/boxing
 
 interface BoxingRadarChartProps {
   scores: Record<Dimension, number>;
-  /** Segunda série opcional (ex.: avaliação do professor), sobreposta em traço tracejado neutro. */
+  /** Segunda série opcional (ex.: avaliação do professor), sobreposta em traço tracejado claro (mesmo peso visual da primeira série, sem hierarquia entre as duas leituras). */
   compareScores?: Record<Dimension, number>;
   size?: number;
 }
@@ -116,7 +116,7 @@ export function BoxingRadarChart({ scores, compareScores, size = 280 }: BoxingRa
               y={label.y}
               textAnchor="middle"
               dominantBaseline="middle"
-              fontSize={10.5}
+              fontSize={12}
               fill="hsl(var(--muted-foreground))"
             >
               {DIMENSION_SHORT_LABELS[dim]}
@@ -130,13 +130,13 @@ export function BoxingRadarChart({ scores, compareScores, size = 280 }: BoxingRa
           <polygon
             points={compareDataPath}
             fill="none"
-            stroke="hsl(var(--muted-foreground))"
+            stroke="hsl(var(--foreground))"
             strokeWidth={2}
             strokeDasharray="4 3"
             strokeLinejoin="round"
           />
           {compareDataPoints!.map((p, i) => (
-            <circle key={`compare-${DIMENSIONS[i]}`} cx={p.x} cy={p.y} r={2.5} fill="hsl(var(--muted-foreground))" />
+            <circle key={`compare-${DIMENSIONS[i]}`} cx={p.x} cy={p.y} r={2.5} fill="hsl(var(--foreground))" />
           ))}
         </>
       )}

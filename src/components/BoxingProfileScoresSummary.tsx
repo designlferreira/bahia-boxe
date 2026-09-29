@@ -59,19 +59,19 @@ export function BoxingProfileScoresSummary({
       {(assessmentLength === "short" || isOldFormula) && (
         <div className="flex flex-wrap gap-1.5 mb-2.5">
           {assessmentLength === "short" && (
-            <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground bg-secondary rounded-full px-2.5 py-1">
+            <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground bg-secondary rounded-full px-2.5 py-1">
               Versão rápida
             </span>
           )}
           {isOldFormula && (
-            <span className="text-[10px] font-bold uppercase tracking-wide text-amber bg-amber/10 rounded-full px-2.5 py-1">
+            <span className="text-xs font-bold uppercase tracking-wide text-amber bg-amber/10 rounded-full px-2.5 py-1">
               Calculado pela fórmula anterior
             </span>
           )}
         </div>
       )}
       <div className="rounded-[20px] p-5 mb-4 bg-[linear-gradient(150deg,#1F1B0C,#171717_60%)] border border-amber/30">
-        <div className="flex items-center gap-1.5 text-amber text-[11px] font-bold uppercase tracking-wide mb-2">
+        <div className="flex items-center gap-1.5 text-amber text-xs font-bold uppercase tracking-wide mb-2">
           <Trophy className="h-3.5 w-3.5" /> {heroLabel}
         </div>
         <div className="font-display text-[28px] tracking-wide text-foreground leading-none mb-1">
@@ -84,7 +84,7 @@ export function BoxingProfileScoresSummary({
       {notice}
 
       <div className="card-dark p-4 mb-5">
-        <div className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">Perfil secundário</div>
+        <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">Perfil secundário</div>
         <div className="flex items-baseline justify-between gap-3">
           <div>
             <div className="text-[15px] font-semibold text-foreground">{FIGHTER_PROFILE_LABELS[secondaryProfile]}</div>

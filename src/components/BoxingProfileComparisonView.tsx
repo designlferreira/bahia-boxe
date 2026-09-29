@@ -96,7 +96,7 @@ export function BoxingProfileComparisonView({ self, coach, viewer, showNextSteps
   return (
     <div>
       {(lengthMismatch || versionMismatch) && (
-        <p className="text-[11.5px] text-amber leading-relaxed mb-4 bg-amber/10 rounded-xl px-3.5 py-2.5">
+        <p className="text-xs text-amber leading-relaxed mb-4 bg-amber/10 rounded-xl px-3.5 py-2.5">
           {lengthMismatch
             ? "Essas duas avaliações usam versões diferentes do questionário (rápida e completa) — os números abaixo não são diretamente comparáveis."
             : "Essas duas avaliações foram calculadas por versões diferentes da fórmula — os números abaixo não são diretamente comparáveis."}
@@ -105,7 +105,7 @@ export function BoxingProfileComparisonView({ self, coach, viewer, showNextSteps
       {/* O resultado que a tela promete vem PRIMEIRO; as duas leituras que o formam ficam logo abaixo,
           e radar/tabela como detalhe (antes o combinado era o último bloco, a ~75% da página). */}
       <div className="rounded-[20px] p-5 mb-3 bg-[linear-gradient(150deg,#1F1B0C,#171717_60%)] border border-amber/30">
-        <div className="flex items-center gap-1.5 text-amber text-[11px] font-bold uppercase tracking-wide mb-2">
+        <div className="flex items-center gap-1.5 text-amber text-xs font-bold uppercase tracking-wide mb-2">
           <Trophy className="h-3.5 w-3.5" aria-hidden /> Resultado combinado
         </div>
         <div className="font-display text-[28px] tracking-wide text-foreground leading-none mb-1">
@@ -122,7 +122,7 @@ export function BoxingProfileComparisonView({ self, coach, viewer, showNextSteps
       </div>
 
       {combined.isDivergent && (
-        <p className="text-[11.5px] text-amber leading-relaxed mb-4">
+        <p className="text-xs text-amber leading-relaxed mb-4">
           {divergenceText(combined.divergentDimension ? DIMENSION_LABELS[combined.divergentDimension] : null)}
         </p>
       )}
@@ -132,19 +132,19 @@ export function BoxingProfileComparisonView({ self, coach, viewer, showNextSteps
 
       <div className="grid grid-cols-2 gap-2.5 mb-2.5">
         <div className="card-dark p-3.5">
-          <div className="text-[10.5px] uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">{copy.selfLabel}</div>
+          <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">{copy.selfLabel}</div>
           <div className="text-[14px] font-semibold text-foreground leading-snug">{FIGHTER_PROFILE_LABELS[self.primaryProfile]}</div>
           <FighterProfileGloss profile={self.primaryProfile} />
           <div className="text-[12px] text-accent font-semibold mt-0.5">{self.profileScores[self.primaryProfile]}%</div>
         </div>
         <div className="card-dark p-3.5">
-          <div className="text-[10.5px] uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">{copy.coachLabel}</div>
+          <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">{copy.coachLabel}</div>
           <div className="text-[14px] font-semibold text-foreground leading-snug">{FIGHTER_PROFILE_LABELS[coach.primaryProfile]}</div>
           <FighterProfileGloss profile={coach.primaryProfile} />
           <div className="text-[12px] text-accent font-semibold mt-0.5">{coach.profileScores[coach.primaryProfile]}%</div>
         </div>
       </div>
-      <p className="text-[11.5px] text-muted-foreground leading-relaxed mb-5">{samePrimaryProfile ? copy.agree : copy.differ}</p>
+      <p className="text-xs text-muted-foreground leading-relaxed mb-5">{samePrimaryProfile ? copy.agree : copy.differ}</p>
 
       {viewer === "student" && talkToCoachHref && (!samePrimaryProfile || combined.isDivergent) && (
         <a
@@ -169,35 +169,35 @@ export function BoxingProfileComparisonView({ self, coach, viewer, showNextSteps
       <div className="card-dark p-4 mb-2 flex flex-col items-center">
         <BoxingRadarChart scores={self.dimensionScores} compareScores={coach.dimensionScores} />
         <div className="flex items-center gap-4 mt-1">
-          <span className="flex items-center gap-1.5 text-[11px] text-foreground/80">
+          <span className="flex items-center gap-1.5 text-xs text-foreground/80">
             <span className="h-2 w-2 rounded-full bg-accent" /> {copy.selfLabel}
           </span>
-          <span className="flex items-center gap-1.5 text-[11px] text-foreground/80">
-            <span className="h-2 w-2 rounded-full border border-dashed border-muted-foreground" /> {copy.coachLabel}
+          <span className="flex items-center gap-1.5 text-xs text-foreground/80">
+            <span className="h-2 w-2 rounded-full border border-dashed border-foreground" /> {copy.coachLabel}
           </span>
         </div>
       </div>
 
-      <div className="card-dark p-4 mb-5">
-        <div className="flex items-center text-[10.5px] uppercase tracking-wide text-muted-foreground font-semibold mb-2.5">
-          <span className="flex-1">Dimensão</span>
-          <span className="w-11 text-right">{copy.selfColumn}</span>
-          <span className="w-11 text-right">{copy.coachColumn}</span>
-          <span className="w-11 text-right">Combin.</span>
+      <div role="table" aria-label="Notas por competência" className="card-dark p-4 mb-5">
+        <div role="row" className="flex items-center text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2.5">
+          <span role="columnheader" className="flex-1">Competência</span>
+          <span role="columnheader" className="w-14 text-right">{copy.selfColumn}</span>
+          <span role="columnheader" className="w-14 text-right">{copy.coachColumn}</span>
+          <span role="columnheader" className="w-14 text-right">Combin.</span>
         </div>
         <div className="flex flex-col gap-2">
           {DIMENSIONS.map((dim) => (
-            <div key={dim} className="flex items-center text-[13px]">
-              <span className="flex-1 text-foreground/80">{DIMENSION_LABELS[dim]}</span>
-              <span className="w-11 text-right font-semibold text-foreground tabular-nums">{self.dimensionScores[dim]}</span>
-              <span className="w-11 text-right font-semibold text-muted-foreground tabular-nums">{coach.dimensionScores[dim]}</span>
-              <span className="w-11 text-right font-semibold text-accent tabular-nums">{combined.dimensionScores[dim]}</span>
+            <div key={dim} role="row" className="flex items-center text-[13px]">
+              <span role="rowheader" className="flex-1 text-foreground/80">{DIMENSION_LABELS[dim]}</span>
+              <span role="cell" className="w-14 text-right font-semibold text-foreground tabular-nums">{self.dimensionScores[dim]}</span>
+              <span role="cell" className="w-14 text-right font-semibold text-foreground tabular-nums">{coach.dimensionScores[dim]}</span>
+              <span role="cell" className="w-14 text-right font-semibold text-accent tabular-nums">{combined.dimensionScores[dim]}</span>
             </div>
           ))}
         </div>
       </div>
 
-      <p className="text-[11.5px] text-muted-foreground leading-relaxed">{copy.disclaimer}</p>
+      <p className="text-xs text-muted-foreground leading-relaxed">{copy.disclaimer}</p>
     </div>
   );
 }

@@ -43,7 +43,7 @@ export function BoxingProfileLengthChoice({ onChoose, questionCount }: BoxingPro
         </p>
       </button>
 
-      <p className="text-[11px] text-muted-foreground leading-relaxed text-center mt-1">
+      <p className="text-xs text-muted-foreground leading-relaxed text-center mt-1">
         Os resultados das duas versões não são diretamente comparáveis entre si.
       </p>
     </div>

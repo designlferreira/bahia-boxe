@@ -127,7 +127,7 @@ export default function StudentPerfilLutador() {
             ctaLabel="Descobrir meu perfil"
             onCta={goToQuestionnaire}
           />
-          <p className="text-[11.5px] text-muted-foreground text-center leading-relaxed mt-3">
+          <p className="text-xs text-muted-foreground text-center leading-relaxed mt-3">
             É uma autoavaliação: reflete como você percebe o seu próprio jogo no momento, não uma medição técnica feita pelo seu
             treinador.
           </p>
