@@ -1637,6 +1637,13 @@ export default function Amostras() {
               </ComRota>
             </Seeded>
           </Frame>
+          <Frame title="Alterar senha · sucesso" note="texto sobre a sessão; o foco vai para o título (só no app real)">
+            <Seeded data={base} modo="autosservico">
+              <ComRota path="/app/minha-conta/alterar-senha" url="/app/minha-conta/alterar-senha">
+                <AlterarSenha backTo="/app/minha-conta" amostra="sucesso" />
+              </ComRota>
+            </Seeded>
+          </Frame>
           <Frame title="Alterar senha · professor" note="a mesma tela, voltando para a conta do professor">
             <SeededAdmin data={null}>
               <ComRota path="/admin/minha-conta/alterar-senha" url="/admin/minha-conta/alterar-senha">

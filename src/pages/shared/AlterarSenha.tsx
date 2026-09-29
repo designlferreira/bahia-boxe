@@ -1,7 +1,6 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, CheckCircle2 } from "lucide-react";
-import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +10,7 @@ import { changePassword, AuthError } from "@/integrations/backend/auth";
 const SENHA_DE_AMOSTRA = "Amostra123";
 
 /** `amostra`: só para a página de amostras de desenvolvimento (abre a tela já num estado); não tem efeito no app. */
-export default function AlterarSenha({ backTo, amostra }: { backTo: string; amostra?: "erro-atual" | "erro-geral" }) {
+export default function AlterarSenha({ backTo, amostra }: { backTo: string; amostra?: "erro-atual" | "erro-geral" | "sucesso" }) {
   const navigate = useNavigate();
   const currentRef = useRef<HTMLInputElement>(null);
   const [show, setShow] = useState(false);
@@ -27,7 +26,12 @@ export default function AlterarSenha({ backTo, amostra }: { backTo: string; amos
   const [errorGeral, setErrorGeral] = useState<string | null>(
     amostra === "erro-geral" ? "Não foi possível alterar a senha. Verifique sua conexão e tente de novo." : null,
   );
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState(amostra === "sucesso");
+  const tituloSucessoRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    // Na galeria (`amostra`) não move o foco: ele rolaria a página até este quadro ao abrir.
+    if (done && !amostra) tituloSucessoRef.current?.focus();
+  }, [done, amostra]);
 
   function limparErros() {
     setErrorCurrent(null);
@@ -48,7 +52,6 @@ export default function AlterarSenha({ backTo, amostra }: { backTo: string; amos
     try {
       await changePassword(current, next);
       setDone(true);
-      toast.success("Senha alterada com sucesso");
     } catch (err) {
       if (err instanceof AuthError && err.code === "senha_atual_incorreta") {
         setErrorCurrent(err.message);
@@ -157,15 +160,22 @@ export default function AlterarSenha({ backTo, amostra }: { backTo: string; amos
           </Button>
         </form>
       ) : (
-        <div className="card-dark border-accent/30 p-7 text-center animate-bb-up">
+        <div role="status" className="card-dark border-accent/30 p-7 text-center animate-bb-up">
           <div className="mx-auto mb-3.5 h-14 w-14 rounded-full bg-accent/15 flex items-center justify-center">
-            <CheckCircle2 className="h-[26px] w-[26px] text-accent" />
+            <CheckCircle2 className="h-[26px] w-[26px] text-accent" aria-hidden />
           </div>
-          <div className="font-display text-2xl tracking-wide text-foreground mb-1.5">SENHA ALTERADA</div>
+          {/* Foco aqui: o formulário some ao concluir e o foco caía no <body>; o `role="status"` anuncia o cartão. */}
+          <h2
+            ref={tituloSucessoRef}
+            tabIndex={-1}
+            className="font-display text-2xl font-normal tracking-wide text-foreground mb-1.5 focus:outline-none"
+          >
+            SENHA ALTERADA
+          </h2>
           <p className="text-[13.5px] text-muted-foreground mb-5">
-            Sua nova senha já está valendo. Use-a no próximo login.
+            Pronto. Você continua conectado neste aparelho e vai usar a nova senha nos próximos acessos.
           </p>
-          <Button size="lg" className="w-full" onClick={() => navigate(backTo)}>
+          <Button size="lg" className="w-full" onClick={() => navigate(backTo, { replace: true })}>
             Voltar para a conta
           </Button>
         </div>
