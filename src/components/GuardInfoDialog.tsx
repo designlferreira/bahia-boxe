@@ -20,7 +20,7 @@ export function GuardInfoDialog({ guard, onOpenChange }: GuardInfoDialogProps) {
             <div className="text-[13.5px] text-foreground/85 leading-relaxed mb-4">{info.description}</div>
 
             <div className="mb-3">
-              <div className="text-[11px] uppercase tracking-wide text-accent font-semibold mb-1.5">Vantagens</div>
+              <div className="text-xs uppercase tracking-wide text-accent font-semibold mb-1.5">Vantagens</div>
               <ul className="flex flex-col gap-1">
                 {info.pros.map((p) => (
                   <li key={p} className="text-[13px] text-foreground/80 leading-snug pl-3.5 relative before:content-['+'] before:absolute before:left-0 before:text-accent before:font-bold">
@@ -31,7 +31,7 @@ export function GuardInfoDialog({ guard, onOpenChange }: GuardInfoDialogProps) {
             </div>
 
             <div>
-              <div className="text-[11px] uppercase tracking-wide text-destructive font-semibold mb-1.5">Desvantagens</div>
+              <div className="text-xs uppercase tracking-wide text-[hsl(var(--red-text))] font-semibold mb-1.5">Desvantagens</div>
               <ul className="flex flex-col gap-1">
                 {info.cons.map((c) => (
                   <li key={c} className="text-[13px] text-foreground/80 leading-snug pl-3.5 relative before:content-['–'] before:absolute before:left-0 before:text-destructive before:font-bold">

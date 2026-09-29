@@ -289,7 +289,7 @@ export default function AdminDisponibilidade() {
                   {day.slots.map((slot) => {
                     const booked = slot.bookedCount;
                     return (
-                      <div key={slot.key} className="flex items-center gap-2.5 p-2.5 rounded-[13px] bg-[#141414] border border-[#262626]">
+                      <div key={slot.key} className="flex items-center gap-2.5 p-2.5 rounded-[13px] bg-raised border border-secondary">
                         <div className="flex-1">
                           <div className={cn("text-[14.5px] font-semibold text-foreground", !day.active && "opacity-60")}>
                             {slot.startTime} – {slot.endTime}

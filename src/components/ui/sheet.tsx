@@ -190,7 +190,7 @@ const SheetContent = React.forwardRef<
           triggerRef.current?.focus();
         }}
         className={cn(
-          "fixed inset-x-0 bottom-0 z-[74] mx-auto w-full max-w-[32rem] max-h-[85vh] overflow-y-auto overscroll-contain rounded-t-[26px] border-t border-border bg-[#161616] px-5 pt-2 pb-8 data-[state=open]:animate-bb-toast",
+          "fixed inset-x-0 bottom-0 z-[74] mx-auto w-full max-w-[32rem] max-h-[85vh] overflow-y-auto overscroll-contain rounded-t-[26px] border-t border-border bg-raised px-5 pt-2 pb-8 data-[state=open]:animate-bb-toast",
           className,
         )}
         {...props}

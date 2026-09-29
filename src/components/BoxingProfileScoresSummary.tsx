@@ -70,7 +70,7 @@ export function BoxingProfileScoresSummary({
           )}
         </div>
       )}
-      <div className="rounded-[20px] p-5 mb-4 bg-[linear-gradient(150deg,#1F1B0C,#171717_60%)] border border-amber/30">
+      <div className="rounded-[20px] p-5 mb-4 bg-[linear-gradient(150deg,hsl(var(--surface-amber-wash)),hsl(var(--surface-raised))_60%)] border border-amber/30">
         <div className="flex items-center gap-1.5 text-amber text-xs font-bold uppercase tracking-wide mb-2">
           <Trophy className="h-3.5 w-3.5" aria-hidden /> {heroLabel}
         </div>
