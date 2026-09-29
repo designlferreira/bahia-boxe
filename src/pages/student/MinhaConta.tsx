@@ -75,7 +75,7 @@ export default function StudentMinhaConta() {
         </div>
       </div>
 
-      <div className="flex flex-col rounded-2xl bg-card border border-border overflow-hidden mb-3.5">
+      <ul aria-label="Minha conta" className="flex flex-col rounded-2xl bg-card border border-border overflow-hidden mb-3.5">
         {/* Nomes que dizem o que abre (antes: "Editar perfil" só editava o nome e "Perfil físico e de boxe"
             parecia o "Perfil de Boxe" da Home, que é o resultado do estilo de luta). */}
         {whatsapp && (
@@ -96,7 +96,7 @@ export default function StudentMinhaConta() {
           onClick={() => navigate("/app/minha-conta/alterar-senha")}
           last
         />
-      </div>
+      </ul>
 
       <PWAInstallBanner placement="settings" />
 

@@ -29,16 +29,21 @@ export function AccountRow({ label, hint, icon: Icon, onClick, href, last }: Acc
       <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
     </>
   );
+  // Cada linha é um item de lista: o container precisa ser um <ul> (o leitor de tela anuncia "lista de N itens").
   if (href) {
     return (
-      <a href={href} target="_blank" rel="noopener noreferrer" className={cls}>
-        {conteudo}
-      </a>
+      <li>
+        <a href={href} target="_blank" rel="noopener noreferrer" className={cls}>
+          {conteudo}
+        </a>
+      </li>
     );
   }
   return (
-    <button type="button" onClick={onClick} className={cls}>
-      {conteudo}
-    </button>
+    <li>
+      <button type="button" onClick={onClick} className={`w-full ${cls}`}>
+        {conteudo}
+      </button>
+    </li>
   );
 }

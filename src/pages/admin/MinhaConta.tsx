@@ -47,8 +47,8 @@ export default function AdminMinhaConta() {
 
       {/* Dois blocos: o que o professor OFERECE (ferramentas do negócio) e a CONTA dele. Antes eram 6 linhas numa lista só e "onde mudo
           meus horários?" dependia de adivinhar que era em "Conta" (a barra de baixo não tem Horários nem Pacotes). A barra não mudou. */}
-      <h2 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">O que você oferece</h2>
-      <div className="flex flex-col rounded-2xl bg-card border border-border overflow-hidden mb-5">
+      <h2 id="bloco-oferece" className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">O que você oferece</h2>
+      <ul aria-labelledby="bloco-oferece" className="flex flex-col rounded-2xl bg-card border border-border overflow-hidden mb-5">
         <AccountRow label="Minha disponibilidade" icon={CalendarClock} onClick={() => navigate("/admin/disponibilidade")} />
         <AccountRow label="Modelos de pacote" icon={Package} onClick={() => navigate("/admin/pacotes")} />
         <AccountRow
@@ -58,10 +58,10 @@ export default function AdminMinhaConta() {
           onClick={() => navigate("/admin/perfil-alunos")}
           last
         />
-      </div>
+      </ul>
 
-      <h2 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Minha conta</h2>
-      <div className="flex flex-col rounded-2xl bg-card border border-border overflow-hidden mb-3.5">
+      <h2 id="bloco-conta" className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Minha conta</h2>
+      <ul aria-labelledby="bloco-conta" className="flex flex-col rounded-2xl bg-card border border-border overflow-hidden mb-3.5">
         <AccountRow
           label="Configurações"
           hint="Modo de agendamento, WhatsApp e regra de faltas"
@@ -70,7 +70,7 @@ export default function AdminMinhaConta() {
         />
         <AccountRow label="Meu nome" icon={UserRound} onClick={() => setEditOpen(true)} />
         <AccountRow label="Alterar senha" icon={KeyRound} onClick={() => navigate("/admin/minha-conta/alterar-senha")} last />
-      </div>
+      </ul>
 
       <PWAInstallBanner placement="settings" />
 
