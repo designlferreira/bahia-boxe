@@ -38,7 +38,7 @@ export default defineConfig({
         // e o navegador baixa em paralelo.
         manualChunks: {
           react: ["react", "react-dom", "react-router-dom"],
-          supabase: ["@supabase/supabase-js"],
+          supabase: ["@supabase/auth-js", "@supabase/postgrest-js"],
           query: ["@tanstack/react-query"],
           datas: ["date-fns", "date-fns-tz"],
         },
