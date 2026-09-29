@@ -707,11 +707,18 @@ export async function reconcileBookingStatuses() {
   if (error) throw new Error(error.message);
 }
 
-/** Primeiros passos de um professor que ainda não tem aluno (painel, "Comece por aqui"). */
+/**
+ * Configuração básica do professor. Sem aluno: vira o "Comece por aqui". Com aluno: o que ainda
+ * faltar aparece em "Resolver agora" — antes a lista sumia no primeiro aluno, mesmo sem WhatsApp
+ * (e sem WhatsApp o aluno não vê o botão "Falar com o professor").
+ */
 export interface PrimeirosPassos {
+  /** Tem horário publicado daqui pra frente (sem isso ninguém agenda no autosserviço). */
   horarios: boolean;
   pacotes: boolean;
   whatsapp: boolean;
+  /** Horários e pacotes só importam no autosserviço — na recorrência quem marca é o professor. */
+  modo: ModoAgendamento;
 }
 
 export async function getAdminDashboard(adminId: string) {
@@ -767,7 +774,7 @@ export async function getAdminDashboard(adminId: string) {
   const [atRisk, antesPendentes, primeirosPassos] = await Promise.all([
     alunosEmRisco(students),
     antecessores((pendingRes.data ?? []).map((r) => r.replacement_for_booking_id)),
-    students.length === 0 ? getPrimeirosPassos(adminId) : Promise.resolve(null),
+    getPrimeirosPassos(adminId),
   ]);
 
   return {
@@ -789,7 +796,12 @@ export async function getAdminDashboard(adminId: string) {
 /** Três checagens baratas (count sem trazer linha) pro "Comece por aqui". */
 async function getPrimeirosPassos(adminId: string): Promise<PrimeirosPassos> {
   const [slotsRes, templatesRes, settings] = await Promise.all([
-    client().from("availability_slots").select("id", { count: "exact", head: true }).eq("admin_id", adminId).eq("is_active", true),
+    client()
+      .from("availability_slots")
+      .select("id", { count: "exact", head: true })
+      .eq("admin_id", adminId)
+      .eq("is_active", true)
+      .gte("start_time", new Date().toISOString()),
     client().from("package_templates").select("id", { count: "exact", head: true }).eq("admin_id", adminId).eq("is_active", true),
     getAdminSettings(adminId),
   ]);
@@ -799,6 +811,7 @@ async function getPrimeirosPassos(adminId: string): Promise<PrimeirosPassos> {
     horarios: (slotsRes.count ?? 0) > 0,
     pacotes: (templatesRes.count ?? 0) > 0,
     whatsapp: !!settings?.whatsapp,
+    modo: settings?.modoAgendamento ?? "autosservico",
   };
 }
 

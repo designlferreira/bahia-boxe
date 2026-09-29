@@ -427,12 +427,12 @@ const DASH_CASES: { title: string; note: string; data: unknown }[] = [
       awaitingConfirmation: [aulaDe("s3", "Diego Martins", -1, 19, "scheduled", { pacoteId: "pkg-rec" }), aulaEm("s8", "Julia Pereira", -90, "scheduled")],
       purchaseRequests: 1,
       atRisk: RISCO,
-      primeirosPassos: null,
+      primeirosPassos: { horarios: true, pacotes: true, whatsapp: true, modo: "autosservico" },
     },
   },
   {
     title: "Fim do dia",
-    note: "todas as aulas de hoje registradas; mostra a próxima",
+    note: "todas as aulas de hoje registradas; mostra a próxima; WhatsApp não cadastrado",
     data: {
       activeStudents: 8,
       today: [aulaEm("s1", "Ana Beatriz Souza", -240, "completed"), aulaEm("s4", "Fernanda Rocha", -120, "completed")],
@@ -441,7 +441,7 @@ const DASH_CASES: { title: string; note: string; data: unknown }[] = [
       awaitingConfirmation: [],
       purchaseRequests: 0,
       atRisk: RISCO.slice(1, 2),
-      primeirosPassos: null,
+      primeirosPassos: { horarios: true, pacotes: true, whatsapp: false, modo: "autosservico" },
     },
   },
   {
@@ -455,7 +455,7 @@ const DASH_CASES: { title: string; note: string; data: unknown }[] = [
       awaitingConfirmation: [],
       purchaseRequests: 0,
       atRisk: [],
-      primeirosPassos: null,
+      primeirosPassos: { horarios: true, pacotes: true, whatsapp: true, modo: "autosservico" },
     },
   },
   {
@@ -469,7 +469,7 @@ const DASH_CASES: { title: string; note: string; data: unknown }[] = [
       awaitingConfirmation: [],
       purchaseRequests: 0,
       atRisk: [],
-      primeirosPassos: { horarios: true, pacotes: false, whatsapp: false },
+      primeirosPassos: { horarios: true, pacotes: false, whatsapp: false, modo: "autosservico" },
     },
   },
 ];

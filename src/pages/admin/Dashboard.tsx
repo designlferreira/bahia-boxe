@@ -108,6 +108,7 @@ export default function AdminDashboard() {
               pending={data.pending}
               awaiting={data.awaitingConfirmation}
               purchaseRequests={data.purchaseRequests}
+              faltaConfigurar={semAlunos ? [] : faltaConfigurar(data.primeirosPassos)}
               pendentes={pendentes}
               aulas={aulas}
             />
@@ -176,12 +177,14 @@ function ResolverAgora({
   pending,
   awaiting,
   purchaseRequests,
+  faltaConfigurar: faltando,
   pendentes,
   aulas,
 }: {
   pending: Pendente[];
   awaiting: AulaComNome[];
   purchaseRequests: number;
+  faltaConfigurar: Passo[];
   pendentes: ReturnType<typeof usePendingActions>;
   aulas: ReturnType<typeof useLessonActions>;
 }) {
@@ -214,7 +217,7 @@ function ResolverAgora({
     ultimo.current = { grupo, id, posicao: lista.findIndex((b) => b.id === id) };
   };
 
-  if (pending.length === 0 && awaiting.length === 0 && purchaseRequests === 0) return null;
+  if (pending.length === 0 && awaiting.length === 0 && purchaseRequests === 0 && faltando.length === 0) return null;
 
   const remarcacoes = pending.filter((b) => b.antecessorInicio).length;
   const novos = pending.length - remarcacoes;
@@ -330,6 +333,24 @@ function ResolverAgora({
           <ChevronRight className="h-[18px] w-[18px] text-muted-foreground shrink-0" aria-hidden />
         </button>
       )}
+
+      {faltando.map((p, i) => (
+        <button
+          key={p.rota}
+          type="button"
+          onClick={() => navigate(p.rota)}
+          className={cn(
+            "w-full text-left min-h-11 py-3 flex items-center gap-3 active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md",
+            (pending.length > 0 || awaiting.length > 0 || purchaseRequests > 0 || i > 0) && "border-t border-border rounded-none",
+          )}
+        >
+          <div className="flex-1 min-w-0">
+            <div className="text-[15px] font-semibold text-foreground">{p.titulo}</div>
+            <div className="text-sm text-muted-foreground">{p.porque}</div>
+          </div>
+          <ChevronRight className="h-[18px] w-[18px] text-muted-foreground shrink-0" aria-hidden />
+        </button>
+      ))}
     </section>
   );
 }
@@ -563,26 +584,68 @@ function Hoje({ today, nextAfterToday, agora }: { today: AulaComNome[]; nextAfte
 // Comece por aqui — professor sem aluno nenhum. Cada passo se marca sozinho quando é feito.
 // ---------------------------------------------------------------------------
 
+interface Passo {
+  feito: boolean;
+  titulo: string;
+  /** Por que importa — aparece quando o passo reaparece em "Resolver agora". */
+  porque: string;
+  rota: string;
+}
+
+/** Os passos que valem pro modo do professor (recorrência não depende de horários nem pacotes). */
+function passosDe(p: PrimeirosPassos): Passo[] {
+  const autosservico = p.modo === "autosservico";
+  return [
+    ...(autosservico
+      ? [
+          {
+            feito: p.horarios,
+            titulo: "Publicar seus horários",
+            porque: "Sem horários publicados, os alunos não conseguem agendar",
+            rota: "/admin/disponibilidade",
+          },
+          {
+            feito: p.pacotes,
+            titulo: "Criar um pacote de aulas",
+            porque: "Sem pacote, os alunos não têm o que pedir",
+            rota: "/admin/pacotes",
+          },
+        ]
+      : []),
+    {
+      feito: p.whatsapp,
+      titulo: "Cadastrar seu WhatsApp",
+      porque: "Sem ele, seus alunos não veem o botão para falar com você",
+      rota: "/admin/configuracoes",
+    },
+  ];
+}
+
+const faltaConfigurar = (p: PrimeirosPassos) => passosDe(p).filter((x) => !x.feito);
+
 function ComecePorAqui({ passos }: { passos: PrimeirosPassos }) {
   const navigate = useNavigate();
-  const itens = [
-    { feito: passos.horarios, titulo: "Publicar seus horários", rota: "/admin/disponibilidade" },
-    { feito: passos.pacotes, titulo: "Criar um pacote de aulas", rota: "/admin/pacotes" },
-    { feito: passos.whatsapp, titulo: "Cadastrar seu WhatsApp", rota: "/admin/configuracoes" },
-    { feito: false, titulo: "Convidar o primeiro aluno", rota: "/admin/alunos" },
+  const itens: Passo[] = [
+    ...passosDe(passos),
+    { feito: false, titulo: "Convidar o primeiro aluno", porque: "", rota: "/admin/alunos" },
   ];
+  const feitos = itens.filter((p) => p.feito).length;
   return (
     <section aria-labelledby="comece" className="card-dark rounded-[20px] p-4">
       <h2 id="comece" className="font-display text-[28px] leading-tight tracking-wide text-foreground uppercase">
         Comece por aqui
       </h2>
-      <div className="text-sm text-muted-foreground mb-2">Quatro passos para receber o primeiro aluno.</div>
+      <div className="text-sm text-muted-foreground mb-2">
+        {feitos === 0
+          ? `${itens.length} passos para receber o primeiro aluno.`
+          : `${feitos} de ${itens.length} passos feitos para receber o primeiro aluno.`}
+      </div>
       <ol>
         {itens.map((p) => (
           <li key={p.rota} className="border-t border-border">
             {p.feito ? (
               <div className="min-h-11 py-2.5 flex items-center gap-3 text-muted-foreground">
-                <CheckCircle2 className="h-5 w-5 text-accent shrink-0" aria-hidden />
+                <CheckCircle2 className="h-5 w-5 text-muted-foreground shrink-0" aria-hidden />
                 <span className="line-through">{p.titulo}</span>
                 <span className="sr-only">(feito)</span>
               </div>
