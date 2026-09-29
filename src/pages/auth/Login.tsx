@@ -119,6 +119,9 @@ export default function Login() {
             ref={emailRef}
             type="email"
             autoComplete="email"
+            inputMode="email"
+            autoCapitalize="none"
+            spellCheck={false}
             value={email}
             onChange={(e) => {
               setEmail(e.target.value);
@@ -156,9 +159,11 @@ export default function Login() {
               type="button"
               onClick={() => setShowPassword((v) => !v)}
               aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              aria-pressed={showPassword}
+              // 44px de toque (o ícone tem 18): dentro do campo, à direita — o campo tem `pr-11`.
+              className="absolute right-0 top-1/2 -translate-y-1/2 h-11 w-11 flex items-center justify-center rounded-xl text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              {showPassword ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
+              {showPassword ? <EyeOff className="h-[18px] w-[18px]" aria-hidden /> : <Eye className="h-[18px] w-[18px]" aria-hidden />}
             </button>
           </div>
           {fieldErrors.password && (
