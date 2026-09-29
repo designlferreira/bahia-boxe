@@ -787,7 +787,7 @@ const intervalo = (weekday: number, ini: number, fim: number, agendadas = 0) => 
 });
 const semana = (dias: Record<number, { active: boolean; slots: ReturnType<typeof intervalo>[] }>) =>
   NOMES_DIA.map((name, weekday) => ({ weekday, name, active: dias[weekday]?.active ?? false, slots: dias[weekday]?.slots ?? [] }));
-const DISPONIBILIDADE_CASOS: { title: string; note: string; dados: ReturnType<typeof semana> | null }[] = [
+const DISPONIBILIDADE_CASOS: { title: string; note: string; dados: ReturnType<typeof semana> | null; modo?: "recorrencia" }[] = [
   {
     title: "Semana em uso",
     note: "dias ativos com aulas marcadas, um dia pausado com horários, dias vazios",
@@ -799,6 +799,12 @@ const DISPONIBILIDADE_CASOS: { title: string; note: string; dados: ReturnType<ty
     }),
   },
   { title: "Nada publicado", note: "primeira vez: nenhum horário em nenhum dia", dados: semana({}) },
+  {
+    title: "Professor em Recorrência",
+    note: "a grade continua editável, mas a faixa explica que os alunos não a usam",
+    modo: "recorrencia",
+    dados: semana({ 1: { active: true, slots: [intervalo(1, 18, 21, 1)] }, 3: { active: true, slots: [intervalo(3, 18, 21)] } }),
+  },
 ];
 
 function SeededAdmin({ data, children, seed }: { data: unknown; children: ReactNode; seed?: (qc: QueryClient) => void }) {
@@ -1077,7 +1083,13 @@ export default function Amostras() {
         <div className="flex flex-wrap gap-6 mb-12">
           {DISPONIBILIDADE_CASOS.map((c) => (
             <Frame key={c.title} title={c.title} note={c.note}>
-              <SeededAdmin data={null} seed={(qc) => qc.setQueryData(["availability", ADMIN_ID], c.dados)}>
+              <SeededAdmin
+                data={null}
+                seed={(qc) => {
+                  qc.setQueryData(["availability", ADMIN_ID], c.dados);
+                  if (c.modo) qc.setQueryData(["admin-settings", ADMIN_ID], { adminId: ADMIN_ID, noShowConsumesClass: false, modoAgendamento: c.modo, whatsapp: null });
+                }}
+              >
                 <AdminDisponibilidade />
               </SeededAdmin>
             </Frame>

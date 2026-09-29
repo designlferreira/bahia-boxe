@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Pencil, Plus, Trash2 } from "lucide-react";
@@ -13,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   deleteAvailabilityInterval,
+  getAdminSettings,
   getAvailability,
   HORIZON_WEEKS,
   restoreAvailabilityInterval,
@@ -48,6 +50,15 @@ export default function AdminDisponibilidade() {
     queryFn: () => getAvailability(profile!.id),
     enabled: !!profile,
   });
+
+  // Só para explicar (não bloqueia nada): em Recorrência o aluno não escolhe horário, então esta grade
+  // não é o que ele usa. Mesma leitura de Configurações (`getAdminSettings`) — a tela continua editável.
+  const { data: settings } = useQuery({
+    queryKey: ["admin-settings", profile?.id],
+    queryFn: () => getAdminSettings(profile!.id),
+    enabled: !!profile,
+  });
+  const emRecorrencia = settings?.modoAgendamento === "recorrencia";
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: key });
@@ -127,6 +138,20 @@ export default function AdminDisponibilidade() {
           marcadas não são afetadas por mudanças aqui.
         </div>
       </div>
+
+      {emRecorrencia && (
+        <div className="rounded-xl border border-amber/40 bg-amber/10 p-3.5 mb-4 text-[13px] leading-snug">
+          <div className="text-amber">
+            Você está no modo Recorrência: seus alunos não escolhem horário. Esta grade só vale no modo Autosserviço.
+          </div>
+          <Link
+            to="/admin/configuracoes"
+            className="mt-1.5 inline-flex min-h-11 items-center font-semibold text-foreground underline underline-offset-4 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Abrir Configurações
+          </Link>
+        </div>
+      )}
 
       {isError && <ErrorState title="Não foi possível carregar a disponibilidade" onRetry={() => refetch()} />}
       {isLoading && !isError && <SkeletonList count={3} height={112} />}
