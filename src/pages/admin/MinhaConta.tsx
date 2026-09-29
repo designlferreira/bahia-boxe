@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, KeyRound, LogOut, Package, Settings, CalendarClock, Users } from "lucide-react";
+import { KeyRound, LogOut, Package, Settings, CalendarClock, UserRound, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Avatar } from "@/components/ui/avatar";
 import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { AccountRow } from "@/components/AccountRow";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 import { EditProfileDialog } from "@/components/EditProfileDialog";
 import { formatDateShort } from "@/lib/dateUtils";
@@ -46,7 +47,7 @@ export default function AdminMinhaConta() {
         <AccountRow label="Modelos de pacote" icon={Package} onClick={() => navigate("/admin/pacotes")} />
         <AccountRow label="Perfil dos alunos" icon={Users} onClick={() => navigate("/admin/perfil-alunos")} />
         <AccountRow label="Configurações" icon={Settings} onClick={() => navigate("/admin/configuracoes")} />
-        <AccountRow label="Editar perfil" onClick={() => setEditOpen(true)} />
+        <AccountRow label="Meu nome" icon={UserRound} onClick={() => setEditOpen(true)} />
         <AccountRow label="Alterar senha" icon={KeyRound} onClick={() => navigate("/admin/minha-conta/alterar-senha")} last />
       </div>
 
@@ -74,31 +75,5 @@ export default function AdminMinhaConta() {
         onConfirm={() => signOut()}
       />
     </div>
-  );
-}
-
-function AccountRow({
-  label,
-  icon: Icon,
-  onClick,
-  last,
-}: {
-  label: string;
-  icon?: typeof KeyRound;
-  onClick: () => void;
-  last?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`h-[52px] px-4 flex items-center gap-2.5 text-left text-[14.5px] text-foreground hover:bg-secondary transition-colors ${
-        last ? "" : "border-b border-[#232323]"
-      }`}
-    >
-      {Icon && <Icon className="h-[17px] w-[17px] text-muted-foreground" />}
-      <span className="flex-1">{label}</span>
-      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-    </button>
   );
 }
