@@ -21,8 +21,9 @@ import {
 export default function AdminPedidos() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
-  const [rejectTarget, setRejectTarget] = useState<{ id: string; student: string } | null>(null);
-  const [approveTarget, setApproveTarget] = useState<{ id: string; student: string; lost: number } | null>(null);
+  // Aprovar SEMPRE confirma (é dinheiro e cria um pacote, sem desfazer); recusar não confirma — tem
+  // "Desfazer" (decisão do Lucas, 2026-09-29).
+  const [approveTarget, setApproveTarget] = useState<{ id: string; student: string; lost: number; what: string } | null>(null);
 
   const key = ["purchase-requests", profile?.id];
   const { data, isLoading, isError, refetch } = useQuery({
@@ -31,27 +32,33 @@ export default function AdminPedidos() {
     enabled: !!profile,
   });
 
+  const invalidar = () => {
+    queryClient.invalidateQueries({ queryKey: key });
+    // O painel conta estes pedidos ("N pedidos de aulas") — sem isto a contagem ficava velha.
+    queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
+  };
+
   const approve = useMutation({
-    mutationFn: (id: string) => approvePurchaseRequest(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: key });
-      toast.success("Pedido aprovado · pacote criado");
+    mutationFn: ({ id }: { id: string; student: string }) => approvePurchaseRequest(id),
+    onSuccess: (_r, { student }) => {
+      invalidar();
+      toast.success(`Pedido de ${student.split(" ")[0]} aprovado · aulas liberadas`);
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível aprovar o pedido."),
   });
 
   const reject = useMutation({
-    mutationFn: (id: string) => rejectPurchaseRequest(id),
-    onSuccess: (_r, id) => {
-      queryClient.invalidateQueries({ queryKey: key });
-      toast.warning("Pedido recusado", {
+    mutationFn: ({ id }: { id: string; student: string }) => rejectPurchaseRequest(id),
+    onSuccess: (_r, { id, student }) => {
+      invalidar();
+      toast.warning(`Pedido de ${student.split(" ")[0]} recusado · o aluno é avisado no app`, {
         duration: 8000,
         action: {
           label: "Desfazer",
-          onClick: async () => {
-            await restorePurchaseRequest(id);
-            queryClient.invalidateQueries({ queryKey: key });
-          },
+          onClick: () =>
+            restorePurchaseRequest(id)
+              .then(invalidar)
+              .catch((err) => toast.error(err instanceof Error ? err.message : "Não foi possível desfazer.")),
         },
       });
     },
@@ -124,9 +131,12 @@ export default function AdminPedidos() {
                   size="sm"
                   className="flex-1"
                   onClick={() =>
-                    classesLostOnApprove > 0
-                      ? setApproveTarget({ id: request.id, student: studentName, lost: classesLostOnApprove })
-                      : approve.mutate(request.id)
+                    setApproveTarget({
+                      id: request.id,
+                      student: studentName,
+                      lost: classesLostOnApprove,
+                      what: template?.name ?? (request.kind === "package" ? "Pacote" : "Aula avulsa"),
+                    })
                   }
                   disabled={approve.isPending}
                 >
@@ -136,7 +146,7 @@ export default function AdminPedidos() {
                   variant="secondary"
                   size="sm"
                   className="flex-1"
-                  onClick={() => setRejectTarget({ id: request.id, student: studentName })}
+                  onClick={() => reject.mutate({ id: request.id, student: studentName })}
                 >
                   Recusar
                 </Button>
@@ -153,24 +163,18 @@ export default function AdminPedidos() {
       <ConfirmDialog
         open={!!approveTarget}
         onOpenChange={(o) => !o && setApproveTarget(null)}
-        title="APROVAR E ENCERRAR O PACOTE ATUAL?"
+        title={approveTarget && approveTarget.lost > 0 ? "APROVAR E ENCERRAR O PACOTE ATUAL?" : "APROVAR PEDIDO?"}
         description={
           approveTarget
-            ? `${approveTarget.student} ainda tem ${approveTarget.lost} ${approveTarget.lost === 1 ? "aula" : "aulas"} para usar no pacote atual. Aprovar agora encerra esse pacote e ${approveTarget.lost === 1 ? "essa aula deixa" : "essas aulas deixam"} de valer. As aulas já agendadas continuam de pé. Se preferir, aprove quando o pacote atual acabar.`
+            ? approveTarget.lost > 0
+              ? `${approveTarget.student} ainda tem ${approveTarget.lost} ${approveTarget.lost === 1 ? "aula" : "aulas"} para usar no pacote atual. Aprovar agora encerra esse pacote e ${approveTarget.lost === 1 ? "essa aula deixa" : "essas aulas deixam"} de valer. As aulas já agendadas continuam de pé. Se preferir, aprove quando o pacote atual acabar.`
+              : `${approveTarget.what} para ${approveTarget.student}. O aluno recebe as aulas na hora e é avisado no app. Não dá para desfazer depois.`
             : ""
         }
-        confirmLabel="Aprovar mesmo assim"
-        tone="destructive"
-        onConfirm={() => approveTarget && approve.mutate(approveTarget.id)}
-      />
-
-      <ConfirmDialog
-        open={!!rejectTarget}
-        onOpenChange={(o) => !o && setRejectTarget(null)}
-        title="RECUSAR PEDIDO"
-        description={`O pedido de ${rejectTarget?.student} será recusado. O aluno recebe um aviso no app.`}
-        confirmLabel="Recusar"
-        onConfirm={() => rejectTarget && reject.mutate(rejectTarget.id)}
+        confirmLabel={approveTarget && approveTarget.lost > 0 ? "Aprovar mesmo assim" : "Aprovar"}
+        cancelLabel="Voltar"
+        tone={approveTarget && approveTarget.lost > 0 ? "destructive" : "default"}
+        onConfirm={() => approveTarget && approve.mutate({ id: approveTarget.id, student: approveTarget.student })}
       />
     </div>
   );
