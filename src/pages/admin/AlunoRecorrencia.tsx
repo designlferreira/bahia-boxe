@@ -48,7 +48,9 @@ const WEEKDAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sex
  * que a recorrência prometia (nada de 30/45/90 min por enquanto) em troca de nunca depender de um
  * aviso pós-fato. Se precisar de outra duração no futuro, resolve a view antes, não aqui.
  */
-const HOURS = Array.from({ length: 24 }, (_, h) => h);
+/** Horários de treino razoáveis (05h–22h): 24 botões, com a madrugada no meio, só atrapalhavam a escolha. */
+const HOURS = Array.from({ length: 18 }, (_, h) => h + 5);
+const MAX_AULAS = 52; // o cálculo das datas já limita a 52 semanas
 const FOCO = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 const hhmm = (h: number) => String(h).padStart(2, "0") + ":00";
 const DURACAO_MINUTOS = 60;
@@ -114,7 +116,9 @@ export default function AdminAlunoRecorrencia() {
   const [addOpen, setAddOpen] = useState(false);
   const [diaSemana, setDiaSemana] = useState(1);
   const [horario, setHorario] = useState("18:00");
-  const [totalAulas, setTotalAulas] = useState(8);
+  // Texto do campo, não número: com número, apagar o "8" virava "1" na hora e não dava para digitar "12".
+  const [totalTexto, setTotalTexto] = useState("8");
+  const totalAulas = Math.min(MAX_AULAS, Math.max(1, parseInt(totalTexto, 10) || 1));
   const [startDate, setStartDate] = useState<string | null>(null);
   const [confirmGerar, setConfirmGerar] = useState(false);
   const [excluirAlvo, setExcluirAlvo] = useState<AlunoRecorrencia | null>(null);
@@ -306,10 +310,15 @@ export default function AdminAlunoRecorrencia() {
 
       <div className="flex flex-col gap-4 mb-5">
         {recorrencias.length === 0 && (
-          <div className="border border-dashed border-[#2E2E2E] rounded-[13px] p-4 text-center">
-            <div className="text-[12.5px] text-muted-foreground">
-              Nenhum horário fixo cadastrado para {student.name.split(" ")[0]} ainda.
+          <div className="border border-dashed border-border rounded-[13px] p-5 text-center">
+            <div className="text-[13px] text-muted-foreground leading-snug mb-3">
+              {student.name.split(" ")[0]} ainda não tem horário fixo. Cadastre os dias e horários em que treina toda semana; depois é
+              só gerar as aulas.
             </div>
+            <Button onClick={() => setAddOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Adicionar o primeiro horário
+            </Button>
           </div>
         )}
 
@@ -337,6 +346,7 @@ export default function AdminAlunoRecorrencia() {
         )}
       </div>
 
+      {recorrencias.length > 0 && (
       <div className="card-dark p-4">
         <h2 className="section-title mb-1">Gerar pacote</h2>
         <div className="text-[12.5px] text-muted-foreground mb-3">
@@ -415,10 +425,13 @@ export default function AdminAlunoRecorrencia() {
             )}
             <div className="flex gap-2.5">
               <Input
-                type="number"
-                min={1}
-                value={totalAulas}
-                onChange={(e) => setTotalAulas(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={2}
+                value={totalTexto}
+                onChange={(e) => setTotalTexto(e.target.value.replace(/\D/g, ""))}
+                onBlur={() => setTotalTexto(String(totalAulas))}
                 className="w-24 text-center"
                 aria-label="Número de aulas"
               />
@@ -434,6 +447,7 @@ export default function AdminAlunoRecorrencia() {
           </>
         )}
       </div>
+      )}
 
       <Sheet open={addOpen} onOpenChange={setAddOpen}>
         <SheetContent>
