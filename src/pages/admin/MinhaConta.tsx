@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, KeyRound, Package, Settings, CalendarClock, Users } from "lucide-react";
+import { ChevronRight, KeyRound, LogOut, Package, Settings, CalendarClock, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Avatar } from "@/components/ui/avatar";
 import { PageHeader } from "@/components/PageHeader";
@@ -52,7 +52,15 @@ export default function AdminMinhaConta() {
 
       <PWAInstallBanner placement="settings" />
 
-      <Button variant="destructive" size="lg" className="w-full" onClick={() => setConfirmLogout(true)}>
+      {/* Sair é uma ação rara: discreta (sem preenchimento), no fim da tela. Antes era o botão vermelho de largura total (56px), o
+          elemento mais forte de uma tela sem ação principal, colado ao banner de instalar. Igual ao do aluno. */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="w-full mt-2 text-[hsl(var(--red-text))] hover:text-[hsl(var(--red-text))]"
+        onClick={() => setConfirmLogout(true)}
+      >
+        <LogOut className="h-4 w-4" aria-hidden />
         Sair da conta
       </Button>
 
