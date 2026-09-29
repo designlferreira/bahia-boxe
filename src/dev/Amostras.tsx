@@ -1308,6 +1308,7 @@ export default function Amostras() {
                     noShowCount: c.noShow,
                   });
                   if (c.pacote && c.saldo) qc.setQueryData(["saldo-pacote", c.pacote.id], c.saldo);
+                  qc.setQueryData(["student-email", c.aluno.id], c.aluno.id === "s3" ? null : `${c.aluno.name.split(" ")[0].toLowerCase()}@exemplo.com`);
                   qc.setQueryData(["package-templates-admin", ADMIN_ID], [
                     modelo("m1", "Pacote 8 aulas", 8, 32000),
                     modelo("m2", "Pacote 12 aulas", 12, 45000),

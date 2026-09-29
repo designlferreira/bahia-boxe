@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CalendarClock, Sparkles, X } from "lucide-react";
+import { CalendarClock, Mail, Sparkles, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
 import { SkeletonCard, SkeletonList } from "@/components/SkeletonCard";
@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import {
   assignPackageFromTemplate,
   getAdminStudentDetail,
+  getEmailDoAluno,
   getPackageTemplates,
   getSaldoPacote,
   removeActivePackage,
@@ -44,6 +45,16 @@ export default function AdminAlunoDetalhe() {
     queryKey: ["package-templates-admin", profile?.id],
     queryFn: () => getPackageTemplates(profile!.id),
     enabled: assignOpen && !!profile,
+  });
+
+  // Contato do aluno (0036). Se a consulta falhar (função ainda não aplicada, rede), a linha simplesmente não
+  // aparece: o e-mail é um extra, não pode derrubar a tela.
+  const { data: emailAluno } = useQuery({
+    queryKey: ["student-email", studentId],
+    queryFn: () => getEmailDoAluno(studentId!),
+    enabled: !!studentId,
+    staleTime: 60 * 60 * 1000,
+    retry: false,
   });
 
   const pkg = data?.package ?? null;
@@ -119,6 +130,16 @@ export default function AdminAlunoDetalhe() {
   return (
     <div className="page-container">
       <PageHeader title={student.name.toUpperCase()} subtitle="Aluno" back />
+
+      {emailAluno && (
+        <a
+          href={`mailto:${emailAluno}`}
+          className="-mt-2 mb-3 inline-flex min-h-11 max-w-full items-center gap-2 text-[13.5px] text-muted-foreground underline underline-offset-4 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Mail className="h-4 w-4 shrink-0" aria-hidden />
+          <span className="break-all">{emailAluno}</span>
+        </a>
+      )}
 
       <div className="mb-3.5">
         <ActivePackageCard pkg={pkg} credits={credits} saldo={saldo} />

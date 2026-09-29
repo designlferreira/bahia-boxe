@@ -2076,6 +2076,16 @@ export async function updateWhatsapp(adminId: string, whatsapp: string | null) {
  * WhatsApp do professor, lido pelo aluno. Por RPC pelo mesmo motivo de
  * `getModoAgendamentoEfetivo` logo abaixo: o aluno não lê a linha de `profiles` do professor.
  */
+/**
+ * E-mail da conta de um aluno DO PRÓPRIO professor (contato). Vai por RPC (0036): o e-mail fica em `auth.users`, que o
+ * cliente não lê, e `profiles` não o guarda. Só o professor dono chama; qualquer outro recebe erro.
+ */
+export async function getEmailDoAluno(studentId: string): Promise<string | null> {
+  const { data, error } = await client().rpc("email_do_aluno", { p_student_id: studentId });
+  if (error) throw new Error(error.message);
+  return (data as string | null) ?? null;
+}
+
 export async function getWhatsappDoProfessor(professorId: string): Promise<string | null> {
   const { data, error } = await client().rpc("whatsapp_do_professor", { p_professor_id: professorId });
   if (error) throw new Error(error.message);
