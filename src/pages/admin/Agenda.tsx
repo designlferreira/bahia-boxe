@@ -183,7 +183,8 @@ export default function AdminAgenda() {
     <div className="page-container">
       <h1 className="font-display text-3xl tracking-wide text-foreground leading-none mb-1">AGENDA</h1>
       <div className="flex items-center gap-2.5 mb-3.5">
-        <div className="flex-1 text-[13px] text-muted-foreground">
+        {/* aria-live: trocar de dia muda a lista inteira — sem isto o leitor de tela não dizia nada. */}
+        <div className="flex-1 text-[13px] text-muted-foreground" aria-live="polite">
           {formatDate(selectedDate)} · {nAulas === 1 ? "1 aula" : `${nAulas} aulas`}
         </div>
         <Button variant="secondary" size="sm" onClick={() => navigate("/admin/disponibilidade")}>
@@ -246,7 +247,7 @@ export default function AdminAgenda() {
               aria-label={`${formatWeekdayLong(d)}, dia ${formatDayNumber(d)}${ehHoje ? ", hoje" : ""}${pendencia ? " — tem algo para resolver" : ""}`}
               aria-pressed={on}
               className={cn(
-                "relative min-w-0 py-2 rounded-2xl border transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "relative min-w-0 pt-1.5 pb-3 rounded-2xl border transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 on ? "bg-primary border-primary" : ehHoje ? "bg-secondary border-foreground/50" : "bg-secondary border-border",
               )}
             >
@@ -254,11 +255,16 @@ export default function AdminAgenda() {
               {pendencia && (
                 <span
                   aria-hidden
-                  className={cn("absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full", on ? "bg-primary-foreground" : "bg-amber")}
+                  className={cn(
+                    // Embaixo do número, no centro: no canto encostava no nome do dia.
+                    "absolute bottom-1 left-1/2 -translate-x-1/2 h-1.5 w-1.5 rounded-full",
+                    on ? "bg-primary-foreground" : "bg-amber",
+                  )}
                 />
               )}
               <div aria-hidden className={cn("text-xs", on ? "text-primary-foreground" : "text-muted-foreground")}>
-                {formatWeekdayShort(d)}
+                {/* Hoje escrito, não só a borda clara. */}
+                {ehHoje ? "Hoje" : formatWeekdayShort(d)}
               </div>
               <div
                 aria-hidden
@@ -322,7 +328,8 @@ export default function AdminAgenda() {
                   <span
                     className={cn(
                       "absolute -left-[3px] top-1.5 h-2 w-2 rounded-full transition-colors",
-                      entry.free ? "bg-muted-foreground/50" : dotClassFor(entry),
+                      // Livre: anel vazado (não confunde com o cinza cheio de "feita") e com contraste ≥ 3:1.
+                      entry.free ? "bg-background border border-muted-foreground" : dotClassFor(entry),
                     )}
                   />
                 </div>
@@ -330,7 +337,7 @@ export default function AdminAgenda() {
                     e o cartão saía pela lateral da tela, cortando Recusar/Cancelar. */}
                 <div className="flex-1 min-w-0 pb-3">
                   {entry.free ? (
-                    <div className="border border-dashed border-muted-foreground/40 rounded-2xl p-3.5 text-[13px] text-muted-foreground">
+                    <div className="border border-dashed border-muted-foreground/70 rounded-2xl p-3.5 text-[13px] text-muted-foreground">
                       Horário livre
                     </div>
                   ) : (
