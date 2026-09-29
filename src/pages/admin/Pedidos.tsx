@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AlertTriangle, Inbox } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
@@ -13,6 +14,7 @@ import { formatPriceLabel } from "@/lib/packageUtils";
 import { relativeTime } from "@/lib/dateUtils";
 import {
   approvePurchaseRequest,
+  getPedidosDecididos,
   getPurchaseRequests,
   rejectPurchaseRequest,
   restorePurchaseRequest,
@@ -20,6 +22,7 @@ import {
 
 export default function AdminPedidos() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   // Aprovar SEMPRE confirma (é dinheiro e cria um pacote, sem desfazer); recusar não confirma — tem
   // "Desfazer" (decisão do Lucas, 2026-09-29).
@@ -32,8 +35,15 @@ export default function AdminPedidos() {
     enabled: !!profile,
   });
 
+  const { data: decididos } = useQuery({
+    queryKey: ["purchase-requests-decididos", profile?.id],
+    queryFn: () => getPedidosDecididos(profile!.id),
+    enabled: !!profile,
+  });
+
   const invalidar = () => {
     queryClient.invalidateQueries({ queryKey: key });
+    queryClient.invalidateQueries({ queryKey: ["purchase-requests-decididos"] });
     // O painel conta estes pedidos ("N pedidos de aulas") — sem isto a contagem ficava velha.
     queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
   };
@@ -73,7 +83,7 @@ export default function AdminPedidos() {
   return (
     <div className="page-container">
       <h1 className="font-display text-3xl tracking-wide text-foreground leading-none mb-1">PEDIDOS</h1>
-      <div className="text-[12.5px] text-muted-foreground mb-4">Solicitações de pacote e aula avulsa</div>
+      <div className="text-[13px] text-muted-foreground mb-4">Pacotes e aulas avulsas que seus alunos pediram</div>
 
       {isError && <ErrorState title="Não foi possível carregar os pedidos" onRetry={() => refetch()} />}
       {isLoading && !isError && <SkeletonList count={2} height={118} />}
@@ -99,11 +109,8 @@ export default function AdminPedidos() {
                         : `${aulasRestantes} aulas restantes`}
                   </div>
                 </div>
-                <Badge
-                  className={
-                    request.kind === "package" ? "bg-accent/15 text-accent whitespace-nowrap" : "bg-primary/15 text-primary whitespace-nowrap"
-                  }
-                >
+                {/* Neutro: é um rótulo de tipo, não um estado — o vermelho (e o dourado) têm significado no app. */}
+                <Badge className="bg-secondary text-foreground whitespace-nowrap">
                   {request.kind === "package" ? "Pacote" : "Aula avulsa"}
                 </Badge>
               </div>
@@ -133,6 +140,7 @@ export default function AdminPedidos() {
               )}
               <div className="flex gap-2">
                 <Button
+                  variant="soft"
                   size="sm"
                   className="flex-1"
                   onClick={() =>
@@ -165,7 +173,38 @@ export default function AdminPedidos() {
       )}
 
       {!isLoading && !isError && data && data.length === 0 && (
-        <EmptyState icon={Inbox} title="Nenhum pedido pendente" description="Tudo em dia por aqui." />
+        <EmptyState
+          icon={Inbox}
+          title="Nenhum pedido pendente"
+          description="Tudo em dia por aqui."
+          ctaLabel="Ver agenda"
+          ctaVariant="secondary"
+          onCta={() => navigate("/admin/agenda")}
+        />
+      )}
+
+      {decididos && decididos.length > 0 && (
+        <section aria-labelledby="decididos" className="mt-8">
+          <h2 id="decididos" className="section-title mb-2">
+            Decididos recentemente
+          </h2>
+          <ul className="card-dark divide-y divide-border">
+            {decididos.map(({ request, studentName, template }) => (
+              <li key={request.id} className="flex items-center gap-3 px-4 py-3">
+                <div className="flex-1 min-w-0">
+                  <div className="text-[14.5px] font-semibold text-foreground truncate">{studentName}</div>
+                  <div className="text-[13px] text-muted-foreground truncate">
+                    {template?.name ?? (request.kind === "package" ? "Pacote" : "Aula avulsa")}
+                    {request.decidedAt ? ` · ${relativeTime(request.decidedAt)}` : ""}
+                  </div>
+                </div>
+                <Badge className={request.status === "approved" ? "border border-border text-muted-foreground" : "bg-destructive/20 text-[hsl(var(--red-text))]"}>
+                  {request.status === "approved" ? "Aprovado" : "Recusado"}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <ConfirmDialog

@@ -780,7 +780,16 @@ export default function Amostras() {
         <div className="flex flex-wrap gap-6 mb-12">
           {PEDIDOS_CASOS.map((c) => (
             <Frame key={c.title} title={c.title} note={c.note}>
-              <SeededAdmin data={null} seed={(qc) => qc.setQueryData(["purchase-requests", ADMIN_ID], c.lista)}>
+              <SeededAdmin
+                data={null}
+                seed={(qc) => {
+                  qc.setQueryData(["purchase-requests", ADMIN_ID], c.lista);
+                  qc.setQueryData(["purchase-requests-decididos", ADMIN_ID], [
+                    { request: { ...pedido("d1", "package", "x", null, 0).request, status: "approved", decidedAt: at(-2, 9) }, studentName: "Fernanda Rocha", template: modelo("t9", "Pacote de 8 aulas", 8, 32000) },
+                    { request: { ...pedido("d2", "single", "x", null, 0).request, status: "rejected", decidedAt: at(-5, 9) }, studentName: "Gustavo Alves", template: modelo("t8", "Aula avulsa", 1, 5000) },
+                  ]);
+                }}
+              >
                 <AdminPedidos />
               </SeededAdmin>
             </Frame>

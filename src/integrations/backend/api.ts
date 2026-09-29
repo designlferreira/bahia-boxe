@@ -1684,6 +1684,34 @@ export async function getPurchaseRequests(adminId: string) {
   });
 }
 
+/** Os últimos pedidos já decididos (aprovados ou recusados) — pra conferir o que foi feito. */
+export async function getPedidosDecididos(adminId: string, limite = 5) {
+  const { data, error } = await client()
+    .from("purchase_requests")
+    .select("*")
+    .eq("admin_id", adminId)
+    .neq("status", "pending")
+    .order("decided_at", { ascending: false, nullsFirst: false })
+    .limit(limite);
+  if (error) throw new Error(error.message);
+  const rows = data ?? [];
+  const templateIds = Array.from(new Set(rows.map((r) => r.template_id).filter(Boolean)));
+  const [students, templatesRes] = await Promise.all([
+    adminStudents(adminId),
+    templateIds.length
+      ? client().from("package_templates").select("*").in("id", templateIds)
+      : Promise.resolve({ data: [], error: null } as const),
+  ]);
+  if (templatesRes.error) throw new Error(templatesRes.error.message);
+  const nameOf = new Map(students.map((s) => [s.id, s.name]));
+  const templates = new Map((templatesRes.data ?? []).map((t) => [t.id, mapTemplate(t)]));
+  return rows.map((r) => ({
+    request: mapRequest(r),
+    studentName: nameOf.get(r.student_id) ?? "Aluno",
+    template: r.template_id ? (templates.get(r.template_id) ?? null) : null,
+  }));
+}
+
 export async function approvePurchaseRequest(requestId: string) {
   const { error } = await client().rpc("approve_purchase_request", { p_request_id: requestId });
   if (error) throw new Error(error.message);
