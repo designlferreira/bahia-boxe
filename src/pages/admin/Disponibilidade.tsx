@@ -76,6 +76,11 @@ export default function AdminDisponibilidade() {
       setEditorError(null);
       toast.success(vars.interval ? "Horário atualizado" : `Horário adicionado em ${vars.dayName}`);
     },
+    // Falha de gravação (rede, servidor): antes o sheet ficava aberto sem nenhum aviso e o professor
+    // achava que tinha salvado. A mensagem aparece dentro do sheet, junto do botão.
+    onError: (err) => {
+      setEditorError(err instanceof Error ? err.message : "Não foi possível salvar. Tente de novo.");
+    },
   });
 
   const deleteSlot = useMutation({
@@ -87,12 +92,19 @@ export default function AdminDisponibilidade() {
         action: {
           label: "Desfazer",
           onClick: async () => {
-            await restoreAvailabilityInterval(slot);
-            invalidate();
+            try {
+              await restoreAvailabilityInterval(slot);
+              invalidate();
+              toast.success("Horário de volta");
+            } catch (err) {
+              // Sem isto, um "Desfazer" que falha deixava a lista como estava e o professor sem saber.
+              toast.error(err instanceof Error ? err.message : "Não foi possível desfazer. Adicione o horário de novo.");
+            }
           },
         },
       });
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível remover o horário."),
   });
 
   if (!profile) return null;
@@ -274,7 +286,7 @@ export default function AdminDisponibilidade() {
             </div>
 
             {editorError && (
-              <div className="rounded-[13px] border border-destructive/35 bg-destructive/10 p-3 mb-3.5 text-[12.5px] text-destructive">
+              <div role="alert" className="rounded-[13px] border border-destructive/35 bg-destructive/10 p-3 mb-3.5 text-[13px] text-destructive">
                 {editorError}
               </div>
             )}

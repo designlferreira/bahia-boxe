@@ -30,6 +30,7 @@ import AdminAlunoRecorrencia from "@/pages/admin/AlunoRecorrencia";
 import StudentPerfilLutador from "@/pages/student/PerfilLutador";
 import AdminAlunoPerfilBoxe from "@/pages/admin/AlunoPerfilBoxe";
 import AdminConfiguracoes from "@/pages/admin/Configuracoes";
+import AdminDisponibilidade from "@/pages/admin/Disponibilidade";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
 import { RemarcacaoSheet } from "@/components/RemarcacaoSheet";
@@ -775,6 +776,31 @@ const PERFIL_PROF_CASOS: { title: string; note: string; lista: BoxingProfileAsse
   { title: "Os dois", note: "comparação e resultado combinado", lista: [SELF, COACH] },
 ];
 
+const NOMES_DIA = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+const intervalo = (weekday: number, ini: number, fim: number, agendadas = 0) => ({
+  key: `${weekday}-${ini}-${fim}`,
+  weekday,
+  startTime: `${String(ini).padStart(2, "0")}:00`,
+  endTime: `${String(fim).padStart(2, "0")}:00`,
+  slotIds: Array.from({ length: fim - ini }, (_, i) => `s-${weekday}-${ini + i}`),
+  bookedCount: agendadas,
+});
+const semana = (dias: Record<number, { active: boolean; slots: ReturnType<typeof intervalo>[] }>) =>
+  NOMES_DIA.map((name, weekday) => ({ weekday, name, active: dias[weekday]?.active ?? false, slots: dias[weekday]?.slots ?? [] }));
+const DISPONIBILIDADE_CASOS: { title: string; note: string; dados: ReturnType<typeof semana> | null }[] = [
+  {
+    title: "Semana em uso",
+    note: "dias ativos com aulas marcadas, um dia pausado com horários, dias vazios",
+    dados: semana({
+      1: { active: true, slots: [intervalo(1, 6, 9, 2), intervalo(1, 18, 21, 3)] },
+      2: { active: true, slots: [intervalo(2, 18, 21)] },
+      3: { active: false, slots: [intervalo(3, 7, 10, 1)] },
+      5: { active: true, slots: [intervalo(5, 6, 9)] },
+    }),
+  },
+  { title: "Nada publicado", note: "primeira vez: nenhum horário em nenhum dia", dados: semana({}) },
+];
+
 function SeededAdmin({ data, children, seed }: { data: unknown; children: ReactNode; seed?: (qc: QueryClient) => void }) {
   const [client] = useState(() => {
     const qc = new QueryClient({
@@ -1042,6 +1068,17 @@ export default function Amostras() {
                 }}
               >
                 <AdminConfiguracoes />
+              </SeededAdmin>
+            </Frame>
+          ))}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Disponibilidade (professor)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {DISPONIBILIDADE_CASOS.map((c) => (
+            <Frame key={c.title} title={c.title} note={c.note}>
+              <SeededAdmin data={null} seed={(qc) => qc.setQueryData(["availability", ADMIN_ID], c.dados)}>
+                <AdminDisponibilidade />
               </SeededAdmin>
             </Frame>
           ))}
