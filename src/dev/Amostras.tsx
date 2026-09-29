@@ -29,6 +29,7 @@ import ConfirmarEmail from "@/pages/auth/ConfirmarEmail";
 import AdminAlunoRecorrencia from "@/pages/admin/AlunoRecorrencia";
 import StudentPerfilLutador from "@/pages/student/PerfilLutador";
 import AdminAlunoPerfilBoxe from "@/pages/admin/AlunoPerfilBoxe";
+import AdminConfiguracoes from "@/pages/admin/Configuracoes";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { BoxingProfileHomeCard } from "@/components/BoxingProfileHomeCard";
 import { RemarcacaoSheet } from "@/components/RemarcacaoSheet";
@@ -789,7 +790,7 @@ function SeededAdmin({ data, children, seed }: { data: unknown; children: ReactN
     (w.__amostrasAdmin ??= []).push(qc);
     // Professor configurado pra falta NÃO descontar, mas o pacote de recorrência do Diego foi criado
     // quando descontava: a janela de falta tem que seguir o pacote (regra da aula, não a geral).
-    if (!qc.getQueryData(["admin-settings", ADMIN_ID])) {
+    if (!qc.getQueryState(["admin-settings", ADMIN_ID])) {
       qc.setQueryData(["admin-settings", ADMIN_ID], { adminId: ADMIN_ID, noShowConsumesClass: false, modoAgendamento: "autosservico", whatsapp: null });
     }
     qc.setQueryData(["regra-consumo", "a-s3--1-19", false], { falta: true, cancelamentoPeloAluno: true, origem: "pacote" });
@@ -1017,6 +1018,30 @@ export default function Amostras() {
                 <ComRota path="/admin/alunos/:studentId/perfil-lutador" url="/admin/alunos/s1/perfil-lutador">
                   <AdminAlunoPerfilBoxe />
                 </ComRota>
+              </SeededAdmin>
+            </Frame>
+          ))}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Configurações (professor)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {[
+            { title: "Autosserviço, com WhatsApp", note: "falta não consome aula; número cadastrado", modo: "autosservico", noShow: false, whatsapp: "5511947034983" },
+            { title: "Recorrência, sem WhatsApp", note: "falta consome aula; sem número (alunos não veem o botão)", modo: "recorrencia", noShow: true, whatsapp: null },
+            { title: "Não carregou", note: "a busca das configurações falhou", modo: "erro", noShow: true, whatsapp: null },
+          ].map((c) => (
+            <Frame key={c.title} title={c.title} note={c.note}>
+              <SeededAdmin
+                data={null}
+                seed={(qc) => {
+                  if (c.modo === "erro") {
+                    qc.fetchQuery({ queryKey: ["admin-settings", ADMIN_ID], queryFn: () => Promise.reject(new Error("amostra")), retry: false }).catch(() => {});
+                  } else {
+                    qc.setQueryData(["admin-settings", ADMIN_ID], { adminId: ADMIN_ID, noShowConsumesClass: c.noShow, modoAgendamento: c.modo, whatsapp: c.whatsapp });
+                  }
+                }}
+              >
+                <AdminConfiguracoes />
               </SeededAdmin>
             </Frame>
           ))}

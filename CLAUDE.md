@@ -2724,6 +2724,42 @@ perfis empatados); ilustração ou identidade de boxe no destaque do estilo (a c
 mostrar a leitura do professor só depois da autoavaliação (recusado, ver acima); professor sem atalho para a evolução
 do aluno.
 
+### Configurações (professor): rodada de crítica (2026-09-29) — sem migration nova
+
+`src/pages/admin/Configuracoes.tsx` (rota `/admin/configuracoes`; acessível por "Minha conta" e pelo aviso do
+modo Autosserviço em Horários fixos): crítica **18/40** (a revisão de design leu só o código, o navegador negou
+o acesso; as medições vieram da varredura). Relatório em `.impeccable/critique/*configuracoes*`. Cinco passos na
+`dev`, testados pelo Lucas. Na página de amostras ("Configurações (professor)": Autosserviço com WhatsApp,
+Recorrência sem WhatsApp, "Não carregou").
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Trocar o modo de agendamento pede CONFIRMAÇÃO** (janela com Cancelar/Trocar) e diz o que o ALUNO passa a ver
+  ("deixam de ver 'Agendar' e passam a ver 'Ver minhas aulas'…"); só grava depois do "Trocar". Tocar no modo que
+  já está ativo não faz nada. A alternativa "trocar na hora, com Desfazer" foi oferecida e recusada.
+- **Tela em seções por assunto, nesta ordem:** "Como os alunos agendam" (modo), "Regras do pacote" (falta),
+  "Contato" (WhatsApp), "O que o aluno vê" (Orientações da aula). As três primeiras só aparecem com os dados
+  carregados; "O que o aluno vê" sempre.
+
+**O que mudou / armadilhas:**
+- **Falha de gravação agora avisa** (o switch da falta e o modo não tinham `onError`; só o WhatsApp avisava):
+  `toast.error`, switch travado enquanto grava. Se a busca das configurações falha, aparece `ErrorState` com
+  "Tentar novamente" — antes o switch mostrava "ligado" (`?? true`) como se fosse o valor real.
+- **Vocabulário:** "Falta desconta uma aula" (não "consome crédito"). A explicação diz que pacotes de
+  **Recorrência já gerados mantêm a regra de quando foram criados** — é a única situação em que a regra é
+  "congelada" (decisão 3/5); nos demais pacotes ela vale na hora da falta. Não escrever "vale só para pacotes
+  novos" de forma geral. O aviso "trocar não migra dados" virou "as aulas e os pacotes que já existem não mudam".
+- Acessibilidade: switch ligado ao título e à descrição (`aria-labelledby`/`describedby`); os dois botões de modo
+  formam um `role="group"` nomeado, com 44px e foco visível; **o modo selecionado é neutro invertido com ✓, não
+  vermelho** (vermelho fica para a ação principal de cada tela); erro do WhatsApp com `role="alert"`; título e
+  descrição do WhatsApp com os mesmos tamanhos dos outros cartões; nenhum texto < 12px.
+- Na galeria, `SeededAdmin` só preenche `admin-settings` se a consulta ainda não existe (`getQueryState`), para as
+  amostras poderem definir o próprio modo ou simular erro. O `Toaster` do Sonner não existe na galeria, então
+  avisos (`toast`) não aparecem lá.
+
+**Deixado para depois (registrado, não pedido):** resumo do estado atual dos ajustes de relance; nome/e-mail do
+professor ficam em "Minha conta" (decisão de deixar lá); campo do WhatsApp pode ser sobrescrito se outra gravação
+atualizar a tela enquanto o professor digita; nome da tela igual ao item de menu.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
