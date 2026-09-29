@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Sparkles, TrendingUp } from "lucide-react";
+import { CheckCircle2, Sparkles, TrendingUp } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
@@ -27,10 +27,18 @@ import { coachAssessmentNotificationId } from "@/components/BoxingProfileHomeCar
 /** Abaixo disso, refazer o teste mostra um aviso (não bloqueante) antes de seguir. */
 const RECENT_ASSESSMENT_HOURS = 24;
 
-export default function StudentPerfilLutador() {
+/** `amostraEnviada` só existe para a página de amostras de desenvolvimento mostrar a confirmação sem navegar. */
+export default function StudentPerfilLutador({ amostraEnviada }: { amostraEnviada?: boolean }) {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [confirmRetake, setConfirmRetake] = useState(false);
+  // Veio de ENVIAR o questionário (`state.avaliacaoEnviada`): mostra a confirmação e limpa o estado, para não reaparecer ao recarregar.
+  const [avaliacaoEnviada] = useState(() => !!amostraEnviada || (location.state as { avaliacaoEnviada?: boolean } | null)?.avaliacaoEnviada === true);
+  useEffect(() => {
+    if (avaliacaoEnviada && !amostraEnviada) navigate(location.pathname, { replace: true, state: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { data: studentId } = useQuery({
     queryKey: ["my-student-id", profile?.id],
@@ -114,6 +122,18 @@ export default function StudentPerfilLutador() {
   return (
     <div className="page-container">
       <PageHeader title="PERFIL DE BOXE" back />
+
+      {avaliacaoEnviada && (
+        <div role="status" className="flex items-start gap-2.5 rounded-2xl border border-accent/30 bg-accent/10 p-3.5 mb-4">
+          <CheckCircle2 className="h-5 w-5 text-accent shrink-0 mt-0.5" aria-hidden />
+          <div>
+            <div className="text-[14.5px] font-semibold text-foreground">Avaliação enviada</div>
+            <div className="text-[13px] text-muted-foreground leading-snug mt-0.5">
+              Ela já está salva no seu histórico. Este é o seu resultado.
+            </div>
+          </div>
+        </div>
+      )}
 
       {isError && <ErrorState onRetry={() => refetch()} />}
       {isLoading && !isError && <SkeletonList count={3} height={100} />}

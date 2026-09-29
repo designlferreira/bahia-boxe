@@ -42,6 +42,7 @@ import AdminMinhaConta from "@/pages/admin/MinhaConta";
 import AdminOrientacoesAula from "@/pages/admin/OrientacoesAula";
 import StudentPerfilLutadorQuestionario from "@/pages/student/PerfilLutadorQuestionario";
 import AdminAlunoPerfilBoxeQuestionario from "@/pages/admin/AlunoPerfilBoxeQuestionario";
+import StudentPerfilLutadorResultado from "@/pages/student/PerfilLutadorResultado";
 import { BoxingProfileHeading, BoxingProfileQuestionnaire } from "@/components/BoxingProfileQuestionnaire";
 import { getQuestions, QUESTIONNAIRE_VERSION } from "@/lib/boxingProfile";
 import AdminHistorico from "@/pages/admin/Historico";
@@ -1242,6 +1243,11 @@ export default function Amostras() {
               </Seeded>
             </Frame>
           ))}
+          <Frame title="Perfil de Boxe · recém-enviado" note="logo depois de enviar o questionário: faixa de confirmação sobre o resultado">
+            <Seeded data={base} modo="autosservico" extra={PROFILE_CASES[1].extra}>
+              <StudentPerfilLutador amostraEnviada />
+            </Seeded>
+          </Frame>
         </div>
 
         <h2 className="text-lg font-semibold mb-4">Perfil de Boxe (professor)</h2>
@@ -1518,6 +1524,31 @@ export default function Amostras() {
               <AmostraQuestionario voz="coach" ate={0} chave="coach-0" />
             </SeededAdmin>
           </Frame>
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Resultado do Perfil de Boxe (aluno, logo depois de responder)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {(
+            [
+              { title: "Resultado · versão completa", note: "acabou de concluir a completa (37 perguntas)", id: "res-full", dados: { ...SELF, id: "res-full", completedAt: new Date().toISOString(), createdAt: new Date().toISOString() } as BoxingProfileAssessment | null },
+              { title: "Resultado · versão rápida", note: "acabou de concluir a rápida (14 perguntas)", id: "res-short", dados: { ...SELF, id: "res-short", assessmentLength: "short", completedAt: new Date().toISOString(), createdAt: new Date().toISOString() } as BoxingProfileAssessment | null },
+              { title: "Resultado · fórmula anterior", note: "avaliação antiga aberta pelo histórico", id: "res-old", dados: { ...SELF, id: "res-old", scoringVersion: "boxing-profile-scoring-v1", completedAt: at(-40, 10), createdAt: at(-40, 10) } as BoxingProfileAssessment | null },
+              { title: "Resultado · não encontrada", note: "link de uma avaliação que não existe", id: "res-none", dados: null },
+              { title: "Resultado · erro", note: "a consulta falhou (não é semeada de propósito)", id: "res-err", dados: undefined },
+            ] as { title: string; note: string; id: string; dados: BoxingProfileAssessment | null | undefined }[]
+          ).map((c) => (
+            <Frame key={c.title} title={c.title} note={c.note}>
+              <Seeded
+                data={base}
+                modo="autosservico"
+                extra={c.dados === undefined ? [] : [[["boxing-profile-assessment", c.id], c.dados]]}
+              >
+                <ComRota path="/app/perfil-lutador/resultado/:id" url={`/app/perfil-lutador/resultado/${c.id}`}>
+                  <StudentPerfilLutadorResultado />
+                </ComRota>
+              </Seeded>
+            </Frame>
+          ))}
         </div>
 
         <h2 className="text-lg font-semibold mb-4">Histórico (professor)</h2>
