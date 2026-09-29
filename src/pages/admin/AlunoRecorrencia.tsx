@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { fromZonedTime } from "date-fns-tz";
@@ -337,7 +337,22 @@ export default function AdminAlunoRecorrencia() {
           {activasCount > 0 ? ` (${activasCount} ativo${activasCount > 1 ? "s" : ""})` : ""}.
         </div>
 
-        {activasCount > 0 && (
+        {emAutosservico && (
+          <div className="rounded-xl border border-amber/40 bg-amber/10 p-3 text-[13px] leading-snug">
+            <div className="text-amber">
+              Você está no modo Autosserviço, em que o aluno escolhe os próprios horários. Para gerar aulas por aqui, mude para o
+              modo Recorrência.
+            </div>
+            <Link
+              to="/admin/configuracoes"
+              className="mt-1.5 inline-flex min-h-11 items-center font-semibold text-foreground underline underline-offset-4 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Abrir Configurações
+            </Link>
+          </div>
+        )}
+
+        {!emAutosservico && activasCount > 0 && (
           <>
             <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">
               Começa em
@@ -368,7 +383,7 @@ export default function AdminAlunoRecorrencia() {
           </>
         )}
 
-        {aulasNovas.length > 0 && (
+        {!emAutosservico && aulasNovas.length > 0 && (
           <div className="rounded-xl bg-background border border-border p-3 mb-3 text-[13px] leading-snug">
             <div className="text-foreground">
               Vai criar <strong>{aulasNovas.length} aula{aulasNovas.length > 1 ? "s" : ""}</strong>: {horariosAtivos.join(" e ")},{" "}
@@ -383,31 +398,32 @@ export default function AdminAlunoRecorrencia() {
           </div>
         )}
 
-        <div className="flex gap-2.5">
-          <Input
-            type="number"
-            min={1}
-            value={totalAulas}
-            onChange={(e) => setTotalAulas(Math.max(1, parseInt(e.target.value, 10) || 1))}
-            className="w-24 text-center"
-            aria-label="Número de aulas"
-          />
-          <Button
-            className="flex-1"
-            disabled={emAutosservico || activasCount === 0 || !effectiveStartDate || gerarPacote.isPending}
-            onClick={pedirGeracao}
-          >
-            {cancelaveis > 0 ? `Gerar ${totalAulas} e cancelar ${cancelaveis}` : `Gerar ${totalAulas} aula${totalAulas > 1 ? "s" : ""}`}
-          </Button>
-        </div>
-        {emAutosservico ? (
-          <div className="text-[12px] text-amber mt-2">
-            Ative o modo Recorrência em Configurações para gerar pacotes por aqui.
-          </div>
-        ) : (
-          activasCount === 0 && (
-            <div className="text-[12px] text-amber mt-2">Ative pelo menos um dia fixo para gerar um pacote.</div>
-          )
+        {!emAutosservico && (
+          <>
+            {activasCount === 0 && (
+              <div id="gerar-motivo" className="text-[13px] text-amber mb-2.5">
+                Ative pelo menos um dia fixo para gerar um pacote.
+              </div>
+            )}
+            <div className="flex gap-2.5">
+              <Input
+                type="number"
+                min={1}
+                value={totalAulas}
+                onChange={(e) => setTotalAulas(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                className="w-24 text-center"
+                aria-label="Número de aulas"
+              />
+              <Button
+                className="flex-1"
+                disabled={activasCount === 0 || !effectiveStartDate || gerarPacote.isPending}
+                aria-describedby={activasCount === 0 ? "gerar-motivo" : undefined}
+                onClick={pedirGeracao}
+              >
+                {cancelaveis > 0 ? `Gerar ${totalAulas} e cancelar ${cancelaveis}` : `Gerar ${totalAulas} aula${totalAulas > 1 ? "s" : ""}`}
+              </Button>
+            </div>
+          </>
         )}
       </div>
 
