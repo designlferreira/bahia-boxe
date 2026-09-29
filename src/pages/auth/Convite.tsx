@@ -105,9 +105,12 @@ export default function Convite() {
 
   return (
     <main className="min-h-dvh flex flex-col justify-center bg-background px-6">
-      <h1 className="font-display text-3xl tracking-wide text-foreground mb-1.5">VOCÊ FOI CONVIDADO</h1>
-      <p className="text-[13.5px] text-muted-foreground mb-6">
-        Seu professor está te convidando para gerenciar suas aulas no Bahia Boxe.
+      <h1 className="font-display text-[38px] leading-[0.95] tracking-wide text-foreground mb-2">VOCÊ FOI CONVIDADO</h1>
+      {/* Sem o nome do professor: quem abre o link ainda não tem login e validate_invite não o devolve
+          (supabase/README.md). O texto diz o que o aluno ganha e o que vem depois. */}
+      <p className="text-sm text-muted-foreground mb-1">Seu professor convidou você para o Bahia Boxe.</p>
+      <p className="text-sm text-muted-foreground mb-6">
+        Crie sua conta e, em seguida, agende suas aulas e acompanhe seu pacote por aqui.
       </p>
       <ContaForm
         submitLabel="Aceitar convite"
