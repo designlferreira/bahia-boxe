@@ -65,6 +65,11 @@ export default function AdminPedidos() {
     onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível recusar o pedido."),
   });
 
+  // Só o cartão que está sendo decidido trava (antes `approve.isPending` travava TODOS os "Aprovar",
+  // sem explicação, e "Recusar" ficava livre durante uma aprovação).
+  const emAndamento = (id: string) =>
+    (approve.isPending && approve.variables?.id === id) || (reject.isPending && reject.variables?.id === id);
+
   return (
     <div className="page-container">
       <h1 className="font-display text-3xl tracking-wide text-foreground leading-none mb-1">PEDIDOS</h1>
@@ -138,17 +143,20 @@ export default function AdminPedidos() {
                       what: template?.name ?? (request.kind === "package" ? "Pacote" : "Aula avulsa"),
                     })
                   }
-                  disabled={approve.isPending}
+                  disabled={emAndamento(request.id)}
+                  aria-label={`Aprovar o pedido de ${studentName}`}
                 >
-                  Aprovar
+                  {approve.isPending && approve.variables?.id === request.id ? "Aprovando…" : "Aprovar"}
                 </Button>
                 <Button
                   variant="secondary"
                   size="sm"
                   className="flex-1"
                   onClick={() => reject.mutate({ id: request.id, student: studentName })}
+                  disabled={emAndamento(request.id)}
+                  aria-label={`Recusar o pedido de ${studentName}`}
                 >
-                  Recusar
+                  {reject.isPending && reject.variables?.id === request.id ? "Recusando…" : "Recusar"}
                 </Button>
               </div>
             </div>
