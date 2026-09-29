@@ -9,8 +9,10 @@
  *   acabou de ser ocupado."), e trocá-las apagaria o motivo real.
  */
 const SEM_CONEXAO = "Sem conexão com a internet. Confira o sinal e tente de novo.";
+const CONEXAO_LENTA = "A conexão está lenta e a resposta não chegou. Tente de novo.";
 const SESSAO_VENCIDA = "Sua sessão venceu. Entre de novo para continuar.";
 
+const LENTA = /timeouterror|conexao_lenta/i;
 const REDE = /failed to fetch|networkerror|network request failed|load failed|fetch failed|timeout|timed out|econn|err_internet/i;
 const SESSAO = /jwt (expired|invalid)|invalid jwt|refresh token|not authenticated|session (missing|expired)|auth session/i;
 const TECNICA =
@@ -20,7 +22,9 @@ export function mensagemDeErro(err: unknown, fallback: string): string {
   const offline = typeof navigator !== "undefined" && navigator.onLine === false;
   if (!(err instanceof Error)) return offline ? SEM_CONEXAO : fallback;
   const m = (err.message ?? "").trim();
-  if (offline || REDE.test(m)) return SEM_CONEXAO;
+  if (offline) return SEM_CONEXAO;
+  if (LENTA.test(m)) return CONEXAO_LENTA;
+  if (REDE.test(m)) return SEM_CONEXAO;
   if (SESSAO.test(m)) return SESSAO_VENCIDA;
   if (!m || /^[a-z0-9_.:-]+$/.test(m) || TECNICA.test(m)) return fallback;
   return m;

@@ -8,6 +8,10 @@ describe("mensagemDeErro", () => {
     expect(mensagemDeErro(new TypeError("Failed to fetch"), F)).toMatch(/Sem conexão/);
     expect(mensagemDeErro(new Error("Load failed"), F)).toMatch(/Sem conexão/);
   });
+  it("diz que a conexão está lenta quando estoura o tempo limite", () => {
+    expect(mensagemDeErro(new DOMException("conexao_lenta", "TimeoutError"), F)).toMatch(/lenta/);
+    expect(mensagemDeErro(new Error("TimeoutError: conexao_lenta"), F)).toMatch(/lenta/);
+  });
   it("pede novo login quando a sessão venceu", () => {
     expect(mensagemDeErro(new Error("JWT expired"), F)).toMatch(/sessão venceu/);
   });
