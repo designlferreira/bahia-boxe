@@ -9,10 +9,11 @@ import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/SkeletonCard";
 import { getAdminStudents, getAlunosEmRisco, semAcento } from "@/integrations/backend/api";
 
-const FILTROS = [
-  { value: "todos", label: "Todos" },
-  { value: "risco", label: "Em risco" },
-];
+type Filtro = "todos" | "risco" | "sem-pacote";
+const DESCRICAO: Partial<Record<Filtro, string>> = {
+  risco: "Pacote acabando ou faltas seguidas.",
+  "sem-pacote": "Alunos sem nenhum pacote ativo.",
+};
 
 export default function AdminAlunos() {
   const { profile } = useAuth();
@@ -21,7 +22,9 @@ export default function AdminAlunos() {
   // Filtro na URL (`?filtro=risco`): o "Ver todos" do painel cai direto aqui já filtrado, e voltar
   // pelo navegador mantém o filtro.
   const [params, setParams] = useSearchParams();
-  const soRisco = params.get("filtro") === "risco";
+  const filtroParam = params.get("filtro");
+  const filtro: Filtro = filtroParam === "risco" || filtroParam === "sem-pacote" ? filtroParam : "todos";
+  const soRisco = filtro === "risco";
 
   // A lista é buscada UMA vez e a busca filtra em memória: com o texto na chave da consulta, cada letra digitada trocava a
   // chave, a lista inteira virava esqueleto e o app refazia 3 consultas por tecla. Sem acento nem maiúscula ("jose" acha "José").
@@ -31,23 +34,40 @@ export default function AdminAlunos() {
     enabled: !!profile,
   });
   const termo = semAcento(search);
-  const todos = lista && termo ? lista.filter((e) => semAcento(e.student.name).includes(termo)) : lista;
+  // Ordem estável por nome: a consulta não define ordem, então a lista podia mudar de uma visita pra outra.
+  const ordenada = lista ? [...lista].sort((a, b) => a.student.name.localeCompare(b.student.name, "pt-BR")) : lista;
+  const todos =
+    ordenada && termo ? ordenada.filter((e) => semAcento(e.student.name).includes(termo)) : ordenada;
+  const semPacote = todos ? todos.filter((e) => e.restantes === null) : undefined;
   const { data: risco, isLoading: carregandoRisco, isError: erroRisco, refetch: refetchRisco } = useQuery({
     queryKey: ["alunos-em-risco", profile?.id],
     queryFn: () => getAlunosEmRisco(profile!.id),
-    enabled: !!profile && soRisco,
+    // Sempre: o chip "Em risco" mostra a contagem mesmo com outro filtro ativo.
+    enabled: !!profile,
   });
 
   const motivoPorAluno = new Map((risco ?? []).map((r) => [r.student.id, r]));
   // Em risco: na ordem do painel (mais urgente primeiro), não na ordem alfabética da lista.
   const data =
-    soRisco && todos && risco
-      ? risco.flatMap((r) => todos.filter((e) => e.student.id === r.student.id))
-      : soRisco
-        ? undefined
+    filtro === "risco"
+      ? todos && risco
+        ? risco.flatMap((r) => todos.filter((e) => e.student.id === r.student.id))
+        : undefined
+      : filtro === "sem-pacote"
+        ? semPacote
         : todos;
+  // Contagens sobre TODOS os alunos (não sobre a busca): o número do chip não pode mudar a cada letra digitada.
+  const total = ordenada?.length;
+  const totalSemPacote = ordenada?.filter((e) => e.restantes === null).length;
+  const comContagem = (label: string, n: number | undefined) => (n === undefined ? label : `${label} ${n}`);
+  const FILTROS = [
+    { value: "todos", label: comContagem("Todos", total) },
+    { value: "risco", label: comContagem("Em risco", risco?.length) },
+    { value: "sem-pacote", label: comContagem("Sem pacote", totalSemPacote) },
+  ];
   const isLoading = carregandoTodos || (soRisco && carregandoRisco);
   const isError = erroTodos || (soRisco && erroRisco);
+  const filtrado = filtro !== "todos";
 
   return (
     <div className="page-container">
@@ -57,10 +77,10 @@ export default function AdminAlunos() {
         onSearchChange={setSearch}
         searchPlaceholder="Buscar aluno"
         filters={FILTROS}
-        activeFilter={soRisco ? "risco" : "todos"}
-        onFilterChange={(v) => setParams(v === "risco" ? { filtro: "risco" } : {}, { replace: true })}
+        activeFilter={filtro}
+        onFilterChange={(v) => setParams(v === "todos" ? {} : { filtro: v }, { replace: true })}
       />
-      {soRisco && <div className="text-sm text-muted-foreground -mt-1.5 mb-3">Pacote acabando ou faltas seguidas.</div>}
+      {DESCRICAO[filtro] && <div className="text-sm text-muted-foreground -mt-1.5 mb-3">{DESCRICAO[filtro]}</div>}
 
       {isError && (
         <ErrorState
@@ -116,17 +136,21 @@ export default function AdminAlunos() {
         </div>
       )}
 
-      {!isLoading && !isError && data && data.length === 0 && soRisco && !search && (
+      {!isLoading && !isError && data && data.length === 0 && filtrado && !search && (
         <EmptyState
           icon={Users}
-          title="Nenhum aluno em risco"
-          description="Quando um pacote estiver acabando ou um aluno faltar seguido, ele aparece aqui."
+          title={soRisco ? "Nenhum aluno em risco" : "Todos os alunos têm pacote ativo"}
+          description={
+            soRisco
+              ? "Quando um pacote estiver acabando ou um aluno faltar seguido, ele aparece aqui."
+              : "Quando um aluno ficar sem pacote, ele aparece aqui."
+          }
           ctaLabel="Ver todos os alunos"
           onCta={() => setParams({}, { replace: true })}
         />
       )}
 
-      {!isLoading && !isError && data && data.length === 0 && !(soRisco && !search) && (
+      {!isLoading && !isError && data && data.length === 0 && !(filtrado && !search) && (
         <EmptyState
           icon={Users}
           title="Nenhum aluno encontrado"
