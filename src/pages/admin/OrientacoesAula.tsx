@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import { OrientacoesDaAula, temOrientacoesVisiveis } from "@/components/OrientacoesDaAula";
 import { PageHeader } from "@/components/PageHeader";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ErrorState } from "@/components/ErrorState";
@@ -225,6 +226,17 @@ export default function AdminOrientacoesAula() {
   }
 
   const eq = form.equipment;
+
+  // Avisos do que o aluno NÃO vai ver (regras de `OrientacoesDaAula`/`classGuidelines`): sem rua não há local; luvas/bandagem só aparecem
+  // com pelo menos um tamanho marcado — antes o professor marcava "Obrigatório", esquecia o tamanho e o aluno simplesmente não via as luvas.
+  const temEndereco = !!(form.street ?? "").trim();
+  const outrosDoEndereco = [form.cep, form.number, form.complement, form.neighborhood, form.city, form.referencePoint].some((v) => !!(v ?? "").trim());
+  const avisos: string[] = [];
+  if (!temEndereco && outrosDoEndereco) avisos.push("Sem a rua, o aluno não vê o local da aula (nem o link do mapa). Preencha a rua.");
+  if (eq.gloves && eq.gloves.sizes.length === 0) avisos.push("Luvas: marque pelo menos um tamanho, senão o aluno não vê as luvas.");
+  if (eq.wraps && eq.wraps.lengths.length === 0) avisos.push("Bandagem: marque pelo menos um comprimento, senão o aluno não vê a bandagem.");
+  const previa = { ...form, equipment: form.equipment };
+
   return (
     <div className="page-container">
       <PageHeader
@@ -387,6 +399,26 @@ export default function AdminOrientacoesAula() {
           placeholder="Traga garrafa de água e uma toalha."
           className="h-16 border-muted-foreground/70"
         />
+      </Section>
+
+      {/* O professor preenche seis cartões às cegas e nunca via o que o aluno recebe. O mesmo componente do detalhe da aula do aluno. */}
+      <Section title="Como o aluno vai ver">
+        {avisos.length > 0 && (
+          <ul className="rounded-xl border border-amber/40 bg-amber/10 p-3.5 mb-3.5 text-[13px] leading-snug text-amber flex flex-col gap-1.5">
+            {avisos.map((a) => (
+              <li key={a}>{a}</li>
+            ))}
+          </ul>
+        )}
+        {temOrientacoesVisiveis(previa) ? (
+          <div className="-mb-3.5">
+            <OrientacoesDaAula guidelines={previa} />
+          </div>
+        ) : (
+          <p className="text-[13px] text-muted-foreground">
+            Nada será mostrado ao aluno ainda. Preencha a rua, a antecedência, o equipamento ou um recado.
+          </p>
+        )}
       </Section>
 
       <Button
