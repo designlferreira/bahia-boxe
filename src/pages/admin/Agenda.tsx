@@ -7,7 +7,16 @@ import { useAuth } from "@/context/AuthContext";
 import { ErrorState } from "@/components/ErrorState";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { formatDate, formatDateShort, formatDayNumber, formatWeekdayLong, formatWeekdayShort, isoDateOnly } from "@/lib/dateUtils";
+import {
+  formatDate,
+  formatDateShort,
+  formatDayNumber,
+  formatQuando,
+  formatTime,
+  formatWeekdayLong,
+  formatWeekdayShort,
+  isoDateOnly,
+} from "@/lib/dateUtils";
 import { isAwaitingConfirmation } from "@/lib/bookingStatus";
 import { useLessonActions } from "@/hooks/useLessonActions";
 import { usePendingActions, type PendenteAlvo } from "@/hooks/usePendingActions";
@@ -33,14 +42,16 @@ interface AgendaNavState {
   date?: string;
 }
 
+/** Mesmo significado de cor do app (CLAUDE.md, "Cor com significado"): âmbar = depende do
+ *  professor, neutro = feito, branco = vem pela frente, vermelho = falta/recusa. */
 function dotClassFor(entry: TimelineEntry) {
   const status = entry.booking!.status;
   if (status === "scheduled" && isAwaitingConfirmation(status, entry.booking!.endTime)) return "bg-amber";
   switch (status) {
     case "scheduled":
-      return "bg-primary";
+      return "bg-foreground";
     case "completed":
-      return "bg-accent";
+      return "bg-muted-foreground";
     case "pending_confirmation":
     case "rejected_with_suggestion":
       return "bg-amber";
@@ -253,9 +264,22 @@ export default function AdminAgenda() {
                               </span>
                             )}
                           </div>
-                          <div className="text-xs text-muted-foreground mt-0.5">
-                            {entry.hour} – {String((parseInt(entry.hour, 10) + 1) % 24).padStart(2, "0")}:00
-                          </div>
+                          {entry.vinculo === "pedido_remarcacao" && entry.antecessorInicio ? (
+                            // Pedido de remarcação: de onde pra onde, como no painel.
+                            <div className="text-[13px] text-muted-foreground mt-0.5">
+                              <span className="sr-only">de </span>
+                              <span className="line-through">{formatQuando(entry.antecessorInicio)}</span>
+                              <span aria-hidden> → </span>
+                              <span className="sr-only">para </span>
+                              <span className="text-foreground">
+                                {formatTime(booking!.startTime)} – {formatTime(booking!.endTime)}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="text-[13px] text-muted-foreground mt-0.5">
+                              {formatTime(booking!.startTime)} – {formatTime(booking!.endTime)}
+                            </div>
+                          )}
                         </div>
                         <StatusBadge status={booking!.status} semRegistro={awaiting} />
                         <span className="sr-only">. Ver detalhes</span>
@@ -264,6 +288,7 @@ export default function AdminAgenda() {
                       {booking?.status === "pending_confirmation" && (
                         <div className="flex gap-2">
                           <Button
+                            variant="soft"
                             size="sm"
                             className="flex-1"
                             onClick={() => pendentes.requestApprove(alvoDe(entry))}
@@ -325,9 +350,9 @@ export default function AdminAgenda() {
                                   Remarcar
                                 </Button>
                                 <Button
-                                  variant="secondary"
+                                  variant="destructive"
                                   size="sm"
-                                  className="flex-1 h-10 !border-destructive/35 !text-destructive"
+                                  className="flex-1 h-10"
                                   disabled={actions.isBusy(booking.id)}
                                   onClick={() => actions.openCancelar(booking, entry.studentName ?? "Aluno")}
                                 >

@@ -75,6 +75,16 @@ export function formatRelativeDay(date: string | Date) {
   return formatWeekdayLong(date);
 }
 
+/**
+ * "Amanhã, 07:00" / "Terça-feira, 06 out · 07:00" — pro começo de uma linha (maiúscula). Além de
+ * amanhã o dia da semana sozinho é ambíguo, por isso ganha a data.
+ */
+export function formatQuando(date: string | Date) {
+  const dia = formatRelativeDay(date);
+  if (dia === "Hoje" || dia === "Amanhã") return `${dia}, ${formatTime(date)}`;
+  return `${dia}, ${formatDateShort(date)} · ${formatTime(date)}`;
+}
+
 export function formatNextClass(startTime: string, endTime: string) {
   return `${formatDateTime(startTime)} – ${formatTime(endTime)}`;
 }

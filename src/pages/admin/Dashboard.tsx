@@ -6,7 +6,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonCard } from "@/components/SkeletonCard";
 import { Button } from "@/components/ui/button";
-import { formatDate, formatDateShort, formatRelativeDay, formatTime } from "@/lib/dateUtils";
+import { formatDate, formatQuando, formatTime } from "@/lib/dateUtils";
 import { getAdminDashboard, type PrimeirosPassos } from "@/integrations/backend/api";
 import { cn } from "@/lib/utils";
 import { CheckCircle2, ChevronDown, ChevronRight, Circle } from "lucide-react";
@@ -20,12 +20,7 @@ type AulaComNome = Booking & { studentName: string };
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 const t = (iso: string) => new Date(iso).getTime();
 
-/** "Amanhã, 07:00" / "Terça, 06 out · 07:00" — além de amanhã o dia da semana sozinho é ambíguo. */
-function quando(iso: string) {
-  const dia = formatRelativeDay(iso);
-  if (dia === "Hoje" || dia === "Amanhã") return `${dia}, ${formatTime(iso)}`;
-  return `${dia}, ${formatDateShort(iso)} · ${formatTime(iso)}`;
-}
+const quando = formatQuando;
 
 /** "em 40 min" / "em 2 h 15 min". Longe demais, o horário grande já basta. */
 function contagem(inicio: string, agora: number) {
