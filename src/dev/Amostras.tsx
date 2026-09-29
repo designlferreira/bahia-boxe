@@ -16,6 +16,7 @@ import { AuthContext } from "@/context/AuthContext";
 import StudentHome from "@/pages/student/Home";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminAlunos from "@/pages/admin/Alunos";
+import AdminPedidos from "@/pages/admin/Pedidos";
 import AdminAgenda from "@/pages/admin/Agenda";
 import StudentAgendar from "@/pages/student/Agendar";
 import AdminAulaDetalhe from "@/pages/admin/AulaDetalhe";
@@ -663,6 +664,38 @@ const DETALHE_ALUNO: { title: string; note: string; id: string; valor: unknown; 
   },
 ];
 
+const modelo = (id: string, name: string, totalClasses: number, priceCents: number | null) => ({
+  id, adminId: ADMIN_ID, name, description: "", totalClasses, priceCents, validityDays: null, isActive: true,
+});
+const pedido = (
+  id: string,
+  kind: "package" | "single",
+  student: string,
+  template: ReturnType<typeof modelo> | null,
+  lost: number,
+  recorrenciaRestantes = 0,
+) => ({
+  request: { id, studentId: `s-${id}`, adminId: ADMIN_ID, kind, templateId: template?.id ?? null, status: "pending" as const, notes: null, createdAt: at(-1, 10), decidedAt: null },
+  studentName: student,
+  template,
+  classesLostOnApprove: lost,
+  recorrenciaRestantes,
+});
+const PEDIDOS_CASOS: { title: string; note: string; lista: unknown[] }[] = [
+  {
+    title: "Vários pedidos",
+    note: "pacote sem perda, encerra 3 aulas, aula avulsa, sem preço, aluno de recorrência (5 marcadas)",
+    lista: [
+      pedido("r1", "package", "Ana Beatriz Souza", modelo("t1", "Pacote de 8 aulas", 8, 32000), 0),
+      pedido("r2", "package", "Carlos Henrique Lima", modelo("t2", "Pacote de 12 aulas", 12, 45000), 3),
+      pedido("r3", "single", "Julia Pereira", modelo("t3", "Aula avulsa", 1, 5000), 0),
+      pedido("r4", "package", "Marina Costa", modelo("t4", "Pacote de 4 aulas", 4, null), 1),
+      pedido("r5", "package", "Igor Nascimento", modelo("t5", "Pacote de 8 aulas", 8, 32000), 0, 5),
+    ],
+  },
+  { title: "Nenhum pedido", note: "tudo em dia", lista: [] },
+];
+
 /** Lista de alunos: 6 alunos, 4 deles em risco (os mesmos do painel). */
 function semearAlunos(qc: QueryClient) {
   const nomes = ["Ana Beatriz Souza", "Helena Costa", "Igor Nascimento", "Julia Pereira", "Karina Duarte", "Leonardo Prado"];
@@ -736,6 +769,17 @@ export default function Amostras() {
             <Frame key={c.title} title={c.title} note={c.note}>
               <SeededAdmin data={c.data}>
                 <AdminDashboard />
+              </SeededAdmin>
+            </Frame>
+          ))}
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Solicitações (professor)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          {PEDIDOS_CASOS.map((c) => (
+            <Frame key={c.title} title={c.title} note={c.note}>
+              <SeededAdmin data={null} seed={(qc) => qc.setQueryData(["purchase-requests", ADMIN_ID], c.lista)}>
+                <AdminPedidos />
               </SeededAdmin>
             </Frame>
           ))}

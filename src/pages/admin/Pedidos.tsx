@@ -67,7 +67,7 @@ export default function AdminPedidos() {
 
       {!isLoading && !isError && data && data.length > 0 && (
         <div className="flex flex-col gap-2.5">
-          {data.map(({ request, studentName, template, classesLostOnApprove }) => (
+          {data.map(({ request, studentName, template, classesLostOnApprove, recorrenciaRestantes }) => (
             <div key={request.id} className="card-dark p-[15px]">
               <div className="flex items-center gap-2.5 mb-3">
                 <div className="flex-1">
@@ -95,6 +95,13 @@ export default function AdminPedidos() {
                     {classesLostOnApprove === 1 ? "aula" : "aulas"} no pacote atual. Aprovar agora encerra esse
                     pacote.
                   </span>
+                </p>
+              )}
+              {classesLostOnApprove === 0 && recorrenciaRestantes > 0 && (
+                // Recorrência: as aulas já estão marcadas e continuam valendo — informação, não alarme.
+                <p className="text-sm text-muted-foreground mb-3">
+                  {studentName.split(" ")[0]} tem {recorrenciaRestantes} {recorrenciaRestantes === 1 ? "aula marcada" : "aulas marcadas"}{" "}
+                  na recorrência. {recorrenciaRestantes === 1 ? "Ela continua" : "Elas continuam"} valendo.
                 </p>
               )}
               <div className="flex gap-2">

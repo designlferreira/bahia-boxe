@@ -1643,18 +1643,34 @@ export async function getPurchaseRequests(adminId: string) {
     activeByStudent.set(p.studentId, [...(activeByStudent.get(p.studentId) ?? []), p]);
   }
 
+  // Pacote de RECORRÊNCIA: as aulas restantes já nascem todas MARCADAS e continuam valendo depois que o
+  // pacote é encerrado (a conclusão debita pelo `pacote_id`). Então aprovar não "tira" nada dali — e o
+  // número certo vem de `saldo_pacotes` (a autoridade, decisão 4), não da cópia `used_classes`, que
+  // fica defasada depois de um desfazer. Antes o aviso contava as duas coisas do mesmo jeito e dizia
+  // "essas aulas deixam de valer" para quem tinha só aulas já marcadas.
+  const recIds = (activePkgsRes.data ?? []).filter((r) => r.origin === "recurrence").map((r) => r.id as string);
+  const saldoRes = recIds.length
+    ? await client().from("saldo_pacotes").select("pacote_id, restantes").in("pacote_id", recIds)
+    : { data: [], error: null };
+  if (saldoRes.error) throw new Error(saldoRes.error.message);
+  const restantesRec = new Map((saldoRes.data ?? []).map((r) => [r.pacote_id as string, r.restantes as number]));
+
   const nameOf = new Map(students.map((s) => [s.id, s.name]));
   const templates = new Map((templatesRes.data ?? []).map((t) => [t.id, mapTemplate(t)]));
 
   return rows.map((r) => {
     const request = mapRequest(r);
     const closed = (activeByStudent.get(r.student_id) ?? []).filter((p) => p.origin !== "trial");
+    const normais = closed.filter((p) => p.origin !== "recurrence");
+    const recorrencia = closed.filter((p) => p.origin === "recurrence");
     return {
       request,
       studentName: nameOf.get(r.student_id) ?? "Aluno",
       template: r.template_id ? (templates.get(r.template_id) ?? null) : null,
-      /** Aulas que o aluno ainda tinha pra usar e que a aprovação encerra. 0 = aprovar não tira nada. */
-      classesLostOnApprove: closed.reduce((acc, p) => acc + Math.max(0, p.totalClasses - p.usedClasses), 0),
+      /** Aulas que o aluno ainda tinha pra AGENDAR e que a aprovação encerra (pacotes que não são de recorrência). 0 = aprovar não tira nada. */
+      classesLostOnApprove: normais.reduce((acc, p) => acc + Math.max(0, p.totalClasses - p.usedClasses), 0),
+      /** Aulas marcadas num pacote de recorrência: continuam valendo mesmo com a aprovação. */
+      recorrenciaRestantes: recorrencia.reduce((acc, p) => acc + (restantesRec.get(p.id) ?? 0), 0),
     };
   });
 }
