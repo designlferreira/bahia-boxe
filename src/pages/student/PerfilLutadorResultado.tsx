@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
 import { ErrorState } from "@/components/ErrorState";
-import { SkeletonList } from "@/components/SkeletonCard";
+import { SkeletonCard } from "@/components/SkeletonCard";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { BoxingProfileResultView } from "@/components/BoxingProfileResultView";
@@ -82,7 +82,20 @@ export default function StudentPerfilLutadorResultado() {
           onRetry={() => refetch()}
         />
       )}
-      {isLoading && !isError && <SkeletonList count={4} height={110} />}
+      {/* Esqueleto com a forma do resultado (cartão do estilo, secundário, botão, radar), não quatro blocos iguais; anunciado ao leitor de tela. */}
+      {isLoading && !isError && (
+        <div aria-busy="true">
+          <p role="status" className="sr-only">
+            Carregando o resultado…
+          </p>
+          <div aria-hidden>
+            <SkeletonCard height={300} className="mb-4" />
+            <SkeletonCard height={84} className="mb-5" />
+            <SkeletonCard height={44} className="mb-5" />
+            <SkeletonCard height={280} />
+          </div>
+        </div>
+      )}
       {!isLoading && !isError && !assessment && (
         <EmptyState
           title="Avaliação não encontrada"
