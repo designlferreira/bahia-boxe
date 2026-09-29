@@ -7,11 +7,18 @@ import { BookingCard } from "@/components/BookingCard";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonList } from "@/components/SkeletonCard";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatDayNumber, formatMonthShort, formatTime } from "@/lib/dateUtils";
-import { getStudentBookingHistory } from "@/integrations/backend/api";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatDate, formatQuando, formatRelativeDay, formatTime } from "@/lib/dateUtils";
+import { getStatusConfig, isAwaitingConfirmation } from "@/lib/bookingStatus";
+import { PageHeader } from "@/components/PageHeader";
+import {
+  getModoAgendamentoEfetivo,
+  getStudentAdminId,
+  getStudentBookingHistory,
+  getWhatsappDoProfessor,
+} from "@/integrations/backend/api";
 
-type Tab = "proximas" | "anteriores" | "todas";
+type Tab = "proximas" | "anteriores";
 
 export default function StudentHistorico() {
   const { profile } = useAuth();
@@ -24,46 +31,126 @@ export default function StudentHistorico() {
     enabled: !!profile,
   });
 
+  // O vazio depende de quem marca as aulas: no autosserviço o aluno agenda; na Recorrência quem marca é o professor
+  // (a rota de agendar redireciona), então o botão certo ali é falar com ele — mesmas consultas da Home/Minha conta.
+  const { data: adminId } = useQuery({
+    queryKey: ["student-admin-id", profile?.id],
+    queryFn: () => getStudentAdminId(profile!.id),
+    enabled: !!profile,
+    staleTime: Infinity,
+  });
+  const { data: modo } = useQuery({
+    queryKey: ["modo-agendamento-efetivo", adminId],
+    queryFn: () => getModoAgendamentoEfetivo(adminId!),
+    enabled: !!adminId,
+    staleTime: Infinity,
+  });
+  const { data: whatsapp } = useQuery({
+    queryKey: ["whatsapp-professor", adminId],
+    queryFn: () => getWhatsappDoProfessor(adminId!),
+    enabled: !!adminId,
+    staleTime: 60 * 60 * 1000,
+  });
+
+  const n = data?.length ?? 0;
+  // "Histórico completo do seu pacote" era falso (a lista traz aulas de todos os pacotes) e nem fazia sentido em Próximas.
+  const subtitle =
+    !data || isError
+      ? undefined
+      : tab === "proximas"
+        ? n === 0
+          ? undefined
+          : `${n} ${n === 1 ? "aula marcada" : "aulas marcadas"}`
+        : n === 0
+          ? undefined
+          : "As mais recentes primeiro";
+
   return (
     <div className="page-container">
-      <h1 className="font-display text-3xl tracking-wide text-foreground leading-none mb-1">MINHAS AULAS</h1>
-      <div className="text-[12.5px] text-muted-foreground mb-4">Histórico completo do seu pacote</div>
+      <PageHeader title="MINHAS AULAS" subtitle={subtitle} />
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="mb-4">
-        <TabsList>
+      {/* Anuncia o resultado ao trocar de aba (leitor de tela não vê a lista mudar). */}
+      <p role="status" className="sr-only">
+        {!isLoading && !isError && data ? `${tab === "proximas" ? "Próximas" : "Anteriores"}: ${n} ${n === 1 ? "aula" : "aulas"}` : ""}
+      </p>
+
+      <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
+        <TabsList aria-label="Filtrar aulas" className="mb-4">
           <TabsTrigger value="proximas">Próximas</TabsTrigger>
           <TabsTrigger value="anteriores">Anteriores</TabsTrigger>
-          <TabsTrigger value="todas">Todas</TabsTrigger>
         </TabsList>
-      </Tabs>
 
+        {/* O painel da aba: liga as abas à lista (antes as abas apontavam para um painel que não existia). */}
+        <TabsContent value={tab}>
       {isError && <ErrorState onRetry={() => refetch()} />}
       {isLoading && !isError && <SkeletonList count={4} />}
 
       {!isLoading && !isError && data && data.length > 0 && (
-        <div className="flex flex-col gap-2.5">
-          {data.map((b) => (
+        <ul aria-label={tab === "proximas" ? "Próximas aulas" : "Aulas anteriores"} className="flex flex-col gap-2.5">
+          {data.map((b, i) => (
+            <li key={b.id}>
             <BookingCard
-              key={b.id}
-              dayNumber={formatDayNumber(b.startTime)}
-              monthLabel={formatMonthShort(b.startTime)}
-              title={`${formatTime(b.startTime)} – ${formatTime(b.endTime)}`}
+              // A pergunta que traz o aluno aqui é "quando é a próxima?": a primeira de Próximas se destaca das demais.
+              destaque={
+                tab === "proximas" && i === 0
+                  ? b.status === "scheduled" && new Date(b.startTime).getTime() <= Date.now()
+                    ? "Acontecendo agora"
+                    : "Próxima aula"
+                  : undefined
+              }
+              // "Amanhã, 19:00" / "Quarta-feira, 30 set · 19:00": responde "quando é?" sem o aluno calcular o dia da semana
+              // (antes: "30" + "set" com o mês em 10,5px e só "19:00 – 20:00"). A hora final fica no detalhe.
+              title={formatQuando(b.startTime)}
               status={b.status}
+              semRegistro={isAwaitingConfirmation(b.status, b.endTime)}
+              agora={b.status === "scheduled" && new Date(b.startTime).getTime() <= Date.now() && new Date(b.endTime).getTime() > Date.now()}
+              // Nome falado completo (o cartão só mostra "Amanhã, 19:00"): dia por extenso, horário e estado.
+              ariaLabel={`${formatRelativeDay(b.startTime) === "Hoje" || formatRelativeDay(b.startTime) === "Amanhã" ? formatRelativeDay(b.startTime) + ", " : ""}${formatDate(b.startTime)}, ${formatTime(b.startTime)} às ${formatTime(b.endTime)}, ${
+                isAwaitingConfirmation(b.status, b.endTime)
+                  ? "Aguardando registro"
+                  : b.status === "scheduled" && new Date(b.startTime).getTime() <= Date.now() && new Date(b.endTime).getTime() > Date.now()
+                    ? "Acontecendo agora"
+                    : getStatusConfig(b.status, "student").label
+              }. Ver detalhes`}
               onClick={() => navigate(`/app/aula/${b.id}`)}
             />
+            </li>
           ))}
-        </div>
+        </ul>
       )}
 
       {!isLoading && !isError && data && data.length === 0 && (
-        <EmptyState
-          icon={CalendarClock}
-          title="Nada por aqui"
-          description="Você ainda não tem aulas neste filtro."
-          ctaLabel="Agendar aula"
-          onCta={() => navigate("/app/agendar")}
-        />
+        tab === "anteriores" ? (
+          <EmptyState
+            icon={CalendarClock}
+            title="Nenhuma aula anterior ainda"
+            description="Depois da sua primeira aula, ela aparece aqui."
+          />
+        ) : modo === "recorrencia" ? (
+          <EmptyState
+            icon={CalendarClock}
+            title="Nenhuma aula marcada"
+            description="Seu professor marca as suas aulas. Quando ele marcar, elas aparecem aqui."
+            ctaLabel={whatsapp ? "Falar com o professor" : undefined}
+            ctaVariant="secondary"
+            onCta={
+              whatsapp
+                ? () => window.open(`https://wa.me/${whatsapp}?text=${encodeURIComponent(`Olá! Aqui é ${profile?.name.split(" ")[0] ?? ""}.`)}`, "_blank", "noopener")
+                : undefined
+            }
+          />
+        ) : (
+          <EmptyState
+            icon={CalendarClock}
+            title="Nenhuma aula marcada"
+            description="Escolha um dia e um horário para a sua próxima aula."
+            ctaLabel={modo === "autosservico" ? "Agendar aula" : undefined}
+            onCta={modo === "autosservico" ? () => navigate("/app/agendar") : undefined}
+          />
+        )
       )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

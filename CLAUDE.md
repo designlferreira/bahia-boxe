@@ -2958,6 +2958,38 @@ link, mostrar/copiar/compartilhar). A frase do vazio ("Convide um novo aluno par
 **Deixado para depois (registrado, não pedido):** criar convite no app (ver acima); próxima aula / "há N dias sem vir" no cartão;
 estilo do lutador (Perfil de Boxe) no cartão; ordenar por aulas restantes; abrir o cartão em nova aba (é botão, não link).
 
+### Minhas aulas (aluno): rodada de crítica (2026-09-29) — sem migration nova
+
+`src/pages/student/Historico.tsx` (rota `/app/historico`, aba "Aulas" do aluno): crítica **21/40**, relatório em
+`.impeccable/critique/*student-historico*`. Seis passos na `dev`, testados pelo Lucas. Na página de amostras ("Minhas aulas
+(aluno)": autosserviço, Recorrência, sem aulas e Recorrência sem aulas — a galeria não tinha nenhuma amostra desta tela antes).
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Duas abas, Próximas e Anteriores; a aba "Todas" saiu** (era a soma das duas e mudava a ordem das mesmas aulas entre as abas).
+  `getStudentBookingHistory` aceita só `"proximas" | "anteriores"`.
+- **Data no título do cartão** com `formatQuando` ("Amanhã, 19:00" / "Sexta-feira, 02 out · 19:00"); o bloco "30 / set" saiu (mês em
+  10,5px). A hora final fica só no detalhe da aula.
+- **Próximas = o que ainda vai acontecer OU acontece agora** (`end_time > agora`) **e está de pé** (`scheduled`,
+  `pending_confirmation`, `rejected_with_suggestion`); **Anteriores = todo o resto** — nenhuma aula some das duas abas (antes uma
+  cancelada com data futura não aparecia em lugar nenhum). Remarcada e recusada saem de Próximas.
+- **A primeira de Próximas ganha cartão em destaque** ("Próxima aula", ou "Acontecendo agora" se já começou): tom dourado, título 17px,
+  rótulo acima (`destaque` no `BookingCard`).
+
+**O que mudou / armadilhas:**
+- **`StatusBadge` ganhou a voz do aluno:** aula `scheduled` cujo horário passou sem registro mostra **"Aguardando registro"** (âmbar) para o
+  aluno e continua "Sem registro" para o professor; "Agora" para aula em andamento. Vale também no detalhe da aula do aluno.
+- **Subtítulo verdadeiro** ("N aulas marcadas" em Próximas, "As mais recentes primeiro" em Anteriores; some sem aulas) — o antigo
+  "Histórico completo do seu pacote" era falso. **Vazio por aba e por modo:** Próximas/autosserviço → "Agendar aula"; Próximas/Recorrência →
+  "Seu professor marca as suas aulas" com "Falar com o professor" (WhatsApp, só se houver número; **nunca "Agendar aula" em Recorrência**,
+  a rota redireciona); Anteriores → sem botão.
+- Acessibilidade: abas com foco visível e `aria-label="Filtrar aulas"`, lista dentro de `TabsContent` (o painel que as abas apontam),
+  `<ul>`/`<li>`, `aria-label` falado por cartão (data por extenso + horário + estado) e `role="status"` ao trocar de aba. `TabsContent`
+  (`ui/tabs.tsx`) agora tem foco visível; `BookingCard` só é usado nesta tela.
+
+**Deixado para depois (registrado, não pedido):** a borda do `card-dark` (1,48:1, estilo global do app); distinguir "Cancelada" de
+"Remarcada" pela cor e dizer quem cancelou (pesa no crédito); agrupar por mês; resumo "seg e qua, 19h" para o aluno de recorrência;
+explicar "Aguardando o professor"/"Remarcada" ao aluno.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa

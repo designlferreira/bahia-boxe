@@ -24,6 +24,7 @@ import {
 } from "@/integrations/backend/api";
 import { RemarcacaoSheet } from "@/components/RemarcacaoSheet";
 import { StatusBadge } from "@/components/StatusBadge";
+import { isAwaitingConfirmation } from "@/lib/bookingStatus";
 import { Badge } from "@/components/ui/badge";
 
 export default function StudentAulaDetalhe() {
@@ -204,7 +205,12 @@ export default function StudentAulaDetalhe() {
 
       <div className="card-dark p-5 mb-3.5">
         <div className="flex items-center gap-2 mb-3">
-          <StatusBadge status={booking.status} audience="student" />
+          <StatusBadge
+            status={booking.status}
+            audience="student"
+            semRegistro={isAwaitingConfirmation(booking.status, booking.endTime)}
+            agora={booking.status === "scheduled" && new Date(booking.startTime).getTime() <= Date.now() && new Date(booking.endTime).getTime() > Date.now()}
+          />
           {(isPedido || pedidoPendente) && <Badge className="bg-amber/20 text-amber">Pedido em análise</Badge>}
           {booking.isReplacement && (
             <Badge className="bg-secondary text-muted-foreground flex items-center gap-1">
