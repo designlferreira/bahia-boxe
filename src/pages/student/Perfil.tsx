@@ -145,7 +145,12 @@ export default function StudentPerfil() {
     return (
       <div className="page-container">
         <PageHeader title="MEUS DADOS FÍSICOS" back />
-        <SkeletonCard height={280} />
+        {/* Do tamanho do formulário (antes um bloco só de 280px, e a tela real é ~6x mais alta: a página "pulava" ao carregar). */}
+        <SkeletonCard height={90} className="mb-5" />
+        <SkeletonCard height={70} className="mb-3" />
+        <SkeletonCard height={110} className="mb-5" />
+        <SkeletonCard height={330} className="mb-5" />
+        <SkeletonCard height={60} />
       </div>
     );
   }
@@ -185,10 +190,10 @@ export default function StudentPerfil() {
         Perfil de Boxe.
       </div>
 
-      <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Informações pessoais</div>
+      <h2 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Informações pessoais</h2>
       <div className="mb-2.5">
-        <Label>Sexo</Label>
-        <div className="flex gap-2">
+        <Label id="sexo-label">Sexo</Label>
+        <div role="radiogroup" aria-labelledby="sexo-label" className="flex gap-2">
           {(Object.keys(SEX_LABELS) as Sex[]).map((s) => (
             <Pill key={s} label={SEX_LABELS[s]} on={form.sex === s} onClick={() => setForm((f) => ({ ...f, sex: f.sex === s ? null : s }))} />
           ))}
@@ -206,7 +211,7 @@ export default function StudentPerfil() {
             onBlur={() => setTocados((t) => ({ ...t, heightCm: true }))}
             aria-invalid={!!(tocados.heightCm && erros.heightCm)}
             aria-describedby={tocados.heightCm && erros.heightCm ? "erro-height" : undefined}
-            className={tocados.heightCm && erros.heightCm ? "border-destructive" : undefined}
+            className={tocados.heightCm && erros.heightCm ? "border-destructive" : "border-muted-foreground/70"}
             placeholder="165"
           />
           <ErroCampo id="erro-height" msg={tocados.heightCm ? erros.heightCm : null} />
@@ -221,7 +226,7 @@ export default function StudentPerfil() {
             onBlur={() => setTocados((t) => ({ ...t, weightKg: true }))}
             aria-invalid={!!(tocados.weightKg && erros.weightKg)}
             aria-describedby={tocados.weightKg && erros.weightKg ? "erro-weight" : undefined}
-            className={tocados.weightKg && erros.weightKg ? "border-destructive" : undefined}
+            className={tocados.weightKg && erros.weightKg ? "border-destructive" : "border-muted-foreground/70"}
             placeholder="59,5"
           />
           <ErroCampo id="erro-weight" msg={tocados.weightKg ? erros.weightKg : null} />
@@ -241,13 +246,13 @@ export default function StudentPerfil() {
           onBlur={() => setTocados((t) => ({ ...t, wingspanCm: true }))}
           aria-invalid={!!(tocados.wingspanCm && erros.wingspanCm)}
           aria-describedby={tocados.wingspanCm && erros.wingspanCm ? "erro-wingspan" : undefined}
-          className={tocados.wingspanCm && erros.wingspanCm ? "border-destructive" : undefined}
+          className={tocados.wingspanCm && erros.wingspanCm ? "border-destructive" : "border-muted-foreground/70"}
           placeholder="168"
         />
         <ErroCampo id="erro-wingspan" msg={tocados.wingspanCm ? erros.wingspanCm : null} />
       </div>
 
-      <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Boxe</div>
+      <h2 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-2">Boxe</h2>
       <div className="mb-5">
         <Label id="guarda-label">Guarda</Label>
         <div className="text-[12.5px] text-muted-foreground mb-2.5 -mt-1 leading-snug">
@@ -262,7 +267,7 @@ export default function StudentPerfil() {
                 key={g}
                 className={cn(
                   "rounded-2xl border p-3.5 transition-all",
-                  on ? "bg-primary/15 border-primary" : "bg-secondary border-border",
+                  on ? "bg-primary/15 border-primary" : "bg-secondary border-muted-foreground/60",
                 )}
               >
                 <button
@@ -293,8 +298,8 @@ export default function StudentPerfil() {
         </div>
       </div>
       <div className="mb-6">
-        <Label>Lateralidade</Label>
-        <div className="flex flex-wrap gap-2">
+        <Label id="lateralidade-label">Lateralidade</Label>
+        <div role="radiogroup" aria-labelledby="lateralidade-label" className="flex flex-wrap gap-2">
           {(Object.keys(LATERALITY_LABELS) as Laterality[]).map((l) => (
             <Pill
               key={l}
@@ -367,10 +372,13 @@ function Pill({ label, on, onClick }: { label: string; on: boolean; onClick: () 
   return (
     <button
       type="button"
+      role="radio"
+      aria-checked={on}
       onClick={onClick}
       className={cn(
-        "h-11 px-4 rounded-xl border text-[13.5px] font-semibold transition-all active:scale-95",
-        on ? "bg-primary/15 border-primary text-primary" : "bg-secondary border-border text-foreground/85",
+        "h-11 px-4 rounded-xl border text-[13.5px] font-semibold transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        // Marcada: vermelho de texto (o vermelho de destaque dava 3,5:1 sobre o fundo); desmarcada: contorno legível (era 1,5:1).
+        on ? "bg-primary/15 border-primary text-[hsl(var(--red-text))]" : "bg-secondary border-muted-foreground/60 text-foreground/85",
       )}
     >
       {label}
