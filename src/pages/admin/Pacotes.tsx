@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Package, Pencil, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -35,6 +36,7 @@ function priceError(priceCents: number | null): string | null {
 
 type PriceMode = "defined" | "tbd";
 
+const FOCO = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 const MAX_AULAS = 99;
 function aulasError(texto: string): string | null {
   if (!texto) return "Informe quantas aulas tem o pacote.";
@@ -163,12 +165,14 @@ export default function AdminPacotes() {
 
   return (
     <div className="page-container">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="font-display text-3xl tracking-wide text-foreground leading-none">PACOTES</h1>
-        <Button size="sm" onClick={openCreate}>
+      {/* O botão fica abaixo do cabeçalho: ao lado do título, "MODELOS DE PACOTE" quebrava em 3 linhas no celular. */}
+      <PageHeader title="MODELOS DE PACOTE" subtitle="O que seus alunos podem pedir" back />
+
+      {!isLoading && !isError && data && data.length > 0 && (
+        <Button className="w-full mb-4" onClick={openCreate}>
           Novo modelo
         </Button>
-      </div>
+      )}
 
       {isError && <ErrorState onRetry={() => refetch()} />}
       {isLoading && !isError && <SkeletonList count={3} height={92} />}
@@ -179,7 +183,7 @@ export default function AdminPacotes() {
             <div key={t.id} className="card-dark p-4 flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 {/* Nome longo corta em 2 linhas (antes o cartão dobrava de altura); o texto inteiro segue no DOM. */}
-                <div className="text-[15px] font-semibold text-foreground line-clamp-2 break-words">{t.name}</div>
+                <h2 className="text-[15px] font-semibold text-foreground line-clamp-2 break-words">{t.name}</h2>
                 <div className="text-[12.5px] text-muted-foreground mt-0.5">{t.totalClasses === 1 ? "1 aula" : `${t.totalClasses} aulas`}</div>
                 {t.description && <div className="text-[12.5px] text-muted-foreground mt-0.5 line-clamp-2">{t.description}</div>}
                 <div className="text-base text-accent font-semibold mt-1.5">{formatPriceLabel(t.priceCents)}</div>
@@ -196,18 +200,18 @@ export default function AdminPacotes() {
               <button
                 type="button"
                 onClick={() => openEdit(t)}
-                aria-label="Editar modelo"
-                className="h-11 w-11 rounded-[10px] border border-border bg-secondary flex items-center justify-center active:scale-95"
+                aria-label={`Editar ${t.name}`}
+                className={`h-11 w-11 shrink-0 rounded-[10px] border border-muted-foreground/70 bg-secondary flex items-center justify-center active:scale-95 ${FOCO}`}
               >
-                <Pencil className="h-[15px] w-[15px] text-foreground/80" />
+                <Pencil className="h-[15px] w-[15px] text-foreground/80" aria-hidden />
               </button>
               <button
                 type="button"
                 onClick={() => setDeleteTarget(t)}
-                aria-label="Remover modelo"
-                className="h-11 w-11 rounded-[10px] border border-destructive/35 bg-destructive/10 flex items-center justify-center active:scale-95"
+                aria-label={`Remover ${t.name}`}
+                className={`h-11 w-11 shrink-0 rounded-[10px] border border-destructive/70 bg-destructive/10 flex items-center justify-center active:scale-95 ${FOCO}`}
               >
-                <Trash2 className="h-[15px] w-[15px] text-destructive" />
+                <Trash2 className="h-[15px] w-[15px] text-[hsl(var(--red-text))]" aria-hidden />
               </button>
             </div>
           ))}
@@ -291,13 +295,13 @@ export default function AdminPacotes() {
                       setForm((f) => ({ ...f, priceCents: tbd ? null : (f.priceCents ?? 0) }));
                       setPriceTouched(false);
                     }}
-                    className="h-4 w-4 accent-primary"
+                    className={`h-5 w-5 accent-primary ${FOCO}`}
                   />
                   Preço a combinar
                 </label>
               </div>
               {priceMode === "tbd" ? (
-                <div className="text-[12.5px] text-muted-foreground rounded-[13px] border border-dashed border-[#333] px-3.5 py-3">
+                <div className="text-[12.5px] text-muted-foreground rounded-[13px] border border-dashed border-muted-foreground/60 px-3.5 py-3">
                   Sem valor fixo — o preço será combinado diretamente com o aluno.
                 </div>
               ) : (
