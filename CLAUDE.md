@@ -2626,6 +2626,39 @@ cinza ("N aulas marcadas na recorrência. Elas continuam valendo."), nunca como 
 **Deixado para depois:** desfazer uma aprovação (exigiria função no banco e cuidado com saldo);
 WhatsApp direto no cartão do pedido; motivo da recusa.
 
+### Login: rodada de crítica (2026-09-29) — sem migration nova
+
+`src/pages/auth/Login.tsx`: crítica **24/40** (a revisão leu só o código; a varredura mediu). Relatório em
+`.impeccable/critique/*login*`. Cinco passos na `dev`. Na página de amostras é o primeiro quadro de
+"Entrada"; o e-mail com "naoconfirmado" simula o erro de e-mail não confirmado.
+
+**ERRO REAL corrigido (consequência do "Confirm email" ativo — ver "Entrada"):** o Supabase devolve
+"Email not confirmed" como HTTP **400**, igual a senha errada, e `signInWithPassword` mapeava todo
+400/401/422 para "E-mail ou senha incorretos.". Era o caminho de **todo aluno novo que entra antes de
+abrir o link do e-mail** — e o botão "Já confirmei, entrar" o mandava exatamente pra cá. Ele concluía que
+errou a senha e a redefinia em círculos. Agora:
+- `AuthError` tem `code`; `signInWithPassword` reconhece `email_not_confirmed` (por `error.code` ou pela
+  mensagem) e lança "Seu e-mail ainda não foi confirmado. Abra o link que enviamos para você.".
+- O Login mostra esse aviso com o botão **"Reenviar e-mail de confirmação"** (o mesmo
+  `resendConfirmationEmail` de "Confirme seu e-mail") e o resultado do reenvio.
+- **Não voltar a agrupar todo 400 como credencial errada** sem checar esse caso.
+
+**Decisões do Lucas:**
+- Legenda sob "BAHIA BOXE": **"Suas aulas de boxe"** (era "Gestão de aulas", que falava com o
+  professor). Exemplo de e-mail neutro **"voce@email.com"** (também em Recuperar senha).
+- A marca fixa "BAHIA BOXE" **não** foi mexida: marca por professor é um caminho ainda não
+  implementado (PRODUCT.md). Não tentar resolver isso na tela de Login.
+
+**O que mudou / detalhes:**
+- Com convite guardado neste aparelho (`lerConvitePendente`), o Login mostra "Entre para concluir seu
+  convite" + "Voltar ao convite"; sem convite, nada muda.
+- Botão do olho com 44px, `aria-pressed`, foco visível e ícones `aria-hidden` (igual ao `ContaForm`);
+  e-mail com `inputMode="email"`, `autoCapitalize="none"`, `spellCheck` off.
+- Textos ≥ 12px, logo `aria-hidden`, foco nos links, e o erro (e o reenvio) some ao começar a corrigir.
+
+**Deixado para depois:** "manter conectado"/aviso de sessão; comprimir o topo em telas muito baixas
+(hoje cabe em 375×667); marca por professor no Login.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
