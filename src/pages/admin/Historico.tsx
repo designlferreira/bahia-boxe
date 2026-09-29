@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { formatInTimeZone } from "date-fns-tz";
 import { ptBR } from "date-fns/locale";
@@ -65,12 +65,15 @@ function contextoDaAula(e: { booking: { status: string; canceladoPor?: string | 
 export default function AdminHistorico() {
   const { profile } = useAuth();
   const navigate = useNavigate();
-  const [search, setSearch] = useState("");
+  // "Ver todas as aulas" do detalhe do aluno chega com `?busca=<nome>`: a busca já vem preenchida.
+  const [params] = useSearchParams();
+  const buscaInicial = params.get("busca") ?? "";
+  const [search, setSearch] = useState(buscaInicial);
   const [periodo, setPeriodo] = useState<Periodo>("anteriores");
   const [statusFilter, setStatusFilter] = useState("todas");
 
   // A consulta só sai ~0,3 s depois da última tecla (antes cada tecla refazia a busca).
-  const [buscaAplicada, setBuscaAplicada] = useState("");
+  const [buscaAplicada, setBuscaAplicada] = useState(buscaInicial);
   useEffect(() => {
     const t = window.setTimeout(() => setBuscaAplicada(search), 300);
     return () => window.clearTimeout(t);
