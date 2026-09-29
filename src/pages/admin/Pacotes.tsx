@@ -18,6 +18,7 @@ import {
   createPackageTemplate,
   deletePackageTemplate,
   getPackageTemplates,
+  restorePackageTemplate,
   updatePackageTemplate,
 } from "@/integrations/backend/api";
 import type { PackageTemplate } from "@/integrations/backend/types";
@@ -87,11 +88,27 @@ export default function AdminPacotes() {
   });
 
   const remove = useMutation({
-    mutationFn: (id: string) => deletePackageTemplate(id),
-    onSuccess: () => {
+    mutationFn: (t: PackageTemplate) => deletePackageTemplate(t.id),
+    onSuccess: (_r, t) => {
       invalidate();
-      toast.warning("Modelo removido");
+      toast.warning(`"${t.name}" removido`, {
+        duration: 8000,
+        action: {
+          label: "Desfazer",
+          onClick: async () => {
+            try {
+              await restorePackageTemplate(t.id);
+              invalidate();
+              toast.success("Modelo de volta");
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Não foi possível desfazer. Crie o modelo de novo.");
+            }
+          },
+        },
+      });
     },
+    // Antes uma falha aqui não mostrava nada: o professor achava que tinha removido.
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível remover o modelo."),
   });
 
   function openCreate() {
@@ -267,9 +284,13 @@ export default function AdminPacotes() {
         open={!!deleteTarget}
         onOpenChange={(o) => !o && setDeleteTarget(null)}
         title="REMOVER MODELO"
-        description={`"${deleteTarget?.name}" deixará de aparecer para solicitação de novos pacotes.`}
+        description={
+          deleteTarget
+            ? `"${deleteTarget.name}" deixa de aparecer para novos pedidos. Pedidos que os alunos já fizeram continuam valendo. Você tem 8 segundos para desfazer.`
+            : ""
+        }
         confirmLabel="Remover"
-        onConfirm={() => deleteTarget && remove.mutate(deleteTarget.id)}
+        onConfirm={() => deleteTarget && remove.mutate(deleteTarget)}
       />
     </div>
   );

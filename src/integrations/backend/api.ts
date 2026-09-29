@@ -1798,6 +1798,12 @@ export async function deletePackageTemplate(id: string) {
   if (error) throw new Error(error.message);
 }
 
+/** Desfaz `deletePackageTemplate`: o modelo volta a aparecer para novos pedidos (era só `is_active = false`). */
+export async function restorePackageTemplate(id: string) {
+  const { error } = await client().from("package_templates").update({ is_active: true }).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 // ---------------------------------------------------------------------------
 // admin · disponibilidade
 // ---------------------------------------------------------------------------
