@@ -2499,6 +2499,51 @@ aulas com `slot_id` estavam `completed`, nenhuma `pending_confirmation`. Consequ
   permanente num ancestral de elemento fixo.
 - `PageHeader`: foco visível no voltar; subtítulo 13px (vale pra todas as telas que o usam).
 
+### Detalhe da aula (professor e aluno): rodada de crítica (2026-09-29) — migration 0035
+
+`src/pages/admin/AulaDetalhe.tsx` (crítica **24/40**) e `src/pages/student/AulaDetalhe.tsx` (**25/40**),
+relatórios em `.impeccable/critique/*auladetalhe*`. Sete passos na `dev`, testados pelo Lucas. As duas
+telas estão na página de amostras (professor: 4 situações; aluno: 4).
+
+**Migration 0035 (`0035_cancelar_desconta_aula.sql`) — APLICADA e VERIFICADA (4/4 OK,
+`supabase/verify_0035_cancelamento_desconta.sql`):** `cancelamento_desconta_aula(p_booking_id)`,
+`security definer`, só leitura, só a aula do aluno logado (`not_allowed` pra outro). Aula com
+`pacote_id`: `coalesce(pacote.falta_consome_credito, profiles.no_show_consumes_class, true)` — o que
+`calcular_saldo_pacote` aplica a "cancelada pelo aluno"; sem pacote (autosserviço): `false` (cancelar
+nunca lança nada no ledger). O aluno não lê `profiles` nem a cópia da regra, por isso uma função só com
+a resposta (mesmo padrão de `whatsapp_do_professor`).
+
+**Decisões do Lucas (não reabrir sem ele):**
+- **Aluno a menos de 6h de aula agendada:** o botão "Cancelar aula" **sai** e entra o quadro "Faltam
+  menos de 6 horas" com o botão do **WhatsApp** do professor — recorrência **e** autosserviço.
+  `cancelar_minha_aula` (0034) já recusava; o botão só errava depois de confirmar. Pedido pendente
+  continua cancelável até o início.
+- **Janela de cancelar do aluno (recorrência) diz a consequência:** "Pela regra do seu pacote, cancelar
+  desconta 1 aula" / "não desconta aula" (0035).
+- **Detalhe do professor, aula passada sem registro:** só **Aconteceu/Faltou** + botão **"Outras
+  ações"** (abre Remarcar, Cancelar aula e "Marcar como reposição"). Aula futura mantém as três à vista.
+- **Pedido pendente no detalhe do professor tem Aprovar/Recusar** (`usePendingActions`, com o "Antes:"
+  riscado) — antes era beco sem saída pra quem chegava por notificação.
+- **Detalhe do aluno segue o momento da aula:** com pedido de outro horário pendente o quadro sobe pra
+  logo abaixo da data e o selo ganha "Pedido em análise"; depois da aula o recado do professor vem
+  primeiro e endereço/chegada/equipamento/orientações saem.
+
+**Armadilhas e detalhes:**
+- `getAdminBookingDetail` devolve `antecessorInicio` e **não conta o pedido ainda pendente** em
+  "Remarcada Nx" (o pedido entra na cadeia ao ser feito — 0033 —, contá-lo mostrava "Remarcada 1x"
+  antes de qualquer aprovação). `vinculoPorAntecessor` foi removida; use `antecessores()`.
+- `RescheduleSheet` (professor) abre no primeiro dia em que a hora da aula ainda é futura e não é a
+  própria aula ("Atual: …"), rola até o dia/hora escolhidos, apaga as horas passadas de hoje. **Não**
+  marca horários livres/ocupados (exigiria consulta por dia; o banco já recusa colisão com mensagem
+  legível) — ficou de fora.
+- Avisos do professor sem a palavra "crédito" ("o aluno não perde a aula", "não desconta outra aula").
+- Seções do detalhe do aluno são `<h2>` de verdade; `RemarcacaoSheet` tem "Tentar de novo" no erro.
+- O `CancelLessonSheet` e o botão "Cancelar aula" usam a variant `destructive` (não `!text-destructive`).
+
+**Deixado para depois (registrado, não pedido):** marcar horários livres/ocupados na janela Remarcar do
+professor; pontos nos dias com horário livre na janela "Pedir outro horário" do aluno; confirmação em
+"Cancelar pedido" do aluno.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
