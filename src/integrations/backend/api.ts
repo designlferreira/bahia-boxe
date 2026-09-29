@@ -2199,16 +2199,34 @@ async function deriveNotifications(userId: string): Promise<AppNotification[]> {
         });
       }
     }
+    // "Já dá para agendar" só é verdade no autosserviço: na recorrência o aluno não escolhe horário
+    // (o professor marca) e a aba de agendar nem aparece. Sem o modo, o aviso prometia o que o
+    // aluno não podia fazer.
+    let autosservico = true;
+    if ((requestsRes.data ?? []).some((r) => r.status === "approved")) {
+      try {
+        const { data: st } = await client().from("students").select("admin_id").eq("id", studentId).maybeSingle();
+        if (st?.admin_id) autosservico = (await getModoAgendamentoEfetivo(st.admin_id)) === "autosservico";
+      } catch {
+        /* sem o modo: mantém o texto do autosserviço (o padrão) */
+      }
+    }
     for (const r of requestsRes.data ?? []) {
+      const aprovado = r.status === "approved";
       items.push({
         id: `request:${r.id}:${r.status}`,
         userId,
         kind: "system",
-        title: r.status === "approved" ? "Pedido aprovado" : "Pedido recusado",
-        description: r.status === "approved" ? "Suas aulas já estão disponíveis para agendar." : "Fale com seu professor para entender o motivo.",
+        title: aprovado ? "Pedido aprovado" : "Pedido recusado",
+        description: aprovado
+          ? autosservico
+            ? "Suas aulas já estão disponíveis para agendar."
+            : "Seu professor liberou o pacote. As aulas são marcadas por ele."
+          : "Fale com seu professor para entender o motivo.",
         createdAt: r.decided_at ?? r.created_at,
         read: false,
-        entity: { type: "purchase_requests" },
+        // Recusado leva à tela inicial (onde está o WhatsApp); aprovado, aos pacotes.
+        entity: aprovado ? { type: "purchase_requests" } : { type: "home" },
       });
     }
     for (const a of coachAssessmentsRes.data ?? []) {

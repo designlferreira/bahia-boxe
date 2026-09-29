@@ -208,6 +208,8 @@ export type NotificationEntity =
   | { type: "booking"; id: string }
   | { type: "purchase_requests" }
   | { type: "boxing_profile" }
+  /** Tela inicial do aluno — onde mora o "Falar com o professor" (WhatsApp). */
+  | { type: "home" }
   | null;
 
 export interface AppNotification {
