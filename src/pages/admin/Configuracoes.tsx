@@ -60,7 +60,7 @@ export default function AdminConfiguracoes() {
     mutationFn: (value: boolean) => updateNoShowConsumesClass(profile!.id, value),
     onSuccess: (_r, value) => {
       queryClient.invalidateQueries({ queryKey: key });
-      toast(value ? "Falta passa a consumir crédito" : "Falta não consome mais crédito");
+      toast(value ? "Falta agora desconta uma aula" : "Falta não desconta mais a aula");
     },
     // Antes uma falha de gravação sumia em silêncio (só o WhatsApp avisava) e o switch voltava sozinho.
     onError: (err) => toast.error(err instanceof Error ? err.message : "Não foi possível salvar. Tente de novo."),
@@ -108,8 +108,8 @@ export default function AdminConfiguracoes() {
         <div className="card-dark p-4">
           <div className="text-[14.5px] font-semibold text-foreground">Modo de agendamento</div>
           <div className="text-[12.5px] text-muted-foreground mt-0.5">
-            Autosserviço: o aluno escolhe o horário na sua disponibilidade publicada. Recorrência:
-            você define dias fixos por aluno e gera os pacotes de aulas.
+            Autosserviço: o aluno escolhe o horário entre os que você publicou. Recorrência: você combina horários fixos com
+            cada aluno e gera as aulas.
           </div>
           <div className="flex gap-2 mt-3">
             {MODO_OPTIONS.map((opt) => {
@@ -132,9 +132,8 @@ export default function AdminConfiguracoes() {
               );
             })}
           </div>
-          <div className="text-[11.5px] text-muted-foreground/80 mt-2.5">
-            Trocar aqui não migra nenhum dado: pacotes e aulas já criados continuam exatamente como
-            estão, nos dois modos. Isto só decide qual fluxo fica disponível daqui pra frente.
+          <div className="text-[12.5px] text-muted-foreground mt-2.5">
+            Ao trocar, as aulas e os pacotes que já existem não mudam. A troca vale só para o que vier depois.
           </div>
         </div>
         </>
@@ -145,13 +144,15 @@ export default function AdminConfiguracoes() {
           <h2 className="section-title mt-6 mb-2.5">Regras do pacote</h2>
         <div className="card-dark p-4 flex items-center gap-3">
           <div className="flex-1">
-            <div className="text-[14.5px] font-semibold text-foreground">Falta consome crédito</div>
-            <div className="text-[12.5px] text-muted-foreground mt-0.5">
-              Aluno que não aparece perde a aula do pacote.
+            <div id="falta-titulo" className="text-[14.5px] font-semibold text-foreground">Falta desconta uma aula</div>
+            <div id="falta-descricao" className="text-[12.5px] text-muted-foreground mt-0.5">
+              Se o aluno não aparecer, a aula é descontada do pacote. Pacotes de Recorrência já gerados mantêm a regra que valia
+              quando foram criados.
             </div>
           </div>
           <Switch
-            aria-label="Alternar consumo de crédito na falta"
+            aria-labelledby="falta-titulo"
+            aria-describedby="falta-descricao"
             checked={data?.noShowConsumesClass ?? true}
             disabled={toggle.isPending}
             onCheckedChange={(v) => toggle.mutate(v)}
