@@ -292,34 +292,41 @@ export default function AdminAgenda() {
                               </Button>
                             </div>
                           )}
-                          <div className="flex gap-2">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="flex-1 h-10"
-                              disabled={actions.isBusy(booking.id)}
-                              onClick={() => actions.openReagendar(booking, entry.studentName ?? "Aluno")}
-                            >
-                              Remarcar
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="flex-1 h-10 !border-destructive/35 !text-destructive"
-                              disabled={actions.isBusy(booking.id)}
-                              onClick={() => actions.openCancelar(booking, entry.studentName ?? "Aluno")}
-                            >
-                              Cancelar
-                            </Button>
-                          </div>
-                          {!booking.isReplacement && (
-                            <button
-                              type="button"
-                              onClick={() => actions.openReplacement(booking, entry.studentName ?? "Aluno")}
-                              className="self-start text-[12px] text-muted-foreground underline underline-offset-2 min-h-11 flex items-center"
-                            >
-                              Marcar como reposição
-                            </button>
+                          {/* Aula que já passou: a única pergunta é "aconteceu ou faltou?" (decisão do
+                              Lucas, 2026-09-28). Remarcar/Cancelar/reposição continuam no detalhe, a um
+                              toque no nome — no cartão viravam uma parede de 5 botões. */}
+                          {!awaiting && (
+                            <>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  className="flex-1 h-10"
+                                  disabled={actions.isBusy(booking.id)}
+                                  onClick={() => actions.openReagendar(booking, entry.studentName ?? "Aluno")}
+                                >
+                                  Remarcar
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  className="flex-1 h-10 !border-destructive/35 !text-destructive"
+                                  disabled={actions.isBusy(booking.id)}
+                                  onClick={() => actions.openCancelar(booking, entry.studentName ?? "Aluno")}
+                                >
+                                  Cancelar
+                                </Button>
+                              </div>
+                              {!booking.isReplacement && (
+                                <button
+                                  type="button"
+                                  onClick={() => actions.openReplacement(booking, entry.studentName ?? "Aluno")}
+                                  className="self-start text-[12px] text-muted-foreground underline underline-offset-2 min-h-11 flex items-center"
+                                >
+                                  Marcar como reposição
+                                </button>
+                              )}
+                            </>
                           )}
                         </div>
                       )}
