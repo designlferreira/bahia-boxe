@@ -269,7 +269,6 @@ function historicoAluno(proximas: Booking[], anteriores: Booking[]): [unknown[],
   return [
     [["student-history", PROFILE.id, "proximas"], proximas],
     [["student-history", PROFILE.id, "anteriores"], anteriores],
-    [["student-history", PROFILE.id, "todas"], [...proximas].reverse().concat(anteriores)],
   ];
 }
 

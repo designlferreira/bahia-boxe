@@ -573,10 +573,10 @@ export async function restoreSuggestion(bookingId: string) {
 
 export async function getStudentBookingHistory(
   profileId: string,
-  tab: "proximas" | "anteriores" | "todas",
+  tab: "proximas" | "anteriores",
 ): Promise<Booking[]> {
   const studentId = await studentIdForProfile(profileId);
-  // "proximas" precisa da mais próxima primeiro (ascendente); "anteriores"/"todas" continuam como
+  // "proximas" precisa da mais próxima primeiro (ascendente); "anteriores" continua como
   // sempre foram, mais recente primeiro (descendente) — bug real corrigido aqui (2026-09-08): as
   // três abas reusavam a MESMA ordem descendente, então "proximas" mostrava a aula mais DISTANTE
   // no topo em vez da mais próxima.
@@ -595,8 +595,8 @@ export async function getStudentBookingHistory(
       // cancelamento pelo professor CONTINUA aparecendo — é um fato que o aluno viveu; só o
       // descarte por regeneração some (filtrado na query acima), porque nunca foi compromisso.
       if (tab === "proximas") return isFuture && r.status !== "cancelled";
-      if (tab === "anteriores") return !isFuture;
-      return true;
+      // A aba "Todas" saiu (era a soma das duas e mudava a ordem das mesmas aulas entre as abas).
+      return !isFuture;
     })
     .map(mapBooking);
 }

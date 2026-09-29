@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatQuando } from "@/lib/dateUtils";
 import { getStudentBookingHistory } from "@/integrations/backend/api";
 
-type Tab = "proximas" | "anteriores" | "todas";
+type Tab = "proximas" | "anteriores";
 
 export default function StudentHistorico() {
   const { profile } = useAuth();
@@ -33,7 +33,6 @@ export default function StudentHistorico() {
         <TabsList>
           <TabsTrigger value="proximas">Próximas</TabsTrigger>
           <TabsTrigger value="anteriores">Anteriores</TabsTrigger>
-          <TabsTrigger value="todas">Todas</TabsTrigger>
         </TabsList>
       </Tabs>
 
