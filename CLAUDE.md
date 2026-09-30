@@ -3750,7 +3750,9 @@ Um passo na `dev`, testado pelo Lucas. A logo oficial (boxeador de luvas vermelh
   O Login ainda cabe em 375×667 com "Entrar" visível. As telas 404, "Algo deu errado" e "Não conseguimos abrir sua conta" continuam com o texto "BAHIA BOXE" (o `ErrorBoundary` deve continuar sem depender de arquivo).
 - **Ícones refeitos a partir da logo, só o boxeador** (recorte 610×610 a partir de x=455, y=0 do original de 1536×1024, sobre `#121212`; o nome fica ilegível em ícone): `icon-192`/`icon-512` (cantos arredondados), `icon-maskable-512` e `apple-touch-icon` (quadrado inteiro; o rosto fica na área segura) e `favicon-48.png`.
   **`favicon.svg` foi APAGADO** (era o desenho provisório de duas linhas; misturá-lo mostraria o ícone antigo em alguns lugares). Os PNGs da seção "polish pós-auditoria" não valem mais.
-  Gerados por um script PowerShell (`System.Drawing`) que NÃO está no repositório; o original em alta está fora do repositório. Se a logo mudar, refazer os ícones a partir do original.
+  **O original em alta (1536×1024, fundo transparente, ~2,2 MB) está em `brand/logo-bahia-boxe-original.png`** — fora de `public/` de propósito, para não ser publicado.
+  **`brand/gerar-icones.ps1`** refaz todos os ícones e a logo reduzida a partir dele (`powershell -ExecutionPolicy Bypass -File brand\gerar-icones.ps1`, na raiz; conferido: gera arquivos idênticos aos publicados).
+  Se a logo mudar, trocar o original e ajustar o recorte (`$crop`) no script.
 - Quem já instalou o app mantém o ícone antigo até reinstalar (o sistema guarda o ícone na instalação).
 
 **Requisito futuro registrado (não iniciado):** quando o app tiver outras academias/professores, cada um sobe a própria logo e o app deriva a identidade visual por heurística 60-30-10 (60 fundo, 30 superfícies, 10 destaque), com o ícone mudando junto quando possível. Pontos a decidir antes: onde guardar logo e cores por professor (migration + storage, e liberar o storage na CSP do `vercel.json`);
