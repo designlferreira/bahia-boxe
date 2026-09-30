@@ -7,7 +7,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: "autoUpdate",
+      // "prompt": a versão nova fica esperando até a pessoa tocar em "Atualizar" (AvisoNovaVersao). Com "autoUpdate" ela só aparecia na
+      // abertura seguinte, e no iPhone o app instalado quase nunca abre do zero. O registro é feito pelo próprio AvisoNovaVersao.
+      registerType: "prompt",
+      injectRegister: false,
       includeAssets: ["favicon-48.png", "apple-touch-icon.png"],
       // Padrão do plugin não inclui fontes: sem isto os títulos (Bebas Neue) caem numa fonte comum no app instalado sem internet.
       workbox: { // A logo entra no cache offline (Login e tela de abertura); os ícones não, o sistema os guarda na instalação.
