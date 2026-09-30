@@ -2163,8 +2163,9 @@ export async function getEmailDoAluno(studentId: string): Promise<string | null>
  * O professor cria um convite de UM aluno (uso único, vale alguns dias — o prazo mora na função do banco, 0037).
  * O token é gerado no servidor; o app só monta o link (`linkDoConvite`). Só o professor chama.
  */
-export async function criarConvite(): Promise<{ token: string; expiresAt: string }> {
-  const { data, error } = await client().rpc("criar_convite");
+export async function criarConvite(nomeConvidado?: string): Promise<{ token: string; expiresAt: string }> {
+  // O nome é só um rótulo do professor (0038): em branco vira NULL no servidor.
+  const { data, error } = await client().rpc("criar_convite", { p_nome: nomeConvidado?.trim() || null });
   if (error) throw new Error(error.message);
   const linha = (data as { token: string; expires_at: string }[] | null)?.[0];
   if (!linha) throw new Error("criar_convite_sem_resposta");
@@ -2176,6 +2177,8 @@ export interface ConviteEmAberto {
   token: string;
   createdAt: string;
   expiresAt: string;
+  /** Para quem o professor disse que era (opcional; convites antigos e sem nome vêm null). */
+  nomeConvidado: string | null;
 }
 
 /**
@@ -2185,14 +2188,14 @@ export interface ConviteEmAberto {
 export async function getConvitesEmAberto(adminId: string): Promise<ConviteEmAberto[]> {
   const { data, error } = await client()
     .from("invites")
-    .select("id, token, created_at, expires_at")
+    .select("id, token, created_at, expires_at, nome_convidado")
     .eq("admin_id", adminId)
     .eq("used", false)
     .gt("expires_at", new Date().toISOString())
     .order("created_at", { ascending: false })
     .limit(50);
   if (error) throw new Error(error.message);
-  return (data ?? []).map((r) => ({ id: r.id, token: r.token, createdAt: r.created_at, expiresAt: r.expires_at }));
+  return (data ?? []).map((r) => ({ id: r.id, token: r.token, createdAt: r.created_at, expiresAt: r.expires_at, nomeConvidado: r.nome_convidado ?? null }));
 }
 
 /**

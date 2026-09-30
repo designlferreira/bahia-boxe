@@ -4,7 +4,7 @@ import { Check, Copy, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { criarConvite } from "@/integrations/backend/api";
-import { linkDoConvite, linkWhatsappConvite } from "@/lib/convite";
+import { NOME_CONVIDADO_MAX, linkDoConvite, linkWhatsappConvite } from "@/lib/convite";
 import { formatDateShort } from "@/lib/dateUtils";
 import { mensagemDeErro } from "@/lib/erros";
 import { CONVITES_EM_ABERTO_KEY, ConvitesEmAberto } from "@/components/ConvitesEmAberto";
@@ -12,6 +12,8 @@ import { CONVITES_EM_ABERTO_KEY, ConvitesEmAberto } from "@/components/ConvitesE
 interface Convite {
   token: string;
   expiresAt: string;
+  /** Para quem o professor disse que é (opcional): só rótulo dele, vira "Oi, Ana!" na mensagem e o nome na lista de convites. */
+  nome?: string | null;
 }
 
 /**
@@ -23,12 +25,13 @@ export function ConviteCorpo({ amostra, onCriado }: { amostra?: Convite; onCriad
   const queryClient = useQueryClient();
   const [convite, setConvite] = useState<Convite | null>(amostra ?? null);
   const [copiado, setCopiado] = useState(false);
+  const [nome, setNome] = useState("");
   const campo = useRef<HTMLInputElement>(null);
 
   const gerar = useMutation({
-    mutationFn: criarConvite,
+    mutationFn: () => criarConvite(nome),
     onSuccess: (c) => {
-      setConvite(c);
+      setConvite({ ...c, nome: nome.trim() || null });
       setCopiado(false);
       onCriado?.(c.token);
       // A lista de convites em aberto (janela e aviso da lista de alunos) passa a contar o novo.
@@ -72,14 +75,38 @@ export function ConviteCorpo({ amostra, onCriado }: { amostra?: Convite; onCriad
           Você gera um link, manda pelo WhatsApp e o aluno cria a conta por ele. Cada link serve para um aluno só.
         </p>
         <p className="text-[13px] text-muted-foreground mb-4">Quando ele entrar, já aparece na sua lista de alunos.</p>
-        {gerar.isError && (
-          <p role="alert" className="text-[13px] text-[hsl(var(--red-text))] mb-3">
-            {mensagemDeErro(gerar.error, "Não foi possível criar o convite. Tente de novo.")}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            gerar.mutate();
+          }}
+        >
+          <label htmlFor="nome-convidado" className="block text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-1.5">
+            Para quem é? <span className="normal-case tracking-normal font-normal">(opcional)</span>
+          </label>
+          <input
+            id="nome-convidado"
+            value={nome}
+            onChange={(e) => setNome(e.target.value)}
+            maxLength={NOME_CONVIDADO_MAX}
+            autoComplete="off"
+            autoCapitalize="words"
+            placeholder="Ex.: Ana"
+            aria-describedby="nome-convidado-ajuda"
+            className="input-dark w-full h-12 px-3 text-[15px] mb-1.5 text-foreground"
+          />
+          <p id="nome-convidado-ajuda" className="text-[12.5px] text-muted-foreground mb-4">
+            Só você vê. Ajuda a reconhecer o convite na lista, e a mensagem começa chamando pelo nome.
           </p>
-        )}
-        <Button size="lg" className="w-full" onClick={() => gerar.mutate()} disabled={gerar.isPending}>
-          {gerar.isPending ? "Gerando…" : gerar.isError ? "Tentar de novo" : "Gerar link de convite"}
-        </Button>
+          {gerar.isError && (
+            <p role="alert" className="text-[13px] text-[hsl(var(--red-text))] mb-3">
+              {mensagemDeErro(gerar.error, "Não foi possível criar o convite. Tente de novo.")}
+            </p>
+          )}
+          <Button type="submit" size="lg" className="w-full" disabled={gerar.isPending}>
+            {gerar.isPending ? "Gerando…" : gerar.isError ? "Tentar de novo" : "Gerar link de convite"}
+          </Button>
+        </form>
       </div>
     );
   }
@@ -87,7 +114,7 @@ export function ConviteCorpo({ amostra, onCriado }: { amostra?: Convite; onCriad
   return (
     <div>
       <p className="text-[14px] text-foreground/85 leading-relaxed mb-3">
-        Link pronto. Vale para um aluno e até {validoAte.replace(" ", " ")}.
+        {convite.nome ? `Convite para ${convite.nome}. ` : "Link pronto. "}Vale para um aluno e até {validoAte.replace(" ", " ")}.
       </p>
       <label className="block text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-1.5" htmlFor="link-convite">
         Link do convite
@@ -102,7 +129,7 @@ export function ConviteCorpo({ amostra, onCriado }: { amostra?: Convite; onCriad
       />
       <div className="flex flex-col gap-2.5">
         <Button size="lg" className="w-full" asChild>
-          <a href={linkWhatsappConvite(link, validoAte)} target="_blank" rel="noopener noreferrer">
+          <a href={linkWhatsappConvite(link, validoAte, convite.nome)} target="_blank" rel="noopener noreferrer">
             <MessageCircle className="h-[18px] w-[18px] mr-2" aria-hidden />
             Enviar pelo WhatsApp
           </a>
@@ -121,6 +148,7 @@ export function ConviteCorpo({ amostra, onCriado }: { amostra?: Convite; onCriad
           type="button"
           onClick={() => {
             setConvite(null);
+            setNome("");
             gerar.reset();
             // O link que saiu de cena volta a contar como "em aberto" na lista logo abaixo.
             onCriado?.(null);
