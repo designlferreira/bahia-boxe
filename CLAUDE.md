@@ -3841,6 +3841,25 @@ Um passo na `dev`, testado pelo Lucas. Fecha o item "lista de convites em aberto
 **Aceito/limite:** a lista não mostra QUEM foi convidado (a tabela não guarda nome nem telefone do convidado); o professor reconhece o convite pela data. Uma lista maior que 50 convites em aberto mostra só os 50 mais novos.
 **Deixado para depois (registrado, não pedido):** nome/apelido do convidado no convite (exigiria coluna nova); aviso quando um convite vence sem uso; fechar o furo das policies de `invites`.
 
+### Nome de quem vai receber o convite (2026-09-30) — migration 0038
+
+Um passo na `dev`, testado pelo Lucas. Fecha o item "nome/apelido do convidado no convite" de "Convites em aberto": a lista só mostrava datas e, com vários convites, o professor não sabia qual era de quem.
+
+**Migration 0038 (`0038_convite_com_nome.sql`) — APLICADA (2026-09-30); `supabase/verify_0038_convite_com_nome.sql` foi rodado pelo Lucas, mas o RESULTADO NÃO foi colado de volta nesta sessão** (só o "rodei"):
+- **`invites.nome_convidado text`, NULLABLE** (convites antigos e sem nome ficam NULL), `CHECK` de 1 a 80 caracteres quando preenchido (`invites_nome_convidado_check`). **É só um rótulo do professor:** `validate_invite`/`accept_invite` não o leem e o aluno não o vê; NÃO é o nome da conta do aluno.
+- **`criar_convite(p_nome text default null)` SUBSTITUI a versão sem argumento da 0037** (`drop function if exists public.criar_convite()`): como o parâmetro tem DEFAULT, uma chamada SEM argumento (`rpc("criar_convite")`, o que o app em produção fazia até o novo deploy) continua funcionando e cria convite sem nome. **Duas sobrecargas (com e sem argumento) deixariam a chamada ambígua:
+  não recriar a versão sem argumento.** Nome em branco vira NULL (`nullif(btrim(...), '')`); mais de 80 caracteres é recusado (`nome_muito_longo`; a tela já limita a 80). O resto é o da 0037 (só professor, 7 dias, uso único, token de 64 hex). `revoke`/`grant` refeitos na assinatura nova `(text)`.
+
+**No app:**
+- `criarConvite(nomeConvidado?)` manda `p_nome` (em branco → `null`); `getConvitesEmAberto` lê `nome_convidado` (`ConviteEmAberto.nomeConvidado: string | null`).
+- **`ConviteAluno.tsx`:** campo opcional "Para quem é?" (`NOME_CONVIDADO_MAX = 80`, `autoCapitalize="words"`, Enter gera), com a frase "Só você vê. Ajuda a reconhecer o convite na lista, e a mensagem começa chamando pelo nome."; o link pronto diz "Convite para <nome>."; "Gerar outro" limpa o campo.
+  **Sem pronome na frase** ("dela"/"dele"): o texto é neutro de propósito, porque o app não sabe o gênero do convidado.
+- **`lib/convite.ts`:** `mensagemDoConvite`/`linkWhatsappConvite` aceitam o nome e abrem com **"Oi, <primeiro nome>!"** (só o primeiro nome; sem nome ou só espaços, "Oi!"); testes novos.
+- **`ConvitesEmAberto.tsx`:** o nome é o título de cada convite ("Convite sem nome" quando não há), "Enviar" da lista também chama pelo nome, rótulos falados e o aviso de cancelar citam o nome.
+
+**Aceito/limite:** o nome não pode ser editado depois de criado (para corrigir, cancela-se e gera-se outro); o convidado só tem nome, sem telefone (o link segue sendo mandado pelo professor, pelo WhatsApp dele).
+**Deixado para depois (registrado, não pedido):** editar o nome de um convite em aberto; aviso quando um convite vence sem uso; fechar o furo das policies de `invites` (ver "Onboarding do professor").
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa

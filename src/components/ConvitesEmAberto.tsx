@@ -39,7 +39,7 @@ export function ConvitesEmAberto({ excluirToken, amostra }: { excluirToken?: str
     mutationFn: (c: ConviteEmAberto) => cancelarConvite(c.id),
     onSuccess: (_r, c) => {
       atualizar();
-      toast("Convite cancelado", {
+      toast(c.nomeConvidado ? `Convite de ${c.nomeConvidado} cancelado` : "Convite cancelado", {
         description: "Quem abrir esse link vai ver que o convite venceu.",
         duration: 8000,
         action: {
@@ -90,20 +90,25 @@ export function ConvitesEmAberto({ excluirToken, amostra }: { excluirToken?: str
           const venceLogo = new Date(c.expiresAt).getTime() - Date.now() < DOIS_DIAS;
           const validoAte = formatDateShort(c.expiresAt);
           const link = linkDoConvite(c.token);
+          const quem = c.nomeConvidado ?? `criado em ${formatDateShort(c.createdAt)}`;
           return (
             <li key={c.id} className="card-dark p-3">
-              <div className="text-[13.5px] text-foreground">Criado em {formatDateShort(c.createdAt)}</div>
+              {/* O nome é a forma de reconhecer o convite; sem nome (convites antigos ou sem rótulo) fica a data. */}
+              <div className="text-[14.5px] font-semibold text-foreground break-words line-clamp-2">
+                {c.nomeConvidado ?? "Convite sem nome"}
+              </div>
+              <div className="text-[12.5px] text-muted-foreground">Criado em {formatDateShort(c.createdAt)}</div>
               <div className={venceLogo ? "text-[12.5px] text-amber" : "text-[12.5px] text-muted-foreground"}>
                 {venceLogo ? `Vence logo: vale até ${validoAte}` : `Vale até ${validoAte}`}
               </div>
               <div className="mt-2.5 flex gap-2">
                 <Button size="sm" variant="soft" className="flex-1 min-w-0 px-3" asChild>
-                  <a href={linkWhatsappConvite(link, validoAte)} target="_blank" rel="noopener noreferrer" aria-label={`Enviar pelo WhatsApp o convite criado em ${formatDateShort(c.createdAt)}`}>
+                  <a href={linkWhatsappConvite(link, validoAte, c.nomeConvidado)} target="_blank" rel="noopener noreferrer" aria-label={`Enviar pelo WhatsApp o convite de ${quem}`}>
                     <MessageCircle className="h-4 w-4 mr-1.5" aria-hidden />
                     Enviar
                   </a>
                 </Button>
-                <Button size="sm" variant="secondary" className="flex-1 min-w-0 px-3" onClick={() => copiar(c)} aria-label={`Copiar o link do convite criado em ${formatDateShort(c.createdAt)}`}>
+                <Button size="sm" variant="secondary" className="flex-1 min-w-0 px-3" onClick={() => copiar(c)} aria-label={`Copiar o link do convite de ${quem}`}>
                   <Copy className="h-4 w-4 mr-1.5" aria-hidden />
                   Copiar
                 </Button>
@@ -113,7 +118,7 @@ export function ConvitesEmAberto({ excluirToken, amostra }: { excluirToken?: str
                   className="shrink-0 px-3 text-[hsl(var(--red-text))]"
                   onClick={() => cancelar.mutate(c)}
                   disabled={cancelar.isPending && cancelar.variables?.id === c.id}
-                  aria-label={`Cancelar o convite criado em ${formatDateShort(c.createdAt)}`}
+                  aria-label={`Cancelar o convite de ${quem}`}
                 >
                   Cancelar
                 </Button>

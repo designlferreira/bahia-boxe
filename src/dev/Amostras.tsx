@@ -809,8 +809,9 @@ const PEDIDOS_CASOS: { title: string; note: string; lista: unknown[] }[] = [
 ];
 
 const CONVITES_AMOSTRA = [
-  { id: "c1", token: "7f3ac9d2b84e4a1f9c0d5e6b2a8f1c3d7f3ac9d2b84e4a1f9c0d5e6b2a8f1c3d", createdAt: at(-1, 10), expiresAt: at(6, 10) },
-  { id: "c2", token: "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90", createdAt: at(-6, 15), expiresAt: at(1, 15) },
+  { id: "c1", token: "7f3ac9d2b84e4a1f9c0d5e6b2a8f1c3d7f3ac9d2b84e4a1f9c0d5e6b2a8f1c3d", createdAt: at(-1, 10), expiresAt: at(6, 10), nomeConvidado: "Ana Beatriz Souza" },
+  { id: "c2", token: "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90", createdAt: at(-6, 15), expiresAt: at(1, 15), nomeConvidado: null },
+  { id: "c3", token: "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0", createdAt: at(-2, 9), expiresAt: at(5, 9), nomeConvidado: "Marcos" },
 ];
 
 /** Lista de alunos: 6 alunos, 4 deles em risco (os mesmos do painel). */
@@ -2060,7 +2061,7 @@ export default function Amostras() {
             <SeededAdmin data={null} seed={semearSemAlunos}>
               <div className="px-5 py-6 bg-card">
                 <div className="page-title mb-2">CONVIDAR ALUNO</div>
-                <ConviteCorpo amostra={{ token: "7f3ac9d2b84e4a1f9c0d5e6b2a8f1c3d7f3ac9d2b84e4a1f9c0d5e6b2a8f1c3d", expiresAt: at(7, 12) }} />
+                <ConviteCorpo amostra={{ token: "7f3ac9d2b84e4a1f9c0d5e6b2a8f1c3d7f3ac9d2b84e4a1f9c0d5e6b2a8f1c3d", expiresAt: at(7, 12), nome: "Ana Beatriz" }} />
               </div>
             </SeededAdmin>
           </Frame>
