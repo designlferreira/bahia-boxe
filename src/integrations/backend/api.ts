@@ -1,3 +1,4 @@
+import { SemVinculoError } from "@/lib/vinculo";
 import { addDays, addWeeks, format } from "date-fns";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { TIMEZONE, formatDate, formatTime } from "@/lib/dateUtils";
@@ -192,7 +193,7 @@ export async function studentIdForProfile(profileId: string): Promise<string> {
   if (cached) return cached;
   const { data, error } = await client().from("students").select("id").eq("profile_id", profileId).maybeSingle();
   if (error) throw new Error(error.message);
-  if (!data) throw new Error("Sua conta ainda não está vinculada a um professor.");
+  if (!data) throw new SemVinculoError();
   studentIdByProfile.set(profileId, data.id);
   return data.id;
 }
@@ -435,7 +436,7 @@ export async function getStudentAdminId(profileId: string): Promise<string> {
     .eq("profile_id", profileId)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  if (!data) throw new Error("Sua conta ainda não está vinculada a um professor.");
+  if (!data) throw new SemVinculoError();
   return data.admin_id;
 }
 

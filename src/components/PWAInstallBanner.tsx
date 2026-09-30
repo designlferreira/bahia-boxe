@@ -57,10 +57,15 @@ interface PWAInstallBannerProps {
    * instalação de propósito, então aparece sempre que o navegador permitir instalar.
    */
   placement?: "optional" | "settings";
+  /**
+   * Só com `optional` (Home): mostra também a orientação do iPhone. Quem chama decide QUEM a vê (a Home só a mostra a aluno recente):
+   * no iPhone ela não some sozinha, então para aluno antigo seria um aviso novo a cada visita. Tem "Agora não" (30 dias).
+   */
+  iosNaHome?: boolean;
   className?: string;
 }
 
-export function PWAInstallBanner({ placement = "optional", className }: PWAInstallBannerProps) {
+export function PWAInstallBanner({ placement = "optional", iosNaHome = false, className }: PWAInstallBannerProps) {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(capturedPrompt);
   const [hidden, setHidden] = useState(() => placement === "optional" && isSnoozed());
 
@@ -71,11 +76,11 @@ export function PWAInstallBanner({ placement = "optional", className }: PWAInsta
     };
   }, []);
 
-  // iPhone/Safari não dispara `beforeinstallprompt`: sem isto o aluno nunca via como instalar. Só na Minha conta
-  // (onde ele procura de propósito) e só se o app ainda não estiver instalado.
+  // iPhone/Safari não dispara `beforeinstallprompt`: sem isto o aluno nunca via como instalar. Na Minha conta (onde ele procura
+  // de propósito) e, se a tela pedir (`iosNaHome`), na Home — sempre só se o app ainda não estiver instalado.
   const isIOS = typeof navigator !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent);
   const instalado = typeof navigator !== "undefined" && (navigator as Navigator & { standalone?: boolean }).standalone === true;
-  if (!deferred && placement === "settings" && isIOS && !instalado) {
+  if (!deferred && isIOS && !instalado && (placement === "settings" || (iosNaHome && !hidden))) {
     return (
       <section aria-label="Instalar o aplicativo" className={cn("rounded-2xl border border-border bg-card p-4 mb-4", className)}>
         <div className="flex items-start gap-3">
@@ -85,11 +90,23 @@ export function PWAInstallBanner({ placement = "optional", className }: PWAInsta
           <div className="flex-1 min-w-0">
             <div className="text-[15px] font-semibold text-foreground">Instale o Bahia Boxe no iPhone</div>
             <div className="text-sm text-muted-foreground mt-0.5">
-              Toque em <Share className="inline h-3.5 w-3.5 -mt-0.5" aria-hidden /> <strong className="text-foreground">Compartilhar</strong> e depois em{" "}
+              No Safari, toque em <Share className="inline h-3.5 w-3.5 -mt-0.5" aria-hidden /> <strong className="text-foreground">Compartilhar</strong> e depois em{" "}
               <strong className="text-foreground">Adicionar à Tela de Início</strong>.
             </div>
           </div>
         </div>
+        {placement === "optional" && (
+          <Button
+            variant="ghost"
+            className="w-full h-11 mt-3 text-muted-foreground"
+            onClick={() => {
+              snooze();
+              setHidden(true);
+            }}
+          >
+            Agora não
+          </Button>
+        )}
       </section>
     );
   }

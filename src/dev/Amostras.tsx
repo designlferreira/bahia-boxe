@@ -22,6 +22,7 @@ import StudentHome from "@/pages/student/Home";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminAlunos from "@/pages/admin/Alunos";
 import { ConviteCorpo } from "@/components/ConviteAluno";
+import { SemProfessor } from "@/components/SemProfessor";
 import AdminPedidos from "@/pages/admin/Pedidos";
 import AdminAgenda from "@/pages/admin/Agenda";
 import StudentAgendar from "@/pages/student/Agendar";
@@ -2047,6 +2048,15 @@ export default function Amostras() {
                 <div className="page-title mb-2">CONVIDAR ALUNO</div>
                 <ConviteCorpo amostra={{ token: "7f3ac9d2b84e4a1f9c0d5e6b2a8f1c3d7f3ac9d2b84e4a1f9c0d5e6b2a8f1c3d", expiresAt: at(7, 12) }} />
               </div>
+            </SeededAdmin>
+          </Frame>
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Aluno sem professor (onboarding)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          <Frame title="Conta sem professor" note="no lugar do app todo: explica e deixa colar o link do convite (teste colando texto qualquer)">
+            <SeededAdmin data={null} seed={semearSemAlunos}>
+              <SemProfessor onVerificar={() => {}} onSair={() => {}} />
             </SeededAdmin>
           </Frame>
         </div>
