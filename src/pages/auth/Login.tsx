@@ -80,17 +80,16 @@ export default function Login() {
   return (
     <main className="min-h-dvh flex flex-col bg-gradient-to-b from-primary/20 to-background px-6 pt-10 pb-10">
       <div>
-        <div className="flex items-center gap-3 mb-10">
-          <div className="h-11 w-11 rounded-2xl bg-gradient-hero shadow-glow flex items-center justify-center">
-            <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
-              <path d="M7 5h8a4 4 0 0 1 4 4v3a4 4 0 0 1-4 4H9" />
-              <path d="M7 5v11a3 3 0 0 0 3 3h5" />
-            </svg>
-          </div>
-          <div>
-            <div className="font-display text-3xl leading-none tracking-wide text-foreground">BAHIA BOXE</div>
-            <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground mt-0.5">Suas aulas de boxe</div>
-          </div>
+        {/* Logo oficial (fundo transparente). Marca por professor ainda não existe: por enquanto é fixa. */}
+        <div className="mb-8 flex flex-col items-center text-center">
+          <img
+            src="/logo-bahia-boxe.png"
+            alt="Bahia Boxe"
+            width={600}
+            height={400}
+            className="w-full max-w-[280px] h-auto"
+          />
+          <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground mt-1">Suas aulas de boxe</div>
         </div>
 
         <h1 className="font-display text-[44px] leading-[0.95] tracking-wide text-foreground mb-5">
