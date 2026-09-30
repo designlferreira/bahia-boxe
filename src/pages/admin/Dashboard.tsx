@@ -705,7 +705,7 @@ function ComecePorAqui({ passos }: { passos: PrimeirosPassos }) {
   const navigate = useNavigate();
   const itens: Passo[] = [
     ...passosDe(passos),
-    { feito: false, titulo: "Convidar o primeiro aluno", porque: "", rota: "/admin/alunos" },
+    { feito: false, titulo: "Convidar o primeiro aluno", porque: "", rota: "/admin/alunos?convidar=1" },
   ];
   const feitos = itens.filter((p) => p.feito).length;
   return (

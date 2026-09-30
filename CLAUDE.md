@@ -3776,6 +3776,34 @@ instalado no iPhone quase nunca abre "do zero" (o Lucas precisou limpar os dados
 
 **Não conferido:** o cartão aparecendo sozinho num celular real depois de um deploy (depende do próximo deploy que mude o build); o iPhone chamar `visibilitychange` ao voltar para o app instalado.
 
+### Onboarding do professor: convidar aluno dentro do app (2026-09-30) — migration 0037
+
+Escopo escolhido pelo Lucas: **só o professor** (o onboarding do aluno fica para depois) e **incluindo a criação de convite**. O passo "Convidar o primeiro aluno" do painel levava a uma lista vazia e o app não criava
+convite (o código só fazia `validate_invite`/`accept_invite`): era onde o professor novo travava.
+
+**FATOS DO BANCO (`supabase/diagnostico_convites.sql`, rodado em 2026-09-30):**
+- `invites(id, admin_id, token, expires_at, used, created_at)`, `token` único, RLS ligada. Policies: `invites_admin_insert`, `invites_admin_manage` (ALL) e `invites_admin_select`, todas só com `admin_id = auth.uid()` (roles `{public}`).
+- `validate_invite(p_token)` devolve `(is_valid, reason)` com `reason` ∈ `not_found` / `used` / `expired` / `valid`; `accept_invite(p_token)` cria `students(profile_id, admin_id)` (`on conflict (profile_id) do nothing`), marca `used = true` e levanta "Invalid or expired invite". Ambas executáveis por `anon` e `authenticated`.
+- **A tabela estava VAZIA (0 linhas): nenhum convite jamais foi criado neste banco.** O fluxo de aceitar convite só foi exercitado com convites criados fora do app (ou removidos depois).
+- **Furo de segurança PRÉ-EXISTENTE, NÃO corrigido (decisão de segurança, pedir ao Lucas):** a policy de insert só confere `admin_id = auth.uid()`, então **qualquer usuário logado, inclusive um aluno, pode inserir um convite direto pela API** e vincular outras contas como "alunos" dele.
+  A 0037 não o fecha (não mexe em policy); só garante que o CAMINHO DO APP exige professor. Fechar de vez = tirar/endurecer as policies de insert/manage para exigir `profiles.role = 'admin'`. `accept_invite` também não confere o papel de quem aceita.
+
+**Migration 0037 (`0037_criar_convite.sql`) — APLICADA (2026-09-30); `supabase/verify_0037_criar_convite.sql` foi rodado pelo Lucas, mas o RESULTADO NÃO foi colado de volta nesta sessão** (só o "rodei"): ver a tabela de novo se aparecer problema.
+`criar_convite() returns table(token, expires_at)`, `security definer`: só `profiles.role = 'admin'` (`only_admin`), cria convite de uso único para o próprio `admin_id = auth.uid()`, **vale 7 dias** (`v_validade`, o único lugar para mudar — escolha minha, não decisão do Lucas),
+token de 64 hex (dois `gen_random_uuid()`). `revoke ... from public, anon; grant ... to authenticated`. Não mexe na tabela, nas policies nem em `validate_invite`/`accept_invite`.
+
+**No app:**
+- `criarConvite()` (`api.ts`), `src/lib/convite.ts` (`linkDoConvite` = `<origem>/convite/<token>`, a rota que `Convite.tsx` já atende; `mensagemDoConvite`/`linkWhatsappConvite`, com testes) e **`ConviteAluno.tsx`** (`ConviteCorpo` + `ConviteSheet`).
+- Janela "CONVIDAR ALUNO": **o convite só é criado ao tocar em "Gerar link de convite"** (abrir só para olhar não deixa convite solto). Com o link: **"Enviar pelo WhatsApp" (principal)** e "Copiar link" (com "Link copiado" por 2,5s e plano B de selecionar o texto se a área de transferência negar), "Gerar outro". Fechar a janela perde o link na tela (o convite segue válido no banco).
+- **A mensagem NÃO cita a marca** ("Oi! Te convidei para o app das minhas aulas de boxe… vale só para você, até 07 out: <link>"): a marca é de cada professor (PRODUCT.md) e o texto sai do WhatsApp dele. O prazo da mensagem é o que o SERVIDOR devolveu, não um número escrito no código.
+- `Alunos.tsx`: botão "Convidar aluno" no cabeçalho; **sem nenhum aluno, a lista mostra "Você ainda não tem alunos" com o botão de convidar (a ação principal) e esconde busca e filtros**; `?convidar=1` abre a janela (o parâmetro sai da URL em seguida).
+  O passo "Convidar o primeiro aluno" do painel (`ComecePorAqui`) agora aponta para `/admin/alunos?convidar=1`.
+- Galeria: "Convidar aluno (professor)" (estado vazio, janela antes de gerar, janela com link pronto).
+
+**Não conferido:** o fluxo completo de ponta a ponta com um aluno de verdade (abrir o link, criar conta, confirmar e-mail, aparecer na lista); o WhatsApp em aparelho real; o caso "professor sem alunos" no app de verdade (a galeria cobre só o visual).
+
+**Deixado para depois (registrado, não pedido):** lista de convites em aberto (com "expira em" e revogar); reenviar um convite; fechar o furo das policies (acima); onboarding do aluno; o passo "Convidar o primeiro aluno" sumir do painel depois do primeiro convite gerado (hoje só some quando já há aluno).
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
