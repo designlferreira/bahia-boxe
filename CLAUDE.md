@@ -3804,6 +3804,27 @@ token de 64 hex (dois `gen_random_uuid()`). `revoke ... from public, anon; grant
 
 **Deixado para depois (registrado, não pedido):** lista de convites em aberto (com "expira em" e revogar); reenviar um convite; fechar o furo das policies (acima); onboarding do aluno; o passo "Convidar o primeiro aluno" sumir do painel depois do primeiro convite gerado (hoje só some quando já há aluno).
 
+### Onboarding do aluno: conta sem professor e instalar no iPhone (2026-09-30) — sem migration nova
+
+Um passo na `dev`, testado pelo Lucas. Fechou o ponto "AINDA EM ABERTO" de "Polish do fluxo do aluno novo" (o que o aluno VÊ sem vínculo com um professor): **a resposta era ruim.** `studentIdForProfile`/`getStudentAdminId` lançavam "Sua conta ainda não está vinculada a um professor.",
+e cada tela do aluno mostrava o `ErrorState` genérico "Não foi possível carregar…" com "Tentar novamente": um beco sem saída para quem criou a conta sem o link do convite, ou cujo convite venceu/foi usado/se perdeu ao abrir o e-mail em outro aparelho.
+O que o aluno vê COM vínculo já tinha onboarding decente (`ComoFunciona` com 3 passos, recorrência, "Falar com o professor"); isso NÃO foi mexido.
+
+- **`SemVinculoError`** (`src/lib/vinculo.ts`, com testes) substitui o erro solto nas duas funções. **`StudentLayout`** lê a MESMA consulta `["student-admin-id", profile.id]` das telas (uma só, em cache) e, **só** se o erro for `SemVinculoError`, troca o app pela tela
+  **`SemProfessor`** ("SÓ FALTA O CONVITE") e **esconde a barra de baixo** (todas as abas dependem do professor). Qualquer outra falha (rede, servidor) continua sendo tratada por cada tela, com "Tentar novamente".
+- **`SemProfessor`:** explica e deixa **colar o link do convite** (`extrairTokenDeConvite` aceita o link inteiro, a mensagem do WhatsApp com o link dentro ou só o código de 16+ caracteres; recusa vazio/texto solto sem chamar o servidor) e chama o MESMO `accept_invite` do fluxo normal;
+  em sucesso limpa o convite guardado (`limparConvitePendente`) e invalida todas as consultas (o app volta no lugar da tela). `accept_invite` responde em inglês ("Invalid or expired invite") para convite usado, vencido ou inexistente: a tela traduz para "Esse convite já foi usado ou venceu. Peça um novo link ao seu professor."
+  Também tem "Verificar de novo" (refaz a consulta) e "Sair da conta".
+- **`retry` global das consultas** (`App.tsx`) é uma função: não tenta de novo um `SemVinculoError` (só atrasava a tela que resolve). Outras falhas mantêm 1 nova tentativa.
+- **Instalar no iPhone na Home:** `PWAInstallBanner` ganhou `iosNaHome`. A Home só o liga para aluno RECENTE (`profile.createdAt` com até 30 dias): no iPhone não existe o aviso nativo e a orientação não some sozinha, então para aluno antigo seria um aviso novo a cada visita (ele a acha em Minha conta).
+  Tem "Agora não" (30 dias, a mesma chave de `snooze` do Android). O texto agora começa com "No Safari," (o navegador interno do WhatsApp não instala).
+- Galeria: quadro "Conta sem professor" (em "Aluno sem professor (onboarding)").
+
+**Limite conhecido (herdado, não corrigido):** `accept_invite` NÃO confere o papel de quem aceita e, se o aluno já for aluno de outro professor, o `insert` é ignorado (`on conflict do nothing`) e o convite é marcado como usado mesmo assim. Não afeta quem está sem professor.
+**Não conferido:** o aviso do iPhone só aparece num iPhone com conta recente e app não instalado; o caso "colar convite de verdade" depende de uma conta de aluno sem professor (o Lucas testou na `dev`).
+
+**Deixado para depois (registrado, não pedido):** e-mail de boas-vindas ao aluno; explicar ao aluno o que é "Perfil de Boxe" na primeira visita; avisar o PROFESSOR quando um aluno fica sem vínculo; ver/reenviar convites em aberto.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa

@@ -386,7 +386,9 @@ export default function StudentHome() {
             </a>
           )}
 
-          <PWAInstallBanner className="mt-6 mb-0" />
+          {/* No iPhone não existe o aviso nativo de instalar: a orientação só aparece aqui para aluno RECENTE (primeiras semanas), o momento
+              de onboarding; aluno antigo a encontra em Minha conta. */}
+          <PWAInstallBanner className="mt-6 mb-0" iosNaHome={Date.now() - new Date(profile.createdAt).getTime() < 30 * 24 * 60 * 60 * 1000} />
 
           <BoxingProfileHomeCard />
         </>

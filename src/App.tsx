@@ -21,6 +21,7 @@ import { AvisoNovaVersao } from "@/components/AvisoNovaVersao";
 import { AnunciadorDeRota } from "@/components/AnunciadorDeRota";
 import { TransicaoDeTela } from "@/components/TransicaoDeTela";
 import { TelaSessaoNaoCarregou } from "@/components/TelaSessaoNaoCarregou";
+import { SemVinculoError } from "@/lib/vinculo";
 
 const StudentHome = lazy(() => import("@/pages/student/Home"));
 const StudentAgendar = lazy(() => import("@/pages/student/Agendar"));
@@ -56,7 +57,11 @@ const AlterarSenha = lazy(() => import("@/pages/shared/AlterarSenha"));
 const queryClient = new QueryClient({
   // Consultas ficam no padrão ("online"): sem rede pausam e retomam ao reconectar. Gravações NÃO podem pausar em silêncio
   // (o botão ficaria em "Salvando…" para sempre): com "always" elas falham na hora e caem no aviso de erro da tela.
-  defaultOptions: { queries: { retry: 1, staleTime: 10_000 }, mutations: { networkMode: "always" } },
+  defaultOptions: {
+    // "Sem professor" não é falha passageira: tentar de novo só atrasa a tela que explica e resolve (`SemProfessor`).
+    queries: { retry: (vezes, erro) => !(erro instanceof SemVinculoError) && vezes < 1, staleTime: 10_000 },
+    mutations: { networkMode: "always" },
+  },
 });
 
 function PostLoginRedirect() {

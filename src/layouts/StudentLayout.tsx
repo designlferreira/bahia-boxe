@@ -1,9 +1,25 @@
 import { Suspense } from "react";
 import { Outlet } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { CarregandoTela } from "@/components/CarregandoTela";
+import { SemProfessor } from "@/components/SemProfessor";
 import { StudentBottomNav } from "@/components/StudentBottomNav";
+import { useAuth } from "@/context/AuthContext";
+import { getStudentAdminId } from "@/integrations/backend/api";
+import { SemVinculoError } from "@/lib/vinculo";
 
 export function StudentLayout() {
+  const { profile, signOut } = useAuth();
+  // Mesma chave e mesmas opções das telas do aluno (a consulta é uma só, em cache): aqui só se OLHA se o aluno tem professor.
+  const vinculo = useQuery({
+    queryKey: ["student-admin-id", profile?.id],
+    queryFn: () => getStudentAdminId(profile!.id),
+    enabled: !!profile,
+    staleTime: Infinity,
+  });
+  // Só o "sem professor" troca o app; qualquer outra falha (rede, servidor) continua sendo tratada por cada tela, com "Tentar novamente".
+  const semProfessor = vinculo.isError && vinculo.error instanceof SemVinculoError;
+
   return (
     <div className="min-h-dvh flex flex-col bg-background">
       {/* Primeiro item do teclado: pula direto para o conteúdo (WCAG 2.4.1). Só aparece quando recebe o foco. */}
@@ -14,12 +30,17 @@ export function StudentLayout() {
         Pular para o conteúdo
       </a>
       <main id="conteudo" tabIndex={-1} className="flex-1 flex flex-col min-h-0 focus:outline-none">
-        {/* As telas carregam sob demanda (lazy em App.tsx): o Suspense fica AQUI para a barra de baixo não sumir enquanto a tela chega. */}
-        <Suspense fallback={<CarregandoTela />}>
-          <Outlet />
-        </Suspense>
+        {semProfessor ? (
+          // Sem barra de baixo: todas as abas dependem do professor e só levariam a telas de erro.
+          <SemProfessor onVerificar={() => vinculo.refetch()} verificando={vinculo.isFetching} onSair={() => void signOut()} />
+        ) : (
+          // As telas carregam sob demanda (lazy em App.tsx): o Suspense fica AQUI para a barra de baixo não sumir enquanto a tela chega.
+          <Suspense fallback={<CarregandoTela />}>
+            <Outlet />
+          </Suspense>
+        )}
       </main>
-      <StudentBottomNav />
+      {!semProfessor && <StudentBottomNav />}
     </div>
   );
 }
