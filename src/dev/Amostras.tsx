@@ -11,6 +11,7 @@
 import { useState, type ReactNode } from "react";
 import { FaixaSemInternet } from "@/components/FaixaSemInternet";
 import { FaixaConexaoLenta } from "@/components/FaixaConexaoLenta";
+import { AvisoNovaVersaoView } from "@/components/AvisoNovaVersao";
 import { TelaSessaoNaoCarregou } from "@/components/TelaSessaoNaoCarregou";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
@@ -1654,6 +1655,11 @@ export default function Amostras() {
                 <FaixaConexaoLenta amostra />
               </div>
             </SemLogin>
+          </Frame>
+          <Frame title="Nova versão disponível" note="aparece quando o app baixou uma versão nova; Atualizar recarrega, Depois esconde">
+            <div className="relative h-64">
+              <AvisoNovaVersaoView amostra onAtualizar={() => {}} onDepois={() => {}} />
+            </div>
           </Frame>
           <Frame title="Abertura do app" note="enquanto a sessão carrega (no lugar do formulário de login que piscava)">
             <TelaDeAbertura />

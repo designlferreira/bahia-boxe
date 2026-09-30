@@ -29,18 +29,20 @@ Portanto:
    Ler o corpo de função aplicado via `pg_get_functiondef` quando a pergunta
    for sobre o que está no banco — o arquivo da migration é a intenção, o
    banco é o fato.
-4. **O app é PWA com service worker (`vite-plugin-pwa`, `registerType:
-   "autoUpdate"`, `vite.config.ts`).** Uma mudança de frontend já commitada e
-   deployada pode não aparecer pra quem está usando o app até fechar e
-   reabrir (ou dar hard refresh) — `autoUpdate` atualiza o service worker em
-   segundo plano, não força reload de quem já tem o app aberto. Aconteceu de
+4. **O app é PWA com service worker (`vite-plugin-pwa`, `vite.config.ts`).
+   Desde 2026-09-29 é `registerType: "prompt"`:** a versão nova fica esperando
+   e o app mostra o cartão "Nova versão disponível" com "Atualizar"
+   (`AvisoNovaVersao`); até a pessoa tocar, ela continua na versão antiga.
+   Antes era `autoUpdate`, e a versão nova só aparecia numa abertura seguinte
+   (no iPhone, às vezes só reinstalando). Aconteceu de
    verdade (2026-09-16): navegação da Agenda reportada como quebrada
    ("só existe a seta de voltar"), código lido de ponta a ponta sem achar
    nada — os dois botões eram simétricos, sem condição nenhuma diferenciando
    um do outro. Era cache do service worker; hard refresh resolveu. **Antes
-   de investigar um bug visual que não bate com o código lido, pedir hard
-   refresh primeiro** — só vale abrir uma investigação de código se o
-   sintoma persistir depois disso.
+   de investigar um bug visual que não bate com o código lido, perguntar se
+   apareceu o aviso "Nova versão disponível" e pedir para tocar em
+   "Atualizar" (ou hard refresh)** — só vale abrir uma investigação de código
+   se o sintoma persistir depois disso.
 
 ---
 
@@ -3757,6 +3759,22 @@ Um passo na `dev`, testado pelo Lucas. A logo oficial (boxeador de luvas vermelh
 
 **Requisito futuro registrado (não iniciado):** quando o app tiver outras academias/professores, cada um sobe a própria logo e o app deriva a identidade visual por heurística 60-30-10 (60 fundo, 30 superfícies, 10 destaque), com o ícone mudando junto quando possível. Pontos a decidir antes: onde guardar logo e cores por professor (migration + storage, e liberar o storage na CSP do `vercel.json`);
 cores derivadas sempre validadas por contraste, com reserva nas cores atuais; o ícone instalado é fixado na instalação e o manifest vale para o endereço inteiro, então ícone por academia exige endereço próprio (subdomínio ou `/a/<slug>`) com manifest dinâmico. Levantar requisitos com o Lucas antes de desenhar.
+
+### Aviso "Nova versão disponível" (2026-09-29) — sem migration nova
+
+Um passo na `dev`, testado pelo Lucas. Resolve o problema recorrente de cache: com `autoUpdate` a versão nova só aparecia numa abertura seguinte, e o app
+instalado no iPhone quase nunca abre "do zero" (o Lucas precisou limpar os dados do site para ver a logo).
+
+- `vite.config.ts`: `registerType: "prompt"` e `injectRegister: false`. O service worker gerado só chama `skipWaiting` ao receber `SKIP_WAITING` (conferido em `dist/sw.js`).
+- **`src/components/AvisoNovaVersao.tsx`** (montado em `App.tsx`, fora do Router) registra o service worker via `useRegisterSW` (`virtual:pwa-register/react`; tipos em `vite-env.d.ts`)
+  e confere se há versão nova ao registrar, **sempre que o app volta para a tela** (`visibilitychange`) e de hora em hora (só com internet). Havendo, mostra o cartão
+  "Nova versão disponível" com **"Atualizar"** (`updateServiceWorker(true)`: ativa e recarrega) e **"Depois"** (esconde; uma versão ainda mais nova avisa de novo).
+  **Nunca recarrega sozinho** (decisão do Lucas: quem está no meio de um formulário não perde o que digitou; a alternativa "atualizar sozinho" foi oferecida e recusada).
+- Fica no rodapé acima da barra de baixo (mesma posição do aviso de conexão lenta, `z-[95]`). `AvisoNovaVersaoView` é só a aparência; a galeria tem o quadro "Nova versão disponível".
+- **Transição:** quem estava com a versão `autoUpdate` recebe esta versão do jeito antigo (abrindo o app uma ou duas vezes); daí em diante as atualizações chegam pelo aviso.
+- Um deploy que não muda nenhum arquivo do build (ex.: só CLAUDE.md) gera o mesmo `sw.js` e NÃO dispara o aviso.
+
+**Não conferido:** o cartão aparecendo sozinho num celular real depois de um deploy (depende do próximo deploy que mude o build); o iPhone chamar `visibilitychange` ao voltar para o app instalado.
 
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
