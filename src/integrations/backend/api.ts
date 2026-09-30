@@ -2171,6 +2171,49 @@ export async function criarConvite(): Promise<{ token: string; expiresAt: string
   return { token: linha.token, expiresAt: linha.expires_at };
 }
 
+export interface ConviteEmAberto {
+  id: string;
+  token: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
+/**
+ * Convites do professor que ainda esperam o aluno: não usados e não vencidos, o mais novo primeiro. Lê direto de `invites`
+ * (a policy `invites_admin_select` já limita às linhas dele). Quem aceita some daqui (`accept_invite` marca `used`).
+ */
+export async function getConvitesEmAberto(adminId: string): Promise<ConviteEmAberto[]> {
+  const { data, error } = await client()
+    .from("invites")
+    .select("id, token, created_at, expires_at")
+    .eq("admin_id", adminId)
+    .eq("used", false)
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => ({ id: r.id, token: r.token, createdAt: r.created_at, expiresAt: r.expires_at }));
+}
+
+/**
+ * Cancela um convite em aberto VENCENDO-O agora (não apaga a linha): quem abrir o link vê "convite vencido" e fica o registro de que
+ * existiu. `used = false` no filtro: nunca mexe num convite que o aluno já aceitou.
+ */
+export async function cancelarConvite(id: string): Promise<void> {
+  const { error } = await client()
+    .from("invites")
+    .update({ expires_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("used", false);
+  if (error) throw new Error(error.message);
+}
+
+/** Desfaz `cancelarConvite`: devolve a validade que o convite tinha. Sem efeito se já foi usado. */
+export async function restaurarConvite(id: string, expiresAt: string): Promise<void> {
+  const { error } = await client().from("invites").update({ expires_at: expiresAt }).eq("id", id).eq("used", false);
+  if (error) throw new Error(error.message);
+}
+
 export async function getWhatsappDoProfessor(professorId: string): Promise<string | null> {
   const { data, error } = await client().rpc("whatsapp_do_professor", { p_professor_id: professorId });
   if (error) throw new Error(error.message);

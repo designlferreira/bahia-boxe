@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight, UserPlus, Users } from "lucide-react";
+import { ChevronRight, Clock, UserPlus, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { BookingFilters } from "@/components/BookingFilters";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConviteSheet } from "@/components/ConviteAluno";
+import { useConvitesEmAberto } from "@/components/ConvitesEmAberto";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
@@ -84,6 +85,8 @@ export default function AdminAlunos() {
   const isError = erroTodos || (soRisco && erroRisco);
   const filtrado = filtro !== "todos";
   const semAlunos = ordenada?.length === 0;
+  const { data: convitesAbertos } = useConvitesEmAberto();
+  const nAbertos = convitesAbertos?.length ?? 0;
 
   return (
     <div className="page-container">
@@ -99,6 +102,21 @@ export default function AdminAlunos() {
           )
         }
       />
+      {/* Convites que ainda não foram usados: abre a janela, onde dá para reenviar, copiar ou cancelar. Fica fora de "Em risco"/filtros: é sobre quem
+          ainda NÃO é aluno. */}
+      {nAbertos > 0 && (
+        <button
+          type="button"
+          onClick={() => setConvidando(true)}
+          className="w-full min-h-11 mb-3 flex items-center gap-2.5 rounded-xl border border-border px-3.5 py-2.5 text-left text-[13.5px] text-foreground/85 active:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Clock className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
+          <span className="flex-1">
+            {nAbertos === 1 ? "1 convite esperando o aluno entrar" : `${nAbertos} convites esperando os alunos entrarem`}
+          </span>
+          <span className="text-muted-foreground underline underline-offset-2">Ver</span>
+        </button>
+      )}
       {!semAlunos && (
         <BookingFilters
           search={search}

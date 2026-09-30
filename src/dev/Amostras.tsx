@@ -23,6 +23,7 @@ import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminAlunos from "@/pages/admin/Alunos";
 import { ConviteCorpo } from "@/components/ConviteAluno";
 import { SemProfessor } from "@/components/SemProfessor";
+import { ConvitesEmAberto, CONVITES_EM_ABERTO_KEY } from "@/components/ConvitesEmAberto";
 import AdminPedidos from "@/pages/admin/Pedidos";
 import AdminAgenda from "@/pages/admin/Agenda";
 import StudentAgendar from "@/pages/student/Agendar";
@@ -807,6 +808,11 @@ const PEDIDOS_CASOS: { title: string; note: string; lista: unknown[] }[] = [
   { title: "Nenhum pedido", note: "tudo em dia", lista: [] },
 ];
 
+const CONVITES_AMOSTRA = [
+  { id: "c1", token: "7f3ac9d2b84e4a1f9c0d5e6b2a8f1c3d7f3ac9d2b84e4a1f9c0d5e6b2a8f1c3d", createdAt: at(-1, 10), expiresAt: at(6, 10) },
+  { id: "c2", token: "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90", createdAt: at(-6, 15), expiresAt: at(1, 15) },
+];
+
 /** Lista de alunos: 6 alunos, 4 deles em risco (os mesmos do painel). */
 function semearAlunos(qc: QueryClient) {
   const nomes = ["Ana Beatriz Souza", "Helena Costa", "Igor Nascimento", "Julia Pereira", "Karina Duarte", "Leonardo Prado"];
@@ -820,10 +826,18 @@ function semearAlunos(qc: QueryClient) {
     })),
   );
   qc.setQueryData(["alunos-em-risco", ADMIN_ID], RISCO);
+  qc.setQueryData([CONVITES_EM_ABERTO_KEY, ADMIN_ID], []);
+}
+
+/** A mesma lista, com 2 convites esperando o aluno entrar (aparece o aviso no topo). */
+function semearAlunosComConvites(qc: QueryClient) {
+  semearAlunos(qc);
+  qc.setQueryData([CONVITES_EM_ABERTO_KEY, ADMIN_ID], CONVITES_AMOSTRA);
 }
 
 /** Professor novo: nenhum aluno ainda (o estado vazio tem o botão "Convidar aluno"). */
 function semearSemAlunos(qc: QueryClient) {
+  qc.setQueryData([CONVITES_EM_ABERTO_KEY, ADMIN_ID], []);
   qc.setQueryData(["admin-students", ADMIN_ID], []);
   qc.setQueryData(["alunos-em-risco", ADMIN_ID], []);
 }
@@ -2047,6 +2061,23 @@ export default function Amostras() {
               <div className="px-5 py-6 bg-card">
                 <div className="page-title mb-2">CONVIDAR ALUNO</div>
                 <ConviteCorpo amostra={{ token: "7f3ac9d2b84e4a1f9c0d5e6b2a8f1c3d7f3ac9d2b84e4a1f9c0d5e6b2a8f1c3d", expiresAt: at(7, 12) }} />
+              </div>
+            </SeededAdmin>
+          </Frame>
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Convites em aberto (professor)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          <Frame title="Lista de alunos com convites" note="aviso no topo; tocar abre a janela de convidar">
+            <SeededAdmin data={null} seed={semearAlunosComConvites}>
+              <AdminAlunos />
+            </SeededAdmin>
+          </Frame>
+          <Frame title="Convites em aberto" note="um vence logo (âmbar); Enviar, Copiar e Cancelar (com Desfazer)">
+            <SeededAdmin data={null} seed={semearSemAlunos}>
+              <div className="px-5 py-6 bg-card">
+                <div className="page-title mb-2">CONVIDAR ALUNO</div>
+                <ConvitesEmAberto amostra={CONVITES_AMOSTRA} />
               </div>
             </SeededAdmin>
           </Frame>
