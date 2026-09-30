@@ -21,6 +21,7 @@ import { AuthError } from "@/integrations/backend/auth";
 import StudentHome from "@/pages/student/Home";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminAlunos from "@/pages/admin/Alunos";
+import { ConviteCorpo } from "@/components/ConviteAluno";
 import AdminPedidos from "@/pages/admin/Pedidos";
 import AdminAgenda from "@/pages/admin/Agenda";
 import StudentAgendar from "@/pages/student/Agendar";
@@ -818,6 +819,12 @@ function semearAlunos(qc: QueryClient) {
     })),
   );
   qc.setQueryData(["alunos-em-risco", ADMIN_ID], RISCO);
+}
+
+/** Professor novo: nenhum aluno ainda (o estado vazio tem o botão "Convidar aluno"). */
+function semearSemAlunos(qc: QueryClient) {
+  qc.setQueryData(["admin-students", ADMIN_ID], []);
+  qc.setQueryData(["alunos-em-risco", ADMIN_ID], []);
 }
 
 const recDia = (id: string, diaSemana: number, horario: string, ativo: boolean, temUso: boolean) => ({
@@ -2015,6 +2022,31 @@ export default function Amostras() {
           <Frame title="Alunos" note='toque em "Em risco" (ou abra /dev/amostras?filtro=risco)'>
             <SeededAdmin data={null} seed={semearAlunos}>
               <AdminAlunos />
+            </SeededAdmin>
+          </Frame>
+        </div>
+
+        <h2 className="text-lg font-semibold mb-4">Convidar aluno (professor)</h2>
+        <div className="flex flex-wrap gap-6 mb-12">
+          <Frame title="Professor sem alunos" note="estado vazio da lista, com o botão de convidar">
+            <SeededAdmin data={null} seed={semearSemAlunos}>
+              <AdminAlunos />
+            </SeededAdmin>
+          </Frame>
+          <Frame title="Janela de convite · antes de gerar" note="o convite só é criado ao tocar em Gerar link">
+            <SeededAdmin data={null} seed={semearSemAlunos}>
+              <div className="px-5 py-6 bg-card">
+                <div className="page-title mb-2">CONVIDAR ALUNO</div>
+                <ConviteCorpo />
+              </div>
+            </SeededAdmin>
+          </Frame>
+          <Frame title="Janela de convite · link pronto" note="WhatsApp é a ação principal; copiar é a alternativa">
+            <SeededAdmin data={null} seed={semearSemAlunos}>
+              <div className="px-5 py-6 bg-card">
+                <div className="page-title mb-2">CONVIDAR ALUNO</div>
+                <ConviteCorpo amostra={{ token: "7f3ac9d2b84e4a1f9c0d5e6b2a8f1c3d7f3ac9d2b84e4a1f9c0d5e6b2a8f1c3d", expiresAt: at(7, 12) }} />
+              </div>
             </SeededAdmin>
           </Frame>
         </div>

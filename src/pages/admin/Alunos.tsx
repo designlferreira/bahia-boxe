@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight, Users } from "lucide-react";
+import { ChevronRight, UserPlus, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { BookingFilters } from "@/components/BookingFilters";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ConviteSheet } from "@/components/ConviteAluno";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
@@ -27,6 +29,17 @@ export default function AdminAlunos() {
   const filtroParam = params.get("filtro");
   const filtro: Filtro = filtroParam === "risco" || filtroParam === "sem-pacote" ? filtroParam : "todos";
   const soRisco = filtro === "risco";
+  // `?convidar=1` (o passo "Convidar o primeiro aluno" do painel) abre a janela de convite já aberta; o parâmetro sai da URL
+  // logo em seguida, senão voltar pelo navegador reabriria a janela.
+  const [convidando, setConvidando] = useState(() => params.get("convidar") === "1");
+  useEffect(() => {
+    if (params.get("convidar")) {
+      const p = new URLSearchParams(params);
+      p.delete("convidar");
+      setParams(p, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // A lista é buscada UMA vez e a busca filtra em memória: com o texto na chave da consulta, cada letra digitada trocava a
   // chave, a lista inteira virava esqueleto e o app refazia 3 consultas por tecla. Sem acento nem maiúscula ("jose" acha "José").
@@ -70,19 +83,33 @@ export default function AdminAlunos() {
   const isLoading = carregandoTodos || (soRisco && carregandoRisco);
   const isError = erroTodos || (soRisco && erroRisco);
   const filtrado = filtro !== "todos";
+  const semAlunos = ordenada?.length === 0;
 
   return (
     <div className="page-container">
-      <PageHeader title="ALUNOS" />
-      <BookingFilters
-        search={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Buscar aluno"
-        filters={FILTROS}
-        filtersLabel="Filtrar alunos"
-        activeFilter={filtro}
-        onFilterChange={(v) => setParams(v === "todos" ? {} : { filtro: v }, { replace: true })}
+      <PageHeader
+        title="ALUNOS"
+        // Sem nenhum aluno o convite é a ação principal da tela e mora no estado vazio (um botão só, não dois).
+        action={
+          semAlunos ? undefined : (
+            <Button variant="secondary" size="sm" onClick={() => setConvidando(true)}>
+              <UserPlus className="h-4 w-4 mr-1.5" aria-hidden />
+              Convidar aluno
+            </Button>
+          )
+        }
       />
+      {!semAlunos && (
+        <BookingFilters
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Buscar aluno"
+          filters={FILTROS}
+          filtersLabel="Filtrar alunos"
+          activeFilter={filtro}
+          onFilterChange={(v) => setParams(v === "todos" ? {} : { filtro: v }, { replace: true })}
+        />
+      )}
       {DESCRICAO[filtro] && <div className="text-sm text-muted-foreground -mt-1.5 mb-3">{DESCRICAO[filtro]}</div>}
 
       {/* Anuncia o resultado ao trocar de filtro ou buscar (leitor de tela não vê a lista mudar). */}
@@ -162,7 +189,17 @@ export default function AdminAlunos() {
         </ul>
       )}
 
-      {!isLoading && !isError && data && data.length === 0 && filtrado && !search && (
+      {!isLoading && !isError && semAlunos && (
+        <EmptyState
+          icon={Users}
+          title="Você ainda não tem alunos"
+          description="Convide o primeiro pelo WhatsApp. Ele cria a conta e já aparece aqui."
+          ctaLabel="Convidar aluno"
+          onCta={() => setConvidando(true)}
+        />
+      )}
+
+      {!isLoading && !isError && !semAlunos && data && data.length === 0 && filtrado && !search && (
         <EmptyState
           icon={Users}
           title={soRisco ? "Nenhum aluno em risco" : "Todos os alunos têm pacote ativo"}
@@ -176,15 +213,17 @@ export default function AdminAlunos() {
         />
       )}
 
-      {!isLoading && !isError && data && data.length === 0 && !(filtrado && !search) && (
+      {!isLoading && !isError && !semAlunos && data && data.length === 0 && !(filtrado && !search) && (
         <EmptyState
           icon={Users}
           title="Nenhum aluno encontrado"
-          description={search ? `Nenhum resultado para "${search}".` : "Convide um novo aluno para começar."}
-          ctaLabel={search ? "Limpar busca" : undefined}
-          onCta={search ? () => setSearch("") : undefined}
+          description={`Nenhum resultado para "${search}".`}
+          ctaLabel="Limpar busca"
+          onCta={() => setSearch("")}
         />
       )}
+
+      <ConviteSheet open={convidando} onOpenChange={setConvidando} />
     </div>
   );
 }

@@ -2158,6 +2158,18 @@ export async function getEmailDoAluno(studentId: string): Promise<string | null>
   return (data as string | null) ?? null;
 }
 
+/**
+ * O professor cria um convite de UM aluno (uso único, vale alguns dias — o prazo mora na função do banco, 0037).
+ * O token é gerado no servidor; o app só monta o link (`linkDoConvite`). Só o professor chama.
+ */
+export async function criarConvite(): Promise<{ token: string; expiresAt: string }> {
+  const { data, error } = await client().rpc("criar_convite");
+  if (error) throw new Error(error.message);
+  const linha = (data as { token: string; expires_at: string }[] | null)?.[0];
+  if (!linha) throw new Error("criar_convite_sem_resposta");
+  return { token: linha.token, expiresAt: linha.expires_at };
+}
+
 export async function getWhatsappDoProfessor(professorId: string): Promise<string | null> {
   const { data, error } = await client().rpc("whatsapp_do_professor", { p_professor_id: professorId });
   if (error) throw new Error(error.message);
