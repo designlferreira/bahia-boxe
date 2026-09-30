@@ -3825,6 +3825,22 @@ O que o aluno vê COM vínculo já tinha onboarding decente (`ComoFunciona` com 
 
 **Deixado para depois (registrado, não pedido):** e-mail de boas-vindas ao aluno; explicar ao aluno o que é "Perfil de Boxe" na primeira visita; avisar o PROFESSOR quando um aluno fica sem vínculo; ver/reenviar convites em aberto.
 
+### Convites em aberto (2026-09-30) — sem migration nova
+
+Um passo na `dev`, testado pelo Lucas. Fecha o item "lista de convites em aberto, com reenvio e cancelamento" deixado por "Onboarding do professor".
+
+- **`src/components/ConvitesEmAberto.tsx`** (+ `useConvitesEmAberto`, chave `["convites-em-aberto", profile.id]`): dentro da janela "Convidar aluno", lista os convites do professor **não usados e não vencidos** (o mais novo primeiro, até 50), com "Criado em…", "Vale até…" (âmbar "Vence logo" quando faltam menos de 2 dias) e três ações:
+  **Enviar** (o mesmo `linkWhatsappConvite`, com o prazo REAL do convite), **Copiar** (`navigator.clipboard`; se negar, aviso "use o botão do WhatsApp") e **Cancelar** (aviso com "Desfazer" de 8s). O convite recém-gerado na janela não se repete na lista (`excluirToken`; "Gerar outro" o devolve à lista).
+- **`api.ts`: `getConvitesEmAberto`, `cancelarConvite`, `restaurarConvite`** leem e atualizam `invites` direto, pelas policies que o professor já tem (`invites_admin_select`/`invites_admin_manage`). **Cancelar VENCE o convite agora (`expires_at = now()`), não apaga a linha:** quem abrir o link vê "convite vencido" (`validate_invite` → `expired`)
+  e fica o registro de que existiu; todos os `update` filtram `used = false` (nunca mexem em convite já aceito). Desfazer devolve a validade original.
+- **`Alunos.tsx`:** linha "N convite(s) esperando o aluno entrar · Ver" abaixo do cabeçalho (abre a janela); aparece também com a lista de alunos vazia. Quando o aluno aceita, `accept_invite` marca `used` e o convite some da lista e do aviso.
+- Galeria: "Convidar aluno (professor)" e "Convites em aberto (professor)" (lista de alunos com aviso + lista de convites com um "vence logo").
+
+**Por que sem função nova no banco:** ler e mudar as PRÓPRIAS linhas já é o que as policies permitem ao professor; não há regra de negócio no servidor a proteger (ao contrário de CRIAR, que exige papel de professor: `criar_convite`, 0037). **O furo de "qualquer logado pode inserir convite" (ver "Onboarding do professor") continua aberto e vale também para estas três operações feitas direto pela API por um aluno nos PRÓPRIOS convites** (sem efeito sobre convites de outro professor).
+
+**Aceito/limite:** a lista não mostra QUEM foi convidado (a tabela não guarda nome nem telefone do convidado); o professor reconhece o convite pela data. Uma lista maior que 50 convites em aberto mostra só os 50 mais novos.
+**Deixado para depois (registrado, não pedido):** nome/apelido do convidado no convite (exigiria coluna nova); aviso quando um convite vence sem uso; fechar o furo das policies de `invites`.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa

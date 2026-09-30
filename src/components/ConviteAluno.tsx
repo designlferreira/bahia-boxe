@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check, Copy, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
@@ -7,6 +7,7 @@ import { criarConvite } from "@/integrations/backend/api";
 import { linkDoConvite, linkWhatsappConvite } from "@/lib/convite";
 import { formatDateShort } from "@/lib/dateUtils";
 import { mensagemDeErro } from "@/lib/erros";
+import { CONVITES_EM_ABERTO_KEY, ConvitesEmAberto } from "@/components/ConvitesEmAberto";
 
 interface Convite {
   token: string;
@@ -18,7 +19,8 @@ interface Convite {
  * O convite só é criado quando o professor toca em "Gerar link" — abrir a janela só para olhar não deixa convite solto no banco.
  * Cada link serve para UM aluno (`accept_invite` marca como usado); para outra pessoa, gera-se outro.
  */
-export function ConviteCorpo({ amostra }: { amostra?: Convite } = {}) {
+export function ConviteCorpo({ amostra, onCriado }: { amostra?: Convite; onCriado?: (token: string | null) => void } = {}) {
+  const queryClient = useQueryClient();
   const [convite, setConvite] = useState<Convite | null>(amostra ?? null);
   const [copiado, setCopiado] = useState(false);
   const campo = useRef<HTMLInputElement>(null);
@@ -28,6 +30,9 @@ export function ConviteCorpo({ amostra }: { amostra?: Convite } = {}) {
     onSuccess: (c) => {
       setConvite(c);
       setCopiado(false);
+      onCriado?.(c.token);
+      // A lista de convites em aberto (janela e aviso da lista de alunos) passa a contar o novo.
+      queryClient.invalidateQueries({ queryKey: [CONVITES_EM_ABERTO_KEY] });
     },
   });
 
@@ -117,6 +122,8 @@ export function ConviteCorpo({ amostra }: { amostra?: Convite } = {}) {
           onClick={() => {
             setConvite(null);
             gerar.reset();
+            // O link que saiu de cena volta a contar como "em aberto" na lista logo abaixo.
+            onCriado?.(null);
           }}
           className="underline underline-offset-2 text-foreground/85 min-h-11 px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
         >
@@ -128,13 +135,16 @@ export function ConviteCorpo({ amostra }: { amostra?: Convite } = {}) {
 }
 
 export function ConviteSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (aberto: boolean) => void }) {
+  // O convite recém-gerado já aparece em destaque no corpo da janela: a lista de "em aberto" não o repete.
+  const [recente, setRecente] = useState<string | null>(null);
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent>
         <SheetTitle>CONVIDAR ALUNO</SheetTitle>
         <SheetDescription className="sr-only">Gere um link de convite de uso único e envie ao aluno.</SheetDescription>
         <div className="mt-2">
-          <ConviteCorpo />
+          <ConviteCorpo onCriado={setRecente} />
+          <ConvitesEmAberto excluirToken={recente} />
         </div>
       </SheetContent>
     </Sheet>
