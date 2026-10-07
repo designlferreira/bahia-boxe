@@ -3930,7 +3930,7 @@ divergir** ("As aulas restantes do aluno mudaram… recarregue a página") antes
 
 **Ordem de deploy:** o código novo chama funções com parâmetros que só existem depois da 0040 — **migration primeiro, código depois**.
 
-**Status:** 0040 APLICADA (2026-10-07). `supabase/verify_0040_somar_aulas_restantes.sql` (6 casos, rollback, usa a LK) — **resultado ainda NÃO verificado nesta sessão**.
+**Status:** 0040 APLICADA e VERIFICADA (2026-10-07): `supabase/verify_0040_somar_aulas_restantes.sql` (6 casos, rollback, usa a LK) — os 6 vieram `OK`.
 **Não coberto pelo script:** `approve_purchase_request` (só repassa o parâmetro; a tabela `purchase_requests` não está nas migrations deste repo). **Não testado na tela.**
 
 **Deixado para depois (registrado, não pedido):** somar também a aula experimental (hoje fica à parte); mostrar no cartão do pacote novo "inclui N aulas do pacote anterior" (a coluna
