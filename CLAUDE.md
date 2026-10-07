@@ -3899,6 +3899,44 @@ do teste do Lucas; leitor de tela no interruptor.
 **Deixado para depois (registrado, não pedido):** marcar uma aula dentro do MESMO pacote por tela (RPC própria, sem encerrar o pacote); pular para o próximo horário
 livre quando o primeiro está ocupado; reposição automática também para falta/cancelamento do aluno perdoado; avisar o aluno quando a aula nova é marcada.
 
+### Somar as aulas que sobraram ao trocar de pacote (2026-10-07) — migration 0040
+
+**Pedido do Lucas:** quando o aluno ainda tem aulas e o professor atribui um pacote novo (ex.: 2 restantes + 8 novas), o aluno deveria ficar com 10, não 8.
+Antes, atribuir/aprovar/gerar encerrava o pacote ativo não-experimental (`_create_package`, decisão 5/6) e as aulas que sobravam se perdiam.
+
+**Decisões (do Lucas, a partir da minha recomendação):**
+- **O professor escolhe a cada troca**, numa janela/linha com interruptor **"Somar as N aulas restantes ao pacote novo", LIGADO por padrão** (`SomarRestantes.tsx`,
+  componente único das três telas). Descartar é a exceção.
+- **Vale para os três caminhos:** atribuir modelo (`AlunoDetalhe`), aprovar pedido (`Pedidos`, janela própria `AprovarPedidoDialog`) e gerar pacote de recorrência
+  (`AlunoRecorrencia`).
+- O pacote novo guarda quantas vieram do anterior em **`packages.aulas_transferidas`** (nullable; `null` = a troca não somou). `total_classes` é o total FINAL.
+
+**O que conta como "sobra" depende do pacote que está sendo encerrado** (`aulas_transferiveis(p_student_id, p_descarta_marcadas)`, RPC pública só para o professor dono —
+a tela precisa do número antes de confirmar; **o servidor sempre recalcula ao gravar, o número da tela nunca é a fonte**):
+- **Pacote sem recorrência (comprado/concedido):** TODAS as restantes (total − usadas). Motivo: as aulas já marcadas debitam o pacote NOVO quando acontecem (a conclusão
+  procura "o mais antigo ativo com vaga", 0001); somar só as "sem data" deixaria o aluno sem as marcadas. É o mesmo número de "aulas que seriam perdidas" do app.
+  Isso **corrige uma imprecisão do texto antigo** ("as já marcadas continuam valendo"): no autosserviço elas continuavam, mas pagas pelo pacote novo.
+- **Pacote de recorrência, ao atribuir/aprovar:** só as SEM data (`restantes − marcadas − a_repor`, o `semData` do cartão do pacote). As marcadas continuam ligadas ao
+  pacote antigo por `pacote_id` e seguem valendo lá.
+- **Pacote de recorrência, ao GERAR outro (`p_descarta_marcadas = true`):** `restantes − a_repor`. A regeneração cancela as futuras marcadas (`regeneracao`, não consome),
+  então elas também viram sobra.
+- O pacote **experimental nunca entra** (essas trocas não o encerram).
+
+**Mudanças de assinatura (sobrecargas antigas removidas — duas versões deixariam a chamada ambígua, como na 0038/0039):** `_create_package(..., p_somar_restantes,
+p_descarta_marcadas)` (REVOKE refeito), `assign_package_from_template(..., p_somar_restantes)`, `approve_purchase_request(..., p_somar_restantes)` (corpo copiado da 0031) e
+`gerar_pacote_recorrencia(..., p_aulas_transferidas)` (corpo da 0027). Todos os parâmetros novos têm default = comportamento antigo.
+**`gerar_pacote_recorrencia` recebe os horários JÁ somados** (o cliente gera `totalAulas + sobras` horários e manda `p_aulas_transferidas`); o servidor recalcula e **recusa se
+divergir** ("As aulas restantes do aluno mudaram… recarregue a página") antes de escrever qualquer coisa. `assign_package_to_student` não mudou (o app não a chama).
+
+**Ordem de deploy:** o código novo chama funções com parâmetros que só existem depois da 0040 — **migration primeiro, código depois**.
+
+**Status:** 0040 APLICADA e VERIFICADA (2026-10-07): `supabase/verify_0040_somar_aulas_restantes.sql` (6 casos, rollback, usa a LK) — os 6 vieram `OK`.
+**Não coberto pelo script:** `approve_purchase_request` (só repassa o parâmetro; a tabela `purchase_requests` não está nas migrations deste repo). **Não testado na tela.**
+
+**Deixado para depois (registrado, não pedido):** somar também a aula experimental (hoje fica à parte); mostrar no cartão do pacote novo "inclui N aulas do pacote anterior" (a coluna
+`aulas_transferidas` já guarda); `assign_package_to_student` sem o parâmetro; o trial lazy-debit (`order by (origin = 'trial') desc`) ainda pode consumir a experimental antes do pacote
+novo no autosserviço, o que não foi tratado.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa

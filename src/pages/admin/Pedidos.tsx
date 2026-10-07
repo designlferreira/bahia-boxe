@@ -6,7 +6,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { SomarRestantes } from "@/components/SomarRestantes";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { SkeletonList } from "@/components/SkeletonCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import { relativeTime } from "@/lib/dateUtils";
 import { useSaidaSuave } from "@/hooks/useSaidaSuave";
 import {
   approvePurchaseRequest,
+  getAulasTransferiveis,
   getPedidosDecididos,
   getPurchaseRequests,
   rejectPurchaseRequest,
@@ -28,7 +30,9 @@ export default function AdminPedidos() {
   const queryClient = useQueryClient();
   // Aprovar SEMPRE confirma (é dinheiro e cria um pacote, sem desfazer); recusar não confirma — tem
   // "Desfazer" (decisão do Lucas, 2026-09-29).
-  const [approveTarget, setApproveTarget] = useState<{ id: string; student: string; lost: number; what: string } | null>(null);
+  const [approveTarget, setApproveTarget] = useState<{ id: string; studentId: string; student: string; what: string } | null>(null);
+  // Somar as aulas que sobraram do pacote atual ao novo (0040). Começa ligado.
+  const [somarRestantes, setSomarRestantes] = useState(true);
 
   const key = ["purchase-requests", profile?.id];
   const { data, isLoading, isError, refetch } = useQuery({
@@ -53,7 +57,7 @@ export default function AdminPedidos() {
   };
 
   const approve = useMutation({
-    mutationFn: ({ id }: { id: string; student: string }) => approvePurchaseRequest(id),
+    mutationFn: ({ id, somar }: { id: string; student: string; somar: boolean }) => approvePurchaseRequest(id, somar),
     onSuccess: (_r, { student }) => {
       invalidar();
       toast.success(`Pedido de ${student.split(" ")[0]} aprovado · aulas liberadas`);
@@ -140,8 +144,8 @@ export default function AdminPedidos() {
                   <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
                   <span>
                     {studentName.split(" ")[0]} ainda tem {classesLostOnApprove}{" "}
-                    {classesLostOnApprove === 1 ? "aula" : "aulas"} no pacote atual. Aprovar agora encerra esse
-                    pacote.
+                    {classesLostOnApprove === 1 ? "aula" : "aulas"} no pacote atual. Aprovar encerra esse pacote; ao
+                    confirmar, você escolhe se {classesLostOnApprove === 1 ? "ela entra" : "elas entram"} no pacote novo.
                   </span>
                 </p>
               )}
@@ -160,8 +164,8 @@ export default function AdminPedidos() {
                   onClick={() =>
                     setApproveTarget({
                       id: request.id,
+                      studentId: request.studentId,
                       student: studentName,
-                      lost: classesLostOnApprove,
                       what: template?.name ?? (request.kind === "package" ? "Pacote" : "Aula avulsa"),
                     })
                   }
@@ -224,22 +228,84 @@ export default function AdminPedidos() {
         </section>
       )}
 
-      <ConfirmDialog
-        open={!!approveTarget}
-        onOpenChange={(o) => !o && setApproveTarget(null)}
-        title={approveTarget && approveTarget.lost > 0 ? "APROVAR E ENCERRAR O PACOTE ATUAL?" : "APROVAR PEDIDO?"}
-        description={
-          approveTarget
-            ? approveTarget.lost > 0
-              ? `${approveTarget.student} ainda tem ${approveTarget.lost} ${approveTarget.lost === 1 ? "aula" : "aulas"} para usar no pacote atual. Aprovar agora encerra esse pacote e ${approveTarget.lost === 1 ? "essa aula deixa" : "essas aulas deixam"} de valer. As aulas já agendadas continuam de pé. Se preferir, aprove quando o pacote atual acabar.`
-              : `${approveTarget.what} para ${approveTarget.student}. O aluno recebe as aulas na hora e é avisado no app. Não dá para desfazer depois.`
-            : ""
-        }
-        confirmLabel={approveTarget && approveTarget.lost > 0 ? "Aprovar mesmo assim" : "Aprovar"}
-        cancelLabel="Voltar"
-        tone={approveTarget && approveTarget.lost > 0 ? "destructive" : "default"}
-        onConfirm={() => approveTarget && approve.mutate({ id: approveTarget.id, student: approveTarget.student })}
+      <AprovarPedidoDialog
+        alvo={approveTarget}
+        somar={somarRestantes}
+        onSomarChange={setSomarRestantes}
+        onClose={() => {
+          setApproveTarget(null);
+          setSomarRestantes(true);
+        }}
+        onConfirm={(somar) => {
+          if (approveTarget) approve.mutate({ id: approveTarget.id, student: approveTarget.student, somar });
+        }}
       />
     </div>
+  );
+}
+
+/**
+ * Confirmação de aprovar. Aprovar SEMPRE confirma (cria pacote, sem desfazer). Se o aluno tem aulas sobrando no pacote
+ * que será encerrado, pergunta se elas entram no pacote novo (0040) — o número vem do servidor, não da lista.
+ */
+function AprovarPedidoDialog({
+  alvo,
+  somar,
+  onSomarChange,
+  onClose,
+  onConfirm,
+}: {
+  alvo: { id: string; studentId: string; student: string; what: string } | null;
+  somar: boolean;
+  onSomarChange: (v: boolean) => void;
+  onClose: () => void;
+  onConfirm: (somar: boolean) => void;
+}) {
+  const { data: transferiveis, isLoading } = useQuery({
+    queryKey: ["aulas-transferiveis", alvo?.studentId, false],
+    queryFn: () => getAulasTransferiveis(alvo!.studentId, false),
+    enabled: !!alvo,
+  });
+  const sobra = transferiveis ?? 0;
+  const primeiro = alvo?.student.split(" ")[0] ?? "";
+  return (
+    <Dialog open={!!alvo} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogTitle>APROVAR PEDIDO?</DialogTitle>
+        <DialogDescription className="whitespace-pre-line">
+          {alvo
+            ? `${alvo.what} para ${alvo.student}. O aluno recebe as aulas na hora e é avisado no app. Não dá para desfazer depois.${sobra > 0 ? `
+
+${primeiro} tem ${sobra} ${sobra === 1 ? "aula" : "aulas"} sobrando no pacote atual, que será encerrado.` : ""}`
+            : ""}
+        </DialogDescription>
+        {sobra > 0 && (
+          <SomarRestantes
+            aulas={sobra}
+            checked={somar}
+            onCheckedChange={onSomarChange}
+            efeitoSomando="As aulas que sobraram entram no pacote novo."
+            efeitoDescartando={`As ${sobra} ${sobra === 1 ? "aula" : "aulas"} que sobraram deixam de valer.`}
+          />
+        )}
+        <div className="flex gap-2.5">
+          <Button variant="secondary" size="lg" className="flex-1 h-auto min-h-14 py-3" onClick={onClose}>
+            Voltar
+          </Button>
+          <Button
+            size="lg"
+            className="flex-1 h-auto min-h-14 whitespace-normal py-3 text-center leading-tight"
+            disabled={isLoading}
+            onClick={() => {
+              const soma = sobra > 0 && somar;
+              onClose();
+              onConfirm(soma);
+            }}
+          >
+            Aprovar
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

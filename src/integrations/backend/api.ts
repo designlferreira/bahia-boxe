@@ -1499,12 +1499,28 @@ export async function getAdminStudentDetail(studentId: string) {
   };
 }
 
-export async function assignPackageFromTemplate(studentId: string, templateId: string) {
+export async function assignPackageFromTemplate(studentId: string, templateId: string, somarRestantes = false) {
   const { error } = await client().rpc("assign_package_from_template", {
     p_student_id: studentId,
     p_template_id: templateId,
+    p_somar_restantes: somarRestantes,
   });
   if (error) throw new Error(error.message);
+}
+
+/**
+ * Quantas aulas do pacote que seria ENCERRADO o professor pode somar ao pacote novo (migration 0040).
+ * O número depende do tipo do pacote atual; `descartaMarcadas` é só para a regeneração de recorrência, que
+ * cancela as aulas futuras marcadas (então elas também viram sobra). 0 = nada a somar (ou sem pacote).
+ * É informação para a tela: quem decide o valor na hora de gravar é sempre o servidor.
+ */
+export async function getAulasTransferiveis(studentId: string, descartaMarcadas = false): Promise<number> {
+  const { data, error } = await client().rpc("aulas_transferiveis", {
+    p_student_id: studentId,
+    p_descarta_marcadas: descartaMarcadas,
+  });
+  if (error) throw new Error(error.message);
+  return (data as number | null) ?? 0;
 }
 
 export async function removeActivePackage(studentId: string) {
@@ -1662,17 +1678,29 @@ export function getRecorrenciaStartDateOptions(
  * amigável se não houver nenhuma linha ativa — a RPC também rejeitaria (`invalid_slots`), mas a
  * mensagem aqui é melhor pra UI.
  */
-export async function gerarPacoteRecorrencia(studentId: string, totalAulas: number, startDate?: string): Promise<string> {
+export async function gerarPacoteRecorrencia(
+  studentId: string,
+  totalAulas: number,
+  startDate?: string,
+  /** Aulas restantes somadas ao pacote novo (as mesmas que a tela mostrou); 0 = não somar. O servidor confere. */
+  aulasSomadas = 0,
+): Promise<string> {
   const recorrencias = (await getAlunoRecorrencias(studentId)).filter((r) => r.ativo);
   if (recorrencias.length === 0) {
     throw new Error("Cadastre pelo menos um dia/horário de recorrência ativo antes de gerar um pacote.");
   }
   const fromInstant = startDate ? fromZonedTime(`${startDate}T00:00:00`, TIMEZONE) : new Date();
-  const slots = computeRecorrenciaSlots(recorrencias, totalAulas, fromInstant);
-  if (slots.length < totalAulas) {
+  // O pacote novo tem os horários do total pedido MAIS as aulas somadas (0040): cada aula somada vira um horário.
+  const totalComSomadas = totalAulas + aulasSomadas;
+  const slots = computeRecorrenciaSlots(recorrencias, totalComSomadas, fromInstant);
+  if (slots.length < totalComSomadas) {
     throw new Error("Não foi possível calcular datas futuras suficientes para esse número de aulas.");
   }
-  const { data, error } = await client().rpc("gerar_pacote_recorrencia", { p_aluno_id: studentId, p_slots: slots });
+  const { data, error } = await client().rpc("gerar_pacote_recorrencia", {
+    p_aluno_id: studentId,
+    p_slots: slots,
+    p_aulas_transferidas: aulasSomadas,
+  });
   if (error) throw new Error(error.message);
   return data as string;
 }
@@ -1921,8 +1949,11 @@ export async function getPedidosDecididos(adminId: string, limite = 5) {
   }));
 }
 
-export async function approvePurchaseRequest(requestId: string) {
-  const { error } = await client().rpc("approve_purchase_request", { p_request_id: requestId });
+export async function approvePurchaseRequest(requestId: string, somarRestantes = false) {
+  const { error } = await client().rpc("approve_purchase_request", {
+    p_request_id: requestId,
+    p_somar_restantes: somarRestantes,
+  });
   if (error) throw new Error(error.message);
 }
 
