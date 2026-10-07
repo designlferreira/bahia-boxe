@@ -88,6 +88,8 @@ export interface SaldoPacote {
   restantes: number;
   /** Cadeias cujo terminal atual é uma falta/cancelamento perdoado, aguardando reposição. */
   aRepor: number;
+  /** Aulas restantes sem data marcada (ex.: a que o professor cancelou). Calculado em `getSaldoPacote`. */
+  semData?: number;
 }
 
 export interface Booking {

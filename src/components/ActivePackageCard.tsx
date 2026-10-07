@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,11 @@ interface ActivePackageCardProps {
   onRequestMore?: () => void;
   /** Botões do próprio pacote (professor: atribuir novo / encerrar) — dentro do cartão, porque agem SOBRE ele. */
   actions?: ReactNode;
+  /**
+   * Professor: pra onde "Marcar aula" leva quando sobra aula sem data. Só a tela que não é ela
+   * mesma passa isto (em Horários fixos o botão apontaria pra onde o professor já está).
+   */
+  marcarAulaTo?: string;
 }
 
 type Tone = "ok" | "low" | "empty";
@@ -95,6 +101,7 @@ export function ActivePackageCard({
   audience = "admin",
   onRequestMore,
   actions,
+  marcarAulaTo,
 }: ActivePackageCardProps) {
   // Autosserviço: `credits` soma TODOS os pacotes ativos (inclusive trial) e já desconta as
   // reservas futuras; o que sobra entre "restantes no pacote" e `credits` é o que está agendado —
@@ -156,6 +163,9 @@ export function ActivePackageCard({
           ? plural(booked, "Já está agendada", "Todas já estão agendadas")
           : null;
   const summary = audience === "student" ? studentSummary : adminSummary;
+  // Aula restante que ninguém marcou (ex.: o professor cancelou uma): sem este aviso o cartão diz
+  // "1 aula restante" e não há aula nenhuma na agenda.
+  const semData = pkg?.status === "finished" ? 0 : (saldo?.semData ?? 0);
 
   return (
     <section
@@ -222,6 +232,25 @@ export function ActivePackageCard({
         </>
       ) : (
         <p className="mt-3 text-sm text-muted-foreground">Nenhum pacote ativo</p>
+      )}
+
+      {semData > 0 && (
+        <div className="mt-3 flex gap-2 items-center justify-between text-sm text-amber">
+          <p className="flex gap-2 items-center">
+            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+            {audience === "student"
+              ? `${plural(semData, "Falta 1 aula", `Faltam ${semData} aulas`)} para o seu professor marcar.`
+              : `${semData} ${plural(semData, "aula sem data marcada", "aulas sem data marcada")}.`}
+          </p>
+          {audience === "admin" && marcarAulaTo && (
+            <Link
+              to={marcarAulaTo}
+              className="shrink-0 -my-2.5 -mr-2 inline-flex min-h-11 items-center px-2 font-semibold underline underline-offset-4 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Marcar aula
+            </Link>
+          )}
+        </div>
       )}
 
       {showLowAlert && (

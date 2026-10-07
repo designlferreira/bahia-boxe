@@ -1639,7 +1639,20 @@ export async function gerarPacoteRecorrencia(studentId: string, totalAulas: numb
 export async function getSaldoPacote(pacoteId: string): Promise<SaldoPacote | null> {
   const { data, error } = await client().from("saldo_pacotes").select("*").eq("pacote_id", pacoteId).maybeSingle();
   if (error) throw new Error(error.message);
-  return data ? mapSaldoPacote(data) : null;
+  if (!data) return null;
+  const saldo = mapSaldoPacote(data);
+  // Aulas restantes sem data: o saldo conta a aula cancelada pelo professor como "restante"
+  // (cancelamento pelo professor nunca consome), mas nada a marca de novo. Restantes menos o que já
+  // está marcado (agendada/pendente, inclusive a passada ainda sem registro, que o professor vai
+  // resolver) e menos o que já aparece como "aguardando reposição".
+  const { count, error: errMarcadas } = await client()
+    .from("bookings")
+    .select("id", { count: "exact", head: true })
+    .eq("pacote_id", pacoteId)
+    .in("status", ACTIVE_STATUSES);
+  if (errMarcadas) throw new Error(errMarcadas.message);
+  saldo.semData = Math.max(0, saldo.restantes - (count ?? 0) - saldo.aRepor);
+  return saldo;
 }
 
 /**
