@@ -3860,6 +3860,45 @@ Um passo na `dev`, testado pelo Lucas. Fecha o item "nome/apelido do convidado n
 **Aceito/limite:** o nome não pode ser editado depois de criado (para corrigir, cancela-se e gera-se outro); o convidado só tem nome, sem telefone (o link segue sendo mandado pelo professor, pelo WhatsApp dele).
 **Deixado para depois (registrado, não pedido):** editar o nome de um convite em aberto; aviso quando um convite vence sem uso; fechar o furo das policies de `invites` (ver "Onboarding do professor").
 
+### Aula restante sem data e reposição automática ao cancelar (2026-10-07) — migration 0039
+
+**Achado em uso real:** a LK tinha "1 aula restante" e nenhuma aula marcada. Causa (confirmada por consulta): o pacote nasceu com
+as 8 aulas, mas a de 28/09 foi cancelada pelo professor. Cancelamento pelo professor nunca consome (decisão 4), então a aula volta como
+"restante" — e nada marcava uma aula nova. Não era bug da geração; faltava o passo depois do cancelamento. A expectativa do
+professor (decisão dele): **o pacote deve sempre ter todas as aulas marcadas, seguindo os dias e horários fixos do aluno.**
+
+**Migration 0039 (`0039_cancelar_aula_com_reposicao.sql`) — APLICADA e VERIFICADA (6/6 OK, `supabase/verify_0039_cancelar_com_reposicao.sql`):**
+`cancelar_aula(p_booking_id, p_cancelado_por, p_repor_inicio, p_repor_fim, p_repor_recorrencia_id)` — os três novos têm `default null`, então
+a chamada antiga de 2 argumentos continua valendo (a versão de 2 argumentos foi removida: duas sobrecargas deixariam a chamada ambígua, como na 0038).
+- Com reposição, cria uma aula **sucessora** da cancelada (mesmo mecanismo de reposição/remarcação, decisão 2): `replacement_for_booking_id` =
+  a cancelada, `cadeia_id` herdado, mesmo `pacote_id`. O terminal da cadeia passa a ser a aula nova (`scheduled`, não consome): **o saldo não muda**
+  e `calcular_saldo_pacote` não foi tocada.
+- **Só vale para cancelamento pelo PROFESSOR** (aluno cancelando: o crédito consome ou fica a repor pela regra do pacote, e o professor decide como repor).
+  Exige aula com `pacote_id`; horário no futuro; sem sobreposição com aula `scheduled`/`pending_confirmation` do professor. Qualquer falha desfaz o
+  cancelamento junto (mesma transação) — nunca fica "cancelada sem a aula que a repõe".
+- **O cliente calcula a data** (`getProximaAulaDoPacote`, `api.ts`): próximo horário fixo ativo depois da última aula do pacote (agendada, pendente,
+  concluída ou falta) e de agora, por `computeRecorrenciaSlots` — mesma razão da decisão 9 (conversão BRT→UTC em TypeScript). A RPC só valida e grava.
+- **Janela "Cancelar aula" (`CancelLessonSheet`):** para aula de pacote, interruptor "Marcar uma aula nova no fim do pacote", **ligado por padrão**,
+  com a data. Sem horário fixo ativo, fica desligado e explica. A escolha ("repor" ou não) é do professor a cada cancelamento.
+- **Ficou de fora, de propósito:** falta/cancelamento do aluno perdoado continua como "aguardando reposição" (o professor repõe na mão).
+
+**Aviso "aula sem data marcada" (`ActivePackageCard`, sem migration):** `getSaldoPacote` devolve `semData` = restantes − aulas marcadas
+(agendada/pendente, inclusive passada ainda sem registro) − `aRepor`. O cartão mostra em âmbar "N aula(s) sem data marcada" (professor, com o link
+"Marcar aula" só no detalhe do aluno) ou "Falta N aula para o seu professor marcar" (aluno). É o mesmo componente da Home, do detalhe do aluno e de
+Horários fixos. "Marcar aula" só leva a Horários fixos: gerar um pacote novo encerra o atual; marcar dentro do mesmo pacote por tela não existe.
+
+**Correção pontual da LK (`supabase/corrige_lk_aula_sem_data.sql`, EXECUTADA com `commit`):** a cancelada de 28/09 foi anterior à 0039 e não ganhou
+reposição sozinha. O script criou a sucessora no próximo horário fixo livre (07/10 20:00), que o professor remarcou depois para 12/10 20:00; o pacote tem 1 aula
+futura e o aviso sumiu. **É específico do pacote `1f8d9938-…` — não reutilizar sem trocar o id e reler as verificações.** Outras aulas canceladas pelo
+professor ANTES da 0039 (em qualquer pacote) continuam sem reposição; o aviso "sem data" as mostra.
+
+**Aceito/limite:** se o próximo horário fixo estiver ocupado, o cancelamento com reposição é recusado inteiro com mensagem legível ("Cancele sem repor e marque a
+aula na mão"); a aula nova não "pula" para o horário seguinte livre (o script pontual da LK pulava, o app não). **Não testado:** o fluxo com dado de aluno real além
+do teste do Lucas; leitor de tela no interruptor.
+
+**Deixado para depois (registrado, não pedido):** marcar uma aula dentro do MESMO pacote por tela (RPC própria, sem encerrar o pacote); pular para o próximo horário
+livre quando o primeiro está ocupado; reposição automática também para falta/cancelamento do aluno perdoado; avisar o aluno quando a aula nova é marcada.
+
 ### Estado final do projeto (RECORRENCIA, Etapas 1-7) — 2026-09-09
 
 Escrito pra uma sessão nova retomar sem precisar do usuário explicar de novo. Se você é essa
