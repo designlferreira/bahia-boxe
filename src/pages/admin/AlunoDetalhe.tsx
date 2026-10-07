@@ -9,6 +9,7 @@ import { SkeletonCard, SkeletonList } from "@/components/SkeletonCard";
 import { ErrorState } from "@/components/ErrorState";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
+import { SomarRestantes } from "@/components/SomarRestantes";
 import { Sheet, SheetClose, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { formatQuando } from "@/lib/dateUtils";
@@ -18,6 +19,7 @@ import { formatPriceLabel } from "@/lib/packageUtils";
 import { cn } from "@/lib/utils";
 import {
   assignPackageFromTemplate,
+  getAulasTransferiveis,
   getAdminStudentDetail,
   getEmailDoAluno,
   getPackageTemplates,
@@ -56,6 +58,8 @@ export default function AdminAlunoDetalhe() {
   // Tocar num modelo só ESCOLHE; quem atribui é o botão de baixo (antes um toque já criava o pacote novo e
   // encerrava o atual, sem aviso).
   const [modeloEscolhido, setModeloEscolhido] = useState<string | null>(null);
+  // Somar as aulas que sobraram do pacote atual ao novo (0040). Começa ligado: perder aula é a exceção.
+  const [somarRestantes, setSomarRestantes] = useState(true);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
@@ -73,6 +77,13 @@ export default function AdminAlunoDetalhe() {
     queryKey: ["package-templates-admin", profile?.id],
     queryFn: () => getPackageTemplates(profile!.id),
     enabled: assignOpen && !!profile,
+  });
+
+  // Quantas aulas do pacote atual podem ir para o novo (0040). Só lida com a janela aberta; o servidor recalcula ao gravar.
+  const { data: transferiveis = 0 } = useQuery({
+    queryKey: ["aulas-transferiveis", studentId, false],
+    queryFn: () => getAulasTransferiveis(studentId!, false),
+    enabled: assignOpen && !!studentId,
   });
 
   // Contato do aluno (0036). Se a consulta falhar (função ainda não aplicada, rede), a linha simplesmente não
@@ -100,11 +111,13 @@ export default function AdminAlunoDetalhe() {
   }
 
   const assign = useMutation({
-    mutationFn: (templateId: string) => assignPackageFromTemplate(studentId!, templateId),
-    onSuccess: (_r, templateId) => {
+    mutationFn: ({ templateId, somar }: { templateId: string; somar: boolean }) =>
+      assignPackageFromTemplate(studentId!, templateId, somar),
+    onSuccess: (_r, { templateId }) => {
       invalidate();
       setAssignOpen(false);
       setModeloEscolhido(null);
+      queryClient.invalidateQueries({ queryKey: ["aulas-transferiveis"] });
       const t = templates?.find((x) => x.id === templateId);
       toast.success(`Pacote atribuído a ${data?.student.name.split(" ")[0]}${t ? ` · ${t.name}` : ""}`);
     },
@@ -325,7 +338,10 @@ export default function AdminAlunoDetalhe() {
         open={assignOpen}
         onOpenChange={(o) => {
           setAssignOpen(o);
-          if (!o) setModeloEscolhido(null);
+          if (!o) {
+            setModeloEscolhido(null);
+            setSomarRestantes(true);
+          }
         }}
       >
         <SheetContent aria-describedby="atribuir-desc">
@@ -350,6 +366,22 @@ export default function AdminAlunoDetalhe() {
           {avisoSubstitui && (
             <div className="rounded-xl border border-amber/40 bg-amber/10 p-3.5 mb-4 text-[13px] leading-snug text-amber">
               {avisoSubstitui}
+            </div>
+          )}
+          {transferiveis > 0 && (
+            <div className="mb-4">
+              <SomarRestantes
+                aulas={transferiveis}
+                checked={somarRestantes}
+                onCheckedChange={setSomarRestantes}
+                disabled={assign.isPending}
+                efeitoSomando={
+                  escolhido
+                    ? `O pacote novo fica com ${escolhido.totalClasses + transferiveis} aulas (${escolhido.totalClasses} do modelo + ${transferiveis} que sobraram).`
+                    : "As aulas que sobraram entram no pacote novo."
+                }
+                efeitoDescartando={`As ${transferiveis} ${transferiveis === 1 ? "aula" : "aulas"} que sobraram deixam de valer.`}
+              />
             </div>
           )}
           {carregandoModelos && <SkeletonList count={3} height={64} />}
@@ -393,7 +425,7 @@ export default function AdminAlunoDetalhe() {
             className="w-full mt-4"
             hidden={!!templates && templates.length === 0}
             disabled={!escolhido || assign.isPending}
-            onClick={() => escolhido && assign.mutate(escolhido.id)}
+            onClick={() => escolhido && assign.mutate({ templateId: escolhido.id, somar: transferiveis > 0 && somarRestantes })}
           >
             {assign.isPending ? "Atribuindo…" : escolhido ? `Atribuir ${escolhido.name}` : "Escolha um modelo"}
           </Button>

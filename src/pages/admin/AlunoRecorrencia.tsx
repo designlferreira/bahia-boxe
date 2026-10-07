@@ -10,6 +10,7 @@ import { SkeletonCard, SkeletonList } from "@/components/SkeletonCard";
 import { ErrorState } from "@/components/ErrorState";
 import { ActivePackageCard } from "@/components/ActivePackageCard";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { SomarRestantes } from "@/components/SomarRestantes";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import {
   gerarPacoteRecorrencia,
   getAdminSettings,
   getAdminStudentDetail,
+  getAulasTransferiveis,
   getAlunoRecorrencias,
   getRecorrenciaStartDateOptions,
   getSaldoPacote,
@@ -122,6 +124,8 @@ export default function AdminAlunoRecorrencia() {
   const totalAulas = Math.min(MAX_AULAS, Math.max(1, parseInt(totalTexto, 10) || 1));
   const [startDate, setStartDate] = useState<string | null>(null);
   const [confirmGerar, setConfirmGerar] = useState(false);
+  // Somar as aulas que sobraram do pacote atual ao novo (0040). Começa ligado.
+  const [somarRestantes, setSomarRestantes] = useState(true);
   const [excluirAlvo, setExcluirAlvo] = useState<AlunoRecorrencia | null>(null);
 
   const detailQuery = useQuery({
@@ -172,7 +176,14 @@ export default function AdminAlunoRecorrencia() {
     enabled: !!studentId,
   });
 
+  const transferiveisQuery = useQuery({
+    queryKey: ["aulas-transferiveis", studentId, true],
+    queryFn: () => getAulasTransferiveis(studentId!, true),
+    enabled: !!studentId,
+  });
+
   function invalidate() {
+    queryClient.invalidateQueries({ queryKey: ["aulas-transferiveis", studentId] });
     queryClient.invalidateQueries({ queryKey: ["aluno-recorrencias", studentId] });
     queryClient.invalidateQueries({ queryKey: ["admin-student-detail", studentId] });
     queryClient.invalidateQueries({ queryKey: ["saldo-pacote"] });
@@ -215,11 +226,12 @@ export default function AdminAlunoRecorrencia() {
   });
 
   const gerarPacote = useMutation({
-    mutationFn: (data: { totalAulas: number; startDate: string | null }) =>
-      gerarPacoteRecorrencia(studentId!, data.totalAulas, data.startDate ?? undefined),
+    mutationFn: (data: { totalAulas: number; startDate: string | null; somadas: number }) =>
+      gerarPacoteRecorrencia(studentId!, data.totalAulas, data.startDate ?? undefined, data.somadas),
     onSuccess: (_r, vars) => {
       invalidate();
-      toast.success(`Pacote de ${vars.totalAulas} aulas gerado`, {
+      queryClient.invalidateQueries({ queryKey: ["aulas-transferiveis", studentId] });
+      toast.success(`Pacote de ${vars.totalAulas + vars.somadas} aulas gerado`, {
         action: { label: "Ver na agenda", onClick: () => navigate("/admin/agenda") },
       });
     },
@@ -254,6 +266,10 @@ export default function AdminAlunoRecorrencia() {
   const inativasOrdenadas = groupByDiaSemana(recorrencias.filter((r) => !r.ativo));
   const activasCount = ativas.length;
   const saldo = saldoQuery.data ?? null;
+  // Aulas do pacote atual que podem ir para o novo (0040). Aqui as aulas já marcadas do pacote antigo são
+  // canceladas ao gerar, então elas também contam como sobra.
+  const transferiveis = transferiveisQuery.data ?? 0;
+  const somadas = transferiveis > 0 && somarRestantes ? transferiveis : 0;
   const datasCancelaveis = cancelaveisQuery.data ?? [];
   const cancelaveis = datasCancelaveis.length;
   // CLAUDE.md, Etapa 7: ver a tela (dias fixos, saldo, histórico) é sempre permitido — só GERAR
@@ -266,7 +282,7 @@ export default function AdminAlunoRecorrencia() {
     if (cancelaveis > 0) {
       setConfirmGerar(true);
     } else {
-      gerarPacote.mutate({ totalAulas, startDate: effectiveStartDate });
+      gerarPacote.mutate({ totalAulas, startDate: effectiveStartDate, somadas });
     }
   }
 
@@ -278,7 +294,7 @@ export default function AdminAlunoRecorrencia() {
 
   // O que "Gerar" vai fazer, mostrado ANTES do toque: quais dias/horários, de quando a quando, e
   // quantas aulas já marcadas serão canceladas (não só na janela de confirmação, depois do compromisso).
-  const aulasNovas = effectiveStartDate ? previewRecorrenciaAulas(ativas, totalAulas, effectiveStartDate) : [];
+  const aulasNovas = effectiveStartDate ? previewRecorrenciaAulas(ativas, totalAulas + somadas, effectiveStartDate) : [];
   const horariosAtivos = Array.from(new Set(ativas.map((r) => `${r.diaSemana}|${r.horario}`)))
     .map((k) => k.split("|"))
     .sort((a, b) => Number(a[0]) - Number(b[0]) || a[1].localeCompare(b[1]))
@@ -419,6 +435,18 @@ export default function AdminAlunoRecorrencia() {
 
         {!emAutosservico && (
           <>
+            {transferiveis > 0 && (
+              <div className="mb-3">
+                <SomarRestantes
+                  aulas={transferiveis}
+                  checked={somarRestantes}
+                  onCheckedChange={setSomarRestantes}
+                  disabled={gerarPacote.isPending}
+                  efeitoSomando={`O pacote novo fica com ${totalAulas + transferiveis} aulas (${totalAulas} novas + ${transferiveis} que sobraram).`}
+                  efeitoDescartando={`As ${transferiveis} ${transferiveis === 1 ? "aula" : "aulas"} que sobraram deixam de valer.`}
+                />
+              </div>
+            )}
             {activasCount === 0 && (
               <div id="gerar-motivo" className="text-[13px] text-amber mb-2.5">
                 Ative pelo menos um horário fixo para gerar um pacote.
@@ -442,7 +470,10 @@ export default function AdminAlunoRecorrencia() {
                 aria-describedby={activasCount === 0 ? "gerar-motivo" : undefined}
                 onClick={pedirGeracao}
               >
-                {cancelaveis > 0 ? `Gerar ${totalAulas} e cancelar ${cancelaveis}` : `Gerar ${totalAulas} aula${totalAulas > 1 ? "s" : ""}`}
+                {(() => {
+                  const n = totalAulas + somadas;
+                  return cancelaveis > 0 ? `Gerar ${n} e cancelar ${cancelaveis}` : `Gerar ${n} aula${n > 1 ? "s" : ""}`;
+                })()}
               </Button>
             </div>
           </>
@@ -515,13 +546,13 @@ export default function AdminAlunoRecorrencia() {
         title="GERAR PACOTE"
         description={
           cancelaveis > 0
-            ? `${cancelaveis} aula${cancelaveis > 1 ? "s" : ""} de ${student.name.split(" ")[0]} (${datasCancelaveis.map((d) => `${formatDateShort(d)} ${formatTime(d)}`).join(", ")}) ${cancelaveis > 1 ? "serão canceladas" : "será cancelada"}, sem contar falta nem gastar aula, e ${totalAulas} novas serão criadas. Continuar?`
+            ? `${cancelaveis} aula${cancelaveis > 1 ? "s" : ""} de ${student.name.split(" ")[0]} (${datasCancelaveis.map((d) => `${formatDateShort(d)} ${formatTime(d)}`).join(", ")}) ${cancelaveis > 1 ? "serão canceladas" : "será cancelada"}, sem contar falta nem gastar aula, e ${totalAulas + somadas} novas serão criadas. Continuar?`
             : ""
         }
         confirmLabel="Gerar mesmo assim"
         tone="default"
         onConfirm={() => {
-          gerarPacote.mutate({ totalAulas, startDate: effectiveStartDate });
+          gerarPacote.mutate({ totalAulas, startDate: effectiveStartDate, somadas });
           setConfirmGerar(false);
         }}
       />
