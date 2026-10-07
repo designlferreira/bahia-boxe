@@ -761,12 +761,53 @@ export async function reagendarAula(bookingId: string, novoInicio: string, novoF
  * cobra falta), por professor nunca consome. `'regeneracao'` não é opção — é valor interno da
  * regeneração de pacote, e a própria RPC rejeita.
  */
-export async function cancelarAula(bookingId: string, canceladoPor: "professor" | "aluno") {
+export async function cancelarAula(
+  bookingId: string,
+  canceladoPor: "professor" | "aluno",
+  repor?: ReposicaoProposta | null,
+) {
   const { error } = await client().rpc("cancelar_aula", {
     p_booking_id: bookingId,
     p_cancelado_por: canceladoPor,
+    p_repor_inicio: repor?.inicio ?? null,
+    p_repor_fim: repor?.fim ?? null,
+    p_repor_recorrencia_id: repor?.recorrenciaId ?? null,
   });
   if (error) throw new Error(error.message);
+}
+
+/** A aula que entra no lugar de uma cancelada pelo professor (migration 0039). */
+export interface ReposicaoProposta {
+  inicio: string;
+  fim: string;
+  recorrenciaId: string;
+}
+
+/**
+ * Próximo horário fixo do aluno DEPOIS da última aula do pacote (agendada, pendente, concluída ou
+ * falta; cancelada e remarcada não contam) — é onde a aula cancelada pelo professor é reposta, pra
+ * o pacote seguir com todas as aulas marcadas nos dias/horários fixos. null = não há horário fixo
+ * ativo (ou nenhuma data futura) e a reposição automática não é possível.
+ */
+export async function getProximaAulaDoPacote(studentId: string, pacoteId: string): Promise<ReposicaoProposta | null> {
+  const [recorrencias, ultima] = await Promise.all([
+    getAlunoRecorrencias(studentId),
+    client()
+      .from("bookings")
+      .select("start_time")
+      .eq("pacote_id", pacoteId)
+      .in("status", ["scheduled", "pending_confirmation", "completed", "no_show"])
+      .order("start_time", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  if (ultima.error) throw new Error(ultima.error.message);
+  const ativas = recorrencias.filter((r) => r.ativo);
+  if (ativas.length === 0) return null;
+  const ultimoInicio = ultima.data ? new Date(ultima.data.start_time) : new Date();
+  const base = ultimoInicio.getTime() > Date.now() ? ultimoInicio : new Date();
+  const proximo = computeRecorrenciaSlots(ativas, 12, base).find((c) => new Date(c.start_time).getTime() > base.getTime());
+  return proximo ? { inicio: proximo.start_time, fim: proximo.end_time, recorrenciaId: proximo.recorrencia_id } : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1639,7 +1680,20 @@ export async function gerarPacoteRecorrencia(studentId: string, totalAulas: numb
 export async function getSaldoPacote(pacoteId: string): Promise<SaldoPacote | null> {
   const { data, error } = await client().from("saldo_pacotes").select("*").eq("pacote_id", pacoteId).maybeSingle();
   if (error) throw new Error(error.message);
-  return data ? mapSaldoPacote(data) : null;
+  if (!data) return null;
+  const saldo = mapSaldoPacote(data);
+  // Aulas restantes sem data: o saldo conta a aula cancelada pelo professor como "restante"
+  // (cancelamento pelo professor nunca consome), mas nada a marca de novo. Restantes menos o que já
+  // está marcado (agendada/pendente, inclusive a passada ainda sem registro, que o professor vai
+  // resolver) e menos o que já aparece como "aguardando reposição".
+  const { count, error: errMarcadas } = await client()
+    .from("bookings")
+    .select("id", { count: "exact", head: true })
+    .eq("pacote_id", pacoteId)
+    .in("status", ACTIVE_STATUSES);
+  if (errMarcadas) throw new Error(errMarcadas.message);
+  saldo.semData = Math.max(0, saldo.restantes - (count ?? 0) - saldo.aRepor);
+  return saldo;
 }
 
 /**

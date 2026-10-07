@@ -10,13 +10,14 @@ import {
   cancelarAula,
   completeBooking,
   getAdminSettings,
+  getProximaAulaDoPacote,
   getRegraDeConsumo,
   markAsReplacement,
   markNoShow,
   reagendarAula,
   undoLessonAction,
 } from "@/integrations/backend/api";
-import type { RegraDeConsumo } from "@/integrations/backend/api";
+import type { ReposicaoProposta, RegraDeConsumo } from "@/integrations/backend/api";
 import type { Booking } from "@/integrations/backend/types";
 import { formatDateTime } from "@/lib/dateUtils";
 import { mensagemDeErro } from "@/lib/erros";
@@ -44,6 +45,8 @@ const primeiroNome = (nome: string) => nome.split(" ")[0];
 /** Falta/cancelamento: a janela precisa da regra DESTA aula (null = não deu pra ler). */
 interface TargetComRegra extends Target {
   regra: RegraDeConsumo | null;
+  /** Aula de pacote de recorrência: a aula que entraria no lugar se o professor cancelar (null = não há horário fixo; undefined = não se aplica). */
+  reposicao?: ReposicaoProposta | null;
 }
 
 /** Texto da consequência da falta, dizendo de onde vem a regra. */
@@ -222,14 +225,23 @@ export function useLessonActions(onChanged: () => void) {
   });
 
   const cancelar = useMutation({
-    mutationFn: ({ bookingId, canceladoPor }: { bookingId: string; canceladoPor: "professor" | "aluno" }) =>
-      cancelarAula(bookingId, canceladoPor),
+    mutationFn: ({
+      bookingId,
+      canceladoPor,
+      repor,
+    }: {
+      bookingId: string;
+      canceladoPor: "professor" | "aluno";
+      repor?: ReposicaoProposta | null;
+    }) => cancelarAula(bookingId, canceladoPor, repor),
     onSuccess: (_r, vars) => {
       after();
       setCancelarTarget(null);
       toast.warning(
         vars.canceladoPor === "professor"
-          ? "Aula cancelada — o aluno não perde a aula."
+          ? vars.repor
+            ? "Aula cancelada e uma aula nova foi marcada no fim do pacote."
+            : "Aula cancelada — o aluno não perde a aula."
           : "Aula cancelada pelo aluno.",
       );
     },
@@ -314,8 +326,11 @@ export function useLessonActions(onChanged: () => void) {
           booking={cancelarTarget.booking}
           studentName={cancelarTarget.studentName}
           alunoCancelarConsome={cancelarTarget.regra ? cancelarTarget.regra.cancelamentoPeloAluno : null}
+          reposicao={cancelarTarget.reposicao}
           pending={cancelar.isPending}
-          onConfirm={(canceladoPor) => cancelar.mutate({ bookingId: cancelarTarget.booking.id, canceladoPor })}
+          onConfirm={(canceladoPor, repor) =>
+            cancelar.mutate({ bookingId: cancelarTarget.booking.id, canceladoPor, repor })
+          }
         />
       )}
     </>
@@ -334,7 +349,13 @@ export function useLessonActions(onChanged: () => void) {
     openReplacement: (booking: Booking, studentName: string) => setReplacementTarget({ booking, studentName }),
     openReagendar: (booking: Booking, studentName: string) => setReagendarTarget({ booking, studentName }),
     openCancelar: (booking: Booking, studentName: string) => {
-      void comRegra(booking, studentName).then(setCancelarTarget);
+      void comRegra(booking, studentName).then(async (alvo) => {
+        // Só aula de pacote de recorrência pode ser reposta; se a leitura falhar, cancela sem repor (a janela avisa).
+        const reposicao = booking.pacoteId
+          ? await getProximaAulaDoPacote(booking.studentId, booking.pacoteId).catch(() => null)
+          : undefined;
+        setCancelarTarget({ ...alvo, reposicao });
+      });
     },
     undo: (bookingId: string) => undo.mutate(bookingId),
     undoPending: undo.isPending,

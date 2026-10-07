@@ -439,6 +439,21 @@ const CARD_CASES: { title: string; note: string; props: Parameters<typeof Active
     note: "com aulas a repor",
     props: { pkg: pkg(12, 4, { origin: "recurrence" }), credits: 0, saldo: saldo(12, 4, 2) },
   },
+  {
+    title: "Admin · aula sem data",
+    note: "professor cancelou a última: sobra 1 sem data",
+    props: {
+      pkg: pkg(8, 7, { origin: "recurrence" }),
+      credits: 0,
+      saldo: { ...saldo(8, 7), semData: 1 },
+      marcarAulaTo: "/admin/alunos/amostra-student/recorrencia",
+    },
+  },
+  {
+    title: "Aluno · aula sem data",
+    note: "mesmo caso, na voz do aluno",
+    props: { pkg: pkg(8, 7, { origin: "recurrence" }), credits: 0, saldo: { ...saldo(8, 7), semData: 1 }, audience: "student" },
+  },
   { title: "Admin · pacote grande", note: "40 aulas — vira barra", props: { pkg: pkg(40, 12), credits: 25 } },
   { title: "Admin · experimental", note: "1 aula de cortesia", props: { pkg: pkg(1, 0, { origin: "trial" }), credits: 1 } },
   { title: "Aluno · 1 aula", note: "singular", props: { pkg: pkg(5, 4), credits: 1, audience: "student" } },

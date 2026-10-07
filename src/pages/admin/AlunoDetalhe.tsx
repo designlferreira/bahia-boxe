@@ -200,6 +200,7 @@ export default function AdminAlunoDetalhe() {
           pkg={pkg}
           credits={credits}
           saldo={saldo}
+          marcarAulaTo={`/admin/alunos/${studentId}/recorrencia`}
           actions={
             pkg ? (
               <>
